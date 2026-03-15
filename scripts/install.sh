@@ -16,6 +16,7 @@ echo "This script will help you set up Snapcast Manager on your Linux server."
 
 REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
 INSTALL_BASE_DIR="/opt/snapcast-manager"
+SERVICE_NAME="snapmanager"
 
 # Helper to automatically answer "yes" if piped/non-interactive
 prompt_yes_no() {
@@ -33,8 +34,25 @@ prompt_yes_no() {
 
 # 0. Check if we need to download the source
 if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
+    # Remote install flow
     echo -e "\n${YELLOW}Project files not found in current directory.${NC}"
     echo "It looks like you are running this script remotely."
+    
+    # Check if already installed
+    if [ -d "$INSTALL_BASE_DIR" ]; then
+        echo -e "${YELLOW}Snapcast Manager is already installed at $INSTALL_BASE_DIR.${NC}"
+        if prompt_yes_no "Do you want to RE-INSTALL and OVERWRITE the existing installation?" "y"; then
+            echo "Stopping existing service..."
+            sudo systemctl stop $SERVICE_NAME 2>/dev/null || true
+            sudo systemctl disable $SERVICE_NAME 2>/dev/null || true
+            echo "Removing existing files..."
+            sudo rm -rf "$INSTALL_BASE_DIR"
+        else
+            echo "Installation aborted."
+            exit 0
+        fi
+    fi
+
     if prompt_yes_no "Do you want to download and install to $INSTALL_BASE_DIR?" "y"; then
         echo "Updating package list and ensuring wget and unzip are installed..."
         sudo apt-get update >/dev/null 2>&1
@@ -135,7 +153,7 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     USER_NAME=$(whoami)
     INSTALL_DIR=$(pwd)
     
-    cat <<EOF | sudo tee /etc/systemd/system/snapmanager.service
+    cat <<EOF | sudo tee /etc/systemd/system/${SERVICE_NAME}.service
 [Unit]
 Description=Snapcast Manager Service
 After=network.target snapserver.service
@@ -152,8 +170,8 @@ WantedBy=multi-user.target
 EOF
 
     sudo systemctl daemon-reload
-    sudo systemctl enable snapmanager
-    sudo systemctl start snapmanager
+    sudo systemctl enable $SERVICE_NAME
+    sudo systemctl restart $SERVICE_NAME
     echo -e "${GREEN}[OK] Service installed and started.${NC}"
 fi
 
