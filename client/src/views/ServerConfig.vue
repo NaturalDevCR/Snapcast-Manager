@@ -44,21 +44,19 @@ const configMetadata = ref<Record<string, any>>({});
 const configSections = ref<Record<string, any>>({});
 const sourceTemplates = ref<any[]>([]);
 
+// Tracks which properties are "enabled" (will be saved)
+const enabledProperties = ref<Record<string, Record<string, boolean>>>({});
+
 // Dialog State
 const showConfirmRestart = ref(false);
 const showConfirmRestore = ref(false);
 const showConfirmDeleteSnapshot = ref(false);
 const showConfirmReset = ref(false);
-const showConfirmDeleteSection = ref(false);
-const showConfirmDeleteProperty = ref(false);
-const showPromptAddSection = ref(false);
 const showPromptAddProperty = ref(false);
 const showAddSourceDialog = ref(false);
 
 const pendingRestoreId = ref<number | null>(null);
 const pendingDeleteSnapshotId = ref<number | null>(null);
-const pendingDeleteSection = ref('');
-const pendingDeleteProperty = ref({ section: '', key: '' });
 const activePromptSection = ref('');
 
 // Source creation state
@@ -77,7 +75,6 @@ const sectionIcons: Record<string, any> = {
   logging: DocumentTextIcon,
 };
 
-// Ordered section keys for tab display
 const sectionOrder = ['server', 'ssl', 'http', 'tcp-control', 'tcp-streaming', 'stream', 'streaming_client', 'logging'];
 
 const orderedSections = computed(() => {
@@ -88,13 +85,82 @@ const currentSectionMeta = computed(() => {
   return configSections.value[activeSection.value] || { label: activeSection.value, description: '' };
 });
 
-const currentSectionProperties = computed(() => {
-  return localParsedConfig.value[activeSection.value] || {};
-});
-
 const selectedTemplate = computed(() => {
   return sourceTemplates.value.find((t: any) => t.type === selectedSourceType.value);
 });
+
+// Returns all property keys for the active section: metadata keys + any extra keys from the config
+const allPropertyKeys = computed(() => {
+  const section = activeSection.value;
+  const metaKeys = Object.keys(configMetadata.value[section] || {});
+  const configKeys = Object.keys(localParsedConfig.value[section] || {});
+  const combined = new Set([...metaKeys, ...configKeys]);
+  return Array.from(combined);
+});
+
+// Initialize enabledProperties tracking based on what's actually in the parsed config
+const initializeEnabledState = () => {
+  const enabled: Record<string, Record<string, boolean>> = {};
+  
+  for (const section of sectionOrder) {
+    enabled[section] = {};
+    const metaKeys = Object.keys(configMetadata.value[section] || {});
+    const configKeys = Object.keys(localParsedConfig.value[section] || {});
+    
+    for (const key of metaKeys) {
+      // A property is enabled if it exists in the parsed config
+      enabled[section][key] = configKeys.includes(key);
+    }
+    // Any config key not in metadata is also enabled (custom properties)
+    for (const key of configKeys) {
+      if (!metaKeys.includes(key)) {
+        enabled[section][key] = true;
+      }
+    }
+  }
+  
+  enabledProperties.value = enabled;
+};
+
+const isPropertyEnabled = (section: string, key: string) => {
+  return enabledProperties.value[section]?.[key] ?? false;
+};
+
+const toggleProperty = (section: string, key: string) => {
+  const meta = configMetadata.value[section]?.[key];
+  const currentlyEnabled = isPropertyEnabled(section, key);
+  
+  if (!enabledProperties.value[section]) {
+    enabledProperties.value[section] = {};
+  }
+  
+  if (currentlyEnabled) {
+    // Disable: remove from localParsedConfig
+    enabledProperties.value[section][key] = false;
+    if (localParsedConfig.value[section]) {
+      delete localParsedConfig.value[section][key];
+    }
+  } else {
+    // Enable: add to localParsedConfig with default value
+    enabledProperties.value[section][key] = true;
+    if (!localParsedConfig.value[section]) {
+      localParsedConfig.value[section] = {};
+    }
+    const defaultVal = meta?.default ?? '';
+    localParsedConfig.value[section][key] = String(defaultVal);
+  }
+};
+
+const getPropertyValue = (section: string, key: string) => {
+  return localParsedConfig.value[section]?.[key] ?? '';
+};
+
+const setPropertyValue = (section: string, key: string, value: any) => {
+  if (!localParsedConfig.value[section]) {
+    localParsedConfig.value[section] = {};
+  }
+  localParsedConfig.value[section][key] = value;
+};
 
 const fetchBoth = async () => {
   await configStore.fetchServerConfig();
@@ -115,7 +181,9 @@ const fetchBoth = async () => {
 
   localRawConfig.value = configStore.serverConfig;
   localParsedConfig.value = JSON.parse(JSON.stringify(configStore.serverConfigParsed));
-}
+  
+  initializeEnabledState();
+};
 
 onMounted(async () => {
     await fetchBoth();
@@ -149,7 +217,7 @@ const handleRestartConfirm = async () => {
   } catch (e: any) {
     uiStore.showToast('Failed to restart: ' + e.message, 'error');
   }
-}
+};
 
 const snapshotName = ref('');
 const snapshotDescription = ref('');
@@ -211,43 +279,9 @@ const handleAddProperty = (key: string) => {
         return;
     }
     localParsedConfig.value[section][key] = '';
+    if (!enabledProperties.value[section]) enabledProperties.value[section] = {};
+    enabledProperties.value[section][key] = true;
     uiStore.showToast(`Property "${key}" added to [${section}]`, 'success');
-};
-
-const handleAddSection = (section: string) => {
-    if (!section) return;
-    if (localParsedConfig.value[section]) {
-        uiStore.showToast('Section already exists', 'warning');
-        return;
-    }
-    localParsedConfig.value[section] = {};
-    uiStore.showToast(`Section [${section}] created`, 'success');
-};
-
-const triggerRemoveProperty = (section: string, key: string) => {
-    pendingDeleteProperty.value = { section, key };
-    showConfirmDeleteProperty.value = true;
-};
-
-const handleRemoveProperty = () => {
-    const { section, key } = pendingDeleteProperty.value;
-    if (section && key) {
-        delete localParsedConfig.value[section][key];
-        uiStore.showToast(`Removed "${key}"`, 'info');
-    }
-};
-
-const triggerRemoveSection = (section: string) => {
-    pendingDeleteSection.value = section;
-    showConfirmDeleteSection.value = true;
-};
-
-const handleRemoveSection = () => {
-    const section = pendingDeleteSection.value;
-    if (section) {
-        delete localParsedConfig.value[section];
-        uiStore.showToast(`Section [${section}] removed`, 'info');
-    }
 };
 
 const handleResetToDefault = async () => {
@@ -328,12 +362,26 @@ const addSourceFromTemplate = () => {
     localParsedConfig.value.stream.source = uri;
   }
   
+  // Ensure source is marked as enabled
+  if (!enabledProperties.value.stream) enabledProperties.value.stream = {};
+  enabledProperties.value.stream.source = true;
+  
   showAddSourceDialog.value = false;
   uiStore.showToast('Source added! Save to apply.', 'success');
 };
 
 const getMetaForKey = (section: string, key: string) => {
   return configMetadata.value[section]?.[key];
+};
+
+const removeSourceEntry = (idx: number) => {
+  const sources = localParsedConfig.value.stream?.source;
+  if (Array.isArray(sources)) {
+    sources.splice(idx, 1);
+    if (sources.length === 1) {
+      localParsedConfig.value.stream.source = sources[0];
+    }
+  }
 };
 </script>
 
@@ -417,73 +465,117 @@ const getMetaForKey = (section: string, key: string) => {
                             <PlusIcon class="h-3 w-3 mr-1" />
                             Add Source
                           </button>
-                          <button @click="triggerAddProperty(activeSection)" class="inline-flex items-center px-2 py-1 text-[10px] font-black text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors uppercase tracking-widest">
+                          <button @click="triggerAddProperty(activeSection)" class="inline-flex items-center px-2 py-1 text-[10px] font-black text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors uppercase tracking-widest" title="Add custom property">
                             <PlusIcon class="h-3 w-3 mr-1" />
-                            Add Property
-                          </button>
-                          <button @click="triggerRemoveSection(activeSection)" class="inline-flex items-center p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors" title="Delete Section">
-                            <TrashIcon class="h-4 w-4" />
+                            Custom
                           </button>
                       </div>
                   </div>
               </template>
               
-              <div class="space-y-5">
-                  <div v-if="Object.keys(currentSectionProperties).length === 0" class="text-center py-12 border-2 border-dashed border-slate-100 dark:border-slate-800/50 rounded-xl">
-                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">No properties defined in this section</p>
-                      <p class="text-[10px] text-slate-400 mt-2">Add properties or switch to Expert mode to edit raw config</p>
+              <div class="space-y-1">
+                  <div v-if="allPropertyKeys.length === 0" class="text-center py-12 border-2 border-dashed border-slate-100 dark:border-slate-800/50 rounded-xl">
+                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">No properties available for this section</p>
                   </div>
                   
-                  <div v-for="(value, key) in currentSectionProperties" :key="key" 
-                    class="grid grid-cols-1 md:grid-cols-4 gap-4 items-start group py-3 px-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all -mx-4">
+                  <div v-for="key in allPropertyKeys" :key="key" 
+                    :class="[
+                      'grid grid-cols-1 md:grid-cols-12 gap-3 items-start py-3 px-4 rounded-xl transition-all -mx-4',
+                      isPropertyEnabled(activeSection, key)
+                        ? 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
+                        : 'opacity-40 hover:opacity-60'
+                    ]">
                       
-                      <!-- Label Column -->
-                      <div class="md:col-span-1">
-                          <div class="flex items-start justify-between">
-                              <div class="flex flex-col min-w-0">
-                                <label class="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-wide">
-                                  {{ getMetaForKey(activeSection, String(key))?.label || String(key) }}
-                                </label>
-                                <span v-if="getMetaForKey(activeSection, String(key))?.description" 
-                                  class="text-[10px] text-slate-400 dark:text-slate-500 leading-snug mt-1">
-                                  {{ getMetaForKey(activeSection, String(key))?.description }}
-                                </span>
-                                <span v-if="getMetaForKey(activeSection, String(key))?.default !== undefined" 
-                                  class="text-[9px] text-indigo-400 dark:text-indigo-500 mt-1 font-mono">
-                                  default: {{ getMetaForKey(activeSection, String(key))?.default }}
-                                </span>
-                              </div>
-                              <button @click="triggerRemoveProperty(activeSection, String(key))" class="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all rounded-md hover:bg-red-50 dark:hover:bg-red-500/10 flex-shrink-0 ml-2">
-                                   <TrashIcon class="h-3.5 w-3.5" />
-                              </button>
+                      <!-- Enable/Disable Toggle (col 1) -->
+                      <div class="md:col-span-1 flex items-center pt-1" v-if="key !== 'source'">
+                        <button 
+                          @click="toggleProperty(activeSection, key)"
+                          :class="[
+                            'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
+                            isPropertyEnabled(activeSection, key) ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                          ]"
+                          :title="isPropertyEnabled(activeSection, key) ? 'Disable this property' : 'Enable this property'"
+                        >
+                          <span :class="[isPropertyEnabled(activeSection, key) ? 'translate-x-4' : 'translate-x-0', 'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
+                        </button>
+                      </div>
+                      <div class="md:col-span-1" v-else>
+                        <!-- Source is always enabled, just a spacer -->
+                      </div>
+
+                      <!-- Label Column (col 2-4) -->
+                      <div class="md:col-span-3">
+                          <div class="flex flex-col min-w-0">
+                            <label class="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                              {{ getMetaForKey(activeSection, key)?.label || key }}
+                            </label>
+                            <span v-if="getMetaForKey(activeSection, key)?.description" 
+                              class="text-[10px] text-slate-400 dark:text-slate-500 leading-snug mt-0.5">
+                              {{ getMetaForKey(activeSection, key)?.description }}
+                            </span>
+                            <span v-if="getMetaForKey(activeSection, key)?.default !== undefined" 
+                              class="text-[9px] text-indigo-400/70 dark:text-indigo-500/70 mt-0.5 font-mono">
+                              default: {{ getMetaForKey(activeSection, key)?.default }}
+                            </span>
                           </div>
                       </div>
                       
-                      <!-- Input Column -->
-                      <div class="md:col-span-3">
+                      <!-- Input Column (col 5-12) -->
+                      <div class="md:col-span-8">
+                          <!-- SOURCE: Special array handling -->
+                          <div v-if="key === 'source'" class="space-y-2">
+                              <div v-if="!localParsedConfig[activeSection]?.source" class="text-xs text-slate-400 italic py-2">
+                                No sources configured. Use "Add Source" above.
+                              </div>
+                              <div v-for="(_item, idx) in (Array.isArray(localParsedConfig[activeSection]?.source) ? localParsedConfig[activeSection].source : (localParsedConfig[activeSection]?.source ? [localParsedConfig[activeSection].source] : []))" :key="idx" class="flex space-x-2">
+                                  <input 
+                                    v-if="Array.isArray(localParsedConfig[activeSection]?.source)"
+                                    v-model="localParsedConfig[activeSection].source[idx]"
+                                    class="flex-1 text-[12px] font-mono font-medium px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                                  />
+                                  <input 
+                                    v-else
+                                    :value="localParsedConfig[activeSection]?.source"
+                                    @input="setPropertyValue(activeSection, 'source', ($event.target as HTMLInputElement).value)"
+                                    class="flex-1 text-[12px] font-mono font-medium px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                                  />
+                                  <button v-if="Array.isArray(localParsedConfig[activeSection]?.source)" @click="removeSourceEntry(idx as number)" class="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
+                                    <TrashIcon class="h-4 w-4" />
+                                  </button>
+                              </div>
+                          </div>
+                          
+                          <!-- DISABLED property: show default as read-only -->
+                          <div v-else-if="!isPropertyEnabled(activeSection, key)" class="py-1">
+                            <span class="text-xs text-slate-400 font-mono">
+                              {{ getMetaForKey(activeSection, key)?.default ?? '(empty)' }}
+                            </span>
+                          </div>
+
                           <!-- Boolean Toggle -->
-                          <div v-if="getMetaForKey(activeSection, String(key))?.type === 'boolean'" class="flex items-center py-1">
+                          <div v-else-if="getMetaForKey(activeSection, key)?.type === 'boolean'" class="flex items-center py-1">
                             <button 
-                              @click="localParsedConfig[activeSection][key] = String(localParsedConfig[activeSection][key]) === 'true' ? 'false' : 'true'"
+                              @click="setPropertyValue(activeSection, key, String(getPropertyValue(activeSection, key)) === 'true' ? 'false' : 'true')"
                               :class="[
                                 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 dark:focus:ring-offset-slate-900',
-                                String(localParsedConfig[activeSection][key]) === 'true' ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                                String(getPropertyValue(activeSection, key)) === 'true' ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
                               ]"
                             >
-                              <span :class="[String(localParsedConfig[activeSection][key]) === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
+                              <span :class="[String(getPropertyValue(activeSection, key)) === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                             </button>
                             <span class="ml-3 text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">
-                              {{ String(localParsedConfig[activeSection][key]) === 'true' ? 'Enabled' : 'Disabled' }}
+                              {{ String(getPropertyValue(activeSection, key)) === 'true' ? 'Enabled' : 'Disabled' }}
                             </span>
                           </div>
                           
                           <!-- Select Dropdown -->
-                          <div v-else-if="getMetaForKey(activeSection, String(key))?.type === 'select'" class="relative">
+                          <div v-else-if="getMetaForKey(activeSection, key)?.type === 'select'" class="relative">
                             <select
-                              v-model="localParsedConfig[activeSection][String(key)]"
+                              :value="getPropertyValue(activeSection, key)"
+                              @change="setPropertyValue(activeSection, key, ($event.target as HTMLSelectElement).value)"
                               class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white appearance-none pr-10"
                             >
-                              <option v-for="opt in getMetaForKey(activeSection, String(key))?.options" :key="opt" :value="opt">
+                              <option v-for="opt in getMetaForKey(activeSection, key)?.options" :key="opt" :value="opt">
                                 {{ opt || '(auto)' }}
                               </option>
                             </select>
@@ -492,40 +584,20 @@ const getMetaForKey = (section: string, key: string) => {
 
                           <!-- Number Input -->
                           <input 
-                            v-else-if="getMetaForKey(activeSection, String(key))?.type === 'number'"
+                            v-else-if="getMetaForKey(activeSection, key)?.type === 'number'"
                             type="number"
-                            v-model.number="localParsedConfig[activeSection][String(key)]"
-                            :placeholder="String(getMetaForKey(activeSection, String(key))?.default ?? '')"
+                            :value="getPropertyValue(activeSection, key)"
+                            @input="setPropertyValue(activeSection, key, ($event.target as HTMLInputElement).value)"
+                            :placeholder="String(getMetaForKey(activeSection, key)?.default ?? '')"
                             class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
                           />
-                          
-                          <!-- List (array entries, e.g. sources) -->
-                          <div v-else-if="Array.isArray(value) || getMetaForKey(activeSection, String(key))?.type === 'list'" class="space-y-2">
-                              <div v-for="(_item, idx) in (Array.isArray(value) ? value : [value])" :key="idx" class="flex space-x-2">
-                                  <input 
-                                    v-model="(Array.isArray(value) ? localParsedConfig[activeSection][String(key)] : localParsedConfig[activeSection])[idx === undefined ? String(key) : idx]"
-                                    :placeholder="getMetaForKey(activeSection, String(key))?.default ?? ''"
-                                    class="flex-1 text-sm font-medium px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white font-mono text-[12px]"
-                                  />
-                                  <button v-if="Array.isArray(value)" @click="localParsedConfig[activeSection][String(key)].splice(idx, 1)" class="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
-                                    <TrashIcon class="h-4 w-4" />
-                                  </button>
-                              </div>
-                              <button v-if="Array.isArray(value)" @click="localParsedConfig[activeSection][String(key)].push('')" class="inline-flex items-center text-[10px] font-black text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 uppercase tracking-widest mt-1">
-                                <PlusIcon class="h-3 w-3 mr-1" />
-                                Add Entry
-                              </button>
-                              <button v-else @click="localParsedConfig[activeSection][String(key)] = [value, '']" class="inline-flex items-center text-[10px] font-black text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 uppercase tracking-widest mt-1">
-                                <PlusIcon class="h-3 w-3 mr-1" />
-                                Convert to List
-                              </button>
-                          </div>
                           
                           <!-- Default Text Input -->
                           <input 
                             v-else
-                            v-model="localParsedConfig[activeSection][String(key)]"
-                            :placeholder="String(getMetaForKey(activeSection, String(key))?.default ?? '')"
+                            :value="getPropertyValue(activeSection, key)"
+                            @input="setPropertyValue(activeSection, key, ($event.target as HTMLInputElement).value)"
+                            :placeholder="String(getMetaForKey(activeSection, key)?.default ?? '')"
                             class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
                           />
                       </div>
@@ -534,21 +606,14 @@ const getMetaForKey = (section: string, key: string) => {
           </Card>
 
           <!-- Bottom Actions -->
-          <div class="mt-8 mb-24 flex flex-col space-y-4">
-              <button @click="showPromptAddSection = true" class="w-full py-6 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 dark:text-slate-500 hover:border-indigo-500/50 hover:text-indigo-500 hover:bg-indigo-50/30 dark:hover:bg-indigo-500/5 transition-all flex flex-col justify-center items-center group">
-                  <div class="p-2 bg-slate-100 dark:bg-slate-800 rounded-full group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/20 transition-colors mb-1">
-                    <PlusIcon class="h-5 w-5" />
-                  </div>
-                  <span class="text-[10px] font-black uppercase tracking-widest">Add New Section</span>
-              </button>
-              
-              <button @click="showConfirmReset = true" class="w-full py-3 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 hover:text-amber-500 hover:bg-amber-500/5 transition-all flex justify-center items-center space-x-2">
+          <div class="mt-8 mb-24 flex justify-center">
+              <button @click="showConfirmReset = true" class="py-3 px-6 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 hover:text-amber-500 hover:bg-amber-500/5 transition-all flex items-center space-x-2">
                   <ArrowPathRoundedSquareIcon class="h-4 w-4" />
                   <span class="text-[10px] font-black uppercase tracking-widest">Reset Configuration to Default</span>
               </button>
           </div>
 
-           <div class="mt-6 flex justify-end fixed bottom-8 right-8 z-30">
+          <div class="mt-6 flex justify-end fixed bottom-8 right-8 z-30">
               <button 
                   @click="saveParsed" 
                   :disabled="configStore.loading"
@@ -806,8 +871,7 @@ const getMetaForKey = (section: string, key: string) => {
                     </button>
                     <button 
                       @click="addSourceFromTemplate"
-                      :disabled="!sourceFormParams['name']"
-                      class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all"
+                      class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 active:scale-95 transition-all"
                     >
                       Add Source
                     </button>
@@ -855,36 +919,10 @@ const getMetaForKey = (section: string, key: string) => {
         @confirm="handleResetToDefault"
       />
 
-      <ConfirmDialog
-        v-model="showConfirmDeleteSection"
-        title="Delete Section?"
-        :message="`Are you sure you want to delete the entire [${pendingDeleteSection}] section?`"
-        type="danger"
-        confirmText="Delete Section"
-        @confirm="handleRemoveSection"
-      />
-
-      <ConfirmDialog
-        v-model="showConfirmDeleteProperty"
-        title="Delete Property?"
-        :message="`Remove ${pendingDeleteProperty.key} from [${pendingDeleteProperty.section}]?`"
-        type="danger"
-        confirmText="Delete Property"
-        @confirm="handleRemoveProperty"
-      />
-
-      <PromptDialog
-        v-model="showPromptAddSection"
-        title="Add Section"
-        message="Enter the name for the new configuration section."
-        placeholder="e.g. custom_settings"
-        @confirm="handleAddSection"
-      />
-
       <PromptDialog
         v-model="showPromptAddProperty"
-        title="Add Property"
-        :message="`Enter property name for [${activePromptSection}]:`"
+        title="Add Custom Property"
+        :message="`Enter a custom property name for [${activePromptSection}]:`"
         placeholder="e.g. custom_key"
         @confirm="handleAddProperty"
       />
