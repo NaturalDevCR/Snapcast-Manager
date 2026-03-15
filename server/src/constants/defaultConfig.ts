@@ -250,42 +250,221 @@ source = pipe:///tmp/snapfifo?name=default
 
 export const CONFIG_METADATA: Record<string, any> = {
   server: {
-    threads: { label: "Worker Threads", type: "number", description: "Number of additional worker threads to use. -1 for auto." },
-    user: { label: "User", type: "text", description: "The user to run as when daemonized." },
-    group: { label: "Group", type: "text", description: "The group to run as when daemonized." },
-    datadir: { label: "Data Directory", type: "text", description: "Directory where persistent data is stored." },
-    mdns_enabled: { label: "mDNS Enabled", type: "boolean", description: "Enable mDNS to publish services." },
+    threads: { label: "Worker Threads", type: "number", default: -1, description: "Additional worker threads. -1 = auto (2 on dual-core, 4 on quad+). 0 = main thread only." },
+    pidfile: { label: "PID File", type: "text", default: "/var/run/snapserver/pid", description: "Path to the PID file when running as daemon." },
+    user: { label: "User", type: "text", default: "snapserver", description: "The system user to run as when daemonized." },
+    group: { label: "Group", type: "text", default: "snapserver", description: "The system group to run as when daemonized." },
+    datadir: { label: "Data Directory", type: "text", description: "Directory for persistent data (server.json). Empty = /var/lib/snapserver/ (daemon) or ~/.config/snapserver/ (non-daemon)." },
+    mdns_enabled: { label: "mDNS", type: "boolean", default: "true", description: "Publish services via mDNS for auto-discovery." },
   },
   ssl: {
-    certificate: { label: "Certificate File", type: "text", description: "Certificate file in PEM format." },
-    certificate_key: { label: "Private Key", type: "text", description: "Private key file in PEM format." },
-    verify_clients: { label: "Verify Clients", type: "boolean", description: "Verify client certificates." },
+    certificate: { label: "Certificate", type: "text", description: "Certificate file path in PEM format. Relative paths search /etc/snapserver/certs." },
+    certificate_key: { label: "Private Key", type: "text", description: "Private key file path in PEM format." },
+    key_password: { label: "Key Password", type: "text", description: "Password to decrypt the private key (only for encrypted key files)." },
+    verify_clients: { label: "Verify Clients", type: "boolean", default: "false", description: "Require client certificate verification for mutual TLS." },
+    client_cert: { label: "Client CA Certs", type: "list", description: "List of client CA certificate files for client verification." },
   },
   http: {
-    enabled: { label: "HTTP Enabled", type: "boolean", description: "Enable HTTP Control and streaming." },
-    bind_to_address: { label: "Bind Address", type: "text", description: "Address to listen on (e.g., 0.0.0.0 or ::)." },
-    port: { label: "Port", type: "number", description: "HTTP port (default 1780)." },
-    doc_root: { label: "Document Root", type: "text", description: "Location to serve the website from." },
-    ssl_enabled: { label: "SSL Enabled", type: "boolean", description: "Enable HTTPS Json RPC." },
-    ssl_port: { label: "SSL Port", type: "number", description: "HTTPS port (default 1788)." },
+    enabled: { label: "HTTP Enabled", type: "boolean", default: "true", description: "Enable HTTP control, JSON-RPC (POST), and WebSocket streaming." },
+    bind_to_address: { label: "Bind Address", type: "text", default: "::", description: "Listen address. Use 0.0.0.0 (IPv4), :: (IPv6), or 127.0.0.1 (localhost only)." },
+    port: { label: "Port", type: "number", default: 1780, description: "HTTP listening port." },
+    publish_http: { label: "Publish HTTP (mDNS)", type: "boolean", default: "true", description: "Advertise HTTP service via mDNS as _snapcast-http._tcp." },
+    ssl_enabled: { label: "SSL Enabled", type: "boolean", default: "false", description: "Enable HTTPS/WSS for encrypted JSON-RPC and streaming." },
+    ssl_bind_to_address: { label: "SSL Bind Address", type: "text", default: "::", description: "Listen address for HTTPS connections." },
+    ssl_port: { label: "SSL Port", type: "number", default: 1788, description: "HTTPS listening port." },
+    publish_https: { label: "Publish HTTPS (mDNS)", type: "boolean", default: "true", description: "Advertise HTTPS service via mDNS as _snapcast-https._tcp." },
+    doc_root: { label: "Document Root", type: "text", default: "/usr/share/snapserver/snapweb", description: "Directory to serve a web UI from. Leave empty to disable." },
+    host: { label: "Hostname", type: "text", description: "Hostname/IP for clients to reach this server (used for cover art URLs). Use <hostname> as placeholder." },
+    url_prefix: { label: "URL Prefix", type: "text", description: "Custom URL prefix for generated URLs (e.g. behind a reverse proxy). Example: https://<hostname>" },
   },
   "tcp-control": {
-    enabled: { label: "TCP Control Enabled", type: "boolean", description: "Enable TCP Json RPC." },
-    port: { label: "Control Port", type: "number", description: "Control server port (default 1705)." },
+    enabled: { label: "Enabled", type: "boolean", default: "true", description: "Enable TCP JSON-RPC control interface." },
+    bind_to_address: { label: "Bind Address", type: "text", default: "::", description: "Listen address for TCP control connections." },
+    port: { label: "Port", type: "number", default: 1705, description: "TCP control interface port." },
+    publish: { label: "mDNS Publish", type: "boolean", default: "true", description: "Advertise TCP control via mDNS as _snapcast-ctrl._tcp." },
   },
   "tcp-streaming": {
-    enabled: { label: "TCP Streaming Enabled", type: "boolean", description: "Enable TCP streaming." },
-    port: { label: "Streaming Port", type: "number", description: "Streaming server port (default 1704)." },
+    enabled: { label: "Enabled", type: "boolean", default: "true", description: "Enable TCP audio streaming." },
+    bind_to_address: { label: "Bind Address", type: "text", default: "::", description: "Listen address for TCP streaming connections." },
+    port: { label: "Port", type: "number", default: 1704, description: "TCP streaming port." },
+    publish: { label: "mDNS Publish", type: "boolean", default: "true", description: "Advertise TCP streaming via mDNS as _snapcast._tcp." },
   },
   stream: {
-    source: { label: "Audio Sources", type: "list", description: "Input streams. Format: pipe:///tmp/snapfifo?name=default" },
-    sampleformat: { label: "Sample Format", type: "text", description: "Rate:Bits:Channels (e.g., 48000:16:2)." },
-    codec: { label: "Codec", type: "text", description: "Transport codec (flac, ogg, opus, pcm)." },
-    chunk_ms: { label: "Chunk size (ms)", type: "number", description: "Read chunk size in milliseconds." },
-    buffer: { label: "Buffer (ms)", type: "number", description: "End-to-end latency in milliseconds." },
+    source: { label: "Audio Sources", type: "list", description: "Input stream URIs. Use the Add Source button for guided setup." },
+    default_source: { label: "Default Source", type: "text", description: "Default source name for new clients. If empty, first non-meta source is used." },
+    sampleformat: { label: "Sample Format", type: "text", default: "48000:16:2", description: "Default format: <sample rate>:<bits per sample>:<channels>." },
+    codec: { label: "Codec", type: "select", default: "flac", options: ["flac", "ogg", "opus", "pcm"], description: "Transport codec. flac=lossless (~26ms), ogg=lossy, opus=low-latency (48kHz only), pcm=uncompressed." },
+    chunk_ms: { label: "Chunk Size (ms)", type: "number", default: 20, description: "How many milliseconds to read from source per cycle before encoding." },
+    buffer: { label: "Buffer (ms)", type: "number", default: 1000, description: "End-to-end latency from server capture to client playback." },
+    send_to_muted: { label: "Send to Muted", type: "boolean", default: "false", description: "Still send audio data to muted clients (uses more bandwidth)." },
+    plugin_dir: { label: "Plugin Directory", type: "text", default: "/usr/share/snapserver/plug-ins", description: "Directory for control scripts referenced by 'controlscript' parameter." },
+    sandbox_dir: { label: "Sandbox Directory", type: "text", default: "/usr/share/snapserver/sandbox", description: "Directory for executables started by 'process' and 'librespot' sources." },
+  },
+  streaming_client: {
+    initial_volume: { label: "Initial Volume", type: "number", default: 100, description: "Volume (0-100%) assigned to brand-new clients on first connect." },
   },
   logging: {
-    sink: { label: "Log Sink", type: "text", description: "where to log (stdout, stderr, system, file)." },
-    filter: { label: "Log Filter", type: "text", description: "Filter tag:level (e.g., *:info)." },
+    sink: { label: "Log Sink", type: "select", default: "", options: ["", "null", "system", "stdout", "stderr"], description: "Log output destination. Empty = 'system' (daemon) or 'stdout' (non-daemon). Use file:<path> for file logging." },
+    filter: { label: "Log Filter", type: "text", default: "*:info", description: "Filter format: <tag>:<level>[,...]. Tags: * or specific. Levels: trace, debug, info, notice, warning, error, fatal." },
   }
 };
+
+// Section display configuration
+export const CONFIG_SECTIONS: Record<string, { label: string; icon: string; description: string }> = {
+  server:           { label: "Server",           icon: "server",    description: "General server settings like threads, user, and mDNS" },
+  ssl:              { label: "SSL / TLS",        icon: "lock",      description: "Certificate and encryption settings for secure connections" },
+  http:             { label: "HTTP / WebSocket",  icon: "globe",     description: "HTTP/HTTPS and WebSocket control and streaming" },
+  "tcp-control":    { label: "TCP Control",      icon: "terminal",  description: "TCP JSON-RPC control interface" },
+  "tcp-streaming":  { label: "TCP Streaming",    icon: "signal",    description: "TCP raw audio streaming" },
+  stream:           { label: "Stream",           icon: "music",     description: "Audio sources, codecs, and buffer settings" },
+  streaming_client: { label: "Clients",          icon: "users",     description: "Default settings for streaming clients" },
+  logging:          { label: "Logging",          icon: "file-text",  description: "Log output and filtering" },
+};
+
+// Source type templates for guided source creation
+export interface SourceParam {
+  key: string;
+  label: string;
+  description: string;
+  required: boolean;
+  type: 'text' | 'number' | 'boolean' | 'select';
+  default?: string;
+  options?: string[];
+  placeholder?: string;
+}
+
+export interface SourceTemplate {
+  type: string;
+  label: string;
+  description: string;
+  uriPrefix: string;
+  pathPlaceholder: string;
+  fixedSampleFormat?: string;
+  params: SourceParam[];
+}
+
+export const SOURCE_TEMPLATES: SourceTemplate[] = [
+  {
+    type: "pipe",
+    label: "Pipe (FIFO)",
+    description: "Read audio from a named pipe. Use with MPD, Mopidy, FFmpeg, mpv, PulseAudio, Plexamp, etc.",
+    uriPrefix: "pipe://",
+    pathPlaceholder: "/tmp/snapfifo",
+    params: [
+      { key: "name", label: "Name", description: "Unique stream name", required: true, type: "text", placeholder: "default" },
+      { key: "mode", label: "Mode", description: "Pipe creation mode", required: false, type: "select", default: "create", options: ["create", "read"] },
+    ],
+  },
+  {
+    type: "librespot",
+    label: "Spotify (librespot)",
+    description: "Launch librespot for Spotify Connect. Requires librespot binary. Fixed at 44100:16:2.",
+    uriPrefix: "librespot://",
+    pathPlaceholder: "/usr/bin/librespot",
+    fixedSampleFormat: "44100:16:2",
+    params: [
+      { key: "name", label: "Name", description: "Unique stream name", required: true, type: "text", placeholder: "Spotify" },
+      { key: "username", label: "Username", description: "Spotify username (optional for zeroconf)", required: false, type: "text" },
+      { key: "password", label: "Password", description: "Spotify password", required: false, type: "text" },
+      { key: "devicename", label: "Device Name", description: "Name shown in Spotify Connect", required: false, type: "text", default: "Snapcast" },
+      { key: "bitrate", label: "Bitrate", description: "Audio quality", required: false, type: "select", default: "320", options: ["96", "160", "320"] },
+      { key: "volume", label: "Initial Volume", description: "Volume 0-100 on connect", required: false, type: "number", default: "100" },
+      { key: "normalize", label: "Normalize Volume", description: "Enable volume normalization", required: false, type: "boolean", default: "false" },
+      { key: "autoplay", label: "Autoplay", description: "Auto-play similar songs when queue ends", required: false, type: "boolean", default: "false" },
+      { key: "cache", label: "Cache Dir", description: "Directory for cached audio files", required: false, type: "text" },
+      { key: "disable_audio_cache", label: "Disable Audio Cache", description: "Don't cache downloaded audio to disk", required: false, type: "boolean", default: "false" },
+      { key: "killall", label: "Kill Others", description: "Kill all running librespot instances before launch", required: false, type: "boolean", default: "false" },
+      { key: "wd_timeout", label: "Watchdog Timeout", description: "Restart if no log output for this many seconds (0=disabled)", required: false, type: "number", default: "7800" },
+      { key: "params", label: "Extra Params", description: "Additional CLI flags (URL-encoded, use %20 for spaces)", required: false, type: "text" },
+    ],
+  },
+  {
+    type: "airplay",
+    label: "AirPlay (shairport-sync)",
+    description: "Launch shairport-sync for Apple AirPlay. Requires shairport-sync binary. Fixed at 44100:16:2.",
+    uriPrefix: "airplay://",
+    pathPlaceholder: "/usr/bin/shairport-sync",
+    fixedSampleFormat: "44100:16:2",
+    params: [
+      { key: "name", label: "Name", description: "Unique stream name", required: true, type: "text", placeholder: "Airplay" },
+      { key: "devicename", label: "Device Name", description: "Advertised AirPlay name", required: false, type: "text", default: "Snapcast" },
+      { key: "port", label: "Port", description: "RTSP listening port (5000=AirPlay 1, 7000=AirPlay 2)", required: false, type: "select", default: "5000", options: ["5000", "7000"] },
+      { key: "password", label: "Password", description: "Connection password", required: false, type: "text" },
+      { key: "params", label: "Extra Params", description: "Additional CLI flags (URL-encoded)", required: false, type: "text" },
+    ],
+  },
+  {
+    type: "process",
+    label: "Process",
+    description: "Launch any process and read PCM audio from stdout. Use with mpv, go-librespot, custom scripts, etc.",
+    uriPrefix: "process://",
+    pathPlaceholder: "/usr/bin/mpv",
+    params: [
+      { key: "name", label: "Name", description: "Unique stream name", required: true, type: "text", placeholder: "Process" },
+      { key: "params", label: "Arguments", description: "Process command line arguments (URL-encoded)", required: false, type: "text" },
+      { key: "wd_timeout", label: "Watchdog Timeout", description: "Restart if no stderr output for this many seconds (0=disabled)", required: false, type: "number", default: "0" },
+      { key: "log_stderr", label: "Log stderr", description: "Forward process stderr to Snapserver log", required: false, type: "boolean", default: "false" },
+    ],
+  },
+  {
+    type: "file",
+    label: "File",
+    description: "Read raw PCM audio from a file.",
+    uriPrefix: "file://",
+    pathPlaceholder: "/path/to/pcm/file",
+    params: [
+      { key: "name", label: "Name", description: "Unique stream name", required: true, type: "text", placeholder: "File" },
+    ],
+  },
+  {
+    type: "tcp",
+    label: "TCP",
+    description: "Receive audio over TCP socket. Server mode listens for connections, client mode connects to a remote host.",
+    uriPrefix: "tcp://",
+    pathPlaceholder: "127.0.0.1:4953",
+    params: [
+      { key: "name", label: "Name", description: "Unique stream name", required: true, type: "text", placeholder: "TCP" },
+      { key: "mode", label: "Mode", description: "Server (listen) or Client (connect)", required: false, type: "select", default: "server", options: ["server", "client"] },
+    ],
+  },
+  {
+    type: "alsa",
+    label: "ALSA",
+    description: "Capture audio from an ALSA device. Use for line-in or loopback devices.",
+    uriPrefix: "alsa://",
+    pathPlaceholder: "/",
+    params: [
+      { key: "name", label: "Name", description: "Unique stream name", required: true, type: "text", placeholder: "ALSA" },
+      { key: "device", label: "Device", description: "ALSA device name (e.g., default, hw:0,0, hw:0,1,0)", required: true, type: "text", placeholder: "hw:0,0" },
+      { key: "idle_threshold", label: "Idle Threshold (ms)", description: "Switch to idle state after this many ms of silence", required: false, type: "number", default: "100" },
+      { key: "silence_threshold_percent", label: "Silence Threshold %", description: "Amplitude % below which audio is considered silence", required: false, type: "text", default: "0.0" },
+      { key: "send_silence", label: "Send Silence", description: "Forward silence to clients when idle", required: false, type: "boolean", default: "false" },
+    ],
+  },
+  {
+    type: "meta",
+    label: "Meta (Mixer)",
+    description: "Mix audio from other sources. Plays the active source with highest priority (source#1 = highest).",
+    uriPrefix: "meta://",
+    pathPlaceholder: "/source1/source2",
+    params: [
+      { key: "name", label: "Name", description: "Unique stream name", required: true, type: "text", placeholder: "Meta" },
+    ],
+  },
+  {
+    type: "jack",
+    label: "JACK",
+    description: "Read from a JACK audio server. Requires Snapcast built with BUILD_WITH_JACK=ON.",
+    uriPrefix: "jack://",
+    pathPlaceholder: "/",
+    params: [
+      { key: "name", label: "Name", description: "Unique stream name", required: true, type: "text", placeholder: "JACK" },
+      { key: "server_name", label: "Server Name", description: "JACK server name (empty = default)", required: false, type: "text" },
+      { key: "autoconnect", label: "Auto-connect Regex", description: "Regex to match JACK ports for auto-connection", required: false, type: "text" },
+      { key: "autoconnect_skip", label: "Auto-connect Skip", description: "Skip this many regex matches (for multi-channel selection)", required: false, type: "number", default: "0" },
+      { key: "idle_threshold", label: "Idle Threshold (ms)", description: "Switch to idle after this many ms of silence", required: false, type: "number", default: "100" },
+      { key: "silence_threshold_percent", label: "Silence Threshold %", description: "Amplitude % considered as silence", required: false, type: "text", default: "0.0" },
+      { key: "send_silence", label: "Send Silence", description: "Forward silence to clients when idle", required: false, type: "boolean", default: "false" },
+    ],
+  },
+];

@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { configService } from '../services/config';
 import { authenticateToken } from '../auth';
-import { CONFIG_METADATA } from '../constants/defaultConfig';
+import { CONFIG_METADATA, CONFIG_SECTIONS, SOURCE_TEMPLATES } from '../constants/defaultConfig';
 
 const router = express.Router();
 
@@ -103,6 +103,14 @@ router.post('/rebuild', authenticateToken, async (req: Request, res: Response) =
 
 router.get('/metadata', authenticateToken, (req, res) => {
     res.json(CONFIG_METADATA);
+});
+
+router.get('/sections', authenticateToken, (req, res) => {
+    res.json(CONFIG_SECTIONS);
+});
+
+router.get('/source-templates', authenticateToken, (req, res) => {
+    res.json(SOURCE_TEMPLATES);
 });
 
 router.post('/reset', authenticateToken, async (req, res) => {
