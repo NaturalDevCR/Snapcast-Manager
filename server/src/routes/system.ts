@@ -106,7 +106,8 @@ router.post('/update/:pkg', async (req: Request, res: Response) => {
          return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
-        const output = await systemService.updatePackage(pkg as any);
+        const { clean } = req.body;
+        const output = await systemService.updatePackage(pkg as any, clean);
         res.json({ message: `${pkg} updated`, output });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
