@@ -28,10 +28,7 @@ app.get('/api/status', (req, res) => {
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../../client/dist')));
 
-// SPA Fallback
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
-});
+
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
