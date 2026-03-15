@@ -27,6 +27,11 @@ You can install everything directly by running this single command:
 curl -sL https://raw.githubusercontent.com/NaturalDevCR/Snapcast-Manager/main/scripts/install.sh | bash
 ```
 
+*Note: If you want to skip all prompts and use defaults, add `-s -- -y` to the bash command:*
+```bash
+curl -sL https://raw.githubusercontent.com/NaturalDevCR/Snapcast-Manager/main/scripts/install.sh | bash -s -- -y
+```
+
 **Option 2: Manual Clone**
 
 1. Clone the repository or download the source code:

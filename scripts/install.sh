@@ -18,17 +18,41 @@ REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
 INSTALL_BASE_DIR="/opt/snapcast-manager"
 SERVICE_NAME="snapmanager"
 
-# Helper to automatically answer "yes" if piped/non-interactive
+# Parse arguments
+AUTO_CONFIRM=false
+for arg in "$@"; do
+    case $arg in
+        -y|--yes)
+            AUTO_CONFIRM=true
+            shift
+            ;;
+    esac
+done
+
+# Helper to ask questions or auto-confirm
 prompt_yes_no() {
     local prompt="$1"
     local default="$2"
-    if [ ! -t 0 ]; then
+    
+    if [ "$AUTO_CONFIRM" = true ]; then
+        echo -e "${prompt} [Auto-confirmed: y]"
+        return 0
+    fi
+
+    local ans
+    if [ -t 0 ]; then
+        # Standard interactive terminal
+        read -p "$prompt (y/n): " ans
+    elif [ -c /dev/tty ]; then
+        # Piped execution (curl | bash), but TTY is available
+        read -p "$prompt (y/n): " ans < /dev/tty
+    else
+        # Truly headless (no TTY), use default
         echo -e "${prompt} [Auto-answered: ${default}]"
         [[ "$default" == "y" ]]
-        return
+        return $?
     fi
-    local ans
-    read -p "$prompt (y/n): " ans
+    
     [[ "$ans" == "y" || "$ans" == "Y" ]]
 }
 
