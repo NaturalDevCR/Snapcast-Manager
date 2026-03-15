@@ -13,24 +13,53 @@ import {
     PlusIcon, 
     TrashIcon, 
     ArrowPathIcon,
-    DocumentDuplicateIcon
+    DocumentDuplicateIcon,
+    InformationCircleIcon,
+    ArrowPathRoundedSquareIcon
 } from '@heroicons/vue/24/outline';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
+import PromptDialog from '../components/PromptDialog.vue';
 
 const configStore = useConfigStore();
 const systemStore = useSystemStore();
 const snapshotStore = useSnapshotStore();
 const uiStore = useUIStore();
 
-const activeTab = ref<'basic' | 'advanced' | 'snapshots'>('basic');
+const activeTab = ref<'standard' | 'expert' | 'snapshots'>('standard');
 const localRawConfig = ref('');
 const localParsedConfig = ref<Record<string, any>>({});
+const configMetadata = ref<Record<string, any>>({});
 
-const snapshotName = ref('');
-const snapshotDescription = ref('');
+// Dialog State
+const showConfirmRestart = ref(false);
+const showConfirmRestore = ref(false);
+const showConfirmDeleteSnapshot = ref(false);
+const showConfirmReset = ref(false);
+const showConfirmDeleteSection = ref(false);
+const showConfirmDeleteProperty = ref(false);
+const showPromptAddSection = ref(false);
+const showPromptAddProperty = ref(false);
+
+const pendingRestoreId = ref<number | null>(null);
+const pendingDeleteSnapshotId = ref<number | null>(null);
+const pendingDeleteSection = ref('');
+const pendingDeleteProperty = ref({ section: '', key: '' });
+const activePromptSection = ref('');
 
 const fetchBoth = async () => {
   await configStore.fetchServerConfig();
   await configStore.fetchServerConfigParsed();
+  
+  // Fetch Metadata
+  try {
+    const response = await fetch('/api/config/metadata', {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    });
+    configMetadata.value = await response.json();
+  } catch (error) {
+    console.error('Failed to fetch metadata:', error);
+  }
+
   localRawConfig.value = configStore.serverConfig;
   localParsedConfig.value = JSON.parse(JSON.stringify(configStore.serverConfigParsed));
 }
@@ -44,12 +73,7 @@ const saveParsed = async () => {
     try {
         await configStore.updateServerConfigParsed(localParsedConfig.value);
         await fetchBoth();
-        if (confirm('Configuration saved! Do you want to restart Snapserver now to apply changes?')) {
-            await systemStore.controlService('restart', 'snapserver');
-            uiStore.showToast('Server restarted successfully', 'success');
-        } else {
-            uiStore.showToast('Configuration saved (restart required)', 'info');
-        }
+        showConfirmRestart.value = true;
     } catch (e: any) {
         uiStore.showToast('Failed to save configuration: ' + e.message, 'error');
     }
@@ -59,16 +83,23 @@ const saveRaw = async () => {
     try {
         await configStore.updateServerConfig(localRawConfig.value);
         await fetchBoth();
-        if (confirm('Configuration saved! Do you want to restart Snapserver now to apply changes?')) {
-            await systemStore.controlService('restart', 'snapserver');
-            uiStore.showToast('Server restarted successfully', 'success');
-        } else {
-            uiStore.showToast('Configuration saved (restart required)', 'info');
-        }
+        showConfirmRestart.value = true;
     } catch (e: any) {
         uiStore.showToast('Failed to save configuration: ' + e.message, 'error');
     }
 };
+
+const handleRestartConfirm = async () => {
+  try {
+    await systemStore.controlService('restart', 'snapserver');
+    uiStore.showToast('Server restarted successfully', 'success');
+  } catch (e: any) {
+    uiStore.showToast('Failed to restart: ' + e.message, 'error');
+  }
+}
+
+const snapshotName = ref('');
+const snapshotDescription = ref('');
 
 const handleCreateSnapshot = async () => {
     if (!snapshotName.value) return;
@@ -82,10 +113,15 @@ const handleCreateSnapshot = async () => {
     }
 };
 
-const handleRestoreSnapshot = async (id: number) => {
-    if (!confirm('Are you sure you want to restore this snapshot? Current configuration will be overwritten.')) return;
+const triggerRestoreSnapshot = (id: number) => {
+  pendingRestoreId.value = id;
+  showConfirmRestore.value = true;
+};
+
+const handleRestoreSnapshot = async () => {
+    if (pendingRestoreId.value === null) return;
     try {
-        await snapshotStore.restoreSnapshot(id);
+        await snapshotStore.restoreSnapshot(pendingRestoreId.value);
         await fetchBoth();
         uiStore.showToast('Snapshot restored successfully!', 'success');
     } catch (e: any) {
@@ -93,19 +129,29 @@ const handleRestoreSnapshot = async (id: number) => {
     }
 };
 
-const handleDeleteSnapshot = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this snapshot?')) return;
+const triggerDeleteSnapshot = (id: number) => {
+  pendingDeleteSnapshotId.value = id;
+  showConfirmDeleteSnapshot.value = true;
+};
+
+const handleDeleteSnapshot = async () => {
+    if (pendingDeleteSnapshotId.value === null) return;
     try {
-        await snapshotStore.deleteSnapshot(id);
+        await snapshotStore.deleteSnapshot(pendingDeleteSnapshotId.value);
         uiStore.showToast('Snapshot deleted', 'info');
     } catch (e: any) {
         uiStore.showToast('Failed to delete snapshot: ' + e.message, 'error');
     }
 };
 
-const addProperty = (section: string) => {
-    const key = prompt(`Enter property name for [${section}]:`);
-    if (!key) return;
+const triggerAddProperty = (section: string) => {
+  activePromptSection.value = section;
+  showPromptAddProperty.value = true;
+};
+
+const handleAddProperty = (key: string) => {
+    const section = activePromptSection.value;
+    if (!key || !section) return;
     if (localParsedConfig.value[section][key] !== undefined) {
         uiStore.showToast('Property already exists', 'warning');
         return;
@@ -114,8 +160,7 @@ const addProperty = (section: string) => {
     uiStore.showToast(`Property "${key}" added to [${section}]`, 'success');
 };
 
-const addSection = () => {
-    const section = prompt('Enter new section name:');
+const handleAddSection = (section: string) => {
     if (!section) return;
     if (localParsedConfig.value[section]) {
         uiStore.showToast('Section already exists', 'warning');
@@ -125,17 +170,46 @@ const addSection = () => {
     uiStore.showToast(`Section [${section}] created`, 'success');
 };
 
-const removeProperty = (section: string, key: string) => {
-    if (confirm(`Remove ${key} from [${section}]?`)) {
+const triggerRemoveProperty = (section: string, key: string) => {
+    pendingDeleteProperty.value = { section, key };
+    showConfirmDeleteProperty.value = true;
+};
+
+const handleRemoveProperty = () => {
+    const { section, key } = pendingDeleteProperty.value;
+    if (section && key) {
         delete localParsedConfig.value[section][key];
         uiStore.showToast(`Removed "${key}"`, 'info');
     }
 };
 
-const removeSection = (section: string) => {
-    if (confirm(`Remove entire section [${section}]?`)) {
+const triggerRemoveSection = (section: string) => {
+    pendingDeleteSection.value = section;
+    showConfirmDeleteSection.value = true;
+};
+
+const handleRemoveSection = () => {
+    const section = pendingDeleteSection.value;
+    if (section) {
         delete localParsedConfig.value[section];
         uiStore.showToast(`Section [${section}] removed`, 'info');
+    }
+};
+
+const handleResetToDefault = async () => {
+    try {
+        const response = await fetch('/api/config/reset', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (response.ok) {
+          await fetchBoth();
+          uiStore.showToast('Configuration reset to defaults', 'success');
+        } else {
+          throw new Error('Failed to reset');
+        }
+    } catch (e: any) {
+        uiStore.showToast('Failed to reset configuration: ' + e.message, 'error');
     }
 };
 
@@ -146,10 +220,10 @@ const removeSection = (section: string) => {
       <!-- Tabs Navigation -->
       <div class="mb-8 flex space-x-2 bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-2xl w-fit">
           <button 
-            @click="activeTab = 'basic'"
+            @click="activeTab = 'standard'"
             :class="[
                 'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm',
-                activeTab === 'basic' 
+                activeTab === 'standard' 
                 ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
                 : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
             ]"
@@ -158,10 +232,10 @@ const removeSection = (section: string) => {
               <span>Standard</span>
           </button>
           <button 
-            @click="activeTab = 'advanced'"
+            @click="activeTab = 'expert'"
             :class="[
                 'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm',
-                activeTab === 'advanced' 
+                activeTab === 'expert' 
                 ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
                 : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
             ]"
@@ -183,8 +257,8 @@ const removeSection = (section: string) => {
           </button>
       </div>
 
-      <!-- Basic Tab -->
-      <div v-if="activeTab === 'basic'" class="animate-in fade-in slide-in-from-left-4 duration-500">
+      <!-- Standard Tab -->
+      <div v-if="activeTab === 'standard'" class="animate-in fade-in slide-in-from-left-4 duration-500">
           <div v-for="(props, section) in localParsedConfig" :key="section" class="mb-8">
               <Card>
                   <template #title>
@@ -193,62 +267,95 @@ const removeSection = (section: string) => {
                             <span class="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Section</span>
                             <span class="text-sm font-black text-slate-800 dark:text-white uppercase">{{ section }}</span>
                           </div>
-                          <button @click="removeSection(section)" class="inline-flex items-center px-2 py-1 text-[10px] font-black text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors uppercase tracking-widest">
-                            <TrashIcon class="h-3 w-3 mr-1" />
-                            Delete Section
-                          </button>
+                          <div class="flex items-center space-x-2">
+                              <button @click="triggerAddProperty(String(section))" class="inline-flex items-center px-2 py-1 text-[10px] font-black text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors uppercase tracking-widest">
+                                <PlusIcon class="h-3 w-3 mr-1" />
+                                Add Property
+                              </button>
+                              <button @click="triggerRemoveSection(String(section))" class="inline-flex items-center px-2 py-1 text-[10px] font-black text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors uppercase tracking-widest">
+                                <TrashIcon class="h-3 w-3 mr-1" />
+                                Delete Section
+                              </button>
+                          </div>
                       </div>
                   </template>
                   <div class="space-y-6">
                       <div v-if="Object.keys(props).length === 0" class="text-center py-6 border-2 border-dashed border-slate-100 dark:border-slate-800/50 rounded-xl">
                           <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">No properties defined in this section</p>
                       </div>
-                      <div v-for="(value, key) in props" :key="key" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center group">
-                          <div class="md:col-span-1 flex items-center justify-between md:justify-start space-x-3">
-                              <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] truncate">{{ String(key) }}</label>
-                              <button @click="removeProperty(section, String(key))" class="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all rounded-md hover:bg-red-50 dark:hover:bg-red-500/10">
-                                   <TrashIcon class="h-3.5 w-3.5" />
-                              </button>
-                          </div>
-                          <div class="md:col-span-3">
-                              <input 
-                                v-if="typeof value !== 'object'"
-                                v-model="localParsedConfig[section][String(key)]"
-                                class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
-                              />
-                              <div v-else-if="Array.isArray(value)" class="space-y-3">
-                                  <div v-for="(_item, idx) in value" :key="idx" class="flex space-x-2">
-                                      <input 
-                                        v-model="localParsedConfig[section][String(key)][idx]"
-                                        class="flex-1 text-sm font-medium px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
-                                      />
-                                      <button @click="localParsedConfig[section][String(key)].splice(idx, 1)" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
-                                        <TrashIcon class="h-4 w-4" />
-                                      </button>
+                      <div v-for="(value, key) in props" :key="key" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-start group">
+                          <div class="md:col-span-1 py-2">
+                              <div class="flex items-center justify-between">
+                                  <div class="flex flex-col">
+                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] truncate">{{ configMetadata[section]?.[key]?.label || String(key) }}</label>
+                                    <span v-if="configMetadata[section]?.[key]?.description" class="text-[9px] text-slate-500 leading-tight mt-1 max-w-[200px]">{{ configMetadata[section]?.[key]?.description }}</span>
                                   </div>
-                                  <button @click="localParsedConfig[section][String(key)].push('')" class="inline-flex items-center text-[10px] font-black text-indigo-600 dark:text-indigo-400 hover:indigo-700 uppercase tracking-widest">
-                                    <PlusIcon class="h-3 w-3 mr-1" />
-                                    Add Entry
+                                  <button @click="triggerRemoveProperty(String(section), String(key))" class="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all rounded-md hover:bg-red-50 dark:hover:bg-red-500/10">
+                                       <TrashIcon class="h-3.5 w-3.5" />
                                   </button>
                               </div>
                           </div>
-                      </div>
-                      <div class="pt-4 border-t border-slate-100 dark:border-slate-800/60">
-                          <button @click="addProperty(section)" class="inline-flex items-center px-4 py-2 bg-indigo-50 dark:bg-indigo-500/5 text-indigo-600 dark:text-indigo-400 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] hover:bg-indigo-100 dark:hover:bg-indigo-500/10 transition-colors">
-                              <PlusIcon class="h-3.5 w-3.5 mr-2" />
-                              Add Property to [{{ section }}]
-                          </button>
+                          <div class="md:col-span-3">
+                              <!-- typed components based on metadata -->
+                              <div v-if="configMetadata[section]?.[key]?.type === 'boolean'" class="flex items-center py-2">
+                                <button 
+                                  @click="localParsedConfig[section][key] = localParsedConfig[section][key] === 'true' ? 'false' : 'true'"
+                                  :class="[
+                                    'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2',
+                                    localParsedConfig[section][key] === 'true' ? 'bg-indigo-600' : 'bg-slate-700'
+                                  ]"
+                                >
+                                  <span :class="[localParsedConfig[section][key] === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
+                                </button>
+                                <span class="ml-3 text-sm text-slate-400 uppercase tracking-widest font-bold">{{ localParsedConfig[section][key] === 'true' ? 'Enabled' : 'Disabled' }}</span>
+                              </div>
+                              <input 
+                                v-else-if="configMetadata[section]?.[key]?.type === 'number'"
+                                type="number"
+                                v-model.number="localParsedConfig[section][String(key)]"
+                                class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                              />
+                              <div v-else-if="Array.isArray(value) || configMetadata[section]?.[key]?.type === 'list'" class="space-y-3">
+                                  <div v-for="(_item, idx) in (Array.isArray(value) ? value : [value])" :key="idx" class="flex space-x-2">
+                                      <input 
+                                        v-model="(Array.isArray(value) ? localParsedConfig[section][String(key)] : localParsedConfig[section])[idx === undefined ? String(key) : idx]"
+                                        class="flex-1 text-sm font-medium px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                                      />
+                                      <button v-if="Array.isArray(value)" @click="localParsedConfig[section][String(key)].splice(idx, 1)" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
+                                        <TrashIcon class="h-4 w-4" />
+                                      </button>
+                                  </div>
+                                  <button v-if="Array.isArray(value)" @click="localParsedConfig[section][String(key)].push('')" class="inline-flex items-center text-[10px] font-black text-indigo-600 dark:text-indigo-400 hover:indigo-700 uppercase tracking-widest">
+                                    <PlusIcon class="h-3 w-3 mr-1" />
+                                    Add Entry
+                                  </button>
+                                  <button v-else @click="localParsedConfig[section][String(key)] = [value, '']" class="inline-flex items-center text-[10px] font-black text-indigo-600 dark:text-indigo-400 hover:indigo-700 uppercase tracking-widest">
+                                    <PlusIcon class="h-3 w-3 mr-1" />
+                                    Convert to List
+                                  </button>
+                              </div>
+                              <input 
+                                v-else
+                                v-model="localParsedConfig[section][String(key)]"
+                                class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                              />
+                          </div>
                       </div>
                   </div>
               </Card>
           </div>
 
-          <div class="mb-24">
-              <button @click="addSection" class="w-full py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 dark:text-slate-500 hover:border-indigo-500/50 hover:text-indigo-500 hover:bg-indigo-50/30 dark:hover:bg-indigo-500/5 transition-all flex flex-col justify-center items-center group">
+          <div class="mb-24 flex flex-col space-y-4">
+              <button @click="showPromptAddSection = true" class="w-full py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 dark:text-slate-500 hover:border-indigo-500/50 hover:text-indigo-500 hover:bg-indigo-50/30 dark:hover:bg-indigo-500/5 transition-all flex flex-col justify-center items-center group">
                   <div class="p-3 bg-slate-100 dark:bg-slate-800 rounded-full group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/20 transition-colors mb-2">
                     <PlusIcon class="h-6 w-6" />
                   </div>
                   <span class="text-xs font-black uppercase tracking-widest">Add New Section</span>
+              </button>
+              
+              <button @click="showConfirmReset = true" class="w-full py-4 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 hover:text-amber-500 hover:bg-amber-500/5 transition-all flex justify-center items-center space-x-2">
+                  <ArrowPathRoundedSquareIcon class="h-4 w-4" />
+                  <span class="text-[10px] font-black uppercase tracking-widest">Reset Configuration to Default</span>
               </button>
           </div>
 
@@ -264,8 +371,8 @@ const removeSection = (section: string) => {
           </div>
       </div>
 
-      <!-- Advanced Tab -->
-      <div v-else-if="activeTab === 'advanced'" class="animate-in fade-in slide-in-from-right-4 duration-500">
+      <!-- Expert Tab -->
+      <div v-else-if="activeTab === 'expert'" class="animate-in fade-in slide-in-from-right-4 duration-500">
           <Card>
               <template #title>
                 <div class="flex items-center justify-between w-full">
@@ -351,11 +458,11 @@ const removeSection = (section: string) => {
                                   </div>
                               </div>
                               <div class="flex space-x-2">
-                                  <button @click="handleRestoreSnapshot(snapshot.id)" 
+                                  <button @click="triggerRestoreSnapshot(snapshot.id)" 
                                     class="text-[10px] font-black uppercase tracking-widest px-4 py-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 rounded-lg hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition-all shadow-sm active:scale-95">
                                       Restore
                                   </button>
-                                  <button @click="handleDeleteSnapshot(snapshot.id)"
+                                  <button @click="triggerDeleteSnapshot(snapshot.id)"
                                     class="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all group-hover:opacity-100 md:opacity-0">
                                       <TrashIcon class="h-5 w-5" />
                                   </button>
@@ -366,5 +473,77 @@ const removeSection = (section: string) => {
               </div>
           </div>
       </div>
+
+      <!-- Dialogs -->
+      <ConfirmDialog
+        v-model="showConfirmRestart"
+        title="Restart Snapserver?"
+        message="Configuration saved! Restart now to apply changes?"
+        confirmText="Restart Now"
+        @confirm="handleRestartConfirm"
+      />
+
+      <ConfirmDialog
+        v-model="showConfirmRestore"
+        title="Restore Snapshot?"
+        message="Are you sure you want to restore this snapshot? Current configuration will be overwritten."
+        type="danger"
+        confirmText="Overwrite & Restore"
+        @confirm="handleRestoreSnapshot"
+      />
+
+      <ConfirmDialog
+        v-model="showConfirmDeleteSnapshot"
+        title="Delete Snapshot?"
+        message="This action cannot be undone."
+        type="danger"
+        confirmText="Delete Permanently"
+        @confirm="handleDeleteSnapshot"
+      />
+
+      <ConfirmDialog
+        v-model="showConfirmReset"
+        title="Reset to Defaults?"
+        message="This will wipe your current configuration base and restore it to the default Snapserver values. Use with caution!"
+        type="danger"
+        confirmText="Reset Configuration"
+        @confirm="handleResetToDefault"
+      />
+
+      <ConfirmDialog
+        v-model="showConfirmDeleteSection"
+        title="Delete Section?"
+        :message="\`Are you sure you want to delete the entire [\${pendingDeleteSection}] section?\`"
+        type="danger"
+        confirmText="Delete Section"
+        @confirm="handleRemoveSection"
+      />
+
+      <ConfirmDialog
+        v-model="showConfirmDeleteProperty"
+        title="Delete Property?"
+        :message="\`Remove \${pendingDeleteProperty.key} from [\${pendingDeleteProperty.section}]?\`"
+        type="danger"
+        confirmText="Delete Property"
+        @confirm="handleRemoveProperty"
+      />
+
+      <PromptDialog
+        v-model="showPromptAddSection"
+        title="Add Section"
+        message="Enter the name for the new configuration section."
+        placeholder="e.g. custom_settings"
+        @confirm="handleAddSection"
+      />
+
+      <PromptDialog
+        v-model="showPromptAddProperty"
+        title="Add Property"
+        :message="\`Enter property name for [\${activePromptSection}]:\`"
+        placeholder="e.g. custom_key"
+        @confirm="handleAddProperty"
+      />
+  </Layout>
+</template>
   </Layout>
 </template>
