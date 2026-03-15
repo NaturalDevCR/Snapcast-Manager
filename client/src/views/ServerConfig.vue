@@ -175,8 +175,8 @@ const removeSection = (section: string) => {
                       </div>
                       <div v-for="(value, key) in props" :key="key" class="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-gray-100 dark:border-gray-700 pb-3 last:border-0 last:pb-0 group">
                           <div class="flex items-center space-x-2">
-                              <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">{{ key }}</label>
-                              <button @click="removeProperty(section, key)" class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">
+                              <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">{{ String(key) }}</label>
+                              <button @click="removeProperty(section, String(key))" class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">
                                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                       <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
                                   </svg>
@@ -185,18 +185,18 @@ const removeSection = (section: string) => {
                           <div class="md:col-span-2">
                               <input 
                                 v-if="typeof value !== 'object'"
-                                v-model="localParsedConfig[section][key]"
+                                v-model="localParsedConfig[section][String(key)]"
                                 class="w-full text-sm p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500"
                               />
                               <div v-else-if="Array.isArray(value)" class="space-y-2">
                                   <div v-for="(_item, idx) in value" :key="idx" class="flex space-x-2">
                                       <input 
-                                        v-model="localParsedConfig[section][key][idx]"
+                                        v-model="localParsedConfig[section][String(key)][idx]"
                                         class="flex-1 text-sm p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                                       />
-                                      <button @click="localParsedConfig[section][key].splice(idx, 1)" class="text-red-500 hover:text-red-700">×</button>
+                                      <button @click="localParsedConfig[section][String(key)].splice(idx, 1)" class="text-red-500 hover:text-red-700">×</button>
                                   </div>
-                                  <button @click="localParsedConfig[section][key].push('')" class="text-xs text-indigo-500 hover:text-indigo-700">+ Add line</button>
+                                  <button @click="localParsedConfig[section][String(key)].push('')" class="text-xs text-indigo-500 hover:text-indigo-700">+ Add line</button>
                               </div>
                           </div>
                       </div>
