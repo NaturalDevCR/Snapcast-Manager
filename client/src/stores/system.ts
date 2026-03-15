@@ -112,10 +112,13 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  async function updateNodeJs() {
+  async function updateNodeJs(version: string = '20') {
     loading.value = true;
     try {
-      await fetchApi(`/system/update-node`, { method: 'POST' });
+      await fetchApi(`/system/update-node`, { 
+        method: 'POST',
+        body: JSON.stringify({ version })
+      });
       await checkVersion('node');
     } catch (err: any) {
       error.value = err.message;

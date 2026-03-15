@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useSystemStore } from '../stores/system';
 import { useUIStore } from '../stores/ui';
 import Layout from '../components/Layout.vue';
@@ -8,6 +8,8 @@ import { ServerIcon, GlobeAltIcon, VideoCameraIcon, SpeakerWaveIcon, CommandLine
 
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
+
+const selectedNodeVersion = ref('20');
 
 onMounted(() => {
   systemStore.refreshAll();
@@ -23,17 +25,17 @@ const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 's
 };
 
 const handleUpdateNodeJs = async () => {
-    if (!confirm('This will update Node.js to the latest 20.x version. The service might restart briefly. Continue?')) return;
+    if (!confirm(`This will update Node.js to the latest ${selectedNodeVersion.value}.x version. The service might restart briefly. Continue?`)) return;
     try {
-        await systemStore.updateNodeJs();
-        uiStore.showToast('Node.js update initiated successfully!', 'success');
+        await systemStore.updateNodeJs(selectedNodeVersion.value);
+        uiStore.showToast(`Node.js ${selectedNodeVersion.value} update initiated successfully!`, 'success');
     } catch (err: any) {
         uiStore.showToast('Failed to update Node.js: ' + err.message, 'error');
     }
 };
 
 // Version from package.json
-const version = 'v0.1.6';
+const version = 'v0.1.7';
 </script>
 
 <template>
@@ -238,16 +240,30 @@ const version = 'v0.1.6';
             </div>
             <div class="flex flex-col">
                  <div class="flex items-center justify-between mb-1">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase">Engine Version</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Engine Version</span>
                     <span class="text-sm font-mono text-slate-700 dark:text-slate-300">{{ systemStore.packageVersions.node || '...' }}</span>
                  </div>
-                 <div class="mt-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] px-3 py-1.5 rounded-lg font-black italic">
-                     LTS 20.X ACTIVE
+                 
+                 <div class="mt-3 space-y-2">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select LTS Release</span>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button v-for="v in ['18', '20', '22']" :key="v"
+                                @click="selectedNodeVersion = v"
+                                :class="[
+                                    'py-1.5 rounded-lg text-[10px] font-bold transition-all border',
+                                    selectedNodeVersion === v 
+                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' 
+                                    : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                                ]"
+                        >
+                            v{{ v }}
+                        </button>
+                    </div>
                  </div>
             </div>
-            <div class="pt-2">
+            <div class="pt-4">
                  <button @click="handleUpdateNodeJs" class="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-xs hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    UPDATE RUNTIME
+                    UPDATE TO v{{ selectedNodeVersion }}
                  </button>
             </div>
         </div>

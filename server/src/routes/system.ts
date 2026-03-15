@@ -115,8 +115,9 @@ router.post('/update/:pkg', async (req: Request, res: Response) => {
 
 router.post('/update-node', async (req: Request, res: Response) => {
     try {
-        const output = await systemService.updateNodeJs();
-        res.json({ message: 'Node.js update initiated', output });
+        const { version } = req.body;
+        const output = await systemService.updateNodeJs(version);
+        res.json({ message: `Node.js update to ${version || 'LTS'} initiated`, output });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

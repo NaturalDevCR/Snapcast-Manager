@@ -7,6 +7,7 @@ const execAsync = util.promisify(exec);
 export type PackageName = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node';
 
 export class SystemService {
+  private distroCodename: string | null = null;
   
   private async runCommand(command: string): Promise<string> {
     try {
@@ -36,41 +37,77 @@ export class SystemService {
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y --only-upgrade ${pkg}`);
   }
 
+  private async getDistroCodename(): Promise<string> {
+    if (this.distroCodename) return this.distroCodename;
+
+    try {
+      // Try lsb_release first
+      const output = await this.runCommand('lsb_release -cs 2>/dev/null');
+      this.distroCodename = output.trim();
+      if (this.distroCodename) return this.distroCodename;
+    } catch (e) {}
+
+    try {
+      // Fallback to /etc/os-release
+      const output = await this.runCommand('grep VERSION_CODENAME /etc/os-release | cut -d= -f2');
+      this.distroCodename = output.trim().replace(/"/g, '');
+      if (this.distroCodename) return this.distroCodename;
+    } catch (e) {}
+
+    // Ultimate fallback for many debian-based systems if detection fails
+    return 'bookworm';
+  }
+
   private async updateSnapserverFromGitHub(): Promise<string> {
     const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
     const arch = await this.runCommand('dpkg --print-architecture');
     const archTrimmed = arch.trim();
+    const codename = await this.getDistroCodename();
     
-    // Find the deb file for the current architecture
-    // Example pattern: snapserver_0.26.0-1_amd64.deb
+    // Find the deb file for the current architecture and distro
+    // Example: snapserver_0.35.0-1_amd64_bookworm.deb
     const asset = release.assets.find((a: any) => 
       a.name.startsWith('snapserver') && 
       a.name.endsWith('.deb') && 
-      (a.name.includes(archTrimmed) || (archTrimmed === 'armhf' && a.name.includes('armv7hf')))
+      !a.name.includes('pipewire') && // Prefer standard version for now
+      a.name.includes(archTrimmed) &&
+      (a.name.includes(codename) || (codename === 'bookworm' && !a.name.includes('bullseye') && !a.name.includes('trixie'))) // Heuristic if codename match is literal
     );
 
     if (!asset) {
-      throw new Error(`Could not find a .deb asset for architecture ${archTrimmed} in Snapcast release ${release.tag_name}`);
+      // Fallback: search just by arch if codename specific not found
+      const fallbackAsset = release.assets.find((a: any) => 
+        a.name.startsWith('snapserver') && a.name.endsWith('.deb') && a.name.includes(archTrimmed)
+      );
+      
+      if (!fallbackAsset) {
+        throw new Error(`Could not find a .deb asset for architecture ${archTrimmed} (Distro: ${codename}) in Snapcast release ${release.tag_name}`);
+      }
+      return this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name);
     }
 
-    const downloadUrl = asset.browser_download_url;
-    const debFile = `/tmp/${asset.name}`;
+    return this.executeDebUpdate(asset.browser_download_url, asset.name);
+  }
 
-    console.log(`Downloading Snapserver ${release.tag_name} from ${downloadUrl}...`);
+  private async executeDebUpdate(downloadUrl: string, fileName: string): Promise<string> {
+    const debFile = `/tmp/${fileName}`;
+    console.log(`Downloading Snapserver from ${downloadUrl}...`);
     
     return this.runCommand(`
+      sudo apt-get update && \
       wget -qO ${debFile} "${downloadUrl}" && \
       sudo dpkg -i ${debFile} || sudo apt-get install -f -y && \
       rm -f ${debFile} && \
+      sudo systemctl daemon-reload && \
       sudo systemctl restart snapserver
     `);
   }
 
-  async updateNodeJs(): Promise<string> {
-    console.log('Updating Node.js...');
-    // Using NodeSource setup script for version 20
+  async updateNodeJs(version: string = '20'): Promise<string> {
+    console.log(`Updating Node.js to version ${version}...`);
+    // Using NodeSource setup script for version specified
     return this.runCommand(`
-      curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && \
+      curl -fsSL https://deb.nodesource.com/setup_${version}.x | sudo -E bash - && \
       sudo apt-get install -y nodejs
     `);
   }
