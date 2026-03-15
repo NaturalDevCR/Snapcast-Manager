@@ -153,4 +153,14 @@ router.get('/version/:pkg', async (req: Request, res: Response) => {
     }
 });
 
+router.get('/check-updates/:pkg', async (req: Request, res: Response) => {
+    const { pkg } = req.params;
+    try {
+        const version = await systemService.getLatestAvailableVersion(pkg as any);
+        res.json({ pkg, version });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;
