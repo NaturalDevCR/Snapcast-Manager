@@ -8,6 +8,8 @@ export type PackageName = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctr
 
 export class SystemService {
   private distroCodename: string | null = null;
+  private releaseCache: Record<string, { timestamp: number, data: any }> = {};
+  private readonly CACHE_TTL = 60 * 60 * 1000; // 1 hour
   
   private async runCommand(command: string): Promise<string> {
     try {
@@ -221,13 +223,45 @@ export class SystemService {
   }
 
   private async getLatestGitHubRelease(owner: string, repo: string): Promise<any> {
+    const cacheKey = `${owner}/${repo}`;
+    const now = Date.now();
+    if (this.releaseCache[cacheKey] && now - this.releaseCache[cacheKey].timestamp < this.CACHE_TTL) {
+      return this.releaseCache[cacheKey].data;
+    }
+
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
     const output = await this.runCommand(`curl -sL ${apiUrl}`);
     const release = JSON.parse(output);
     if (!release.tag_name) {
       throw new Error(`Invalid response from GitHub API for ${owner}/${repo}`);
     }
+    
+    this.releaseCache[cacheKey] = { timestamp: now, data: release };
     return release;
+  }
+
+  async getDashboardMetrics(): Promise<any> {
+    const packages: PackageName[] = ['snapserver', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node'];
+    const services = ['snapserver', 'shairport-sync'] as const;
+    
+    const installedPromises = packages.map(pkg => this.isInstalled(pkg).then(res => ({ pkg, val: res })));
+    const versionPromises = packages.map(pkg => this.getPackageVersion(pkg).then(res => ({ pkg, val: res })));
+    const availablePromises = packages.map(pkg => this.getLatestAvailableVersion(pkg).then(res => ({ pkg, val: res })));
+    const statusPromises = services.map(svc => this.getServiceStatus(svc).then(res => ({ svc, val: res })));
+
+    const [installedResults, versionResults, availableResults, statusResults] = await Promise.all([
+      Promise.all(installedPromises),
+      Promise.all(versionPromises),
+      Promise.all(availablePromises),
+      Promise.all(statusPromises)
+    ]);
+
+    return {
+      installed: Object.fromEntries(installedResults.map(r => [r.pkg, r.val])),
+      versions: Object.fromEntries(versionResults.map(r => [r.pkg, r.val])),
+      available: Object.fromEntries(availableResults.map(r => [r.pkg, r.val])),
+      statuses: Object.fromEntries(statusResults.map(r => [r.svc, r.val]))
+    };
   }
   
   async restartService(service: 'snapserver' | 'shairport-sync'): Promise<string> {

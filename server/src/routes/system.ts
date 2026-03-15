@@ -7,6 +7,15 @@ const router = express.Router();
 
 router.use(authenticateToken);
 
+router.get('/dashboard', async (req: Request, res: Response) => {
+    try {
+        const metrics = await systemService.getDashboardMetrics();
+        res.json(metrics);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 router.get('/status/:service', async (req: Request, res: Response) => {
     const { service } = req.params;
     if (service !== 'snapserver' && service !== 'shairport-sync' && service !== 'snapmanager') {

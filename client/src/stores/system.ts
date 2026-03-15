@@ -196,25 +196,28 @@ export const useSystemStore = defineStore('system', () => {
 
   async function refreshAll() {
     loading.value = true;
-    await Promise.all([
-      checkStatus('snapserver'),
-      checkStatus('shairport-sync'),
-      checkInstalled('snapserver'),
-      checkInstalled('ffmpeg'),
-      checkInstalled('snap-ctrl'),
-      checkInstalled('shairport-sync'),
-      checkVersion('snapserver'),
-      checkVersion('ffmpeg'),
-      checkVersion('snap-ctrl'),
-      checkVersion('shairport-sync'),
-      checkVersion('node'),
-      checkAvailableVersion('snapserver'),
-      checkAvailableVersion('ffmpeg'),
-      checkAvailableVersion('snap-ctrl'),
-      checkAvailableVersion('shairport-sync'),
-      checkAvailableVersion('node'),
-    ]);
-    loading.value = false;
+    try {
+      const data = await fetchApi('/system/dashboard');
+      
+      if (data.statuses.snapserver) snapserverStatus.value = data.statuses.snapserver;
+      if (data.statuses['shairport-sync']) shairportSyncStatus.value = data.statuses['shairport-sync'];
+      
+      for (const [pkg, isInstalled] of Object.entries(data.installed)) {
+         installedPackages.value[pkg as keyof typeof installedPackages.value] = isInstalled as boolean;
+      }
+      
+      for (const [pkg, ver] of Object.entries(data.versions)) {
+         packageVersions.value[pkg] = ver as string;
+      }
+      
+      for (const [pkg, ver] of Object.entries(data.available)) {
+         availableVersions.value[pkg] = ver as string;
+      }
+    } catch (err) {
+      console.error('Failed to refresh dashboard data:', err);
+    } finally {
+      loading.value = false;
+    }
   }
 
   return { 
