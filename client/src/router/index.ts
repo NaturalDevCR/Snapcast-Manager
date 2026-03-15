@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '../views/Dashboard.vue'
 import Login from '../views/Login.vue'
 import ServerConfig from '../views/ServerConfig.vue'
-import ClientConfig from '../views/ClientConfig.vue'
 import Setup from '../views/Setup.vue'
 import { fetchApi } from '../utils/api'
 
@@ -29,12 +28,6 @@ const router = createRouter({
       path: '/server',
       name: 'server-config',
       component: ServerConfig,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/client',
-      name: 'client-config',
-      component: ClientConfig,
       meta: { requiresAuth: true }
     }
   ]

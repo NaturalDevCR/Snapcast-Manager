@@ -3,7 +3,7 @@ import util from 'util';
 
 const execAsync = util.promisify(exec);
 
-export type PackageName = 'snapserver' | 'snapclient' | 'ffmpeg';
+export type PackageName = 'snapserver' | 'ffmpeg' | 'shairport-sync';
 
 export class SystemService {
   
@@ -19,19 +19,24 @@ export class SystemService {
     }
   }
 
-  async installPackage(pkg: PackageName): Promise<string> {
-    // In a real scenario, this might need sudo or be run as root
-    // For now, we assume the process has permissions or we prefix with sudo
-    // We also use -y to auto-accept
-    return this.runCommand(`sudo apt-get install -y ${pkg}`);
+  async installPackage(pkg: string): Promise<string> {
+    return this.runCommand(`sudo apt-get update && sudo apt-get install -y ${pkg}`);
   }
 
-  async uninstallPackage(pkg: PackageName): Promise<string> {
+  async updatePackage(pkg: string): Promise<string> {
+    return this.runCommand(`sudo apt-get update && sudo apt-get install -y --only-upgrade ${pkg}`);
+  }
+
+  async uninstallPackage(pkg: string): Promise<string> {
     return this.runCommand(`sudo apt-get remove -y ${pkg}`);
   }
 
-  async isInstalled(pkg: PackageName): Promise<boolean> {
+  async isInstalled(pkg: string): Promise<boolean> {
     try {
+      if (pkg === 'snap-ctrl') {
+          await this.runCommand('ls /usr/share/snapserver/snap-ctrl/index.html');
+          return true;
+      }
       await this.runCommand(`dpkg -s ${pkg}`);
       return true;
     } catch (error) {
@@ -39,33 +44,54 @@ export class SystemService {
     }
   }
 
-  async getServiceStatus(service: 'snapserver' | 'snapclient'): Promise<string> {
+  async getServiceStatus(service: 'snapserver' | 'shairport-sync'): Promise<string> {
     try {
       const output = await this.runCommand(`systemctl is-active ${service}`);
       return output.trim();
     } catch (error) {
-       return 'inactive'; // or 'unknown'
+       return 'inactive';
     }
   }
   
-  async restartService(service: 'snapserver' | 'snapclient'): Promise<string> {
+  async restartService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
       return this.runCommand(`sudo systemctl restart ${service}`);
   }
 
-  async startService(service: 'snapserver' | 'snapclient'): Promise<string> {
+  async startService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
       return this.runCommand(`sudo systemctl start ${service}`);
   }
 
-  async stopService(service: 'snapserver' | 'snapclient'): Promise<string> {
+  async stopService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
       return this.runCommand(`sudo systemctl stop ${service}`);
   }
 
-  async enableService(service: 'snapserver' | 'snapclient'): Promise<string> {
+  async enableService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
       return this.runCommand(`sudo systemctl enable ${service}`);
   }
 
-  async disableService(service: 'snapserver' | 'snapclient'): Promise<string> {
+  async disableService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
       return this.runCommand(`sudo systemctl disable ${service}`);
+  }
+
+  async installSnapCtrl(): Promise<string> {
+      const repo = 'NaturalDevCR/snap-ctrl';
+      const apiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
+      const installPath = '/usr/share/snapserver/snap-ctrl';
+      
+      console.log(`Installing snap-ctrl from ${apiUrl}...`);
+      
+      const cmd = `
+        mkdir -p /tmp/snap-ctrl-download && \
+        cd /tmp/snap-ctrl-download && \
+        DOWNLOAD_URL=$(curl -s ${apiUrl} | grep "browser_download_url" | grep "dist.zip" | cut -d '"' -f 4) && \
+        if [ -z "$DOWNLOAD_URL" ]; then echo "Fallback to source zip"; DOWNLOAD_URL=$(curl -s ${apiUrl} | grep "zipball_url" | cut -d '"' -f 4); fi && \
+        wget -qO snap-ctrl.zip "$DOWNLOAD_URL" && \
+        sudo mkdir -p ${installPath} && \
+        sudo unzip -qo snap-ctrl.zip -d ${installPath} && \
+        rm -rf /tmp/snap-ctrl-download
+      `;
+      
+      return this.runCommand(cmd);
   }
 }
 

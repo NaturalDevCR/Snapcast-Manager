@@ -50,26 +50,4 @@ router.post('/server/parsed', async (req: Request, res: Response) => {
     }
 });
 
-router.get('/client', async (req: Request, res: Response) => {
-    try {
-        const config = await configService.readClientConfig();
-        res.json({ config });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-router.post('/client', async (req: Request, res: Response) => {
-    const { config } = req.body;
-    if (typeof config !== 'object') {
-        return res.status(400).json({ error: 'Config must be an object' });
-    }
-    try {
-        await configService.writeClientConfig(config);
-         res.json({ message: 'Client config updated' });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
 export default router;

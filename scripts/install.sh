@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-VERSION="v0.0.9"
+VERSION="v0.1.0"
 
 echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
@@ -123,7 +123,6 @@ fi
 # 2. Check for Snapcast
 echo -e "\n${YELLOW}Step 1: Checking for Snapcast...${NC}"
 SNAPSERVER_INSTALLED=false
-SNAPCLIENT_INSTALLED=false
 
 if command -v snapserver >/dev/null 2>&1; then
     echo -e "${GREEN}[OK] snapserver detected.${NC}"
@@ -132,17 +131,10 @@ else
     echo -e "${YELLOW}[!] snapserver NOT detected.${NC}"
 fi
 
-if command -v snapclient >/dev/null 2>&1; then
-    echo -e "${GREEN}[OK] snapclient detected.${NC}"
-    SNAPCLIENT_INSTALLED=true
-else
-    echo -e "${YELLOW}[!] snapclient NOT detected.${NC}"
-fi
-
-if [ "$SNAPSERVER_INSTALLED" = false ] && [ "$SNAPCLIENT_INSTALLED" = false ]; then
-    if prompt_yes_no "Snapcast components not found. Do you want to install them now?" "y"; then
-        echo "Installing Snapcast..."
-        sudo apt-get update && sudo apt-get install -y snapserver snapclient
+if [ "$SNAPSERVER_INSTALLED" = false ]; then
+    if prompt_yes_no "Snapserver not found. Do you want to install it now?" "y"; then
+        echo "Installing Snapserver and FFmpeg..."
+        sudo apt-get update && sudo apt-get install -y snapserver ffmpeg
     fi
 fi
 
