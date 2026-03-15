@@ -11,12 +11,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.13"
+VERSION="v0.1.14"
 
 echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
 
-REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/archive/refs/heads/main.zip"
+REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/releases/download/${VERSION}/snapcast-manager-release.zip"
 INSTALL_BASE_DIR="/opt/snapcast-manager"
 SERVICE_NAME="snapmanager"
 
@@ -104,10 +104,14 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         sudo apt-get update >/dev/null 2>&1
         sudo apt-get install -y wget unzip >/dev/null 2>&1
         
-        echo "Downloading latest source from main branch..."
+        echo "Downloading pre-built release $VERSION..."
         sudo rm -rf "$INSTALL_BASE_DIR"
         sudo mkdir -p "$INSTALL_BASE_DIR"
-        sudo wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"
+        sudo wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL" || {
+            echo -e "${RED}[!] Release $VERSION not found. Falling back to source code...${NC}"
+            REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/archive/refs/heads/main.zip"
+            sudo wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"
+        }
         
         echo "Extracting source..."
         TEMP_EXTRACT="/tmp/snapmgr_extract"
@@ -115,15 +119,20 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         sudo mkdir -p "$TEMP_EXTRACT"
         sudo unzip -qo /tmp/snapmanager.zip -d "$TEMP_EXTRACT"
         
-        # Move contents from the root folder (Snapcast-Manager-main) to INSTALL_BASE_DIR
-        ROOT_FOLDER=$(ls -d $TEMP_EXTRACT/Snapcast-Manager-*)
-        sudo cp -r $ROOT_FOLDER/. "$INSTALL_BASE_DIR/"
+        # Move contents to INSTALL_BASE_DIR. Note: source zip has a root folder, release zip does not.
+        if [ -d $TEMP_EXTRACT/Snapcast-Manager-* ]; then
+            ROOT_FOLDER=$(ls -d $TEMP_EXTRACT/Snapcast-Manager-*)
+            sudo cp -r $ROOT_FOLDER/. "$INSTALL_BASE_DIR/"
+            # Create flag to force rebuild since this is source code
+            sudo touch "$INSTALL_BASE_DIR/.rebuilding"
+        else
+            sudo cp -r $TEMP_EXTRACT/. "$INSTALL_BASE_DIR/"
+        fi
         
         sudo rm -rf "$TEMP_EXTRACT"
         sudo rm -f /tmp/snapmanager.zip
 
-        # Create flag to force rebuild
-        sudo touch "$INSTALL_BASE_DIR/.rebuilding"
+        # (Flag handled above)
 
         # Restore database if backup exists
         if [ -d "/tmp/snapmgr_data_backup" ]; then
@@ -250,23 +259,22 @@ fi
 
 # 4. Install Dependencies & Build
 echo -e "\n${YELLOW}Step 3: Installing dependencies and building project...${NC}"
-echo "Installing server dependencies..."
-cd server && npm install
 
-if [ ! -d "dist" ] || [ -f "../.rebuilding" ]; then
+if [ -d "dist" ] && [ -d "../client/dist" ] && [ ! -f "../.rebuilding" ]; then
+    echo -e "${GREEN}[OK] Pre-compiled release detected! Skipping long build process.${NC}"
+    echo "Installing server production dependencies..."
+    cd server && npm install --omit=dev
+else
+    echo "Source code detected. Building project from scratch (this may take several minutes)..."
+    echo "Installing server dependencies..."
+    cd server && npm install
     echo "Building server..."
     npm run build
-fi
 
-# Always rebuild client if DIST doesn't exist or if we want to ensure latest UI
-if [ ! -d "../client/dist" ] || [ -f "../.rebuilding" ]; then
     echo "Installing client dependencies..."
     cd ../client && npm install
     echo "Building client..."
     npm run build
-    cd ..
-else
-    echo "Client already built, skipping build step."
     cd ..
 fi
 
