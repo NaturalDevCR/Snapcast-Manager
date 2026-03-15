@@ -110,6 +110,15 @@ if [ "$SNAPSERVER_INSTALLED" = false ] && [ "$SNAPCLIENT_INSTALLED" = false ]; t
     fi
 fi
 
+# 2.5 Check for Build Essentials (for native modules like better-sqlite3)
+echo -e "\n${YELLOW}Step 2.5: Checking for build tools...${NC}"
+if ! command -v make >/dev/null 2>&1; then
+    echo -e "${YELLOW}[!] Build tools (make/gcc) not detected.${NC}"
+    if prompt_yes_no "Install build-essential? (Highly recommended for database performance)" "y"; then
+        sudo apt-get update && sudo apt-get install -y build-essential
+    fi
+fi
+
 # 3. Check for Node.js
 echo -e "\n${YELLOW}Step 2: Checking for Node.js...${NC}"
 if command -v node >/dev/null 2>&1; then
@@ -162,7 +171,7 @@ After=network.target snapserver.service
 Type=simple
 User=$USER_NAME
 WorkingDirectory=$INSTALL_DIR/server
-ExecStart=$(command -v npm) run start
+ExecStart=$(command -v node) dist/index.js
 Restart=always
 
 [Install]
@@ -171,8 +180,15 @@ EOF
 
     sudo systemctl daemon-reload
     sudo systemctl enable $SERVICE_NAME
-    sudo systemctl restart $SERVICE_NAME
-    echo -e "${GREEN}[OK] Service installed and started.${NC}"
+    if sudo systemctl restart $SERVICE_NAME; then
+        echo -e "${GREEN}[OK] Service installed and started.${NC}"
+    else
+        echo -e "${RED}[!] Service failed to start.${NC}"
+        echo "Checking logs..."
+        sudo journalctl -u $SERVICE_NAME -n 50 --no-pager
+        exit 1
+    fi
+fi
 fi
 
 echo -e "\n${GREEN}=== Installation Complete! ===${NC}"
