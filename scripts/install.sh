@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.11"
+VERSION="v0.1.12"
 
 echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
