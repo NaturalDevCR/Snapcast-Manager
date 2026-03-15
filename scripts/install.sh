@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.20"
+VERSION="v0.1.21"
 
 echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
@@ -260,7 +260,7 @@ fi
 # 4. Install Dependencies & Build
 echo -e "\n${YELLOW}Step 3: Installing dependencies and building project...${NC}"
 
-if [ -d "dist" ] && [ -d "../client/dist" ] && [ ! -f "../.rebuilding" ]; then
+if [ -d "server/dist" ] && [ -d "client/dist" ] && [ ! -f ".rebuilding" ]; then
     echo -e "${GREEN}[OK] Pre-compiled release detected! Skipping long build process.${NC}"
     echo "Installing server production dependencies..."
     cd server && npm install --omit=dev
