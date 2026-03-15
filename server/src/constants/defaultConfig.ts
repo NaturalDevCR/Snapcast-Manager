@@ -246,7 +246,7 @@ source = pipe:///tmp/snapfifo?name=default
 #filter = *:info
 #
 ###############################################################################
-\`;
+`;
 
 export const CONFIG_METADATA: Record<string, any> = {
   server: {
