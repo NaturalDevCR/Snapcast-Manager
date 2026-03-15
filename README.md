@@ -1,97 +1,115 @@
-# Snapcast Manager
+# 🎧 Snapcast Manager
 
-Web interface to manage and configure your Snapcast server (Snapserver) and its clients (Snapclient).
+<div align="center">
+  <img src="https://raw.githubusercontent.com/NaturalDevCR/Snapcast-Manager/main/client/public/favicon.ico" alt="Logo" width="120">
+  
+  **A beautiful, modern, and powerful Web Interface to manage, configure, and monitor your Snapcast infrastructure.**
 
-## Features
+  [![GitHub release (latest by date)](https://img.shields.io/github/v/release/NaturalDevCR/Snapcast-Manager?style=flat-square)](https://github.com/NaturalDevCR/Snapcast-Manager/releases/latest)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+  [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg?style=flat-square&logo=paypal)](https://paypal.me/NaturalDevCR)
+</div>
 
-- Snapcast client management.
-- Network and server scanning and configuration (for clients and administrators).
-- Automated installer as a `systemd` service on your Debian/Ubuntu based server.
+---
+
+## ✨ Features
+
+Snapcast Manager turns your raw Debian/Ubuntu server or Raspberry Pi into a premium, easy-to-manage multi-room audio hub. 
+
+- 📊 **Real-Time Live Dashboard**: Monitor active audio streams, connected clients, server health, and daemon status instantly via JSON-RPC.
+- 🎛️ **Visual Config Editor**: Never edit `snapserver.conf` manually again. Toggle all standard Snapcast properties with visual switches. Defaults are pre-populated!
+- 🔌 **Audio Source Management**: Easily add, edit, or remove pipes, tcp streams, alsa inputs, meta streams, and airplay sources.
+- 📦 **1-Click Package Manager**: Install, fix, or update `snapserver`, `ffmpeg`, `shairport-sync`, and `Node.js` directly from the web interface.
+- 🛡️ **Secure Admin Access**: Setup Wizard and JWT-based authentication to keep your configuration completely safe.
+- 📸 **Snapshots (Backups)**: Create instantly restorable backups of your instances, system state, and configurations.
+- 🌓 **Premium Dark/Light UI**: Carefully crafted user experience using Vue 3 and Tailwind CSS.
+- 📱 **Integrated Player**: One-click install of `snap-ctrl` to provide your users with a sleek material-design volume/zone controller.
+
+---
 
 ## 🚀 Quick Installation (Recommended)
 
-If you are installing on a Raspberry Pi or any Linux server (Ubuntu/Debian), the easiest method is to download and run the installation script.
+If you are installing on a Raspberry Pi or any Debian/Ubuntu-based Linux server, the absolute easiest method is our one-line automated installer.
 
-### Prerequisites:
-
+### Prerequisites
 - Operating System: Linux (Debian, Ubuntu, Raspberry Pi OS).
-- (Optional) Node.js 20 will be installed automatically if not detected.
-- (Optional) Snapcast components will be installed automatically if the installer does not detect them.
+- *(Snapcast and Node.js will be installed automatically if not detected).*
 
-### Installation Steps:
+### Run the Installer
 
-**Option 1: One-line Remote Installation (Easiest)**
-You can install everything directly by running this single command:
+You can install the manager and all its dependencies directly by running this single command in your terminal:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/NaturalDevCR/Snapcast-Manager/main/scripts/install.sh | bash
 ```
 
-*Note: If you want to skip all prompts and use defaults, add `-s -- -y` to the bash command:*
-```bash
-curl -sL https://raw.githubusercontent.com/NaturalDevCR/Snapcast-Manager/main/scripts/install.sh | bash -s -- -y
-```
+> **Note:** To skip all interactive prompts and use default settings, add `-s -- -y`:
+> `curl -sL https://raw.githubusercontent.com/NaturalDevCR/Snapcast-Manager/main/scripts/install.sh | bash -s -- -y`
 
-**Option 2: Manual Clone**
+### What the script does:
+1. Detects your hardware architecture and OS.
+2. Prompts to install the latest **Snapserver** tailored for your distribution.
+3. Installs **Node.js LTS** if missing.
+4. Downloads the pre-compiled, optimized latest release of **Snapcast Manager**.
+5. Sets up the application as an auto-starting `systemd` background service (`snapmanager`).
 
-1. Clone the repository or download the source code:
-
-   ```bash
-   git clone https://github.com/NaturalDevCR/Snapcast-Manager.git
-   cd Snapcast-Manager
-   ```
-
-2. Run the interactive installation script:
-
-   ```bash
-   bash scripts/install.sh
-   ```
-
-3. The script will do the following:
-   - Check if `snapserver` and `snapclient` are installed and ask if you want to install them.
-   - Install Node.js v20 dependencies (if necessary).
-   - Install Server (Backend) and Client (Vue/Vite Frontend) dependencies.
-   - Automatically build the frontend and backend.
-   - Configure and enable the web server to start automatically on boot using **systemd** under the service name `snapmanager`.
-
-4. Done! Access your web manager from the browser:
-   ```
-   http://<YOUR-SERVER-IP>:3000
-   ```
-   > Here you can configure your Snapserver and start the setup wizard.
+Once finished, just open your browser:
+**`http://<YOUR-SERVER-IP>:3000`**
 
 ---
 
 ## 🛠 Local Development & Execution
 
-If you want to modify the code or contribute:
+Want to modify the code, test new features, or contribute to Snapcast Manager?
 
-1. **Install core dependencies:**
-   You need [Node.js](https://nodejs.org/) v20 or later.
-
+1. **Clone & Install Dependencies**
+   *Minimum Node.js v20 is required.*
    ```bash
-   # In the root folder
+   git clone https://github.com/NaturalDevCR/Snapcast-Manager.git
+   cd Snapcast-Manager
+   
+   # Install Backend
    cd server && npm install
+   
+   # Install Frontend
    cd ../client && npm install
    ```
 
-2. **Start the Backend Development Server:**
-
+2. **Start the Backend server**
    ```bash
    cd server
    npm run dev
+   # Runs on port 3000
    ```
 
-3. **Start the Frontend Development Server:**
+3. **Start the Frontend Vue/Vite server**
    ```bash
    cd client
    npm run dev
+   # Runs on port 5173 (proxies API requests to 3000 automatically)
    ```
-
-The backend server will serve the API on port `3000`, and Vite will typically serve the frontend on port `5173`. Calls to `/api` in the frontend are automatically proxied according to the `vite.config.ts` setup.
 
 ---
 
-## 📦 About Releases
+## 📦 About Automated Releases
 
-This project includes an automated **GitHub Actions** workflow, which is triggered with every version _tag_ `push` (e.g., `v1.0.0`). This action builds both the TypeScript backend and the Vue+Vite frontend, and attaches a packaged `.zip` ready to be downloaded and run with the `install.sh` script, avoiding the need for long compilation times on small boards like the Raspberry Pi.
+This project utilizes an automated **GitHub Actions** CI/CD workflow. Whenever a new version tag (e.g., `v0.1.26`) is pushed, the workflow automatically:
+1. Compiles the TypeScript backend.
+2. Builds and minifies the Vue 3 + Vite frontend.
+3. Packages everything into an optimized `.zip` artifact.
+
+The `install.sh` script downloads this pre-built artifact, allowing you to install the manager *insanely fast* on small boards like Raspberry Pi without forcing them to compile the code locally.
+
+---
+
+## ❤️ Support & Donate
+
+If you find this project useful, it would mean the world to me if you considered supporting its continued development!
+
+[![Donate via PayPal](https://www.paypalobjects.com/en_US/DK/i/btn/btn_donateCC_LG.gif)](https://paypal.me/NaturalDevCR)
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
