@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { configService } from '../services/config';
 import { authenticateToken } from '../auth';
+import { CONFIG_METADATA } from '../constants/defaultConfig';
 
 const router = express.Router();
 
@@ -98,6 +99,19 @@ router.post('/rebuild', authenticateToken, async (req: Request, res: Response) =
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+router.get('/metadata', authenticateToken, (req, res) => {
+    res.json(CONFIG_METADATA);
+});
+
+router.post('/reset', authenticateToken, async (req, res) => {
+    try {
+        await configService.resetToDefault();
+        res.json({ message: 'Configuration reset to default' });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 export default router;

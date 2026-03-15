@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { SnapConfigParser, SnapServerConfig } from '../utils/snapConfigParser';
+import { DEFAULT_SNAPSERVER_CONF } from '../constants/defaultConfig';
 
 // Default location on Debian
 // Default locations on Debian
@@ -48,10 +49,10 @@ export class ConfigService {
         // Migrate current config to base if base doesn't exist
         console.log(`Migrating ${SNAPSERVER_CONFIG_PATH} to ${SNAPSERVER_CONFIG_BASE}...`);
         const current = await this.readServerConfig();
-        if (current) {
+        if (current && current.length > 50) { // arbitrary length to avoid migrating empty/broken files
           await fs.writeFile(SNAPSERVER_CONFIG_BASE, current, 'utf-8');
         } else {
-          await fs.writeFile(SNAPSERVER_CONFIG_BASE, '# Snapserver Base Configuration\n', 'utf-8');
+          await fs.writeFile(SNAPSERVER_CONFIG_BASE, DEFAULT_SNAPSERVER_CONF, 'utf-8');
         }
       }
     } catch (error) {
@@ -145,6 +146,11 @@ export class ConfigService {
         config.http.doc_root = docRootPath;
         await this.writeServerConfig(SnapConfigParser.stringify(config));
     }
+  }
+
+  async resetToDefault(): Promise<void> {
+    await fs.writeFile(SNAPSERVER_CONFIG_BASE, DEFAULT_SNAPSERVER_CONF, 'utf-8');
+    await this.rebuildMasterConfig();
   }
 }
 
