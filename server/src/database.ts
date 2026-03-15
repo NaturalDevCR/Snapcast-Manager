@@ -1,8 +1,18 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, '../snapmanager.db');
+const isDev = process.env.NODE_ENV !== 'production';
+const dbDir = isDev 
+  ? path.join(__dirname, '../data') 
+  : path.join(__dirname, '../../data');
+
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const dbPath = process.env.DB_PATH || path.join(dbDir, 'snapmanager.db');
 const db = new Database(dbPath);
 
 db.pragma('journal_mode = WAL');
