@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.7"
+VERSION="v0.1.8"
 
 echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
@@ -162,20 +162,65 @@ fi
 
 # 2. Check for Snapcast
 echo -e "\n${YELLOW}Step 1: Checking for Snapcast...${NC}"
-SNAPSERVER_INSTALLED=false
 
+install_latest_snapserver() {
+    echo "Fetching latest Snapserver from GitHub..."
+    local arch=$(dpkg --print-architecture)
+    local codename=$(lsb_release -cs 2>/dev/null || grep VERSION_CODENAME /etc/os-release | cut -d= -f2 | sed 's/"//g')
+    [ -z "$codename" ] && codename="bookworm"
+    
+    local api_url="https://api.github.com/repos/snapcast/snapcast/releases/latest"
+    local assets=$(curl -sL "$api_url" | grep "browser_download_url")
+    
+    # Try to find exact match: arch + codename, excluding pipewire
+    local download_url=$(echo "$assets" | grep "$arch" | grep "$codename" | grep ".deb" | grep -v "pipewire" | head -n 1 | cut -d '"' -f 4)
+    
+    # Fallback to arch only if codename match fails
+    if [ -z "$download_url" ]; then
+        echo "No exact distro match found, falling back to architecture match..."
+        download_url=$(echo "$assets" | grep "$arch" | grep ".deb" | grep -v "pipewire" | head -n 1 | cut -d '"' -f 4)
+    fi
+
+    if [ -z "$download_url" ]; then
+        echo -e "${RED}[!] Could not find a suitable Snapserver release on GitHub. Falling back to apt.${NC}"
+        sudo apt-get install -y snapserver
+        return
+    }
+
+    local deb_file="/tmp/snapserver_latest.deb"
+    echo "Downloading: $(basename "$download_url")"
+    sudo wget -qO "$deb_file" "$download_url"
+    sudo dpkg -i "$deb_file" || sudo apt-get install -f -y
+    sudo rm -f "$deb_file"
+    
+    # CRITICAL: Fix permission/home directory issue
+    echo "Applying system configuration fixes..."
+    sudo mkdir -p /var/lib/snapserver
+    sudo chown -R snapserver:snapserver /var/lib/snapserver
+    # Ensure snapserver user has /var/lib/snapserver as HOME
+    sudo usermod -d /var/lib/snapserver snapserver 2>/dev/null || true
+    
+    sudo systemctl daemon-reload
+    sudo systemctl restart snapserver || echo -e "${YELLOW}[!] Warning: Snapserver failed to start. You may need to check logs.${NC}"
+}
+
+SNAPSERVER_INSTALLED=false
 if command -v snapserver >/dev/null 2>&1; then
     echo -e "${GREEN}[OK] snapserver detected.${NC}"
     SNAPSERVER_INSTALLED=true
-else
-    echo -e "${YELLOW}[!] snapserver NOT detected.${NC}"
 fi
 
 if [ "$SNAPSERVER_INSTALLED" = false ]; then
-    if prompt_yes_no "Snapserver not found. Do you want to install it now?" "y"; then
-        echo "Installing Snapserver and FFmpeg..."
-        sudo apt-get update && sudo apt-get install -y snapserver ffmpeg
+    if prompt_yes_no "Snapserver not found. Do you want to install it from GitHub (Recommended)?" "y"; then
+        sudo apt-get update
+        sudo apt-get install -y curl wget ffmpeg lsb-release
+        install_latest_snapserver
     fi
+else
+    # Even if installed, we might want to ensure permissions are correct if running this script
+    sudo mkdir -p /var/lib/snapserver
+    sudo chown -R snapserver:snapserver /var/lib/snapserver
+    sudo usermod -d /var/lib/snapserver snapserver 2>/dev/null || true
 fi
 
 # 2.5 Check for Build Essentials (for native modules like better-sqlite3)
