@@ -133,7 +133,7 @@ fi
 echo -e "\n${YELLOW}Step 4: Setting up as a systemd service...${NC}"
 if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?" "y"; then
     USER_NAME=$(whoami)
-    INSTALL_DIR=$(pwd | xargs dirname)
+    INSTALL_DIR=$(pwd)
     
     cat <<EOF | sudo tee /etc/systemd/system/snapmanager.service
 [Unit]
