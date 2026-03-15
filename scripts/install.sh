@@ -14,6 +14,33 @@ NC='\033[0m' # No Color
 echo -e "${GREEN}=== Snapcast Manager Installer ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
 
+REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
+INSTALL_BASE_DIR="/opt/snapcast-manager"
+
+# 0. Check if we need to download the source
+if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
+    echo -e "\n${YELLOW}Project files not found in current directory.${NC}"
+    echo "It looks like you are running this script remotely."
+    read -p "Do you want to download and install to $INSTALL_BASE_DIR? (y/n): " DOWNLOAD_INSTALL
+    if [[ "$DOWNLOAD_INSTALL" == "y"* ]]; then
+        echo "Updating package list and ensuring git is installed..."
+        sudo apt-get update >/dev/null 2>&1
+        sudo apt-get install -y git >/dev/null 2>&1
+        echo "Cloning repository..."
+        sudo rm -rf "$INSTALL_BASE_DIR"
+        sudo git clone "$REPO_URL" "$INSTALL_BASE_DIR"
+        sudo chown -R $USER:$USER "$INSTALL_BASE_DIR"
+        
+        echo -e "${GREEN}Resuming installation from $INSTALL_BASE_DIR...${NC}"
+        cd "$INSTALL_BASE_DIR"
+        # Re-run the script from the new location so relative paths work
+        exec bash scripts/install.sh
+    else
+        echo "Installation aborted."
+        exit 1
+    fi
+fi
+
 # 1. Check for Linux
 if [[ "$OSTYPE" != "linux-gnu"* ]]; then
     echo -e "${RED}Error: This script is intended for Linux systems only.${NC}"
@@ -68,10 +95,22 @@ fi
 echo -e "\n${YELLOW}Step 3: Installing dependencies and building project...${NC}"
 echo "Installing server dependencies..."
 cd server && npm install
-echo "Installing client dependencies..."
-cd ../client && npm install
-echo "Building client..."
-npm run build
+
+if [ ! -d "dist" ]; then
+    echo "Building server..."
+    npm run build
+fi
+
+if [ ! -d "../client/dist" ]; then
+    echo "Installing client dependencies..."
+    cd ../client && npm install
+    echo "Building client..."
+    npm run build
+    cd ..
+else
+    echo "Client already built, skipping build step."
+    cd ..
+fi
 
 # 5. Systemd Service setup
 echo -e "\n${YELLOW}Step 4: Setting up as a systemd service...${NC}"

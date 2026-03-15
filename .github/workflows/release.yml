@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags, e.g., v1.0.0
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install & Build Server
+        working-directory: ./server
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install & Build Client
+        working-directory: ./client
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare Release Package
+        run: |
+          mkdir release_package
+          # Only include necessary files to run
+          cp -r server/dist release_package/server_dist
+          cp server/package.json release_package/server_package.json
+          cp server/package-lock.json release_package/server_package-lock.json
+          
+          mkdir release_package/client
+          cp -r client/dist release_package/client/dist
+          
+          mkdir release_package/scripts
+          cp scripts/install.sh release_package/scripts/install.sh
+          
+          # Modify the install script to work with the prebuilt files
+          cd release_package
+          
+          # The release structure is slightly different to avoid exposing source
+          # Re-create server/ structure
+          mkdir server
+          mv server_dist server/dist
+          mv server_package.json server/package.json
+          mv server_package-lock.json server/package-lock.json
+          
+          zip -r ../snapcast-manager-release.zip ./*
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: snapcast-manager-release.zip
+          generate_release_notes: true
