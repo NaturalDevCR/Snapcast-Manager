@@ -15,6 +15,13 @@ export const useSystemStore = defineStore('system', () => {
     'shairport-sync': false,
   });
 
+  const packageVersions = ref<Record<string, string>>({
+    snapserver: '',
+    ffmpeg: '',
+    'snap-ctrl': '',
+    'shairport-sync': '',
+  });
+
   async function checkStatus(service: 'snapserver' | 'shairport-sync') {
      try {
        const data = await fetchApi(`/system/status/${service}`);
@@ -29,6 +36,15 @@ export const useSystemStore = defineStore('system', () => {
     try {
       const data = await fetchApi(`/system/installed/${pkg}`);
       installedPackages.value[pkg] = data.installed;
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function checkVersion(pkg: string) {
+    try {
+      const data = await fetchApi(`/system/version/${pkg}`);
+      packageVersions.value[pkg] = data.version;
     } catch (err) {
       console.error(err);
     }
@@ -109,6 +125,10 @@ export const useSystemStore = defineStore('system', () => {
       checkInstalled('ffmpeg'),
       checkInstalled('snap-ctrl'),
       checkInstalled('shairport-sync'),
+      checkVersion('snapserver'),
+      checkVersion('ffmpeg'),
+      checkVersion('snap-ctrl'),
+      checkVersion('shairport-sync'),
     ]);
     loading.value = false;
   }
@@ -119,6 +139,7 @@ export const useSystemStore = defineStore('system', () => {
     snapserverStatus,
     shairportSyncStatus, 
     installedPackages, 
+    packageVersions,
     controlService, 
     installPackage, 
     updatePackage,
