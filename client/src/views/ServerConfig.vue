@@ -89,6 +89,35 @@ const selectedTemplate = computed(() => {
   return sourceTemplates.value.find((t: any) => t.type === selectedSourceType.value);
 });
 
+// Extract the name= parameter from a source URI
+const extractSourceName = (uri: string): string => {
+  const match = uri.match(/[?&]name=([^&]+)/);
+  return match ? decodeURIComponent(match[1]!) : '';
+};
+
+// Detect the source type from a URI for display
+const getSourceType = (uri: string): string => {
+  if (uri.startsWith('pipe://')) return 'Pipe';
+  if (uri.startsWith('librespot://')) return 'Spotify';
+  if (uri.startsWith('airplay://')) return 'AirPlay';
+  if (uri.startsWith('process://') && uri.includes('ffmpeg')) return 'FFmpeg';
+  if (uri.startsWith('process://')) return 'Process';
+  if (uri.startsWith('file://')) return 'File';
+  if (uri.startsWith('tcp://')) return 'TCP';
+  if (uri.startsWith('alsa://')) return 'ALSA';
+  if (uri.startsWith('meta://')) return 'Meta';
+  if (uri.startsWith('jack://')) return 'JACK';
+  return 'Source';
+};
+
+// Get all source names from the current config for the default_source dropdown
+const availableSourceNames = computed((): string[] => {
+  const sources = localParsedConfig.value?.stream?.source;
+  if (!sources) return [];
+  const list = Array.isArray(sources) ? sources : [sources];
+  return list.map((s: string) => extractSourceName(s)).filter((n: string) => n);
+});
+
 // Returns all property keys for the active section: metadata keys + any extra keys from the config
 const allPropertyKeys = computed(() => {
   const section = activeSection.value;
@@ -551,27 +580,57 @@ const removeSourceEntry = (idx: number) => {
                       
                       <!-- Input Column (col 5-12) -->
                       <div class="md:col-span-8">
-                          <!-- SOURCE: Special array handling -->
-                          <div v-if="key === 'source'" class="space-y-2">
+                          <!-- SOURCE: Special array handling with name labels -->
+                          <div v-if="key === 'source'" class="space-y-3">
                               <div v-if="!localParsedConfig[activeSection]?.source" class="text-xs text-slate-400 italic py-2">
                                 No sources configured. Use "Add Source" above.
                               </div>
-                              <div v-for="(_item, idx) in (Array.isArray(localParsedConfig[activeSection]?.source) ? localParsedConfig[activeSection].source : (localParsedConfig[activeSection]?.source ? [localParsedConfig[activeSection].source] : []))" :key="idx" class="flex space-x-2">
-                                  <input 
-                                    v-if="Array.isArray(localParsedConfig[activeSection]?.source)"
-                                    v-model="localParsedConfig[activeSection].source[idx]"
-                                    class="flex-1 text-[12px] font-mono font-medium px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
-                                  />
-                                  <input 
-                                    v-else
-                                    :value="localParsedConfig[activeSection]?.source"
-                                    @input="setPropertyValue(activeSection, 'source', ($event.target as HTMLInputElement).value)"
-                                    class="flex-1 text-[12px] font-mono font-medium px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
-                                  />
-                                  <button v-if="Array.isArray(localParsedConfig[activeSection]?.source)" @click="removeSourceEntry(idx as number)" class="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
-                                    <TrashIcon class="h-4 w-4" />
-                                  </button>
+                              <div v-for="(_item, idx) in (Array.isArray(localParsedConfig[activeSection]?.source) ? localParsedConfig[activeSection].source : (localParsedConfig[activeSection]?.source ? [localParsedConfig[activeSection].source] : []))" :key="idx" 
+                                class="rounded-xl border border-slate-200 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/30 overflow-hidden">
+                                  <!-- Source header with name badge -->
+                                  <div class="flex items-center justify-between px-3 py-2 bg-slate-100/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700/50">
+                                    <div class="flex items-center space-x-2">
+                                      <span class="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase tracking-widest rounded-md">
+                                        {{ getSourceType(Array.isArray(localParsedConfig[activeSection]?.source) ? localParsedConfig[activeSection].source[idx] : localParsedConfig[activeSection]?.source) }}
+                                      </span>
+                                      <span class="text-sm font-bold text-slate-700 dark:text-slate-200">
+                                        {{ extractSourceName(Array.isArray(localParsedConfig[activeSection]?.source) ? localParsedConfig[activeSection].source[idx] : localParsedConfig[activeSection]?.source) || 'Unnamed' }}
+                                      </span>
+                                    </div>
+                                    <button v-if="Array.isArray(localParsedConfig[activeSection]?.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors" title="Remove source">
+                                      <TrashIcon class="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                  <!-- Source URI input -->
+                                  <div class="px-3 py-2">
+                                    <input 
+                                      v-if="Array.isArray(localParsedConfig[activeSection]?.source)"
+                                      v-model="localParsedConfig[activeSection].source[idx]"
+                                      class="w-full text-[11px] font-mono font-medium px-3 py-1.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-300"
+                                    />
+                                    <input 
+                                      v-else
+                                      :value="localParsedConfig[activeSection]?.source"
+                                      @input="setPropertyValue(activeSection, 'source', ($event.target as HTMLInputElement).value)"
+                                      class="w-full text-[11px] font-mono font-medium px-3 py-1.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-300"
+                                    />
+                                  </div>
                               </div>
+                          </div>
+                          
+                          <!-- DEFAULT_SOURCE: Select dropdown from available source names -->
+                          <div v-else-if="key === 'default_source' && isPropertyEnabled(activeSection, key)" class="relative">
+                            <select
+                              :value="getPropertyValue(activeSection, key)"
+                              @change="setPropertyValue(activeSection, key, ($event.target as HTMLSelectElement).value)"
+                              class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white appearance-none pr-10"
+                            >
+                              <option value="">(auto — first non-meta source)</option>
+                              <option v-for="sName in availableSourceNames" :key="sName" :value="sName">
+                                {{ sName }}
+                              </option>
+                            </select>
+                            <ChevronDownIcon class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                           </div>
                           
                           <!-- DISABLED property: show default as read-only -->
