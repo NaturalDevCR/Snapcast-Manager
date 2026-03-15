@@ -98,6 +98,9 @@ export class SystemService {
       wget -qO ${debFile} "${downloadUrl}" && \
       sudo dpkg -i ${debFile} || sudo apt-get install -f -y && \
       rm -f ${debFile} && \
+      sudo mkdir -p /var/lib/snapserver && \
+      sudo chown -R snapserver:snapserver /var/lib/snapserver && \
+      sudo usermod -d /var/lib/snapserver snapserver 2>/dev/null || true && \
       sudo systemctl daemon-reload && \
       sudo systemctl restart snapserver
     `);
