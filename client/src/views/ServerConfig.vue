@@ -329,12 +329,41 @@ const buildSourceUri = (): string => {
   let uri = `${template.uriPrefix}/${path}`;
   
   const params: string[] = [];
-  for (const p of template.params) {
-    const val = sourceFormParams.value[p.key];
-    if (val !== undefined && val !== '' && val !== p.default) {
-      params.push(`${p.key}=${val}`);
-    } else if (p.required && val) {
-      params.push(`${p.key}=${val}`);
+  
+  if (template.type === 'ffmpeg_radio') {
+    // Special handling: build ffmpeg params from stream URL
+    const streamUrl = sourceFormParams.value['_stream_url'] || '';
+    const name = sourceFormParams.value['name'] || 'Radio';
+    
+    // Build the ffmpeg args: -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i <url> -f s16le -ar <rate> -ac <channels> -
+    const sampleformat = sourceFormParams.value['sampleformat'] || '48000:16:2';
+    const [rate, , channels] = sampleformat.split(':');
+    const ffmpegArgs = `-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i ${streamUrl} -f s16le -ar ${rate || '48000'} -ac ${channels || '2'} -`;
+    const encodedParams = ffmpegArgs.replace(/ /g, '%20');
+    
+    params.push(`name=${name}`);
+    
+    // Add standard params (codec, sampleformat, etc.) but skip _stream_url and name
+    for (const p of template.params) {
+      if (p.key === '_stream_url' || p.key === 'name') continue;
+      const val = sourceFormParams.value[p.key];
+      if (val !== undefined && val !== '' && val !== p.default) {
+        params.push(`${p.key}=${val}`);
+      } else if (p.required && val) {
+        params.push(`${p.key}=${val}`);
+      }
+    }
+    
+    params.push(`params=${encodedParams}`);
+  } else {
+    // Standard URI building
+    for (const p of template.params) {
+      const val = sourceFormParams.value[p.key];
+      if (val !== undefined && val !== '' && val !== p.default) {
+        params.push(`${p.key}=${val}`);
+      } else if (p.required && val) {
+        params.push(`${p.key}=${val}`);
+      }
     }
   }
   
