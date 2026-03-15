@@ -213,7 +213,6 @@ EOF
         exit 1
     fi
 fi
-fi
 
 echo -e "\n${GREEN}=== Installation Complete! ===${NC}"
 echo "You can now access the manager via the configured port (default 3000)."
