@@ -11,12 +11,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.0"
+VERSION="v0.1.1"
 
 echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
 
-REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
+REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/archive/refs/heads/main.zip"
 INSTALL_BASE_DIR="/opt/snapcast-manager"
 SERVICE_NAME="snapmanager"
 
@@ -71,9 +71,12 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
             echo "Stopping existing service..."
             sudo systemctl stop $SERVICE_NAME 2>/dev/null || true
             sudo systemctl disable $SERVICE_NAME 2>/dev/null || true
-            echo "Backing up database data..."
+            
+            echo "Checking for database data..."
             if [ -d "$INSTALL_BASE_DIR/data" ]; then
-                sudo cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
+                 echo "Backing up database data..."
+                 sudo rm -rf /tmp/snapmgr_data_backup
+                 sudo cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
             fi
             
             echo "Removing existing files..."
@@ -89,17 +92,37 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         sudo apt-get update >/dev/null 2>&1
         sudo apt-get install -y wget unzip >/dev/null 2>&1
         
-        echo "Downloading latest release..."
+        echo "Downloading latest source from main branch..."
         sudo rm -rf "$INSTALL_BASE_DIR"
         sudo mkdir -p "$INSTALL_BASE_DIR"
-        sudo wget -qO /tmp/snapmanager.zip "https://github.com/NaturalDevCR/Snapcast-Manager/releases/latest/download/snapcast-manager-release.zip"
+        sudo wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"
         
-        echo "Extracting release..."
-        sudo unzip -qo /tmp/snapmanager.zip -d "$INSTALL_BASE_DIR"
+        echo "Extracting source..."
+        TEMP_EXTRACT="/tmp/snapmgr_extract"
+        sudo rm -rf "$TEMP_EXTRACT"
+        sudo mkdir -p "$TEMP_EXTRACT"
+        sudo unzip -qo /tmp/snapmanager.zip -d "$TEMP_EXTRACT"
+        
+        # Move contents from the root folder (Snapcast-Manager-main) to INSTALL_BASE_DIR
+        ROOT_FOLDER=$(ls -d $TEMP_EXTRACT/Snapcast-Manager-*)
+        sudo cp -r $ROOT_FOLDER/. "$INSTALL_BASE_DIR/"
+        
+        sudo rm -rf "$TEMP_EXTRACT"
         sudo rm -f /tmp/snapmanager.zip
-        echo "Restoring database data..."
+
+        # Create flag to force rebuild
+        sudo touch "$INSTALL_BASE_DIR/.rebuilding"
+
+        # Restore database if backup exists
         if [ -d "/tmp/snapmgr_data_backup" ]; then
-            sudo mv /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
+            echo -e "${YELLOW}Existing database found.${NC}"
+            if prompt_yes_no "Do you want to restore your existing authentication and settings?" "y"; then
+                echo "Restoring database data..."
+                sudo mkdir -p "$INSTALL_BASE_DIR/data"
+                sudo cp -rT /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
+                echo -e "${GREEN}[OK] Data restored.${NC}"
+            fi
+            sudo rm -rf /tmp/snapmgr_data_backup
         fi
         
         sudo chown -R $USER:$USER "$INSTALL_BASE_DIR"
@@ -107,7 +130,12 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         echo -e "${GREEN}Resuming installation from $INSTALL_BASE_DIR...${NC}"
         cd "$INSTALL_BASE_DIR"
         # Re-run the script from the new location so relative paths work
-        exec bash scripts/install.sh
+        # Pass -y if it was used initially
+        if [ "$AUTO_CONFIRM" = true ]; then
+            exec bash scripts/install.sh -y
+        else
+            exec bash scripts/install.sh
+        fi
     else
         echo "Installation aborted."
         exit 1
@@ -168,12 +196,13 @@ echo -e "\n${YELLOW}Step 3: Installing dependencies and building project...${NC}
 echo "Installing server dependencies..."
 cd server && npm install
 
-if [ ! -d "dist" ]; then
+if [ ! -d "dist" ] || [ -f "../.rebuilding" ]; then
     echo "Building server..."
     npm run build
 fi
 
-if [ ! -d "../client/dist" ]; then
+# Always rebuild client if DIST doesn't exist or if we want to ensure latest UI
+if [ ! -d "../client/dist" ] || [ -f "../.rebuilding" ]; then
     echo "Installing client dependencies..."
     cd ../client && npm install
     echo "Building client..."
@@ -183,6 +212,9 @@ else
     echo "Client already built, skipping build step."
     cd ..
 fi
+
+# Clean up re-run flag
+rm -f .rebuilding
 
 # 5. Systemd Service setup
 echo -e "\n${YELLOW}Step 4: Setting up as a systemd service...${NC}"
