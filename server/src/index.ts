@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import authRouter from './auth';
 import systemRouter from './routes/system';
 import configRouter from './routes/config';
@@ -22,6 +23,14 @@ app.use('/api/snapshots', snapshotRouter);
 // Basic status route
 app.get('/api/status', (req, res) => {
   res.json({ status: 'online', service: 'Snapcast Manager' });
+});
+
+// Serve frontend static files
+app.use(express.static(path.join(__dirname, '../../client/dist')));
+
+// SPA Fallback
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
 });
 
 app.listen(PORT, () => {
