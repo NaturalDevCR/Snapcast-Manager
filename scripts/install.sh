@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.8"
+VERSION="v0.1.9"
 
 echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
@@ -185,7 +185,7 @@ install_latest_snapserver() {
         echo -e "${RED}[!] Could not find a suitable Snapserver release on GitHub. Falling back to apt.${NC}"
         sudo apt-get install -y snapserver
         return
-    }
+    fi
 
     local deb_file="/tmp/snapserver_latest.deb"
     echo "Downloading: $(basename "$download_url")"
