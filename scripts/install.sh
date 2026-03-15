@@ -72,11 +72,23 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
             sudo systemctl stop $SERVICE_NAME 2>/dev/null || true
             sudo systemctl disable $SERVICE_NAME 2>/dev/null || true
             
-            echo "Checking for database data..."
+            echo "Checking for database data in $INSTALL_BASE_DIR/data..."
             if [ -d "$INSTALL_BASE_DIR/data" ]; then
-                 echo "Backing up database data..."
-                 sudo rm -rf /tmp/snapmgr_data_backup
-                 sudo cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
+                # Check if there are actually files inside
+                if [ "$(ls -A $INSTALL_BASE_DIR/data)" ]; then
+                    echo -e "${YELLOW}Detected existing database files. Backing up...${NC}"
+                    sudo rm -rf /tmp/snapmgr_data_backup
+                    sudo cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
+                    if [ -d "/tmp/snapmgr_data_backup" ]; then
+                        echo -e "${GREEN}[OK] Database backed up to /tmp/snapmgr_data_backup${NC}"
+                    else
+                        echo -e "${RED}[!] Failed to create backup! Proceeding without backup.${NC}"
+                    fi
+                else
+                    echo "Data directory is empty, skipping backup."
+                fi
+            else
+                echo "No data directory found at $INSTALL_BASE_DIR/data."
             fi
             
             echo "Removing existing files..."
