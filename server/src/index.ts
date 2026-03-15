@@ -6,6 +6,7 @@ import authRouter from './auth';
 import systemRouter from './routes/system';
 import configRouter from './routes/config';
 import snapshotRouter from './routes/snapshot';
+import snapcastRouter from './routes/snapcast';
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/system', systemRouter);
 app.use('/api/config', configRouter);
 app.use('/api/snapshots', snapshotRouter);
+app.use('/api/snapcast', snapcastRouter);
 
 // Basic status route
 app.get('/api/status', (req, res) => {
