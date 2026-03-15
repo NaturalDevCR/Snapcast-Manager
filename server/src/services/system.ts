@@ -35,7 +35,8 @@ export class SystemService {
   async isInstalled(pkg: string): Promise<boolean> {
     try {
       if (pkg === 'snap-ctrl') {
-          await this.runCommand('ls /usr/share/snapserver/snap-ctrl/index.html');
+          // Check if directory exists and is not empty
+          await this.runCommand('[ -d "/usr/share/snapserver/snap-ctrl" ] && [ "$(ls -A /usr/share/snapserver/snap-ctrl)" ]');
           return true;
       }
       await this.runCommand(`dpkg -s ${pkg}`);
@@ -54,25 +55,39 @@ export class SystemService {
     }
   }
 
+  async getServiceLogs(service: 'snapserver' | 'shairport-sync' | 'snapmanager'): Promise<string> {
+    try {
+        // journalctl -n 100 --no-pager
+        const output = await this.runCommand(`sudo journalctl -u ${service} -n 100 --no-pager`);
+        return output;
+    } catch (error) {
+        return 'Failed to retrieve logs';
+    }
+  }
+
   async getPackageVersion(pkg: PackageName): Promise<string> {
     try {
       let cmd = '';
       switch (pkg) {
         case 'snapserver':
-          cmd = 'snapserver --version';
+          cmd = 'snapserver --version 2>&1 | head -n 1';
           break;
         case 'ffmpeg':
-          cmd = 'ffmpeg -version | head -n 1';
+          cmd = 'ffmpeg -version 2>&1 | head -n 1';
           break;
         case 'shairport-sync':
-          cmd = 'shairport-sync -V';
+          cmd = 'shairport-sync -V 2>&1 | head -n 1';
           break;
         case 'snap-ctrl':
-          return 'v1.1.0'; // Hardcoded for now as it's a static web app
+          return 'v1.1.0'; 
       }
       const output = await this.runCommand(cmd);
-      return output.split('\n')[0].trim();
+      // Clean up version string (e.g. "snapserver v0.26.0" -> "v0.26.0")
+      const firstLine = output.split('\n')[0].trim();
+      const match = firstLine.match(/v?\d+\.\d+\.\d+/);
+      return match ? match[0] : firstLine;
     } catch (error) {
+       console.error(`Error getting version for ${pkg}:`, error);
       return 'unknown';
     }
   }

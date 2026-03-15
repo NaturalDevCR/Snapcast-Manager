@@ -108,6 +108,42 @@ export const useSystemStore = defineStore('system', () => {
       await fetchApi(`/system/install-snap-ctrl`, { method: 'POST' });
       await checkInstalled('snap-ctrl');
       await checkStatus('snapserver');
+      await checkVersion('snap-ctrl');
+    } catch (err: any) {
+      error.value = err.message;
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function getLogs(service: string) {
+    try {
+      const data = await fetchApi(`/system/logs/${service}`);
+      return data.logs;
+    } catch (err) {
+      console.error(err);
+      return 'Failed to fetch logs';
+    }
+  }
+
+  async function fetchServerConfig() {
+    try {
+      const data = await fetchApi(`/config/server/parsed`);
+      return data.config;
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  }
+
+  async function saveServerConfig(config: any) {
+    loading.value = true;
+    try {
+      await fetchApi(`/config/server/parsed`, {
+        method: 'POST',
+        body: JSON.stringify({ config }),
+      });
     } catch (err: any) {
       error.value = err.message;
       throw err;
@@ -145,6 +181,9 @@ export const useSystemStore = defineStore('system', () => {
     updatePackage,
     uninstallPackage,
     installSnapCtrl,
+    getLogs,
+    fetchServerConfig,
+    saveServerConfig,
     refreshAll 
   };
 });

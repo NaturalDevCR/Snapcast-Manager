@@ -29,7 +29,7 @@ const handleInstallSnapCtrl = async () => {
   }
 };
 // Version from package.json or hardcoded since we are in a monorepo
-const version = 'v0.1.2';
+const version = 'v0.1.3';
 </script>
 
 <template>

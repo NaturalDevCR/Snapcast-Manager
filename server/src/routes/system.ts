@@ -9,12 +9,28 @@ router.use(authenticateToken);
 
 router.get('/status/:service', async (req: Request, res: Response) => {
     const { service } = req.params;
-    if (service !== 'snapserver' && service !== 'shairport-sync') {
+    if (service !== 'snapserver' && service !== 'shairport-sync' && service !== 'snapmanager') {
         return res.status(400).json({ error: 'Invalid service name' });
     }
     try {
-        const status = await systemService.getServiceStatus(service);
+        if (service === 'snapmanager') {
+            return res.json({ service, status: 'active' });
+        }
+        const status = await systemService.getServiceStatus(service as any);
         res.json({ service, status });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/logs/:service', async (req: Request, res: Response) => {
+    const { service } = req.params;
+    if (service !== 'snapserver' && service !== 'shairport-sync' && service !== 'snapmanager') {
+        return res.status(400).json({ error: 'Invalid service name' });
+    }
+    try {
+        const logs = await systemService.getServiceLogs(service as any);
+        res.json({ service, logs });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -122,6 +138,16 @@ router.post('/install-snap-ctrl', async (req: Request, res: Response) => {
         await systemService.restartService('snapserver');
         
         res.json({ message: 'snap-ctrl installed and configured successfully', output });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/version/:pkg', async (req: Request, res: Response) => {
+    const { pkg } = req.params;
+    try {
+        const version = await systemService.getPackageVersion(pkg as any);
+        res.json({ pkg, version });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
