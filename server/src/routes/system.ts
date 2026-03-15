@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
-import { systemService, PackageName } from '../services/system';
+import { systemService } from '../services/system';
+import { configService } from '../services/config';
 import { authenticateToken } from '../auth';
 
 const router = express.Router();
@@ -8,7 +9,7 @@ router.use(authenticateToken);
 
 router.get('/status/:service', async (req: Request, res: Response) => {
     const { service } = req.params;
-    if (service !== 'snapserver' && service !== 'snapclient') {
+    if (service !== 'snapserver' && service !== 'shairport-sync') {
         return res.status(400).json({ error: 'Invalid service name' });
     }
     try {
@@ -21,7 +22,7 @@ router.get('/status/:service', async (req: Request, res: Response) => {
 
 router.post('/service/:action/:service', async (req: Request, res: Response) => {
     const { action, service } = req.params;
-    if (service !== 'snapserver' && service !== 'snapclient') {
+    if (service !== 'snapserver' && service !== 'shairport-sync') {
         return res.status(400).json({ error: 'Invalid service name' });
     }
     
@@ -59,7 +60,7 @@ router.post('/service/:action/:service', async (req: Request, res: Response) => 
 
 router.get('/installed/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg') {
+    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'snap-ctrl' && pkg !== 'shairport-sync') {
         return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
@@ -72,7 +73,7 @@ router.get('/installed/:pkg', async (req: Request, res: Response) => {
 
 router.post('/install/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg') {
+    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync') {
         return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
@@ -83,9 +84,22 @@ router.post('/install/:pkg', async (req: Request, res: Response) => {
     }
 });
 
+router.post('/update/:pkg', async (req: Request, res: Response) => {
+    const { pkg } = req.params;
+    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync') {
+         return res.status(400).json({ error: 'Invalid package name' });
+    }
+    try {
+        const output = await systemService.updatePackage(pkg);
+        res.json({ message: `${pkg} updated`, output });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 router.post('/uninstall/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg') {
+    if (pkg !== 'snapserver' && pkg !== 'ffmpeg') {
          return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
@@ -93,6 +107,23 @@ router.post('/uninstall/:pkg', async (req: Request, res: Response) => {
         res.json({ message: `${pkg} uninstalled`, output });
     } catch (error: any) {
          res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/install-snap-ctrl', async (req: Request, res: Response) => {
+    try {
+        console.log('Starting snap-ctrl installation...');
+        const output = await systemService.installSnapCtrl();
+        
+        console.log('Configuring snapserver to use snap-ctrl...');
+        await configService.setSnapserverDocRoot('/usr/share/snapserver/snap-ctrl');
+        
+        console.log('Restarting snapserver...');
+        await systemService.restartService('snapserver');
+        
+        res.json({ message: 'snap-ctrl installed and configured successfully', output });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 });
 
