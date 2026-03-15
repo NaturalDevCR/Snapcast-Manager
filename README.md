@@ -7,7 +7,7 @@
 
   [![GitHub release (latest by date)](https://img.shields.io/github/v/release/NaturalDevCR/Snapcast-Manager?style=flat-square)](https://github.com/NaturalDevCR/Snapcast-Manager/releases/latest)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-  [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg?style=flat-square&logo=paypal)](https://paypal.me/NaturalDevCR)
+  [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg?style=flat-square&logo=paypal)](https://www.paypal.com/paypalme/NaturalCloud)
 </div>
 
 ---
@@ -106,7 +106,7 @@ The `install.sh` script downloads this pre-built artifact, allowing you to insta
 
 If you find this project useful, it would mean the world to me if you considered supporting its continued development!
 
-[![Donate via PayPal](https://www.paypalobjects.com/en_US/DK/i/btn/btn_donateCC_LG.gif)](https://paypal.me/NaturalDevCR)
+[![Donate via PayPal](https://www.paypalobjects.com/en_US/DK/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/paypalme/NaturalCloud)
 
 ---
 
