@@ -3,6 +3,7 @@ import Dashboard from '../views/Dashboard.vue'
 import Login from '../views/Login.vue'
 import ServerConfig from '../views/ServerConfig.vue'
 import Setup from '../views/Setup.vue'
+import Logs from '../views/Logs.vue'
 import { fetchApi } from '../utils/api'
 
 const router = createRouter({
@@ -28,6 +29,12 @@ const router = createRouter({
       path: '/server',
       name: 'server-config',
       component: ServerConfig,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/logs',
+      name: 'logs',
+      component: Logs,
       meta: { requiresAuth: true }
     }
   ]
