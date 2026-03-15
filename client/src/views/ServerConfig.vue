@@ -421,6 +421,9 @@ const getMetaForKey = (section: string, key: string) => {
                             <PlusIcon class="h-3 w-3 mr-1" />
                             Add Property
                           </button>
+                          <button @click="triggerRemoveSection(activeSection)" class="inline-flex items-center p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors" title="Delete Section">
+                            <TrashIcon class="h-4 w-4" />
+                          </button>
                       </div>
                   </div>
               </template>
