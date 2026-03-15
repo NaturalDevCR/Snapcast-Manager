@@ -31,9 +31,15 @@ router.post('/setup', (req: Request, res: Response) => {
 
     const hashedPassword = bcrypt.hashSync(password, 10);
     const insert = db.prepare('INSERT INTO users (username, password) VALUES (?, ?)');
-    insert.run(username, hashedPassword);
+    const result = insert.run(username, hashedPassword);
 
-    res.status(201).json({ message: 'Admin user created successfully' });
+    const token = jwt.sign({ id: result.lastInsertRowid, username, role: 'admin' }, JWT_SECRET, { expiresIn: '1d' });
+
+    res.status(201).json({ 
+      message: 'Admin user created successfully',
+      token,
+      user: { id: result.lastInsertRowid, username, role: 'admin' }
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

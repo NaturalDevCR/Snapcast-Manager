@@ -3,12 +3,15 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { fetchApi } from '../utils/api';
 
+import { useAuthStore } from '../stores/auth';
+
 const username = ref('');
 const password = ref('');
 const confirmPassword = ref('');
 const loading = ref(false);
 const error = ref('');
 const router = useRouter();
+const authStore = useAuthStore();
 
 const handleSetup = async () => {
     if (password.value !== confirmPassword.value) {
@@ -20,7 +23,7 @@ const handleSetup = async () => {
     error.value = '';
 
     try {
-        await fetchApi('/auth/setup', {
+        const data = await fetchApi('/auth/setup', {
             method: 'POST',
             body: JSON.stringify({
                 username: username.value,
@@ -28,8 +31,14 @@ const handleSetup = async () => {
             }),
         });
         
-        alert('System initialized successfully! Please log in.');
-        router.push('/login');
+        // Auto-login logic
+        authStore.token = data.token;
+        authStore.user = data.user;
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        alert('System initialized successfully! Automatically logged in.');
+        router.push('/');
     } catch (err: any) {
         error.value = err.message || 'Setup failed';
     } finally {

@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-VERSION="v0.0.8"
+VERSION="v0.0.9"
 
 echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
@@ -71,6 +71,11 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
             echo "Stopping existing service..."
             sudo systemctl stop $SERVICE_NAME 2>/dev/null || true
             sudo systemctl disable $SERVICE_NAME 2>/dev/null || true
+            echo "Backing up database data..."
+            if [ -d "$INSTALL_BASE_DIR/data" ]; then
+                sudo cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
+            fi
+            
             echo "Removing existing files..."
             sudo rm -rf "$INSTALL_BASE_DIR"
         else
@@ -92,6 +97,11 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         echo "Extracting release..."
         sudo unzip -qo /tmp/snapmanager.zip -d "$INSTALL_BASE_DIR"
         sudo rm -f /tmp/snapmanager.zip
+        echo "Restoring database data..."
+        if [ -d "/tmp/snapmgr_data_backup" ]; then
+            sudo mv /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
+        fi
+        
         sudo chown -R $USER:$USER "$INSTALL_BASE_DIR"
         
         echo -e "${GREEN}Resuming installation from $INSTALL_BASE_DIR...${NC}"
