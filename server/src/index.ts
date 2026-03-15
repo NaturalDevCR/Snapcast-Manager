@@ -28,8 +28,8 @@ app.get('/api/status', (req, res) => {
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../../client/dist')));
 
-// SPA Fallback - Express 5 compatible syntax
-app.get('(.*)', (req, res) => {
+// SPA Fallback - Path-less middleware for Express 5 compatibility
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
 });
 
