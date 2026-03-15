@@ -51,13 +51,44 @@ export class SnapConfigParser {
     
     for (const [section, props] of Object.entries(config)) {
       content += `[${section}]\n`;
-      for (const [key, value] of Object.entries(props)) {
-        if (Array.isArray(value)) {
-          for (const item of value) {
-            content += `${key} = ${item}\n`;
-          }
-        } else {
+      
+      if (section === 'stream') {
+        // Stream section: output non-source properties first, then sources with name comments
+        for (const [key, value] of Object.entries(props)) {
+          if (key === 'source') continue; // Handle sources after
+          if (Array.isArray(value)) {
+            for (const item of value) {
+              content += `${key} = ${item}\n`;
+            }
+          } else {
             content += `${key} = ${value}\n`;
+          }
+        }
+        
+        // Now output sources with name comments
+        const sources = props.source;
+        if (sources !== undefined) {
+          const sourceList = Array.isArray(sources) ? sources : [sources];
+          for (const src of sourceList) {
+            const srcStr = String(src);
+            const nameMatch = srcStr.match(/[?&]name=([^&]+)/);
+            const sourceName = nameMatch ? decodeURIComponent(nameMatch[1]!) : '';
+            if (sourceName) {
+              content += `# ${sourceName}\n`;
+            }
+            content += `source = ${srcStr}\n`;
+          }
+        }
+      } else {
+        // Standard section handling
+        for (const [key, value] of Object.entries(props)) {
+          if (Array.isArray(value)) {
+            for (const item of value) {
+              content += `${key} = ${item}\n`;
+            }
+          } else {
+            content += `${key} = ${value}\n`;
+          }
         }
       }
       content += '\n';
