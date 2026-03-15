@@ -8,6 +8,7 @@ export const useConfigStore = defineStore('config', () => {
   const serverConfig = ref('');
   const serverConfigParsed = ref<any>({});
   const clientConfig = ref<Record<string, string>>({});
+  const configSegments = ref<{name: string, content: string}[]>([]);
 
   async function fetchServerConfig() {
     loading.value = true;
@@ -93,6 +94,63 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
+  async function fetchConfigSegments() {
+    loading.value = true;
+    try {
+      const data = await fetchApi('/config/segments');
+      configSegments.value = data;
+    } catch (err: any) {
+      error.value = err.message;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function saveConfigSegment(name: string, content: string) {
+    loading.value = true;
+    try {
+      await fetchApi('/config/segments', {
+        method: 'POST',
+        body: JSON.stringify({ name, content }),
+      });
+      await fetchConfigSegments();
+    } catch (err: any) {
+      error.value = err.message;
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function deleteConfigSegment(name: string) {
+    loading.value = true;
+    try {
+      await fetchApi(`/config/segments/${name}`, {
+        method: 'DELETE',
+      });
+      await fetchConfigSegments();
+    } catch (err: any) {
+      error.value = err.message;
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function rebuildMasterConfig() {
+    loading.value = true;
+    try {
+      await fetchApi('/config/rebuild', {
+        method: 'POST',
+      });
+    } catch (err: any) {
+      error.value = err.message;
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   return { 
     loading, 
     error, 
@@ -104,6 +162,11 @@ export const useConfigStore = defineStore('config', () => {
     updateServerConfig, 
     updateServerConfigParsed,
     fetchClientConfig, 
-    updateClientConfig 
+    updateClientConfig,
+    configSegments,
+    fetchConfigSegments,
+    saveConfigSegment,
+    deleteConfigSegment,
+    rebuildMasterConfig
   };
 });

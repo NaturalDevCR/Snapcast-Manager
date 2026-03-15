@@ -15,12 +15,16 @@ onMounted(() => {
   systemStore.refreshAll();
 });
 
-const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl') => {
+const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl', clean: boolean = false) => {
+  if (clean && !confirm(`WARNING: This will UNINSTALL ${pkg} and DELETE ALL its configuration and data files before a fresh installation. Continue?`)) {
+      return;
+  }
+  
   try {
-    await systemStore.updatePackage(pkg);
-    uiStore.showToast(`${pkg} updated successfully!`, 'success');
+    await systemStore.updatePackage(pkg, clean);
+    uiStore.showToast(`${pkg} ${clean ? 'reinstalled' : 'updated'} successfully!`, 'success');
   } catch (err: any) {
-    uiStore.showToast(`Failed to update ${pkg}: ` + err.message, 'error');
+    uiStore.showToast(`Failed to ${clean ? 'reinstall' : 'update'} ${pkg}: ` + err.message, 'error');
   }
 };
 
@@ -35,7 +39,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Version from package.json
-const version = 'v0.1.9';
+const version = 'v0.1.10';
 </script>
 
 <template>
@@ -106,7 +110,7 @@ const version = 'v0.1.9';
                     <button v-if="systemStore.snapserverStatus === 'active'" @click="systemStore.controlService('stop', 'snapserver')" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl hover:bg-red-500 hover:text-white transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
                     <button v-else @click="systemStore.controlService('start', 'snapserver')" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl hover:bg-green-500 hover:text-white transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
                 </div>
-                <button @click="handleUpdate('snapserver')" 
+                <button @click="handleUpdate('snapserver', systemStore.packageVersions.snapserver === systemStore.availableVersions.snapserver || systemStore.availableVersions.snapserver === 'unknown')" 
                         :class="[
                             'w-full px-4 py-2.5 rounded-xl text-xs font-black transition-all active:scale-95 disabled:opacity-50',
                             systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown'
@@ -114,7 +118,7 @@ const version = 'v0.1.9';
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                         ]"
                         :disabled="systemStore.loading">
-                    {{ systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' ? 'INSTALL UPDATE' : 'REINSTALL / FIX' }}
+                    {{ systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' ? 'INSTALL UPDATE' : 'CLEAN REINSTALL / FIX' }}
                 </button>
             </div>
             <div class="pt-4" v-else>

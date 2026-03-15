@@ -25,13 +25,13 @@ export class SystemService {
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y ${pkg}`);
   }
 
-  async updatePackage(pkg: PackageName): Promise<string> {
+  async updatePackage(pkg: PackageName, clean: boolean = false): Promise<string> {
     if (pkg === 'snap-ctrl') {
       return this.installSnapCtrl();
     }
     
     if (pkg === 'snapserver') {
-      return this.updateSnapserverFromGitHub();
+      return this.updateSnapserverFromGitHub(clean);
     }
 
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y --only-upgrade ${pkg}`);
@@ -58,7 +58,7 @@ export class SystemService {
     return 'bookworm';
   }
 
-  private async updateSnapserverFromGitHub(): Promise<string> {
+  private async updateSnapserverFromGitHub(clean: boolean = false): Promise<string> {
     const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
     const arch = await this.runCommand('dpkg --print-architecture');
     const archTrimmed = arch.trim();
@@ -83,17 +83,27 @@ export class SystemService {
       if (!fallbackAsset) {
         throw new Error(`Could not find a .deb asset for architecture ${archTrimmed} (Distro: ${codename}) in Snapcast release ${release.tag_name}`);
       }
-      return this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name);
+      return this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name, clean);
+    }
+ 
+    return this.executeDebUpdate(asset.browser_download_url, asset.name, clean);
+  }
+ 
+  private async executeDebUpdate(downloadUrl: string, fileName: string, clean: boolean = false): Promise<string> {
+    const debFile = `/tmp/${fileName}`;
+    console.log(`Downloading Snapserver from ${downloadUrl}... (Clean: ${clean})`);
+     
+    let cleanCmd = '';
+    if (clean) {
+      cleanCmd = `
+        sudo systemctl stop snapserver || true && \
+        sudo dpkg --purge snapserver || true && \
+        sudo rm -rf /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /var/lib/snapserver && \
+      `;
     }
 
-    return this.executeDebUpdate(asset.browser_download_url, asset.name);
-  }
-
-  private async executeDebUpdate(downloadUrl: string, fileName: string): Promise<string> {
-    const debFile = `/tmp/${fileName}`;
-    console.log(`Downloading Snapserver from ${downloadUrl}...`);
-    
     return this.runCommand(`
+      ${cleanCmd}
       sudo apt-get update && \
       wget -qO ${debFile} "${downloadUrl}" && \
       sudo dpkg -i ${debFile} || sudo apt-get install -f -y && \
@@ -244,6 +254,7 @@ export class SystemService {
       const repo = 'NaturalDevCR/snap-ctrl';
       const apiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
       const installPath = '/usr/share/snapserver/snap-ctrl';
+      const docRootPath = '/usr/share/snapserver/snap-ctrl/dist';
       
       console.log(`Installing snap-ctrl from ${apiUrl}...`);
       
@@ -278,7 +289,7 @@ export class SystemService {
       
       // Update snapserver config to use this doc_root
       try {
-          await configService.setSnapserverDocRoot(installPath);
+          await configService.setSnapserverDocRoot(docRootPath);
           await this.restartService('snapserver');
       } catch (err) {
           console.error('Failed to update snapserver config for snap-ctrl:', err);

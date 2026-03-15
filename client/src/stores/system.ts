@@ -95,10 +95,13 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  async function updatePackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl') {
+  async function updatePackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl', clean: boolean = false) {
     loading.value = true;
     try {
-      await fetchApi(`/system/update/${pkg}`, { method: 'POST' });
+      await fetchApi(`/system/update/${pkg}`, { 
+        method: 'POST',
+        body: JSON.stringify({ clean })
+      });
       await Promise.all([
           checkInstalled(pkg as any),
           checkVersion(pkg as any),

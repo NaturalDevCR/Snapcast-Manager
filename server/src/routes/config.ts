@@ -50,4 +50,54 @@ router.post('/server/parsed', async (req: Request, res: Response) => {
     }
 });
 
+router.post('/save', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    await configService.writeServerConfig(req.body.config);
+    res.json({ message: 'Configuration saved successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Modular Configuration Routes
+router.get('/segments', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const segments = await configService.getSegments();
+    res.json(segments);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/segments', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { name, content } = req.body;
+    if (!name || content === undefined) {
+      return res.status(400).json({ error: 'Name and content are required' });
+    }
+    await configService.saveSegment(name, content);
+    res.json({ message: 'Segment saved successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/segments/:name', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    await configService.deleteSegment(req.params.name);
+    res.json({ message: 'Segment deleted successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/rebuild', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    await configService.rebuildMasterConfig();
+    res.json({ message: 'Configuration rebuilt successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
