@@ -517,12 +517,7 @@ const removeSourceEntry = (idx: number) => {
                           <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5">{{ currentSectionMeta.description }}</p>
                         </div>
                       </div>
-                      <div class="flex items-center space-x-2">
-                          <!-- Add Source button for stream section -->
-                          <button v-if="activeSection === 'stream'" @click="openAddSourceDialog" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10 rounded-lg transition-colors uppercase tracking-widest border border-emerald-200 dark:border-emerald-800">
-                            <PlusIcon class="h-3 w-3 mr-1" />
-                            Add Source
-                          </button>
+                      <div v-if="activeSection !== 'stream'" class="flex items-center space-x-2">
                           <button @click="triggerAddProperty(activeSection)" class="inline-flex items-center px-2 py-1 text-[10px] font-black text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors uppercase tracking-widest" title="Add custom property">
                             <PlusIcon class="h-3 w-3 mr-1" />
                             Custom
@@ -531,7 +526,195 @@ const removeSourceEntry = (idx: number) => {
                   </div>
               </template>
               
-              <div class="space-y-1">
+              <div v-if="activeSection === 'stream'">
+                  <!-- ==== SUB-SECTION 1: Audio Sources ==== -->
+                  <div class="mb-2">
+                    <div class="flex items-center justify-between mb-4">
+                      <div class="flex items-center space-x-2">
+                        <MusicalNoteIcon class="h-4 w-4 text-emerald-500" />
+                        <h3 class="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">Audio Sources</h3>
+                        <span v-if="availableSourceNames.length" class="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-[10px] font-black rounded-full">{{ availableSourceNames.length }}</span>
+                      </div>
+                      <button @click="openAddSourceDialog" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10 rounded-lg transition-colors uppercase tracking-widest border border-emerald-200 dark:border-emerald-800">
+                        <PlusIcon class="h-3 w-3 mr-1" />
+                        Add Source
+                      </button>
+                    </div>
+                    
+                    <div v-if="!localParsedConfig.stream?.source" class="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-700/50 rounded-xl">
+                      <MusicalNoteIcon class="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">No sources configured</p>
+                      <p class="text-[10px] text-slate-400 mt-1">Use "Add Source" to create your first audio stream</p>
+                    </div>
+                    
+                    <div v-else class="space-y-3">
+                      <div v-for="(_item, idx) in (Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source : [localParsedConfig.stream.source])" :key="idx"
+                        class="rounded-xl border border-slate-200 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/30 overflow-hidden">
+                        <!-- Source header with name badge -->
+                        <div class="flex items-center justify-between px-3 py-2 bg-slate-100/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700/50">
+                          <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase tracking-widest rounded-md">
+                              {{ getSourceType(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) }}
+                            </span>
+                            <span class="text-sm font-bold text-slate-700 dark:text-slate-200">
+                              {{ extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'Unnamed' }}
+                            </span>
+                          </div>
+                          <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors" title="Remove source">
+                            <TrashIcon class="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <!-- Source URI input -->
+                        <div class="px-3 py-2">
+                          <input 
+                            v-if="Array.isArray(localParsedConfig.stream.source)"
+                            v-model="localParsedConfig.stream.source[idx]"
+                            class="w-full text-[11px] font-mono font-medium px-3 py-1.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-300"
+                          />
+                          <input 
+                            v-else
+                            :value="localParsedConfig.stream.source"
+                            @input="setPropertyValue('stream', 'source', ($event.target as HTMLInputElement).value)"
+                            class="w-full text-[11px] font-mono font-medium px-3 py-1.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-300"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- ==== DIVIDER ==== -->
+                  <div class="border-t border-slate-200 dark:border-slate-700/50 my-6"></div>
+
+                  <!-- ==== SUB-SECTION 2: Stream Settings ==== -->
+                  <div>
+                    <div class="flex items-center justify-between mb-4">
+                      <div class="flex items-center space-x-2">
+                        <AdjustmentsHorizontalIcon class="h-4 w-4 text-indigo-500" />
+                        <h3 class="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">Stream Settings</h3>
+                      </div>
+                      <button @click="triggerAddProperty('stream')" class="inline-flex items-center px-2 py-1 text-[10px] font-black text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors uppercase tracking-widest" title="Add custom property">
+                        <PlusIcon class="h-3 w-3 mr-1" />
+                        Custom
+                      </button>
+                    </div>
+                    
+                    <div class="space-y-1">
+                      <div v-for="key in allPropertyKeys.filter(k => k !== 'source')" :key="key"
+                        :class="[
+                          'grid grid-cols-1 md:grid-cols-12 gap-3 items-start py-3 px-4 rounded-xl transition-all -mx-4',
+                          isPropertyEnabled('stream', key)
+                            ? 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
+                            : 'opacity-40 hover:opacity-60'
+                        ]">
+                        <!-- Enable/Disable Toggle -->
+                        <div class="md:col-span-1 flex items-center pt-1">
+                          <button 
+                            @click="toggleProperty('stream', key)"
+                            :class="[
+                              'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
+                              isPropertyEnabled('stream', key) ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                            ]"
+                            :title="isPropertyEnabled('stream', key) ? 'Disable this property' : 'Enable this property'"
+                          >
+                            <span :class="[isPropertyEnabled('stream', key) ? 'translate-x-4' : 'translate-x-0', 'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
+                          </button>
+                        </div>
+                        <!-- Label Column -->
+                        <div class="md:col-span-3">
+                          <div class="flex flex-col min-w-0">
+                            <label class="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                              {{ getMetaForKey('stream', key)?.label || key }}
+                            </label>
+                            <span v-if="getMetaForKey('stream', key)?.description" 
+                              class="text-[10px] text-slate-400 dark:text-slate-500 leading-snug mt-0.5">
+                              {{ getMetaForKey('stream', key)?.description }}
+                            </span>
+                            <span v-if="getMetaForKey('stream', key)?.default !== undefined" 
+                              class="text-[9px] text-indigo-400/70 dark:text-indigo-500/70 mt-0.5 font-mono">
+                              default: {{ getMetaForKey('stream', key)?.default }}
+                            </span>
+                          </div>
+                        </div>
+                        <!-- Input Column -->
+                        <div class="md:col-span-8">
+                          <!-- DEFAULT_SOURCE: Select dropdown from available source names -->
+                          <div v-if="key === 'default_source' && isPropertyEnabled('stream', key)" class="relative">
+                            <select
+                              :value="getPropertyValue('stream', key)"
+                              @change="setPropertyValue('stream', key, ($event.target as HTMLSelectElement).value)"
+                              class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white appearance-none pr-10"
+                            >
+                              <option value="">(auto — first non-meta source)</option>
+                              <option v-for="sName in availableSourceNames" :key="sName" :value="sName">
+                                {{ sName }}
+                              </option>
+                            </select>
+                            <ChevronDownIcon class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                          </div>
+                          
+                          <!-- DISABLED property: show default as read-only -->
+                          <div v-else-if="!isPropertyEnabled('stream', key)" class="py-1">
+                            <span class="text-xs text-slate-400 font-mono">
+                              {{ getMetaForKey('stream', key)?.default ?? '(empty)' }}
+                            </span>
+                          </div>
+
+                          <!-- Boolean Toggle -->
+                          <div v-else-if="getMetaForKey('stream', key)?.type === 'boolean'" class="flex items-center py-1">
+                            <button 
+                              @click="setPropertyValue('stream', key, String(getPropertyValue('stream', key)) === 'true' ? 'false' : 'true')"
+                              :class="[
+                                'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 dark:focus:ring-offset-slate-900',
+                                String(getPropertyValue('stream', key)) === 'true' ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                              ]"
+                            >
+                              <span :class="[String(getPropertyValue('stream', key)) === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
+                            </button>
+                            <span class="ml-3 text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">
+                              {{ String(getPropertyValue('stream', key)) === 'true' ? 'Enabled' : 'Disabled' }}
+                            </span>
+                          </div>
+                          
+                          <!-- Select Dropdown -->
+                          <div v-else-if="getMetaForKey('stream', key)?.type === 'select'" class="relative">
+                            <select
+                              :value="getPropertyValue('stream', key)"
+                              @change="setPropertyValue('stream', key, ($event.target as HTMLSelectElement).value)"
+                              class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white appearance-none pr-10"
+                            >
+                              <option v-for="opt in getMetaForKey('stream', key)?.options" :key="opt" :value="opt">
+                                {{ opt || '(auto)' }}
+                              </option>
+                            </select>
+                            <ChevronDownIcon class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                          </div>
+
+                          <!-- Number Input -->
+                          <input 
+                            v-else-if="getMetaForKey('stream', key)?.type === 'number'"
+                            type="number"
+                            :value="getPropertyValue('stream', key)"
+                            @input="setPropertyValue('stream', key, ($event.target as HTMLInputElement).value)"
+                            :placeholder="String(getMetaForKey('stream', key)?.default ?? '')"
+                            class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                          />
+                          
+                          <!-- Default Text Input -->
+                          <input 
+                            v-else
+                            :value="getPropertyValue('stream', key)"
+                            @input="setPropertyValue('stream', key, ($event.target as HTMLInputElement).value)"
+                            :placeholder="String(getMetaForKey('stream', key)?.default ?? '')"
+                            class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+              </div>
+
+              <!-- ==== NON-STREAM SECTIONS: Standard property loop ==== -->
+              <div v-else class="space-y-1">
                   <div v-if="allPropertyKeys.length === 0" class="text-center py-12 border-2 border-dashed border-slate-100 dark:border-slate-800/50 rounded-xl">
                       <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">No properties available for this section</p>
                   </div>
@@ -545,7 +728,7 @@ const removeSourceEntry = (idx: number) => {
                     ]">
                       
                       <!-- Enable/Disable Toggle (col 1) -->
-                      <div class="md:col-span-1 flex items-center pt-1" v-if="key !== 'source'">
+                      <div class="md:col-span-1 flex items-center pt-1">
                         <button 
                           @click="toggleProperty(activeSection, key)"
                           :class="[
@@ -556,9 +739,6 @@ const removeSourceEntry = (idx: number) => {
                         >
                           <span :class="[isPropertyEnabled(activeSection, key) ? 'translate-x-4' : 'translate-x-0', 'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                         </button>
-                      </div>
-                      <div class="md:col-span-1" v-else>
-                        <!-- Source is always enabled, just a spacer -->
                       </div>
 
                       <!-- Label Column (col 2-4) -->
@@ -580,61 +760,8 @@ const removeSourceEntry = (idx: number) => {
                       
                       <!-- Input Column (col 5-12) -->
                       <div class="md:col-span-8">
-                          <!-- SOURCE: Special array handling with name labels -->
-                          <div v-if="key === 'source'" class="space-y-3">
-                              <div v-if="!localParsedConfig[activeSection]?.source" class="text-xs text-slate-400 italic py-2">
-                                No sources configured. Use "Add Source" above.
-                              </div>
-                              <div v-for="(_item, idx) in (Array.isArray(localParsedConfig[activeSection]?.source) ? localParsedConfig[activeSection].source : (localParsedConfig[activeSection]?.source ? [localParsedConfig[activeSection].source] : []))" :key="idx" 
-                                class="rounded-xl border border-slate-200 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/30 overflow-hidden">
-                                  <!-- Source header with name badge -->
-                                  <div class="flex items-center justify-between px-3 py-2 bg-slate-100/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700/50">
-                                    <div class="flex items-center space-x-2">
-                                      <span class="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase tracking-widest rounded-md">
-                                        {{ getSourceType(Array.isArray(localParsedConfig[activeSection]?.source) ? localParsedConfig[activeSection].source[idx] : localParsedConfig[activeSection]?.source) }}
-                                      </span>
-                                      <span class="text-sm font-bold text-slate-700 dark:text-slate-200">
-                                        {{ extractSourceName(Array.isArray(localParsedConfig[activeSection]?.source) ? localParsedConfig[activeSection].source[idx] : localParsedConfig[activeSection]?.source) || 'Unnamed' }}
-                                      </span>
-                                    </div>
-                                    <button v-if="Array.isArray(localParsedConfig[activeSection]?.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors" title="Remove source">
-                                      <TrashIcon class="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                  <!-- Source URI input -->
-                                  <div class="px-3 py-2">
-                                    <input 
-                                      v-if="Array.isArray(localParsedConfig[activeSection]?.source)"
-                                      v-model="localParsedConfig[activeSection].source[idx]"
-                                      class="w-full text-[11px] font-mono font-medium px-3 py-1.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-300"
-                                    />
-                                    <input 
-                                      v-else
-                                      :value="localParsedConfig[activeSection]?.source"
-                                      @input="setPropertyValue(activeSection, 'source', ($event.target as HTMLInputElement).value)"
-                                      class="w-full text-[11px] font-mono font-medium px-3 py-1.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-300"
-                                    />
-                                  </div>
-                              </div>
-                          </div>
-                          
-                          <!-- DEFAULT_SOURCE: Select dropdown from available source names -->
-                          <div v-else-if="key === 'default_source' && isPropertyEnabled(activeSection, key)" class="relative">
-                            <select
-                              :value="getPropertyValue(activeSection, key)"
-                              @change="setPropertyValue(activeSection, key, ($event.target as HTMLSelectElement).value)"
-                              class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white appearance-none pr-10"
-                            >
-                              <option value="">(auto — first non-meta source)</option>
-                              <option v-for="sName in availableSourceNames" :key="sName" :value="sName">
-                                {{ sName }}
-                              </option>
-                            </select>
-                            <ChevronDownIcon class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                          </div>
-                          
                           <!-- DISABLED property: show default as read-only -->
-                          <div v-else-if="!isPropertyEnabled(activeSection, key)" class="py-1">
+                          <div v-if="!isPropertyEnabled(activeSection, key)" class="py-1">
                             <span class="text-xs text-slate-400 font-mono">
                               {{ getMetaForKey(activeSection, key)?.default ?? '(empty)' }}
                             </span>
