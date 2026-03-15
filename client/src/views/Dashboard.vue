@@ -29,7 +29,7 @@ const handleInstallSnapCtrl = async () => {
   }
 };
 // Version from package.json or hardcoded since we are in a monorepo
-const version = 'v0.1.3';
+const version = 'v0.1.4';
 </script>
 
 <template>
@@ -63,6 +63,14 @@ const version = 'v0.1.3';
         </div>
         <div class="flex items-center justify-between mt-2" v-if="systemStore.installedPackages.snapserver">
              <span class="text-gray-600 dark:text-gray-300 text-xs">Version: {{ systemStore.packageVersions.snapserver || '...' }}</span>
+             <span v-if="systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' && systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver" 
+                   class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                 UPDATE AVAILABLE ({{ systemStore.availableVersions.snapserver }})
+             </span>
+             <span v-else-if="systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown'" 
+                   class="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                 UP TO DATE
+             </span>
         </div>
         <div class="mt-4 flex flex-col space-y-2" v-if="systemStore.installedPackages.snapserver">
             <div class="flex space-x-2">
@@ -70,7 +78,16 @@ const version = 'v0.1.3';
                 <button v-if="systemStore.snapserverStatus === 'active'" @click="systemStore.controlService('stop', 'snapserver')" class="flex-1 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="systemStore.loading">Stop</button>
                 <button v-else @click="systemStore.controlService('start', 'snapserver')" class="flex-1 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="systemStore.loading">Start</button>
             </div>
-            <button @click="handleUpdate('snapserver')" class="w-full px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-200 dark:hover:bg-indigo-900/50 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="systemStore.loading">Update Snapserver</button>
+            <button @click="handleUpdate('snapserver')" 
+                    :class="[
+                        'w-full px-3 py-1 rounded text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
+                        systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown'
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 font-bold' 
+                        : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/50'
+                    ]"
+                    :disabled="systemStore.loading">
+                {{ systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' ? 'Install Update' : 'Reinstall / Fix' }}
+            </button>
         </div>
         <div class="mt-4" v-else>
              <button @click="systemStore.installPackage('snapserver')" class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="systemStore.loading">Install Snapserver</button>
@@ -90,6 +107,10 @@ const version = 'v0.1.3';
         </div>
         <div class="flex items-center justify-between mt-1">
             <span class="text-xs text-gray-500">Version: {{ systemStore.packageVersions['snap-ctrl'] || '...' }}</span>
+            <span v-if="systemStore.availableVersions['snap-ctrl'] && systemStore.availableVersions['snap-ctrl'] !== 'unknown' && systemStore.packageVersions['snap-ctrl'] !== systemStore.availableVersions['snap-ctrl']" 
+                   class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                 UPDATE AVAILABLE
+             </span>
         </div>
         <p class="text-[10px] text-gray-500 mt-2">Modern web interface for Snapcast.</p>
         <div class="mt-4">
@@ -115,6 +136,10 @@ const version = 'v0.1.3';
         </div>
         <div class="flex items-center justify-between mt-1" v-if="systemStore.installedPackages.ffmpeg">
              <span class="text-gray-600 dark:text-gray-300 text-xs">Version: {{ systemStore.packageVersions.ffmpeg || '...' }}</span>
+             <span v-if="systemStore.availableVersions.ffmpeg && systemStore.availableVersions.ffmpeg !== 'unknown' && systemStore.packageVersions.ffmpeg !== systemStore.availableVersions.ffmpeg" 
+                   class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                 UPDATE AVAILABLE
+             </span>
         </div>
         <div class="mt-4" v-if="!systemStore.installedPackages.ffmpeg">
              <button @click="systemStore.installPackage('ffmpeg')" class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="systemStore.loading">Install FFmpeg</button>
@@ -144,6 +169,10 @@ const version = 'v0.1.3';
         </div>
         <div class="flex items-center justify-between mt-2" v-if="systemStore.installedPackages['shairport-sync']">
              <span class="text-gray-600 dark:text-gray-300 text-xs">Version: {{ systemStore.packageVersions['shairport-sync'] || '...' }}</span>
+             <span v-if="systemStore.availableVersions['shairport-sync'] && systemStore.availableVersions['shairport-sync'] !== 'unknown' && systemStore.packageVersions['shairport-sync'] !== systemStore.availableVersions['shairport-sync']" 
+                   class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                 UPDATE AVAILABLE
+             </span>
         </div>
         <div class="mt-4 flex flex-col space-y-2" v-if="systemStore.installedPackages['shairport-sync']">
             <div class="flex space-x-2">

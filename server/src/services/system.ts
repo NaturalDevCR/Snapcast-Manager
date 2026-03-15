@@ -91,6 +91,21 @@ export class SystemService {
       return 'unknown';
     }
   }
+
+  async getLatestAvailableVersion(pkg: PackageName): Promise<string> {
+    try {
+      if (pkg === 'snap-ctrl') return 'v1.1.0'; // Hardcoded for now
+      
+      // Use apt-cache policy to get the candidate version
+      const output = await this.runCommand(`apt-cache policy ${pkg} | grep Candidate | awk '{print $2}'`);
+      const version = output.trim();
+      if (!version || version === '(none)') return 'unknown';
+      return version;
+    } catch (error) {
+      console.error(`Error checking latest version for ${pkg}:`, error);
+      return 'unknown';
+    }
+  }
   
   async restartService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
       return this.runCommand(`sudo systemctl restart ${service}`);

@@ -11,7 +11,7 @@ const systemStore = useSystemStore();
 const snapshotStore = useSnapshotStore();
 const activeTab = ref<'basic' | 'advanced' | 'snapshots'>('basic');
 const localRawConfig = ref('');
-const localParsedConfig = ref<any>({});
+const localParsedConfig = ref<Record<string, any>>({});
 
 const snapshotName = ref('');
 const snapshotDescription = ref('');
@@ -86,6 +86,38 @@ const handleDeleteSnapshot = async (id: number) => {
     }
 };
 
+const addProperty = (section: string) => {
+    const key = prompt(`Enter property name for [${section}]:`);
+    if (!key) return;
+    if (localParsedConfig.value[section][key] !== undefined) {
+        alert('Property already exists');
+        return;
+    }
+    localParsedConfig.value[section][key] = '';
+};
+
+const addSection = () => {
+    const section = prompt('Enter new section name:');
+    if (!section) return;
+    if (localParsedConfig.value[section]) {
+        alert('Section already exists');
+        return;
+    }
+    localParsedConfig.value[section] = {};
+};
+
+const removeProperty = (section: string, key: string) => {
+    if (confirm(`Remove ${key} from [${section}]?`)) {
+        delete localParsedConfig.value[section][key];
+    }
+};
+
+const removeSection = (section: string) => {
+    if (confirm(`Remove entire section [${section}]?`)) {
+        delete localParsedConfig.value[section];
+    }
+};
+
 </script>
 
 <template>
@@ -130,15 +162,31 @@ const handleDeleteSnapshot = async (id: number) => {
       <div v-if="activeTab === 'basic'">
           <!-- All Categories Section -->
           <div v-for="(props, section) in localParsedConfig" :key="section" class="mb-6">
-              <Card :title="`Section: [${section}]`">
+              <Card>
+                  <template #title>
+                      <div class="flex justify-between items-center w-full">
+                          <span>Section: [{{ section }}]</span>
+                          <button @click="removeSection(section)" class="text-red-500 hover:text-red-700 text-xs">Remove Section</button>
+                      </div>
+                  </template>
                   <div class="space-y-3">
-                      <div v-for="(value, key) in props" :key="key" class="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-gray-100 dark:border-gray-700 pb-3 last:border-0 last:pb-0">
-                          <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider self-center">{{ key }}</label>
+                      <div v-if="Object.keys(props).length === 0" class="text-sm text-gray-500 italic py-2">
+                          This section is currently empty.
+                      </div>
+                      <div v-for="(value, key) in props" :key="key" class="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-gray-100 dark:border-gray-700 pb-3 last:border-0 last:pb-0 group">
+                          <div class="flex items-center space-x-2">
+                              <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">{{ key }}</label>
+                              <button @click="removeProperty(section, key)" class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                  </svg>
+                              </button>
+                          </div>
                           <div class="md:col-span-2">
                               <input 
                                 v-if="typeof value !== 'object'"
                                 v-model="localParsedConfig[section][key]"
-                                class="w-full text-sm p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                class="w-full text-sm p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500"
                               />
                               <div v-else-if="Array.isArray(value)" class="space-y-2">
                                   <div v-for="(_item, idx) in value" :key="idx" class="flex space-x-2">
@@ -146,14 +194,31 @@ const handleDeleteSnapshot = async (id: number) => {
                                         v-model="localParsedConfig[section][key][idx]"
                                         class="flex-1 text-sm p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                                       />
-                                      <button @click="localParsedConfig[section][key].splice(idx, 1)" class="text-red-500">×</button>
+                                      <button @click="localParsedConfig[section][key].splice(idx, 1)" class="text-red-500 hover:text-red-700">×</button>
                                   </div>
-                                  <button @click="localParsedConfig[section][key].push('')" class="text-xs text-indigo-500">+ Add line</button>
+                                  <button @click="localParsedConfig[section][key].push('')" class="text-xs text-indigo-500 hover:text-indigo-700">+ Add line</button>
                               </div>
                           </div>
                       </div>
+                      <div class="pt-4 border-t border-gray-100 dark:border-gray-700">
+                          <button @click="addProperty(section)" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                              </svg>
+                              Add Property to [{{ section }}]
+                          </button>
+                      </div>
                   </div>
               </Card>
+          </div>
+
+          <div class="mb-12">
+              <button @click="addSection" class="w-full py-4 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-gray-500 dark:text-gray-400 hover:border-indigo-500 hover:text-indigo-500 transition-all flex justify-center items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Add New Section
+              </button>
           </div>
 
            <div class="mt-6 flex justify-end sticky bottom-6 z-10">
