@@ -14,7 +14,6 @@ import {
     TrashIcon, 
     ArrowPathIcon,
     DocumentDuplicateIcon,
-    InformationCircleIcon,
     ArrowPathRoundedSquareIcon
 } from '@heroicons/vue/24/outline';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
@@ -513,7 +512,7 @@ const handleResetToDefault = async () => {
       <ConfirmDialog
         v-model="showConfirmDeleteSection"
         title="Delete Section?"
-        :message="\`Are you sure you want to delete the entire [\${pendingDeleteSection}] section?\`"
+        :message="`Are you sure you want to delete the entire [${pendingDeleteSection}] section?`"
         type="danger"
         confirmText="Delete Section"
         @confirm="handleRemoveSection"
@@ -522,7 +521,7 @@ const handleResetToDefault = async () => {
       <ConfirmDialog
         v-model="showConfirmDeleteProperty"
         title="Delete Property?"
-        :message="\`Remove \${pendingDeleteProperty.key} from [\${pendingDeleteProperty.section}]?\`"
+        :message="`Remove ${pendingDeleteProperty.key} from [${pendingDeleteProperty.section}]?`"
         type="danger"
         confirmText="Delete Property"
         @confirm="handleRemoveProperty"
@@ -539,11 +538,9 @@ const handleResetToDefault = async () => {
       <PromptDialog
         v-model="showPromptAddProperty"
         title="Add Property"
-        :message="\`Enter property name for [\${activePromptSection}]:\`"
+        :message="`Enter property name for [${activePromptSection}]:`"
         placeholder="e.g. custom_key"
         @confirm="handleAddProperty"
       />
-  </Layout>
-</template>
   </Layout>
 </template>
