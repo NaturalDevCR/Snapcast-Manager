@@ -102,12 +102,21 @@ router.post('/install/:pkg', async (req: Request, res: Response) => {
 
 router.post('/update/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync') {
+    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'snap-ctrl') {
          return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
-        const output = await systemService.updatePackage(pkg);
+        const output = await systemService.updatePackage(pkg as any);
         res.json({ message: `${pkg} updated`, output });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/update-node', async (req: Request, res: Response) => {
+    try {
+        const output = await systemService.updateNodeJs();
+        res.json({ message: 'Node.js update initiated', output });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

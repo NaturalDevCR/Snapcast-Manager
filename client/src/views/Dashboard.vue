@@ -11,7 +11,7 @@ onMounted(() => {
   systemStore.refreshAll();
 });
 
-const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync') => {
+const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl') => {
   try {
     await systemStore.updatePackage(pkg);
     alert(`${pkg} updated successfully!`);
@@ -20,16 +20,19 @@ const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync') => 
   }
 };
 
-const handleInstallSnapCtrl = async () => {
-  try {
-    await systemStore.installSnapCtrl();
-    alert('Snap-ctrl installed and configured successfully!');
-  } catch (err: any) {
-    alert('Failed to install snap-ctrl: ' + err.message);
-  }
+const handleUpdateNodeJs = async () => {
+    if (!confirm('This will update Node.js to the latest 20.x version. The service might restart briefly. Continue?')) return;
+    try {
+        await systemStore.updateNodeJs();
+        alert('Node.js update initiated successfully!');
+    } catch (err: any) {
+        alert('Failed to update Node.js: ' + err.message);
+    }
 };
-// Version from package.json or hardcoded since we are in a monorepo
-const version = 'v0.1.4';
+
+
+// Version from package.json
+const version = 'v0.1.5';
 </script>
 
 <template>
@@ -114,7 +117,7 @@ const version = 'v0.1.4';
         </div>
         <p class="text-[10px] text-gray-500 mt-2">Modern web interface for Snapcast.</p>
         <div class="mt-4">
-             <button @click="handleInstallSnapCtrl" class="w-full px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="systemStore.loading">
+             <button @click="handleUpdate('snap-ctrl')" class="w-full px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="systemStore.loading">
                 {{ systemStore.installedPackages['snap-ctrl'] ? 'Update Snap-ctrl' : 'Install Snap-ctrl' }}
              </button>
         </div>
@@ -184,6 +187,29 @@ const version = 'v0.1.4';
         </div>
         <div class="mt-4" v-else>
              <button @click="systemStore.installPackage('shairport-sync')" class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="systemStore.loading">Install Shairport-sync</button>
+        </div>
+      </Card>
+
+      <!-- Node.js Status -->
+      <Card title="Node.js">
+        <template #icon>
+            <GlobeAltIcon class="h-6 w-6 text-green-600" />
+        </template>
+        <div class="flex items-center justify-between">
+            <span class="text-gray-600 dark:text-gray-300">Status:</span>
+            <span class="text-green-500">Running</span>
+        </div>
+        <div class="flex items-center justify-between mt-2">
+             <span class="text-gray-600 dark:text-gray-300 text-xs">Installed: {{ systemStore.packageVersions.node || '...' }}</span>
+             <span class="bg-indigo-100 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                 LTS 20.x
+             </span>
+        </div>
+        <p class="text-[10px] text-gray-500 mt-2">Required for Snapcast Manager backend.</p>
+        <div class="mt-4">
+             <button @click="handleUpdateNodeJs" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="systemStore.loading">
+                Update Node.js
+             </button>
         </div>
       </Card>
     </div>

@@ -4,7 +4,7 @@ import { configService } from './config';
 
 const execAsync = util.promisify(exec);
 
-export type PackageName = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl';
+export type PackageName = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node';
 
 export class SystemService {
   
@@ -24,8 +24,55 @@ export class SystemService {
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y ${pkg}`);
   }
 
-  async updatePackage(pkg: string): Promise<string> {
+  async updatePackage(pkg: PackageName): Promise<string> {
+    if (pkg === 'snap-ctrl') {
+      return this.installSnapCtrl();
+    }
+    
+    if (pkg === 'snapserver') {
+      return this.updateSnapserverFromGitHub();
+    }
+
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y --only-upgrade ${pkg}`);
+  }
+
+  private async updateSnapserverFromGitHub(): Promise<string> {
+    const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
+    const arch = await this.runCommand('dpkg --print-architecture');
+    const archTrimmed = arch.trim();
+    
+    // Find the deb file for the current architecture
+    // Example pattern: snapserver_0.26.0-1_amd64.deb
+    const asset = release.assets.find((a: any) => 
+      a.name.startsWith('snapserver') && 
+      a.name.endsWith('.deb') && 
+      (a.name.includes(archTrimmed) || (archTrimmed === 'armhf' && a.name.includes('armv7hf')))
+    );
+
+    if (!asset) {
+      throw new Error(`Could not find a .deb asset for architecture ${archTrimmed} in Snapcast release ${release.tag_name}`);
+    }
+
+    const downloadUrl = asset.browser_download_url;
+    const debFile = `/tmp/${asset.name}`;
+
+    console.log(`Downloading Snapserver ${release.tag_name} from ${downloadUrl}...`);
+    
+    return this.runCommand(`
+      wget -qO ${debFile} "${downloadUrl}" && \
+      sudo dpkg -i ${debFile} || sudo apt-get install -f -y && \
+      rm -f ${debFile} && \
+      sudo systemctl restart snapserver
+    `);
+  }
+
+  async updateNodeJs(): Promise<string> {
+    console.log('Updating Node.js...');
+    // Using NodeSource setup script for version 20
+    return this.runCommand(`
+      curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && \
+      sudo apt-get install -y nodejs
+    `);
   }
 
   async uninstallPackage(pkg: string): Promise<string> {
@@ -80,6 +127,9 @@ export class SystemService {
           break;
         case 'snap-ctrl':
           return 'v1.1.0'; 
+        case 'node':
+          cmd = 'node -v';
+          break;
       }
       const output = await this.runCommand(cmd);
       // Clean up version string (e.g. "snapserver v0.26.0" -> "v0.26.0")
@@ -94,9 +144,22 @@ export class SystemService {
 
   async getLatestAvailableVersion(pkg: PackageName): Promise<string> {
     try {
-      if (pkg === 'snap-ctrl') return 'v1.1.0'; // Hardcoded for now
+      if (pkg === 'snap-ctrl') {
+        const release = await this.getLatestGitHubRelease('NaturalDevCR', 'snap-ctrl');
+        return release.tag_name;
+      }
+
+      if (pkg === 'snapserver') {
+        const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
+        return release.tag_name;
+      }
+
+      if (pkg === 'node') {
+        // Simple way to get latest LTS version or just assume we follow nodesource 20.x
+        return 'v20.x (Latest)'; 
+      }
       
-      // Use apt-cache policy to get the candidate version
+      // Use apt-cache policy to get the candidate version for others
       const output = await this.runCommand(`apt-cache policy ${pkg} | grep Candidate | awk '{print $2}'`);
       const version = output.trim();
       if (!version || version === '(none)') return 'unknown';
@@ -105,6 +168,16 @@ export class SystemService {
       console.error(`Error checking latest version for ${pkg}:`, error);
       return 'unknown';
     }
+  }
+
+  private async getLatestGitHubRelease(owner: string, repo: string): Promise<any> {
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
+    const output = await this.runCommand(`curl -sL ${apiUrl}`);
+    const release = JSON.parse(output);
+    if (!release.tag_name) {
+      throw new Error(`Invalid response from GitHub API for ${owner}/${repo}`);
+    }
+    return release;
   }
   
   async restartService(service: 'snapserver' | 'shairport-sync'): Promise<string> {

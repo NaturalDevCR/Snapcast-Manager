@@ -13,6 +13,7 @@ export const useSystemStore = defineStore('system', () => {
     ffmpeg: false,
     'snap-ctrl': false,
     'shairport-sync': false,
+    'node': true,
   });
 
   const packageVersions = ref<Record<string, string>>({
@@ -20,6 +21,7 @@ export const useSystemStore = defineStore('system', () => {
     ffmpeg: '',
     'snap-ctrl': '',
     'shairport-sync': '',
+    'node': '',
   });
 
   const availableVersions = ref<Record<string, string>>({
@@ -27,6 +29,7 @@ export const useSystemStore = defineStore('system', () => {
     ffmpeg: '',
     'snap-ctrl': '',
     'shairport-sync': '',
+    'node': '',
   });
 
   async function checkStatus(service: 'snapserver' | 'shairport-sync') {
@@ -92,11 +95,28 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  async function updatePackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync') {
+  async function updatePackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl') {
     loading.value = true;
     try {
       await fetchApi(`/system/update/${pkg}`, { method: 'POST' });
-      await checkInstalled(pkg);
+      await Promise.all([
+          checkInstalled(pkg as any),
+          checkVersion(pkg as any),
+          checkAvailableVersion(pkg as any)
+      ]);
+    } catch (err: any) {
+      error.value = err.message;
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function updateNodeJs() {
+    loading.value = true;
+    try {
+      await fetchApi(`/system/update-node`, { method: 'POST' });
+      await checkVersion('node');
     } catch (err: any) {
       error.value = err.message;
       throw err;
@@ -181,10 +201,12 @@ export const useSystemStore = defineStore('system', () => {
       checkVersion('ffmpeg'),
       checkVersion('snap-ctrl'),
       checkVersion('shairport-sync'),
+      checkVersion('node'),
       checkAvailableVersion('snapserver'),
       checkAvailableVersion('ffmpeg'),
       checkAvailableVersion('snap-ctrl'),
       checkAvailableVersion('shairport-sync'),
+      checkAvailableVersion('node'),
     ]);
     loading.value = false;
   }
@@ -202,6 +224,7 @@ export const useSystemStore = defineStore('system', () => {
     updatePackage,
     uninstallPackage,
     installSnapCtrl,
+    updateNodeJs,
     getLogs,
     fetchServerConfig,
     saveServerConfig,
