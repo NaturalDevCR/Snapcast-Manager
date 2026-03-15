@@ -17,18 +17,37 @@ echo "This script will help you set up Snapcast Manager on your Linux server."
 REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
 INSTALL_BASE_DIR="/opt/snapcast-manager"
 
+# Helper to automatically answer "yes" if piped/non-interactive
+prompt_yes_no() {
+    local prompt="$1"
+    local default="$2"
+    if [ ! -t 0 ]; then
+        echo -e "${prompt} [Auto-answered: ${default}]"
+        [[ "$default" == "y" ]]
+        return
+    fi
+    local ans
+    read -p "$prompt (y/n): " ans
+    [[ "$ans" == "y" || "$ans" == "Y" ]]
+}
+
 # 0. Check if we need to download the source
 if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
     echo -e "\n${YELLOW}Project files not found in current directory.${NC}"
     echo "It looks like you are running this script remotely."
-    read -p "Do you want to download and install to $INSTALL_BASE_DIR? (y/n): " DOWNLOAD_INSTALL
-    if [[ "$DOWNLOAD_INSTALL" == "y"* ]]; then
-        echo "Updating package list and ensuring git is installed..."
+    if prompt_yes_no "Do you want to download and install to $INSTALL_BASE_DIR?" "y"; then
+        echo "Updating package list and ensuring wget and unzip are installed..."
         sudo apt-get update >/dev/null 2>&1
-        sudo apt-get install -y git >/dev/null 2>&1
-        echo "Cloning repository..."
+        sudo apt-get install -y wget unzip >/dev/null 2>&1
+        
+        echo "Downloading latest release..."
         sudo rm -rf "$INSTALL_BASE_DIR"
-        sudo git clone "$REPO_URL" "$INSTALL_BASE_DIR"
+        sudo mkdir -p "$INSTALL_BASE_DIR"
+        sudo wget -qO /tmp/snapmanager.zip "https://github.com/NaturalDevCR/Snapcast-Manager/releases/latest/download/snapcast-manager-release.zip"
+        
+        echo "Extracting release..."
+        sudo unzip -qo /tmp/snapmanager.zip -d "$INSTALL_BASE_DIR"
+        sudo rm -f /tmp/snapmanager.zip
         sudo chown -R $USER:$USER "$INSTALL_BASE_DIR"
         
         echo -e "${GREEN}Resuming installation from $INSTALL_BASE_DIR...${NC}"
@@ -67,8 +86,7 @@ else
 fi
 
 if [ "$SNAPSERVER_INSTALLED" = false ] && [ "$SNAPCLIENT_INSTALLED" = false ]; then
-    read -p "Snapcast components not found. Do you want to install them now? (y/n): " INSTALL_SNAP
-    if [[ "$INSTALL_SNAP" == "y"* ]]; then
+    if prompt_yes_no "Snapcast components not found. Do you want to install them now?" "y"; then
         echo "Installing Snapcast..."
         sudo apt-get update && sudo apt-get install -y snapserver snapclient
     fi
@@ -81,8 +99,7 @@ if command -v node >/dev/null 2>&1; then
     echo -e "${GREEN}[OK] Node.js $NODE_VER detected.${NC}"
 else
     echo -e "${RED}[!] Node.js not detected.${NC}"
-    read -p "Install Node.js 20? (y/n): " INSTALL_NODE
-    if [[ "$INSTALL_NODE" == "y"* ]]; then
+    if prompt_yes_no "Install Node.js 20?" "y"; then
         curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
         sudo apt-get install -y nodejs
     else
@@ -114,8 +131,7 @@ fi
 
 # 5. Systemd Service setup
 echo -e "\n${YELLOW}Step 4: Setting up as a systemd service...${NC}"
-read -p "Do you want to install Snapcast Manager as a systemd service? (y/n): " INSTALL_SERVICE
-if [[ "$INSTALL_SERVICE" == "y"* ]]; then
+if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?" "y"; then
     USER_NAME=$(whoami)
     INSTALL_DIR=$(pwd | xargs dirname)
     
