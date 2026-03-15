@@ -1,18 +1,36 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useSystemStore } from '../stores/system';
 import { useUIStore } from '../stores/ui';
+import { useSnapcastStore } from '../stores/snapcast';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
-import { ServerIcon, GlobeAltIcon, VideoCameraIcon, SpeakerWaveIcon, CommandLineIcon } from '@heroicons/vue/24/outline';
+import { 
+    ServerIcon, GlobeAltIcon, VideoCameraIcon, 
+    SpeakerWaveIcon, CommandLineIcon, SignalIcon, 
+    UserGroupIcon, MusicalNoteIcon 
+} from '@heroicons/vue/24/outline';
 
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
+const snapcastStore = useSnapcastStore();
 
 const selectedNodeVersion = ref('20');
+let pollingInterval: number | undefined;
 
 onMounted(() => {
   systemStore.refreshAll();
+  snapcastStore.fetchStatus();
+  // Poll Snapcast status every 3 seconds for live dashboard updates
+  pollingInterval = window.setInterval(() => {
+    snapcastStore.fetchStatus();
+  }, 3000);
+});
+
+onUnmounted(() => {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
 });
 
 const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl', clean: boolean = false) => {
@@ -39,7 +57,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Version from package.json
-const version = 'v0.1.25';
+const version = 'v0.1.26';
 </script>
 
 <template>
@@ -65,6 +83,122 @@ const version = 'v0.1.25';
               <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
               <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Syncing...</span>
           </div>
+      </div>
+
+      <!-- Snapcast Live Metrics Section -->
+      <div v-if="snapcastStore.status" class="space-y-4">
+        <div class="flex items-center space-x-2 px-1">
+            <SignalIcon class="h-5 w-5 text-emerald-500 animate-pulse" />
+            <h2 class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest">Live Server Metrics</h2>
+        </div>
+        
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <!-- Streams Card -->
+            <Card title="Active Streams">
+                <template #icon>
+                    <div class="p-2 bg-emerald-500/10 rounded-lg">
+                        <MusicalNoteIcon class="h-5 w-5 text-emerald-500" />
+                    </div>
+                </template>
+                <div class="flex flex-col h-full justify-between">
+                    <div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white mb-4">
+                            {{ snapcastStore.status.streams.length }}
+                        </div>
+                        <div class="space-y-2 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                            <div v-for="stream in snapcastStore.status.streams" :key="stream.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[120px]" :title="stream.id">
+                                    {{ stream.uri?.query?.name || stream.id }}
+                                </span>
+                                <span :class="stream.status === 'playing' ? 'text-emerald-500 bg-emerald-500/10' : 'text-slate-500 bg-slate-500/10'" class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider">
+                                    {{ stream.status }}
+                                </span>
+                            </div>
+                            <div v-if="snapcastStore.status.streams.length === 0" class="text-xs text-slate-400 italic">No active streams</div>
+                        </div>
+                    </div>
+                </div>
+            </Card>
+
+            <!-- Clients Card -->
+            <Card title="Connected Clients">
+                <template #icon>
+                    <div class="p-2 bg-blue-500/10 rounded-lg">
+                        <UserGroupIcon class="h-5 w-5 text-blue-500" />
+                    </div>
+                </template>
+                <div class="flex flex-col h-full justify-between">
+                    <div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white mb-4">
+                            <!-- Safely calculate total connected clients across all groups -->
+                            {{ snapcastStore.status.groups.reduce((acc, g) => acc + g.clients.filter(c => c.connected).length, 0) }}
+                        </div>
+                        <div class="space-y-2 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                            <template v-for="group in snapcastStore.status.groups" :key="group.id">
+                                <div v-for="client in group.clients.filter(c => c.connected)" :key="client.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                                    <div class="flex flex-col min-w-0">
+                                        <span class="text-xs font-bold text-slate-700 dark:text-slate-300 truncate" :title="client.host.name">
+                                            {{ client.config.name || client.host.name }}
+                                        </span>
+                                        <span class="text-[9px] text-slate-400 font-mono">{{ client.host.ip }}</span>
+                                    </div>
+                                    <span :class="client.config.volume.muted ? 'text-red-500 bg-red-500/10' : 'text-blue-500 bg-blue-500/10'" class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider flex-shrink-0">
+                                        {{ client.config.volume.muted ? 'MUTED' : client.config.volume.percent + '%' }}
+                                    </span>
+                                </div>
+                            </template>
+                            <div v-if="snapcastStore.status.groups.reduce((acc, g) => acc + g.clients.filter(c => c.connected).length, 0) === 0" class="text-xs text-slate-400 italic">No connected clients</div>
+                        </div>
+                    </div>
+                </div>
+            </Card>
+
+            <!-- Server Health Card -->
+            <Card title="Server Health">
+                <template #icon>
+                    <div class="p-2 bg-indigo-500/10 rounded-lg">
+                        <ServerIcon class="h-5 w-5 text-indigo-500" />
+                    </div>
+                </template>
+                <div class="flex flex-col h-full">
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/50 pb-3">
+                            <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Daemon Status</span>
+                            <div class="flex items-center space-x-2">
+                                <span class="relative flex h-2 w-2">
+                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                <span class="text-emerald-500 font-black text-xs uppercase tracking-widest">ONLINE</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Snapserver Version</span>
+                            <span class="text-sm font-mono text-slate-700 dark:text-slate-300">{{ snapcastStore.status.server.version }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Groups</span>
+                            <span class="text-sm font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md">{{ snapcastStore.status.groups.length }}</span>
+                        </div>
+                    </div>
+                </div>
+            </Card>
+        </div>
+      </div>
+      
+      <!-- System/Daemon Offline State -->
+      <div v-else-if="!snapcastStore.loading && snapcastStore.error" class="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl p-6 text-center">
+          <ServerIcon class="h-8 w-8 text-red-400 mx-auto mb-3" />
+          <h3 class="text-sm font-black text-red-700 dark:text-red-400 uppercase tracking-widest">Snapserver Offline or Unreachable</h3>
+          <p class="text-xs text-red-600 dark:text-red-300 mt-2 max-w-md mx-auto">{{ snapcastStore.error }}</p>
+      </div>
+
+      <div class="border-t border-slate-200 dark:border-slate-700/50 my-8"></div>
+
+      <!-- System Services Section -->
+      <div class="flex items-center space-x-2 px-1 mb-2">
+          <CommandLineIcon class="h-5 w-5 text-slate-400" />
+          <h2 class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest">System Services</h2>
       </div>
 
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
