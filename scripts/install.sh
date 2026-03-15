@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.21"
+VERSION="v0.1.22"
 
 echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
@@ -285,7 +285,7 @@ rm -f .rebuilding
 echo -e "\n${YELLOW}Step 4: Setting up as a systemd service...${NC}"
 if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?" "y"; then
     USER_NAME=$(whoami)
-    INSTALL_DIR=$(pwd)
+    INSTALL_DIR="$INSTALL_BASE_DIR"
     
     cat <<EOF | sudo tee /etc/systemd/system/${SERVICE_NAME}.service
 [Unit]
