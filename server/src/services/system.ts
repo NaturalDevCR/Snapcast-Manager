@@ -333,6 +333,7 @@ export class SystemService {
       const cmd = `
         echo "Installing build dependencies..." && \
         sudo apt-get update && \
+        (sudo apt-get install -y --no-install-recommends systemd-dev 2>/dev/null || true) && \
         sudo apt-get install -y --no-install-recommends build-essential git autoconf automake libtool \
           libpopt-dev libconfig-dev libasound2-dev avahi-daemon libavahi-client-dev \
           libssl-dev libsoxr-dev libplist-dev libsodium-dev uuid-dev libgcrypt-dev xxd \
