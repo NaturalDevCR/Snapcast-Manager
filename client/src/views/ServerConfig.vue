@@ -7,29 +7,6 @@ import { useUIStore } from '../stores/ui';
 import { fetchApi } from '../utils/api';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
-import { 
-    AdjustmentsHorizontalIcon, 
-    CodeBracketIcon, 
-    ClockIcon, 
-    PlusIcon, 
-    TrashIcon, 
-    ArrowPathIcon,
-    DocumentDuplicateIcon,
-    ArrowPathRoundedSquareIcon,
-    ServerIcon,
-    LockClosedIcon,
-    GlobeAltIcon,
-    CommandLineIcon,
-    SignalIcon,
-    MusicalNoteIcon,
-    SpeakerWaveIcon,
-    DocumentTextIcon,
-    ChevronDownIcon,
-    InformationCircleIcon,
-    XMarkIcon,
-    ShieldCheckIcon,
-    ArrowDownTrayIcon,
-} from '@heroicons/vue/24/outline';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import PromptDialog from '../components/PromptDialog.vue';
 
@@ -66,15 +43,15 @@ const selectedSourceType = ref('');
 const sourceFormPath = ref('');
 const sourceFormParams = ref<Record<string, string>>({});
 
-const sectionIcons: Record<string, any> = {
-  server: ServerIcon,
-  ssl: LockClosedIcon,
-  http: GlobeAltIcon,
-  'tcp-control': CommandLineIcon,
-  'tcp-streaming': SignalIcon,
-  stream: MusicalNoteIcon,
-  streaming_client: SpeakerWaveIcon,
-  logging: DocumentTextIcon,
+const sectionIcons: Record<string, string> = {
+  server: 'router',
+  ssl: 'lock',
+  http: 'language',
+  'tcp-control': 'terminal',
+  'tcp-streaming': 'sensors',
+  stream: 'queue_music',
+  streaming_client: 'cast',
+  logging: 'article',
 };
 
 const sectionOrder = ['server', 'ssl', 'http', 'tcp-control', 'tcp-streaming', 'stream', 'streaming_client', 'logging'];
@@ -526,54 +503,54 @@ const removeSourceEntry = (idx: number) => {
 <template>
   <Layout>
       <!-- Main Tabs Navigation -->
-      <div class="mb-6 flex space-x-2 bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-2xl w-fit">
+      <div class="mb-8 flex space-x-2 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl w-fit border border-white/5 shadow-lg">
           <button 
             @click="activeTab = 'standard'"
             :class="[
-                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm',
+                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                 activeTab === 'standard' 
-                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             ]"
           >
-              <AdjustmentsHorizontalIcon class="h-4 w-4" />
+              <span class="material-symbols-outlined text-[18px]">tune</span>
               <span>Standard</span>
           </button>
           <button 
             @click="activeTab = 'expert'"
             :class="[
-                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm',
+                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                 activeTab === 'expert' 
-                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             ]"
           >
-              <CodeBracketIcon class="h-4 w-4" />
+              <span class="material-symbols-outlined text-[18px]">code</span>
               <span>Expert</span>
           </button>
           <button 
             @click="activeTab = 'snapshots'"
             :class="[
-                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm',
+                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                 activeTab === 'snapshots' 
-                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             ]"
           >
-              <ClockIcon class="h-4 w-4" />
+              <span class="material-symbols-outlined text-[18px]">history</span>
               <span>Snapshots</span>
           </button>
           <button 
             @click="activeTab = 'security'"
             :class="[
-                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm',
+                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                 activeTab === 'security' 
-                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             ]"
           >
-              <ShieldCheckIcon class="h-4 w-4" />
-              <span>Security & Backup</span>
+              <span class="material-symbols-outlined text-[18px]">security</span>
+              <span>Security</span>
           </button>
       </div>
 
@@ -581,19 +558,19 @@ const removeSourceEntry = (idx: number) => {
       <div v-if="activeTab === 'standard'" class="animate-in fade-in slide-in-from-left-4 duration-500">
           
           <!-- Section Sub-Tabs -->
-          <div class="mb-6 flex flex-wrap gap-1.5">
+          <div class="mb-6 flex flex-wrap gap-2">
               <button
                 v-for="sKey in orderedSections"
                 :key="sKey"
                 @click="activeSection = sKey"
                 :class="[
-                    'flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 whitespace-nowrap',
+                    'flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap border',
                     activeSection === sKey
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                    : 'bg-slate-100 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200'
+                    ? 'bg-brand-primary text-white border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)]'
+                    : 'bg-black/20 text-gray-400 border-white/5 hover:bg-white/5 hover:text-white'
                 ]"
               >
-                  <component :is="sectionIcons[sKey] || AdjustmentsHorizontalIcon" class="h-3.5 w-3.5" />
+                  <span class="material-symbols-outlined text-[14px]">{{ sectionIcons[sKey] || 'tune' }}</span>
                   <span>{{ configSections[sKey]?.label || sKey }}</span>
               </button>
           </div>
@@ -603,15 +580,15 @@ const removeSourceEntry = (idx: number) => {
               <template #title>
                   <div class="flex justify-between items-center w-full">
                       <div class="flex items-center space-x-3">
-                        <component :is="sectionIcons[activeSection] || AdjustmentsHorizontalIcon" class="h-5 w-5 text-indigo-500" />
+                        <span class="material-symbols-outlined text-[20px] text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.5)]">{{ sectionIcons[activeSection] || 'tune' }}</span>
                         <div>
-                          <span class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest">{{ currentSectionMeta.label }}</span>
-                          <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5">{{ currentSectionMeta.description }}</p>
+                          <span class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">{{ currentSectionMeta.label }}</span>
+                          <p class="text-[10px] font-semibold text-gray-500 mt-0.5">{{ currentSectionMeta.description }}</p>
                         </div>
                       </div>
                       <div v-if="activeSection !== 'stream'" class="flex items-center space-x-2">
-                          <button @click="triggerAddProperty(activeSection)" class="inline-flex items-center px-2 py-1 text-[10px] font-black text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors uppercase tracking-widest" title="Add custom property">
-                            <PlusIcon class="h-3 w-3 mr-1" />
+                          <button @click="triggerAddProperty(activeSection)" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-brand-primary hover:text-white hover:bg-brand-primary border border-brand-primary/30 rounded-lg transition-all uppercase tracking-widest shadow-[inset_0_0_10px_rgba(166,13,242,0.1)] hover:shadow-[0_0_15px_rgba(166,13,242,0.5)]" title="Add custom property">
+                            <span class="material-symbols-outlined text-[14px] mr-1">add</span>
                             Custom
                           </button>
                       </div>
@@ -620,54 +597,54 @@ const removeSourceEntry = (idx: number) => {
               
               <div v-if="activeSection === 'stream'">
                   <!-- ==== SUB-SECTION 1: Audio Sources ==== -->
-                  <div class="mb-2">
+                  <div class="mb-4">
                     <div class="flex items-center justify-between mb-4">
                       <div class="flex items-center space-x-2">
-                        <MusicalNoteIcon class="h-4 w-4 text-emerald-500" />
-                        <h3 class="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">Audio Sources</h3>
-                        <span v-if="availableSourceNames.length" class="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-[10px] font-black rounded-full">{{ availableSourceNames.length }}</span>
+                        <span class="material-symbols-outlined text-[18px] text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">queue_music</span>
+                        <h3 class="text-[11px] font-black text-white uppercase tracking-widest">Audio Sources</h3>
+                        <span v-if="availableSourceNames.length" class="px-2 py-0.5 bg-[#00ff9d]/10 text-[#00ff9d] border border-[#00ff9d]/20 text-[10px] font-black rounded-full">{{ availableSourceNames.length }}</span>
                       </div>
-                      <button @click="openAddSourceDialog" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10 rounded-lg transition-colors uppercase tracking-widest border border-emerald-200 dark:border-emerald-800">
-                        <PlusIcon class="h-3 w-3 mr-1" />
+                      <button @click="openAddSourceDialog" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-[#00ff9d] hover:bg-[#00ff9d]/10 hover:text-white rounded-lg transition-all uppercase tracking-widest border border-[#00ff9d]/30 shadow-[inset_0_0_10px_rgba(0,255,157,0.1)] hover:shadow-[0_0_15px_rgba(0,255,157,0.3)]">
+                        <span class="material-symbols-outlined text-[14px] mr-1">add</span>
                         Add Source
                       </button>
                     </div>
                     
-                    <div v-if="!localParsedConfig.stream?.source" class="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-700/50 rounded-xl">
-                      <MusicalNoteIcon class="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">No sources configured</p>
-                      <p class="text-[10px] text-slate-400 mt-1">Use "Add Source" to create your first audio stream</p>
+                    <div v-if="!localParsedConfig.stream?.source" class="text-center py-8 border border-dashed border-white/10 rounded-xl bg-black/20">
+                      <span class="material-symbols-outlined text-[32px] text-gray-500 mx-auto mb-2 drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">library_music</span>
+                      <p class="text-xs font-black text-gray-400 uppercase tracking-widest">No sources configured</p>
+                      <p class="text-[10px] text-gray-500 mt-1">Use "Add Source" to create your first audio stream</p>
                     </div>
                     
                     <div v-else class="space-y-3">
                       <div v-for="(_item, idx) in (Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source : [localParsedConfig.stream.source])" :key="idx"
-                        class="rounded-xl border border-slate-200 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/30 overflow-hidden">
+                        class="rounded-xl border border-white/5 bg-black/30 overflow-hidden shadow-sm hover:border-brand-primary/30 transition-colors">
                         <!-- Source header with name badge -->
-                        <div class="flex items-center justify-between px-3 py-2 bg-slate-100/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700/50">
+                        <div class="flex items-center justify-between px-3 py-2 bg-white/5 border-b border-white/5">
                           <div class="flex items-center space-x-2">
-                            <span class="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase tracking-widest rounded-md">
+                            <span class="px-2 py-0.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 text-[10px] font-black uppercase tracking-widest rounded-md">
                               {{ getSourceType(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) }}
                             </span>
-                            <span class="text-sm font-bold text-slate-700 dark:text-slate-200">
+                            <span class="text-sm font-bold text-gray-200">
                               {{ extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'Unnamed' }}
                             </span>
                           </div>
-                          <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors" title="Remove source">
-                            <TrashIcon class="h-3.5 w-3.5" />
+                          <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 text-gray-400 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors border border-transparent hover:border-[#ff3b30]/20" title="Remove source">
+                            <span class="material-symbols-outlined text-[16px]">delete</span>
                           </button>
                         </div>
                         <!-- Source URI input -->
-                        <div class="px-3 py-2">
+                        <div class="px-3 py-3">
                           <input 
                             v-if="Array.isArray(localParsedConfig.stream.source)"
                             v-model="localParsedConfig.stream.source[idx]"
-                            class="w-full text-[11px] font-mono font-medium px-3 py-1.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-300"
+                            class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
                           />
                           <input 
                             v-else
                             :value="localParsedConfig.stream.source"
                             @input="setPropertyValue('stream', 'source', ($event.target as HTMLInputElement).value)"
-                            class="w-full text-[11px] font-mono font-medium px-3 py-1.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-300"
+                            class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
                           />
                         </div>
                       </div>
@@ -675,17 +652,17 @@ const removeSourceEntry = (idx: number) => {
                   </div>
 
                   <!-- ==== DIVIDER ==== -->
-                  <div class="border-t border-slate-200 dark:border-slate-700/50 my-6"></div>
+                  <div class="border-t border-white/5 my-8"></div>
 
                   <!-- ==== SUB-SECTION 2: Stream Settings ==== -->
                   <div>
                     <div class="flex items-center justify-between mb-4">
                       <div class="flex items-center space-x-2">
-                        <AdjustmentsHorizontalIcon class="h-4 w-4 text-indigo-500" />
-                        <h3 class="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">Stream Settings</h3>
+                        <span class="material-symbols-outlined text-[18px] text-[#00d4ff] drop-shadow-[0_0_5px_rgba(0,212,255,0.5)]">tune</span>
+                        <h3 class="text-[11px] font-black text-white uppercase tracking-widest">Stream Settings</h3>
                       </div>
-                      <button @click="triggerAddProperty('stream')" class="inline-flex items-center px-2 py-1 text-[10px] font-black text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors uppercase tracking-widest" title="Add custom property">
-                        <PlusIcon class="h-3 w-3 mr-1" />
+                      <button @click="triggerAddProperty('stream')" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-[#00d4ff] hover:text-white hover:bg-[#00d4ff]/10 border border-[#00d4ff]/30 rounded-lg transition-all uppercase tracking-widest shadow-[inset_0_0_10px_rgba(0,212,255,0.1)] hover:shadow-[0_0_15px_rgba(0,212,255,0.3)]" title="Add custom property">
+                        <span class="material-symbols-outlined text-[14px] mr-1">add</span>
                         Custom
                       </button>
                     </div>
@@ -807,15 +784,15 @@ const removeSourceEntry = (idx: number) => {
 
               <!-- ==== NON-STREAM SECTIONS: Standard property loop ==== -->
               <div v-else class="space-y-1">
-                  <div v-if="allPropertyKeys.length === 0" class="text-center py-12 border-2 border-dashed border-slate-100 dark:border-slate-800/50 rounded-xl">
-                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">No properties available for this section</p>
+                  <div v-if="allPropertyKeys.length === 0" class="text-center py-12 border border-dashed border-white/10 rounded-xl bg-black/20">
+                      <p class="text-xs font-black text-gray-500 uppercase tracking-widest">No properties available for this section</p>
                   </div>
                   
                   <div v-for="key in allPropertyKeys" :key="key" 
                     :class="[
                       'grid grid-cols-1 md:grid-cols-12 gap-3 items-start py-3 px-4 rounded-xl transition-all -mx-4',
                       isPropertyEnabled(activeSection, key)
-                        ? 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
+                        ? 'hover:bg-white/5'
                         : 'opacity-40 hover:opacity-60'
                     ]">
                       
@@ -825,7 +802,7 @@ const removeSourceEntry = (idx: number) => {
                           @click="toggleProperty(activeSection, key)"
                           :class="[
                             'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
-                            isPropertyEnabled(activeSection, key) ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                            isPropertyEnabled(activeSection, key) ? 'bg-brand-primary' : 'bg-gray-700'
                           ]"
                           :title="isPropertyEnabled(activeSection, key) ? 'Disable this property' : 'Enable this property'"
                         >
@@ -836,15 +813,15 @@ const removeSourceEntry = (idx: number) => {
                       <!-- Label Column (col 2-4) -->
                       <div class="md:col-span-3">
                           <div class="flex flex-col min-w-0">
-                            <label class="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                            <label class="text-[11px] font-black text-gray-300 uppercase tracking-wide">
                               {{ getMetaForKey(activeSection, key)?.label || key }}
                             </label>
                             <span v-if="getMetaForKey(activeSection, key)?.description" 
-                              class="text-[10px] text-slate-400 dark:text-slate-500 leading-snug mt-0.5">
+                              class="text-[10px] text-gray-500 leading-snug mt-0.5">
                               {{ getMetaForKey(activeSection, key)?.description }}
                             </span>
                             <span v-if="getMetaForKey(activeSection, key)?.default !== undefined" 
-                              class="text-[9px] text-indigo-400/70 dark:text-indigo-500/70 mt-0.5 font-mono">
+                              class="text-[9px] text-[#00d4ff]/70 mt-0.5 font-mono">
                               default: {{ getMetaForKey(activeSection, key)?.default }}
                             </span>
                           </div>
@@ -854,7 +831,7 @@ const removeSourceEntry = (idx: number) => {
                       <div class="md:col-span-8">
                           <!-- DISABLED property: show default as read-only -->
                           <div v-if="!isPropertyEnabled(activeSection, key)" class="py-1">
-                            <span class="text-xs text-slate-400 font-mono">
+                            <span class="text-xs text-gray-500 font-mono">
                               {{ getMetaForKey(activeSection, key)?.default ?? '(empty)' }}
                             </span>
                           </div>
@@ -864,13 +841,13 @@ const removeSourceEntry = (idx: number) => {
                             <button 
                               @click="setPropertyValue(activeSection, key, String(getPropertyValue(activeSection, key)) === 'true' ? 'false' : 'true')"
                               :class="[
-                                'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 dark:focus:ring-offset-slate-900',
-                                String(getPropertyValue(activeSection, key)) === 'true' ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                                'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 focus:ring-offset-black',
+                                String(getPropertyValue(activeSection, key)) === 'true' ? 'bg-brand-primary' : 'bg-gray-700'
                               ]"
                             >
                               <span :class="[String(getPropertyValue(activeSection, key)) === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                             </button>
-                            <span class="ml-3 text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">
+                            <span class="ml-3 text-xs text-gray-400 font-bold uppercase tracking-widest">
                               {{ String(getPropertyValue(activeSection, key)) === 'true' ? 'Enabled' : 'Disabled' }}
                             </span>
                           </div>
@@ -880,13 +857,13 @@ const removeSourceEntry = (idx: number) => {
                             <select
                               :value="getPropertyValue(activeSection, key)"
                               @change="setPropertyValue(activeSection, key, ($event.target as HTMLSelectElement).value)"
-                              class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white appearance-none pr-10"
+                              class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 appearance-none pr-10"
                             >
-                              <option v-for="opt in getMetaForKey(activeSection, key)?.options" :key="opt" :value="opt">
+                              <option v-for="opt in getMetaForKey(activeSection, key)?.options" :key="opt" :value="opt" class="bg-black text-white">
                                 {{ opt || '(auto)' }}
                               </option>
                             </select>
-                            <ChevronDownIcon class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-[18px]">expand_more</span>
                           </div>
 
                           <!-- Number Input -->
@@ -896,7 +873,7 @@ const removeSourceEntry = (idx: number) => {
                             :value="getPropertyValue(activeSection, key)"
                             @input="setPropertyValue(activeSection, key, ($event.target as HTMLInputElement).value)"
                             :placeholder="String(getMetaForKey(activeSection, key)?.default ?? '')"
-                            class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                            class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 placeholder-gray-600"
                           />
                           
                           <!-- Default Text Input -->
@@ -905,7 +882,7 @@ const removeSourceEntry = (idx: number) => {
                             :value="getPropertyValue(activeSection, key)"
                             @input="setPropertyValue(activeSection, key, ($event.target as HTMLInputElement).value)"
                             :placeholder="String(getMetaForKey(activeSection, key)?.default ?? '')"
-                            class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                            class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 placeholder-gray-600"
                           />
                       </div>
                   </div>
@@ -914,8 +891,8 @@ const removeSourceEntry = (idx: number) => {
 
           <!-- Bottom Actions -->
           <div class="mt-8 mb-24 flex justify-center">
-              <button @click="showConfirmReset = true" class="py-3 px-6 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 hover:text-amber-500 hover:bg-amber-500/5 transition-all flex items-center space-x-2">
-                  <ArrowPathRoundedSquareIcon class="h-4 w-4" />
+              <button @click="showConfirmReset = true" class="py-3 px-6 border border-white/5 rounded-xl text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 hover:border-[#ff3b30]/20 transition-all flex items-center space-x-2">
+                  <span class="material-symbols-outlined text-[16px]">restart_alt</span>
                   <span class="text-[10px] font-black uppercase tracking-widest">Reset Configuration to Default</span>
               </button>
           </div>
@@ -924,9 +901,9 @@ const removeSourceEntry = (idx: number) => {
               <button 
                   @click="saveParsed" 
                   :disabled="configStore.loading"
-                  class="flex items-center space-x-2 px-8 py-4 rounded-2xl shadow-2xl shadow-indigo-600/40 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 hover:-translate-y-1 active:scale-95 disabled:opacity-50 transition-all duration-300"
+                  class="flex items-center space-x-2 px-8 py-4 rounded-2xl shadow-[0_0_20px_rgba(166,13,242,0.6)] text-sm font-black text-white bg-brand-primary hover:bg-[#b526ff] hover:-translate-y-1 active:scale-95 disabled:opacity-50 transition-all duration-300"
               >
-                  <ArrowPathIcon v-if="configStore.loading" class="h-5 w-5 animate-spin" />
+                  <span v-if="configStore.loading" class="material-symbols-outlined text-[20px] animate-spin">sync</span>
                   <span>SAVE CONFIGURATION</span>
               </button>
           </div>
@@ -938,20 +915,20 @@ const removeSourceEntry = (idx: number) => {
               <template #title>
                 <div class="flex items-center justify-between w-full">
                   <div class="flex items-center space-x-2">
-                    <CodeBracketIcon class="h-5 w-5 text-indigo-500" />
-                    <span class="font-black text-sm uppercase tracking-widest text-slate-800 dark:text-white">Raw Editor</span>
+                    <span class="material-symbols-outlined text-[20px] text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.5)]">code</span>
+                    <span class="font-black text-sm uppercase tracking-widest text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">Raw Editor</span>
                   </div>
                 </div>
               </template>
               <div class="space-y-6">
-                  <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                      Direct access to <code>snapserver.conf</code>
+                  <p class="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                      Direct access to <code class="bg-black/40 px-2 py-1 rounded text-brand-primary">snapserver.conf</code>
                   </p>
                   <div class="relative group">
-                    <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
+                    <div class="absolute -inset-1 bg-gradient-to-r from-brand-primary/50 to-brand-primary rounded-2xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
                     <textarea 
                         v-model="localRawConfig" 
-                        class="relative w-full h-[600px] font-mono text-xs px-6 py-6 bg-slate-900 border-none rounded-2xl text-indigo-100 focus:ring-0 outline-none leading-relaxed selection:bg-indigo-500/30"
+                        class="relative w-full h-[600px] font-mono text-xs px-6 py-6 bg-black/60 border border-white/5 rounded-2xl text-[#00d4ff] focus:ring-1 focus:ring-brand-primary/50 outline-none leading-relaxed selection:bg-brand-primary/30 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)]"
                         spellcheck="false"
                     ></textarea>
                   </div>
@@ -959,7 +936,7 @@ const removeSourceEntry = (idx: number) => {
                       <button 
                           @click="saveRaw" 
                           :disabled="configStore.loading"
-                          class="px-8 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all"
+                          class="px-8 py-3 bg-brand-primary text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_20px_rgba(166,13,242,0.6)] hover:bg-[#b526ff] active:scale-95 disabled:opacity-50 transition-all border border-brand-primary"
                       >
                           Apply Raw Changes
                       </button>
@@ -974,23 +951,23 @@ const removeSourceEntry = (idx: number) => {
               <div class="lg:col-span-1">
                   <Card title="Checkpoint">
                       <template #icon>
-                        <DocumentDuplicateIcon class="h-5 w-5 text-indigo-500" />
+                        <span class="material-symbols-outlined text-[20px] text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.5)]">content_copy</span>
                       </template>
                       <div class="space-y-5">
                           <div>
-                              <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Identifier</label>
+                              <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Identifier</label>
                               <input v-model="snapshotName" type="text" placeholder="e.g. Pre-optimization" 
-                                class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white">
+                                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600">
                           </div>
                           <div>
-                              <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Notes</label>
+                              <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Notes</label>
                               <textarea v-model="snapshotDescription" placeholder="Briefly describe why this checkpoint is being made..." 
-                                class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white h-32 resize-none"></textarea>
+                                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600 h-32 resize-none"></textarea>
                           </div>
                           <button 
                             @click="handleCreateSnapshot"
                             :disabled="snapshotStore.loading || !snapshotName"
-                            class="w-full px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 disabled:opacity-50 transition-all active:scale-95"
+                            class="w-full px-6 py-3 bg-brand-primary text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#b526ff] shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_20px_rgba(166,13,242,0.6)] disabled:opacity-50 transition-all active:scale-95 border border-brand-primary"
                           >
                             Capture State
                           </button>
@@ -1000,32 +977,32 @@ const removeSourceEntry = (idx: number) => {
               <div class="lg:col-span-2">
                   <Card title="Version History">
                       <template #icon>
-                        <ClockIcon class="h-5 w-5 text-blue-500" />
+                        <span class="material-symbols-outlined text-[20px] text-[#00d4ff] drop-shadow-[0_0_5px_rgba(0,212,255,0.5)]">history</span>
                       </template>
                       <div v-if="snapshotStore.loading && snapshotStore.snapshots.length === 0" class="flex justify-center py-12">
-                          <ArrowPathIcon class="h-8 w-8 text-indigo-500 animate-spin" />
+                          <span class="material-symbols-outlined text-[32px] text-brand-primary animate-spin">sync</span>
                       </div>
-                      <div v-else-if="snapshotStore.snapshots.length === 0" class="text-center py-24 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800/50">
-                          <p class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">No snapshots archived</p>
+                      <div v-else-if="snapshotStore.snapshots.length === 0" class="text-center py-24 bg-black/20 rounded-2xl border border-dashed border-white/10">
+                          <p class="text-xs font-black text-gray-500 uppercase tracking-[0.2em]">No snapshots archived</p>
                       </div>
                       <div v-else class="space-y-4">
                           <div v-for="snapshot in snapshotStore.snapshots" :key="snapshot.id" 
-                            class="p-5 border border-slate-100 dark:border-slate-800 rounded-2xl flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-800 transition-all hover:shadow-lg hover:shadow-indigo-500/5 group">
+                            class="p-5 border border-white/5 rounded-2xl flex justify-between items-center bg-black/30 hover:bg-black/50 hover:border-brand-primary/30 transition-all group shadow-sm">
                               <div class="space-y-1">
-                                  <h4 class="font-black text-slate-800 dark:text-white uppercase tracking-tight">{{ snapshot.name }}</h4>
-                                  <p v-if="snapshot.description" class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ snapshot.description }}</p>
-                                  <div class="flex items-center text-[10px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded w-fit mt-2 uppercase tracking-widest">
+                                  <h4 class="font-black text-white uppercase tracking-tight drop-shadow-[0_0_5px_rgba(255,255,255,0.2)]">{{ snapshot.name }}</h4>
+                                  <p v-if="snapshot.description" class="text-xs font-semibold text-gray-400">{{ snapshot.description }}</p>
+                                  <div class="flex items-center text-[10px] font-bold text-brand-primary bg-brand-primary/10 border border-brand-primary/20 px-2 py-0.5 rounded w-fit mt-2 uppercase tracking-widest">
                                     {{ new Date(snapshot.timestamp).toLocaleString() }}
                                   </div>
                               </div>
                               <div class="flex space-x-2">
                                   <button @click="triggerRestoreSnapshot(snapshot.id)" 
-                                    class="text-[10px] font-black uppercase tracking-widest px-4 py-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 rounded-lg hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition-all shadow-sm active:scale-95">
+                                    class="text-[10px] font-black uppercase tracking-widest px-4 py-2 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 rounded-lg hover:bg-brand-primary hover:text-white transition-all shadow-[inset_0_0_10px_rgba(166,13,242,0.1)] hover:shadow-[0_0_15px_rgba(166,13,242,0.3)] active:scale-95">
                                       Restore
                                   </button>
                                   <button @click="triggerDeleteSnapshot(snapshot.id)"
-                                    class="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all group-hover:opacity-100 md:opacity-0">
-                                      <TrashIcon class="h-5 w-5" />
+                                    class="p-2 text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 border border-transparent hover:border-[#ff3b30]/20 rounded-lg transition-all group-hover:opacity-100 md:opacity-0 active:scale-95">
+                                      <span class="material-symbols-outlined text-[18px]">delete</span>
                                   </button>
                               </div>
                           </div>
@@ -1041,30 +1018,30 @@ const removeSourceEntry = (idx: number) => {
               <!-- Change Password -->
               <Card title="Change Administrator Password">
                   <template #icon>
-                    <LockClosedIcon class="h-5 w-5 text-rose-500" />
+                    <span class="material-symbols-outlined text-[20px] text-[#ff2a5f] drop-shadow-[0_0_5px_rgba(255,42,95,0.5)]">lock</span>
                   </template>
                   <div class="space-y-5">
                       <div>
-                          <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Current Password</label>
+                          <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Current Password</label>
                           <input v-model="currentPassword" type="password" placeholder="Enter current password" 
-                            class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all dark:text-white">
+                            class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
                       </div>
                       <div>
-                          <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">New Password</label>
+                          <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">New Password</label>
                           <input v-model="newPassword" type="password" placeholder="Enter new password" 
-                            class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all dark:text-white">
+                            class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
                       </div>
                       <div>
-                          <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Confirm New Password</label>
+                          <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Confirm New Password</label>
                           <input v-model="confirmPassword" type="password" placeholder="Re-enter new password" 
-                            class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all dark:text-white">
+                            class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
                       </div>
                       <button 
                         @click="handleChangePassword"
                         :disabled="isSavingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword"
-                        class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-700 shadow-lg shadow-rose-500/20 disabled:opacity-50 transition-all active:scale-95"
+                        class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-[#ff2a5f] text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#ff154d] border border-[#ff2a5f] shadow-[0_0_15px_rgba(255,42,95,0.4)] hover:shadow-[0_0_20px_rgba(255,42,95,0.6)] disabled:opacity-50 transition-all active:scale-95"
                       >
-                        <ArrowPathIcon v-if="isSavingPassword" class="h-4 w-4 animate-spin" />
+                        <span v-if="isSavingPassword" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
                         <span>Update Password</span>
                       </button>
                   </div>
@@ -1073,31 +1050,31 @@ const removeSourceEntry = (idx: number) => {
               <!-- Export Backup -->
               <Card title="Export Server Backup">
                   <template #icon>
-                    <ArrowDownTrayIcon class="h-5 w-5 text-emerald-500" />
+                    <span class="material-symbols-outlined text-[20px] text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">download</span>
                   </template>
                   <div class="space-y-5">
-                      <p class="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
+                      <p class="text-sm font-medium text-gray-400 leading-relaxed">
                           Download a complete backup of your Snapcast Manager configuration. 
-                          This <span class="text-emerald-500 font-bold">.tar.gz</span> archive includes:
+                          This <span class="text-[#00ff9d] font-bold drop-shadow-[0_0_5px_rgba(0,255,157,0.2)]">.tar.gz</span> archive includes:
                       </p>
-                      <ul class="text-xs font-semibold text-slate-600 dark:text-slate-300 space-y-2 mb-6">
-                          <li class="flex items-center"><ShieldCheckIcon class="h-4 w-4 mr-2 text-indigo-500" /> Administrator Account</li>
-                          <li class="flex items-center"><ClockIcon class="h-4 w-4 mr-2 text-blue-500" /> Saved Snapshots</li>
-                          <li class="flex items-center"><AdjustmentsHorizontalIcon class="h-4 w-4 mr-2 text-rose-500" /> Snapserver Configuration</li>
+                      <ul class="text-xs font-semibold text-gray-300 space-y-3 mb-6">
+                          <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-brand-primary">security</span> Administrator Account</li>
+                          <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-[#00d4ff]">history</span> Saved Snapshots</li>
+                          <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-[#ff2a5f]">tune</span> Snapserver Configuration</li>
                       </ul>
                       
-                      <div class="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-800/50 p-4 rounded-xl">
-                          <p class="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest">Restore Instructions</p>
-                          <p class="text-xs text-amber-600 dark:text-amber-500 mt-1">Keep this file safe. When reinstalling Snapcast Manager on a new device, you can use the flag <code class="bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded text-amber-800 dark:text-amber-300 font-mono">--restore /path/to/backup.tar.gz</code> during setup to restore everything magically.</p>
+                      <div class="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl">
+                          <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest">Restore Instructions</p>
+                          <p class="text-xs text-amber-400/80 mt-1">Keep this file safe. When reinstalling Snapcast Manager on a new device, you can use the flag <code class="bg-black/40 px-1 py-0.5 rounded text-amber-300 font-mono border border-amber-500/10">--restore /path/to/backup.tar.gz</code> during setup to restore everything magically.</p>
                       </div>
 
                       <button 
                         @click="handleExportBackup"
                         :disabled="isExporting"
-                        class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all active:scale-95 mt-4"
+                        class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-[#00ff9d]/10 text-[#00ff9d] border border-[#00ff9d]/30 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#00ff9d] hover:text-black shadow-[0_0_15px_rgba(0,255,157,0.2)] hover:shadow-[0_0_20px_rgba(0,255,157,0.5)] disabled:opacity-50 transition-all active:scale-95 mt-4"
                       >
-                        <ArrowPathIcon v-if="isExporting" class="h-4 w-4 animate-spin" />
-                        <ArrowDownTrayIcon v-else class="h-4 w-4" />
+                        <span v-if="isExporting" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                        <span v-else class="material-symbols-outlined text-[16px]">download</span>
                         <span>Download Backup</span>
                       </button>
                   </div>
@@ -1116,17 +1093,17 @@ const removeSourceEntry = (idx: number) => {
           leave-to-class="opacity-0"
         >
           <div v-if="showAddSourceDialog" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="fixed inset-0 bg-slate-900/75 backdrop-blur-sm" @click="showAddSourceDialog = false"></div>
-            <div class="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <div class="fixed inset-0 bg-black/80 backdrop-blur-md" @click="showAddSourceDialog = false"></div>
+            <div class="relative bg-[#1c1022] rounded-2xl shadow-[0_0_30px_rgba(166,13,242,0.3)] border border-white/5 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
               
               <!-- Header -->
-              <div class="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+              <div class="sticky top-0 bg-[#1c1022]/90 backdrop-blur-sm border-b border-white/5 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
                 <div>
-                  <h3 class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest">Add Audio Source</h3>
-                  <p class="text-[10px] text-slate-400 mt-0.5">Select a source type and configure its parameters</p>
+                  <h3 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">Add Audio Source</h3>
+                  <p class="text-[10px] text-gray-500 mt-0.5">Select a source type and configure its parameters</p>
                 </div>
-                <button @click="showAddSourceDialog = false" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
-                  <XMarkIcon class="h-5 w-5" />
+                <button @click="showAddSourceDialog = false" class="p-2 text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all">
+                  <span class="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
 
@@ -1138,31 +1115,32 @@ const removeSourceEntry = (idx: number) => {
                       v-for="tmpl in sourceTemplates"
                       :key="tmpl.type"
                       @click="selectSourceType(tmpl.type)"
-                      class="flex flex-col items-center p-4 rounded-xl border-2 border-slate-100 dark:border-slate-700 hover:border-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10 transition-all group text-center"
+                      class="flex flex-col items-center p-4 rounded-xl border border-white/5 bg-black/40 hover:border-brand-primary/50 hover:bg-brand-primary/10 transition-all group text-center shadow-lg"
                     >
-                      <div class="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/20 transition-colors mb-2">
-                        <MusicalNoteIcon class="h-5 w-5 text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
+                      <div class="p-2 bg-white/5 border border-white/5 rounded-lg group-hover:bg-brand-primary/20 group-hover:border-brand-primary/30 transition-colors mb-2 shadow-[inset_0_0_10px_rgba(255,255,255,0.05)] group-hover:shadow-[inset_0_0_15px_rgba(166,13,242,0.3)]">
+                        <span class="material-symbols-outlined text-[24px] text-gray-400 group-hover:text-brand-primary transition-colors drop-shadow-[0_0_5px_currentColor]">queue_music</span>
                       </div>
-                      <span class="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-200">{{ tmpl.label }}</span>
-                      <span class="text-[9px] text-slate-400 mt-1 leading-tight">{{ tmpl.description.split('.')[0] }}</span>
+                      <span class="text-xs font-black uppercase tracking-wider text-gray-200 group-hover:text-white">{{ tmpl.label }}</span>
+                      <span class="text-[9px] text-gray-500 mt-1 leading-tight group-hover:text-gray-400">{{ tmpl.description.split('.')[0] }}</span>
                     </button>
                   </div>
                 </div>
 
                 <!-- Step 2: Parameter Form -->
                 <div v-else-if="selectedTemplate">
-                  <button @click="selectedSourceType = ''" class="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4 hover:text-indigo-700 transition-colors">
-                    ← Back to source types
+                  <button @click="selectedSourceType = ''" class="text-[10px] font-black text-brand-primary uppercase tracking-widest mb-4 hover:text-[#b526ff] hover:drop-shadow-[0_0_5px_rgba(166,13,242,0.5)] transition-all flex items-center">
+                    <span class="material-symbols-outlined text-[14px] mr-1">arrow_back</span>
+                    Back to source types
                   </button>
 
-                  <div class="mb-4 p-3 bg-indigo-50/50 dark:bg-indigo-500/5 border border-indigo-100 dark:border-indigo-800 rounded-xl">
-                    <div class="flex items-start space-x-2">
-                      <InformationCircleIcon class="h-4 w-4 text-indigo-500 flex-shrink-0 mt-0.5" />
+                  <div class="mb-5 p-4 bg-brand-primary/10 border border-brand-primary/20 rounded-xl">
+                    <div class="flex items-start space-x-3">
+                      <span class="material-symbols-outlined text-[20px] text-brand-primary flex-shrink-0 mt-0.5">info</span>
                       <div>
-                        <span class="text-xs font-bold text-indigo-700 dark:text-indigo-300">{{ selectedTemplate.label }}</span>
-                        <p class="text-[10px] text-indigo-600/70 dark:text-indigo-400/70 mt-0.5">{{ selectedTemplate.description }}</p>
-                        <p v-if="selectedTemplate.fixedSampleFormat" class="text-[10px] text-amber-600 dark:text-amber-400 mt-1 font-semibold">
-                          ⚠ Fixed sample format: {{ selectedTemplate.fixedSampleFormat }}
+                        <span class="text-xs font-black text-brand-primary uppercase tracking-widest drop-shadow-[0_0_5px_rgba(166,13,242,0.3)]">{{ selectedTemplate.label }}</span>
+                        <p class="text-[10px] text-brand-primary/70 mt-1">{{ selectedTemplate.description }}</p>
+                        <p v-if="selectedTemplate.fixedSampleFormat" class="text-[10px] text-amber-500/80 mt-2 font-black tracking-widest uppercase">
+                          <span class="mr-1">⚠</span> Fixed sample format: {{ selectedTemplate.fixedSampleFormat }}
                         </p>
                       </div>
                     </div>
@@ -1171,36 +1149,36 @@ const removeSourceEntry = (idx: number) => {
                   <div class="space-y-4">
                     <!-- Path -->
                     <div>
-                      <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
+                      <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">
                         Path / Host
                       </label>
                       <input
                         v-model="sourceFormPath"
                         :placeholder="selectedTemplate.pathPlaceholder"
-                        class="w-full text-sm font-mono px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                        class="w-full text-sm font-mono px-4 py-2 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
                       />
                     </div>
 
                     <!-- Parameters -->
                     <div v-for="param in selectedTemplate.params" :key="param.key">
-                      <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
+                      <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">
                         {{ param.label }}
-                        <span v-if="param.required" class="text-red-400 ml-0.5">*</span>
+                        <span v-if="param.required" class="text-[#ff2a5f] ml-0.5 drop-shadow-[0_0_2px_rgba(255,42,95,0.8)]">*</span>
                       </label>
-                      <span class="text-[9px] text-slate-400 block mb-1.5">{{ param.description }}</span>
+                      <span class="text-[9px] text-gray-500 block mb-2">{{ param.description }}</span>
                       
                       <!-- Boolean param -->
                       <div v-if="param.type === 'boolean'" class="flex items-center">
                         <button 
                           @click="sourceFormParams[param.key] = sourceFormParams[param.key] === 'true' ? 'false' : 'true'"
                           :class="[
-                            'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
-                            sourceFormParams[param.key] === 'true' ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                            'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:ring-2 focus:ring-brand-primary focus:outline-none focus:ring-offset-2 focus:ring-offset-[#1c1022]',
+                            sourceFormParams[param.key] === 'true' ? 'bg-brand-primary shadow-[0_0_10px_rgba(166,13,242,0.4)]' : 'bg-gray-700'
                           ]"
                         >
                           <span :class="[sourceFormParams[param.key] === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200']" />
                         </button>
-                        <span class="ml-3 text-xs text-slate-500 font-bold uppercase tracking-widest">
+                        <span class="ml-3 text-xs text-gray-400 font-bold uppercase tracking-widest">
                           {{ sourceFormParams[param.key] === 'true' ? 'Yes' : 'No' }}
                         </span>
                       </div>
@@ -1209,11 +1187,11 @@ const removeSourceEntry = (idx: number) => {
                       <div v-else-if="param.type === 'select'" class="relative">
                         <select
                           v-model="sourceFormParams[param.key]"
-                          class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white appearance-none pr-10"
+                          class="w-full text-sm font-medium px-4 py-2 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 appearance-none pr-10"
                         >
-                          <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
+                          <option v-for="opt in param.options" :key="opt" :value="opt" class="bg-black text-white">{{ opt }}</option>
                         </select>
-                        <ChevronDownIcon class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-[18px]">expand_more</span>
                       </div>
                       
                       <!-- Number param -->
@@ -1222,7 +1200,7 @@ const removeSourceEntry = (idx: number) => {
                         type="number"
                         v-model="sourceFormParams[param.key]"
                         :placeholder="param.default || ''"
-                        class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                        class="w-full text-sm font-medium px-4 py-2 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
                       />
                       
                       <!-- Text param -->
@@ -1230,25 +1208,25 @@ const removeSourceEntry = (idx: number) => {
                         v-else
                         v-model="sourceFormParams[param.key]"
                         :placeholder="param.placeholder || param.default || ''"
-                        class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                        class="w-full text-sm font-medium px-4 py-2 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
                       />
                     </div>
                   </div>
 
                   <!-- URI Preview -->
-                  <div class="mt-5 p-3 bg-slate-900 rounded-xl">
-                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Generated URI</label>
-                    <code class="text-[11px] text-indigo-300 font-mono break-all leading-relaxed">{{ buildSourceUri() }}</code>
+                  <div class="mt-6 p-4 bg-black/50 rounded-xl border border-white/5">
+                    <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest block mb-2">Generated URI</label>
+                    <code class="text-[11px] text-[#00d4ff] font-mono break-all leading-relaxed">{{ buildSourceUri() }}</code>
                   </div>
 
                   <!-- Actions -->
-                  <div class="flex justify-end space-x-3 mt-5">
-                    <button @click="showAddSourceDialog = false" class="px-5 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-widest hover:text-slate-700 dark:hover:text-white transition-colors">
+                  <div class="flex justify-end space-x-3 mt-6">
+                    <button @click="showAddSourceDialog = false" class="px-5 py-2.5 text-xs font-black text-gray-500 uppercase tracking-widest hover:text-white transition-colors">
                       Cancel
                     </button>
                     <button 
                       @click="addSourceFromTemplate"
-                      class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 active:scale-95 transition-all"
+                      class="px-6 py-2.5 bg-brand-primary text-white border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_20px_rgba(166,13,242,0.6)] rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#b526ff] active:scale-95 transition-all"
                     >
                       Add Source
                     </button>
