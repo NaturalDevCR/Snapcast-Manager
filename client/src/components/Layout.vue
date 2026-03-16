@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
+import { useUIStore } from '../stores/ui';
 import { useRoute } from 'vue-router';
 import ToastNotification from './ToastNotification.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import PromptDialog from './PromptDialog.vue';
 
 const authStore = useAuthStore();
+const uiStore = useUIStore();
 const route = useRoute();
+
+onMounted(() => {
+  uiStore.initTheme();
+});
 
 const isMobileMenuOpen = ref(false);
 
@@ -29,54 +35,61 @@ const navigation = [
     <!-- Navigation Bar -->
     <nav class="sticky top-0 z-40 bg-brand-bg/80 backdrop-blur-xl border-b border-white/5 shadow-2xl">
       <div class="px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-20">
-          <div class="flex">
-            <!-- Burger Button -->
-            <button 
-              @click="isMobileMenuOpen = !isMobileMenuOpen"
-              class="p-2 mr-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl border border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center self-center"
-              title="Open Menu"
-            >
-              <span class="material-symbols-outlined text-[1.3rem]">menu</span>
-            </button>
+        <div class="flex justify-between h-20 items-center relative">
+          <!-- Burger Button (Mobile Left) -->
+          <button 
+            @click="isMobileMenuOpen = !isMobileMenuOpen"
+            class="p-2 mr-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl border border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center self-center"
+            title="Open Menu"
+          >
+            <span class="material-symbols-outlined text-[1.3rem]">menu</span>
+          </button>
 
-            <!-- Brand -->
-            <div class="flex-shrink-0 flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-primary to-indigo-600 flex items-center justify-center shadow-lg shadow-brand-primary/20">
-                  <span class="material-symbols-outlined text-white text-xl">graphic_eq</span>
-              </div>
-              <span class="text-xl font-black tracking-tight text-white hidden sm:block drop-shadow-sm">Snapcast <span class="text-brand-primary">Manager</span></span>
+          <!-- Brand centered on mobile, absolute left-1/2 -->
+          <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 sm:static sm:translate-x-0 sm:left-auto sm:flex-shrink-0">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-primary to-indigo-600 flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                <span class="material-symbols-outlined text-white text-xl">graphic_eq</span>
             </div>
-            
-            <!-- Desktop Nav -->
-            <div class="hidden sm:ml-10 sm:flex sm:space-x-2 sm:items-center">
-              <router-link
-                v-for="item in navigation"
-                :key="item.name"
-                :to="item.href"
-                :class="[
-                  route.path === item.href
-                    ? 'bg-white/10 text-white shadow-inner border border-white/5'
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white',
-                  'px-4 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 flex items-center gap-2'
-                ]"
-              >
-                <span class="material-symbols-outlined text-[1.1rem]" :class="route.path === item.href ? 'text-brand-primary' : ''">{{ item.icon }}</span>
-                {{ item.name }}
-              </router-link>
-            </div>
+            <span class="text-xl font-black tracking-tight text-white hidden sm:block drop-shadow-sm">Snapcast <span class="text-brand-primary">Manager</span></span>
           </div>
           
-          <div class="flex items-center space-x-4">
+          <!-- Desktop Nav (Desktop Only) -->
+          <div class="hidden sm:ml-10 sm:flex sm:space-x-2 sm:items-center sm:mr-auto">
+            <router-link
+              v-for="item in navigation"
+              :key="item.name"
+              :to="item.href"
+              :class="[
+                route.path === item.href
+                  ? 'bg-white/10 text-white shadow-inner border border-white/5'
+                  : 'text-gray-400 hover:bg-white/5 hover:text-white',
+                'px-4 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 flex items-center gap-2'
+              ]"
+            >
+              <span class="material-symbols-outlined text-[1.1rem]" :class="route.path === item.href ? 'text-brand-primary' : ''">{{ item.icon }}</span>
+              {{ item.name }}
+            </router-link>
+          </div>
+          
+          <div class="flex items-center space-x-2">
+            <!-- Light/Dark Mode Toggle -->
+            <button 
+              @click="uiStore.toggleTheme"
+              class="p-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl border border-white/5 transition-all duration-300 flex items-center justify-center"
+              title="Toggle Light/Dark Theme"
+            >
+                <span class="material-symbols-outlined text-[1.2rem]">{{ uiStore.isDark ? 'light_mode' : 'dark_mode' }}</span>
+            </button>
+
             <!-- User Profile / Logout -->
-            <div class="flex items-center gap-3 pl-4 border-l border-white/10">
+            <div class="flex items-center gap-3 pl-3 border-l border-white/10">
                 <div class="text-right hidden sm:block">
                     <p class="text-sm font-bold text-white leading-tight">Admin</p>
                     <p class="text-xs text-brand-primary font-medium">Session Active</p>
                 </div>
                 <button 
                   @click="authStore.logout()"
-                  class="p-2.5 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300 group"
+                  class="p-2.5 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300 group flex items-center justify-center"
                   title="Sign out"
                 >
                     <span class="material-symbols-outlined text-[1.2rem] group-hover:scale-110 transition-transform">logout</span>
