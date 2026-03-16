@@ -373,8 +373,10 @@ export class SystemService {
         sudo make install && \
 
         echo "Setting up systemd service and user access..." && \
+        if ! getent group "shairport-sync" &>/dev/null; then \
+          sudo groupadd -r shairport-sync; \
+        fi && \
         if ! id "shairport-sync" &>/dev/null; then \
-          sudo groupadd -r shairport-sync && \
           sudo useradd -r -M -g shairport-sync -s /usr/sbin/nologin -G audio shairport-sync; \
         fi && \
 
