@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.27"
+VERSION="v0.1.28"
 
 echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo "This script will help you set up Snapcast Manager on your Linux server."
@@ -22,10 +22,22 @@ SERVICE_NAME="snapmanager"
 
 # Parse arguments
 AUTO_CONFIRM=false
-for arg in "$@"; do
-    case $arg in
+RESTORE_FILE=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
         -y|--yes)
             AUTO_CONFIRM=true
+            shift
+            ;;
+        --restore)
+            RESTORE_FILE="$2"
+            shift 2
+            ;;
+        --restore=*)
+            RESTORE_FILE="${1#*=}"
+            shift
+            ;;
+        *)
             shift
             ;;
     esac
@@ -91,6 +103,11 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
                 echo "No data directory found at $INSTALL_BASE_DIR/data."
             fi
             
+            if [ -f "/etc/snapserver.conf" ]; then
+                echo -e "${YELLOW}Detected existing snapserver.conf. Backing up...${NC}"
+                sudo cp /etc/snapserver.conf /tmp/snapserver_conf_backup
+            fi
+            
             echo "Removing existing files..."
             sudo rm -rf "$INSTALL_BASE_DIR"
         else
@@ -135,15 +152,23 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         # (Flag handled above)
 
         # Restore database if backup exists
-        if [ -d "/tmp/snapmgr_data_backup" ]; then
-            echo -e "${YELLOW}Existing database found.${NC}"
+        if [ -d "/tmp/snapmgr_data_backup" ] || [ -f "/tmp/snapserver_conf_backup" ]; then
+            echo -e "${YELLOW}Existing database or configuration found.${NC}"
             if prompt_yes_no "Do you want to restore your existing authentication and settings?" "y"; then
-                echo "Restoring database data..."
-                sudo mkdir -p "$INSTALL_BASE_DIR/data"
-                sudo cp -rT /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
-                echo -e "${GREEN}[OK] Data restored.${NC}"
+                if [ -d "/tmp/snapmgr_data_backup" ]; then
+                    echo "Restoring database data..."
+                    sudo mkdir -p "$INSTALL_BASE_DIR/data"
+                    sudo cp -rT /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
+                    echo -e "${GREEN}[OK] Database Data restored.${NC}"
+                fi
+                if [ -f "/tmp/snapserver_conf_backup" ]; then
+                    echo "Restoring snapserver.conf..."
+                    sudo cp /tmp/snapserver_conf_backup /etc/snapserver.conf
+                    echo -e "${GREEN}[OK] snapserver.conf restored.${NC}"
+                fi
             fi
             sudo rm -rf /tmp/snapmgr_data_backup
+            sudo rm -f /tmp/snapserver_conf_backup
         fi
         
         sudo chown -R $USER:$USER "$INSTALL_BASE_DIR"
@@ -151,12 +176,15 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         echo -e "${GREEN}Resuming installation from $INSTALL_BASE_DIR...${NC}"
         cd "$INSTALL_BASE_DIR"
         # Re-run the script from the new location so relative paths work
-        # Pass -y if it was used initially
+        # Pass -y and --restore if they were used initially
+        EXEC_ARGS=()
         if [ "$AUTO_CONFIRM" = true ]; then
-            exec bash scripts/install.sh -y
-        else
-            exec bash scripts/install.sh
+            EXEC_ARGS+=("-y")
         fi
+        if [ -n "$RESTORE_FILE" ]; then
+            EXEC_ARGS+=("--restore" "$RESTORE_FILE")
+        fi
+        exec bash scripts/install.sh "${EXEC_ARGS[@]}"
     else
         echo "Installation aborted."
         exit 1
@@ -280,6 +308,35 @@ fi
 
 # Clean up re-run flag
 rm -f .rebuilding
+
+# 4.5 Restore from backup file
+if [ -n "$RESTORE_FILE" ]; then
+    echo -e "\n${YELLOW}Step 3.5: Restoring from backup file...${NC}"
+    if [ -f "$RESTORE_FILE" ]; then
+        echo "Extracting $RESTORE_FILE to temporary directory..."
+        sudo mkdir -p /tmp/snapmgr_restore
+        sudo tar -xzf "$RESTORE_FILE" -C /tmp/snapmgr_restore
+        
+        if [ -d "/tmp/snapmgr_restore/data" ]; then
+            echo "Restoring database data..."
+            sudo mkdir -p "$INSTALL_BASE_DIR/data"
+            sudo cp -rT /tmp/snapmgr_restore/data "$INSTALL_BASE_DIR/data"
+            sudo chown -R $USER:$USER "$INSTALL_BASE_DIR/data"
+            echo -e "${GREEN}[OK] Database Data restored.${NC}"
+        fi
+        
+        if [ -f "/tmp/snapmgr_restore/snapserver.conf" ]; then
+            echo "Restoring snapserver.conf..."
+            sudo cp /tmp/snapmgr_restore/snapserver.conf /etc/snapserver.conf
+            sudo chown snapserver:snapserver /etc/snapserver.conf
+            echo -e "${GREEN}[OK] snapserver.conf restored.${NC}"
+        fi
+        
+        sudo rm -rf /tmp/snapmgr_restore
+    else
+        echo -e "${RED}[!] Backup file not found: $RESTORE_FILE${NC}"
+    fi
+fi
 
 # 5. Systemd Service setup
 echo -e "\n${YELLOW}Step 4: Setting up as a systemd service...${NC}"

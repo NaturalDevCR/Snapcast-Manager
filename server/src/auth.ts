@@ -85,4 +85,35 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   });
 };
 
+router.post('/change-password', authenticateToken, (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body;
+  const user = (req as any).user;
+  
+  if (!currentPassword || !newPassword) {
+     return res.status(400).json({ error: 'Current and new passwords are required' });
+  }
+
+  try {
+    const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+    const dbUser = stmt.get(user.id) as any;
+
+    if (!dbUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const validPassword = bcrypt.compareSync(currentPassword, dbUser.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    const update = db.prepare('UPDATE users SET password = ? WHERE id = ?');
+    update.run(hashedPassword, user.id);
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

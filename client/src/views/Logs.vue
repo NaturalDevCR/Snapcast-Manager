@@ -16,7 +16,7 @@ const systemStore = useSystemStore();
 const uiStore = useUIStore();
 const activeService = ref<'snapserver' | 'shairport-sync' | 'snapmanager'>('snapserver');
 const logs = ref('');
-const autoRefresh = ref(true);
+const autoRefresh = ref(false);
 let refreshInterval: number | null = null;
 
 const fetchLogs = async () => {

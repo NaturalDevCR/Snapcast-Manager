@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import { systemService } from '../services/system';
 import { configService } from '../services/config';
 import { authenticateToken } from '../auth';
+import { spawn } from 'child_process';
+import fs from 'fs';
 
 const router = express.Router();
 
@@ -181,6 +183,41 @@ router.get('/check-updates/:pkg', async (req: Request, res: Response) => {
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
+});
+
+router.get('/export', authenticateToken, (req: Request, res: Response) => {
+    const backupName = `snapcast-backup-${Date.now()}.tar.gz`;
+    res.setHeader('Content-disposition', `attachment; filename="${backupName}"`);
+    res.setHeader('Content-type', 'application/gzip');
+    
+    // We want to tar /opt/snapcast-manager/data and /etc/snapserver.conf
+    const dataDir = '/opt/snapcast-manager/data';
+    const confFile = '/etc/snapserver.conf';
+    
+    const targets: string[] = [];
+    if (fs.existsSync(dataDir)) {
+        targets.push('-C', '/opt/snapcast-manager', 'data');
+    }
+    if (fs.existsSync(confFile)) {
+        targets.push('-C', '/etc', 'snapserver.conf');
+    }
+
+    if (targets.length === 0) {
+        return res.status(404).json({ error: 'No backup data found.' });
+    }
+
+    const tarProcess = spawn('tar', ['-czf', '-', ...targets]);
+    
+    tarProcess.stdout.pipe(res);
+    
+    tarProcess.stderr.on('data', (data) => {
+        console.error(`Tar stderr: ${data}`);
+    });
+
+    tarProcess.on('error', (err) => {
+        console.error('Tar error:', err);
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to create backup archve' });
+    });
 });
 
 export default router;

@@ -102,9 +102,11 @@ The `install.sh` script downloads this pre-built artifact, allowing you to insta
 
 ---
 
-## ❤️ Support & Donate
+## ❤️ Support & Acknowledgements
 
-If you find this project useful, it would mean the world to me if you considered supporting its continued development!
+Snapcast Manager is built to manage the incredible **[Snapcast](https://github.com/snapcast/snapcast)** project by badaix. A huge thank you to the original creators for building such a robust multi-room audio system.
+
+If you find this manager UI useful, it would mean the world to me if you considered supporting its continued development!
 
 [![Donate via PayPal](https://www.paypalobjects.com/en_US/DK/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/paypalme/NaturalCloud)
 

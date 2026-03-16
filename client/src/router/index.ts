@@ -50,6 +50,9 @@ router.beforeEach(async (to, _from, next) => {
     try {
       const { isInitialized } = await fetchApi('/auth/setup-status');
       if (!isInitialized) {
+        if (token) {
+           localStorage.removeItem('token');
+        }
         return next('/setup');
       }
     } catch (err) {
@@ -57,9 +60,12 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
-  if (to.meta.requiresAuth && !token) {
+  // RE-read token in case we just deleted it above
+  const currentToken = localStorage.getItem('token');
+
+  if (to.meta.requiresAuth && !currentToken) {
     next('/login');
-  } else if (to.path === '/setup' && token) {
+  } else if (to.path === '/setup' && currentToken) {
     // If already logged in, no need for setup
     next('/');
   } else {
