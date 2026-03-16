@@ -15,7 +15,7 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.44"
+VERSION="v0.1.45"
 
 echo -e "${MAGENTA}${BOLD}"
 cat << "EOF"
@@ -238,8 +238,8 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         
         # Fetch the download URL for any attached ZIP files in the release
         API_URL="https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/tags/${VERSION}"
-        ASSETS=$(curl -sL "$API_URL" | grep "browser_download_url")
-        REPO_ZIP_URL=$(echo "$ASSETS" | grep ".zip" | head -n 1 | cut -d '"' -f 4)
+        ASSETS=$(curl -sL "$API_URL" | grep "browser_download_url" || true)
+        REPO_ZIP_URL=$(echo "$ASSETS" | grep ".zip" | head -n 1 | cut -d '"' -f 4 || true)
         
         sudo wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL" || {
             echo -e "${RED}[!] Pre-built asset $VERSION not found. Falling back to tagged source code...${NC}"
