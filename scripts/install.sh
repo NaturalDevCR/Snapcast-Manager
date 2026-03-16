@@ -14,10 +14,15 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.32"
+VERSION="v0.1.33"
 
 echo -e "${GREEN}${BOLD}=== Snapcast Manager Installer ($VERSION) ===${NC}"
-echo -e "This script will help you set up Snapcast Manager on your Linux server.\n"
+echo -e "This script will help you set up Snapcast Manager.\n"
+
+# Application Configuration
+APP_DIR="/opt/snapcast-manager"
+REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
+NODE_VERSION="20"
 
 REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/releases/download/${VERSION}/snapcast-manager-release.zip"
 INSTALL_BASE_DIR="/opt/snapcast-manager"
