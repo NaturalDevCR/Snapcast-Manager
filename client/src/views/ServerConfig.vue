@@ -1068,7 +1068,7 @@ const removeSourceEntry = (idx: number) => {
               </div>
               
               <!-- Code Editor Container -->
-              <div ref="editorRef" class="h-[600px] text-xs font-mono pce-custom"></div>
+              <div ref="editorRef" class="text-xs font-mono pce-custom"></div>
           </div>
 
           <!-- Footer Actions -->
