@@ -5,13 +5,16 @@ defineProps<{
 </script>
 
 <template>
-  <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300">
-    <div v-if="title || $slots.title" class="px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-800/10 flex items-center">
-      <div v-if="$slots.icon" class="mr-3">
-          <slot name="icon"></slot>
+  <div class="bg-[#2a1c31]/60 backdrop-blur-xl border border-white/5 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 hover:border-brand-primary/30 group">
+    <div v-if="title || $slots.title" class="px-6 py-5 border-b border-white/5 bg-black/20 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div v-if="$slots.icon" class="flex items-center justify-center text-brand-primary bg-brand-primary/10 w-8 h-8 rounded-lg border border-brand-primary/20">
+            <slot name="icon"></slot>
+        </div>
+        <h3 v-if="title" class="text-sm font-bold text-white tracking-widest uppercase">{{ title }}</h3>
+        <slot v-else name="title"></slot>
       </div>
-      <h3 v-if="title" class="text-sm font-bold text-slate-800 dark:text-slate-100 tracking-tight uppercase">{{ title }}</h3>
-      <slot v-else name="title"></slot>
+      <slot name="action"></slot>
     </div>
     <div class="p-6">
       <slot></slot>
