@@ -124,36 +124,86 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         echo -e "Installer Version: ${CYAN}${VERSION}${NC}"
         
         DO_UPDATE=false
+        PRESERVE_DATA=true
         
         if [ "$INSTALLED_VERSION" = "unknown" ] || [ "$INSTALLED_VERSION" != "$VERSION" ]; then
             echo -e "\n${GREEN}An update is available or version mismatch detected.${NC}"
-            if prompt_yes_no "Do you want to safely UPDATE to $VERSION?" "y"; then
-                DO_UPDATE=true
+            echo -e "1) ${CYAN}Update / Upgrade${NC} (Preserves Database & Settings) - Recommended"
+            echo -e "2) ${RED}Force Re-install${NC} (Wipes installation bundle but still backs up data)"
+            echo -e "3) ${RED}Clean Re-install${NC} (Wipes everything, starting fresh)"
+            echo -e "4) ${YELLOW}Abort${NC}"
+            
+            if [ "$AUTO_CONFIRM" = true ]; then
+                CHOICE=1
+                echo -e "Select option [Auto-confirmed: 1]"
+            else
+                read -p "Select an option (1-4): " CHOICE
             fi
+
+            case "$CHOICE" in
+                1|2)
+                    DO_UPDATE=true
+                    ;;
+                3)
+                    DO_UPDATE=true
+                    PRESERVE_DATA=false
+                    ;;
+                *)
+                    echo "Installation aborted."
+                    exit 0
+                    ;;
+            esac
         else
             echo -e "\n${GREEN}You are already running the latest version ($VERSION).${NC}"
-            if prompt_yes_no "Do you want to FORCE RE-INSTALL and OVERWRITE the existing installation?" "n"; then
-                DO_UPDATE=true
+            echo -e "1) ${RED}Update / Force Re-install${NC} (Preserves Database & Settings)"
+            echo -e "2) ${RED}Clean Re-install${NC} (Wipes everything, starting fresh)"
+            echo -e "3) ${YELLOW}Abort${NC}"
+
+            if [ "$AUTO_CONFIRM" = true ]; then
+                CHOICE=3
+                echo -e "Select option [Auto-confirmed: Abort]"
+                exit 0
+            else
+                read -p "Select an option (1-3): " CHOICE
             fi
+
+            case "$CHOICE" in
+                1)
+                    DO_UPDATE=true
+                    ;;
+                2)
+                    DO_UPDATE=true
+                    PRESERVE_DATA=false
+                    ;;
+                *)
+                    echo "Installation aborted."
+                    exit 0
+                    ;;
+            esac
         fi
 
         if [ "$DO_UPDATE" = true ]; then
-            echo -e "\n${BLUE}Preparing for update/re-install...${NC}"
+            echo -e "\n${BLUE}Preparing for installation...${NC}"
             echo "Stopping existing service..."
             sudo systemctl stop $SERVICE_NAME 2>/dev/null || true
             sudo systemctl disable $SERVICE_NAME 2>/dev/null || true
             
-            echo "Backing up database data securely..."
-            if [ -d "$INSTALL_BASE_DIR/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/data 2>/dev/null)" ]; then
-                sudo rm -rf /tmp/snapmgr_data_backup
-                sudo cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
-                echo -e "${GREEN}[OK] Database backed up to /tmp/snapmgr_data_backup${NC}"
+            if [ "$PRESERVE_DATA" = true ]; then
+                echo "Backing up database data securely..."
+                if [ -d "$INSTALL_BASE_DIR/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/data 2>/dev/null)" ]; then
+                    sudo rm -rf /tmp/snapmgr_data_backup
+                    sudo cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
+                    echo -e "${GREEN}[OK] Database backed up to /tmp/snapmgr_data_backup${NC}"
+                else
+                    echo "Data directory is empty or missing, skipping backup."
+                fi
+                
+                if [ -f "/etc/snapserver.conf" ]; then
+                    sudo cp /etc/snapserver.conf /tmp/snapserver_conf_backup
+                fi
             else
-                echo "Data directory is empty or missing, skipping backup."
-            fi
-            
-            if [ -f "/etc/snapserver.conf" ]; then
-                sudo cp /etc/snapserver.conf /tmp/snapserver_conf_backup
+                echo -e "${RED}[!] Clean re-install: Skipping configuration backups.${NC}"
+                sudo rm -rf /tmp/snapmgr_data_backup /tmp/snapserver_conf_backup 2>/dev/null || true
             fi
             
             echo "Wiping existing application files..."
