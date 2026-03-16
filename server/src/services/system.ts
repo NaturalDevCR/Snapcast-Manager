@@ -32,6 +32,10 @@ export class SystemService {
       return this.installSnapCtrl();
     }
     
+    if (pkg === 'shairport-sync') {
+      return this.installShairportSync();
+    }
+    
     if (pkg === 'snapserver') {
       return this.updateSnapserverFromGitHub(clean);
     }
@@ -138,6 +142,14 @@ export class SystemService {
           await execAsync('[ -d "/usr/share/snapserver/snap-ctrl" ] && [ "$(ls -A /usr/share/snapserver/snap-ctrl)" ]');
           return true;
       }
+      if (pkg === 'shairport-sync') {
+          try {
+              await execAsync('command -v shairport-sync');
+              return true;
+          } catch (e) {
+              return false;
+          }
+      }
       if (pkg === 'node') {
           await execAsync('node -v');
           return true;
@@ -217,6 +229,11 @@ export class SystemService {
         return release.tag_name;
       }
 
+      if (pkg === 'shairport-sync') {
+        const release = await this.getLatestGitHubRelease('mikebrady', 'shairport-sync');
+        return release.tag_name;
+      }
+
       if (pkg === 'node') {
         // Simple way to get latest LTS version or just assume we follow nodesource 20.x
         return 'v20.x (Latest)'; 
@@ -293,6 +310,44 @@ export class SystemService {
 
   async disableService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
       return this.runCommand(`sudo systemctl disable ${service}`);
+  }
+
+  async installShairportSync(): Promise<string> {
+      console.log('Installing shairport-sync and nqptp from source... (AirPlay 2)');
+      const cmd = `
+        echo "Installing build dependencies..." && \
+        sudo apt-get update && \
+        sudo apt-get install -y build-essential git autoconf automake libtool \
+          libpopt-dev libconfig-dev libasound2-dev libavahi-client-dev \
+          libssl-dev libdaemon-dev libgcrypt-dev libavcodec-dev libavformat-dev \
+          libavutil-dev libplist-dev libsoxr-dev xmltoman && \
+        
+        echo "Building and installing nqptp..." && \
+        rm -rf /tmp/nqptp-build && \
+        git clone https://github.com/mikebrady/nqptp.git /tmp/nqptp-build && \
+        cd /tmp/nqptp-build && \
+        autoreconf -fvi && \
+        ./configure && \
+        make -j$(nproc) && \
+        sudo make install && \
+        sudo systemctl daemon-reload && \
+        sudo systemctl enable nqptp && \
+        sudo systemctl restart nqptp && \
+
+        echo "Building and installing shairport-sync..." && \
+        rm -rf /tmp/shairport-sync-build && \
+        git clone https://github.com/mikebrady/shairport-sync.git /tmp/shairport-sync-build && \
+        cd /tmp/shairport-sync-build && \
+        autoreconf -fvi && \
+        ./configure --with-alsa --with-avahi --with-ssl=openssl --with-soxr --with-metadata --with-airplay-2 --with-systemd && \
+        make -j$(nproc) && \
+        sudo make install && \
+        sudo systemctl daemon-reload && \
+        sudo systemctl enable shairport-sync && \
+        sudo systemctl restart shairport-sync && \
+        echo "Shairport-sync and nqptp installed successfully."
+      `;
+      return this.runCommand(cmd);
   }
 
   async installSnapCtrl(): Promise<string> {

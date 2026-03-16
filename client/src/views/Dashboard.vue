@@ -340,6 +340,12 @@ const version = 'v0.1.40';
                      {{ systemStore.shairportSyncStatus }}
                  </span>
             </div>
+            <div class="flex items-center justify-between" v-if="systemStore.packageVersions['shairport-sync']">
+                  <span class="text-sm font-semibold text-gray-400">Version</span>
+                  <span class="text-sm font-bold text-gray-200">
+                      {{ systemStore.packageVersions['shairport-sync'] }}
+                  </span>
+             </div>
             <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages['shairport-sync']">
                 <div class="grid grid-cols-2 gap-3">
                     <button @click="systemStore.controlService('restart', 'shairport-sync')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
