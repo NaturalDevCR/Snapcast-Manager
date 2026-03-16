@@ -160,7 +160,7 @@ export class SystemService {
       }
       if (pkg === 'shairport-sync') {
           try {
-              await execAsync('command -v shairport-sync');
+              await execAsync('[ -f /usr/local/bin/shairport-sync ] || command -v shairport-sync');
               return true;
           } catch (e) {
               return false;
@@ -209,7 +209,7 @@ export class SystemService {
           cmd = 'ffmpeg -version 2>&1 | head -n 1';
           break;
         case 'shairport-sync':
-          cmd = 'shairport-sync -V 2>&1 | head -n 1';
+          cmd = 'if [ -f /usr/local/bin/shairport-sync ]; then /usr/local/bin/shairport-sync -V 2>&1 | head -n 1; else shairport-sync -V 2>&1 | head -n 1; fi';
           break;
         case 'snap-ctrl':
           // Attempt to find version in package.json if it exists
