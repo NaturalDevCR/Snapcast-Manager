@@ -5,3 +5,6 @@ dist/
 *.log
 coverage/
 .vscode/
+
+.stitch_screens/
+server/data/
