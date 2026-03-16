@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { basicEditor } from 'prism-code-editor/setups';
 import 'prism-code-editor/prism/languages/ini';
 import 'prism-code-editor/layout.css';
-import 'prism-code-editor/themes/dracula.css';
+import 'prism-code-editor/themes/prism-tomorrow.css';
 import { useConfigStore } from '../stores/config';
 import { useSnapshotStore } from '../stores/snapshots';
 import { useSystemStore } from '../stores/system';
@@ -276,23 +276,25 @@ onMounted(async () => {
 watch(activeTab, async (newTab) => {
     if (newTab === 'expert') {
         await nextTick();
-        if (editorRef.value && !editorInstance) {
+        if (editorRef.value) {
             editorInstance = basicEditor(
                 editorRef.value,
                 {
                     language: 'ini',
-                    theme: 'dracula',
+                    theme: 'prism-tomorrow',
                     value: localRawConfig.value
                 },
                 () => {
-                    editorInstance.addListener('update', (value: string) => {
-                        localRawConfig.value = value;
-                    });
+                    if (editorInstance && typeof editorInstance.on === 'function') {
+                        editorInstance.on('update', (value: string) => {
+                            localRawConfig.value = value;
+                        });
+                    }
                 }
             );
-        } else if (editorInstance) {
-            editorInstance.setOptions({ value: localRawConfig.value });
         }
+    } else {
+        editorInstance = null;
     }
 });
 
@@ -1425,32 +1427,3 @@ const removeSourceEntry = (idx: number) => {
   </Layout>
 </template>
 
-<style scoped>
-.pce-custom.prism-code-editor {
-  --pce-bg: transparent !important; 
-  --pce-cursor: #bd93f9 !important;
-  --pce-selection: rgba(139, 92, 246, 0.2) !important;
-  --pce-line-number: #4a3856 !important;
-  --pce-widget-bg: #1a1024 !important;
-  background: transparent !important;
-  background-color: transparent !important;
-}
-
-/* Ensure padding and layout look clean */
-.pce-custom.prism-code-editor :deep(.pce-textarea),
-.pce-custom.prism-code-editor :deep(.pce-code) {
-  padding: 1.5rem !important;
-  line-height: 1.6 !important;
-  background: transparent !important;
-}
-
-/* Style line numbers wrapper to look like left gutter */
-.pce-custom.prism-code-editor :deep(.prism-code-editor .line-numbers) {
-  background: rgba(0, 0, 0, 0.1) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.02);
-}
-
-.pce-custom.prism-code-editor :deep(.active-line) {
-  background: rgba(166, 13, 242, 0.04);
-}
-</style>
