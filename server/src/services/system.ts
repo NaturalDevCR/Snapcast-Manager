@@ -135,10 +135,14 @@ export class SystemService {
     try {
       if (pkg === 'snap-ctrl') {
           // Check if directory exists and is not empty
-          await this.runCommand('[ -d "/usr/share/snapserver/snap-ctrl" ] && [ "$(ls -A /usr/share/snapserver/snap-ctrl)" ]');
+          await execAsync('[ -d "/usr/share/snapserver/snap-ctrl" ] && [ "$(ls -A /usr/share/snapserver/snap-ctrl)" ]');
           return true;
       }
-      await this.runCommand(`dpkg -s ${pkg}`);
+      if (pkg === 'node') {
+          await execAsync('node -v');
+          return true;
+      }
+      await execAsync(`dpkg -s ${pkg}`);
       return true;
     } catch (error) {
       return false;
@@ -147,9 +151,11 @@ export class SystemService {
 
   async getServiceStatus(service: 'snapserver' | 'shairport-sync'): Promise<string> {
     try {
-      const output = await this.runCommand(`systemctl is-active ${service}`);
-      return output.trim();
-    } catch (error) {
+      const { stdout } = await execAsync(`systemctl is-active ${service}`);
+      return stdout.trim();
+    } catch (error: any) {
+       // systemctl is-active returns non-zero when inactive/failed
+       if (error.stdout) return error.stdout.trim();
        return 'inactive';
     }
   }
@@ -178,18 +184,23 @@ export class SystemService {
           cmd = 'shairport-sync -V 2>&1 | head -n 1';
           break;
         case 'snap-ctrl':
-          return 'v1.1.0'; 
+          // Attempt to find version in package.json if it exists
+          try {
+              const { stdout } = await execAsync('cat /usr/share/snapserver/snap-ctrl/package.json 2>/dev/null | grep version | head -n 1');
+              return stdout.match(/"version":\s*"([^"]+)"/)?.[1] || 'v1.1.0';
+          } catch (e) {
+              return 'v1.1.0';
+          }
         case 'node':
           cmd = 'node -v';
           break;
       }
-      const output = await this.runCommand(cmd);
+      const { stdout } = await execAsync(cmd);
       // Clean up version string (e.g. "snapserver v0.26.0" -> "v0.26.0")
-      const firstLine = output.split('\n')[0].trim();
+      const firstLine = stdout.split('\n')[0].trim();
       const match = firstLine.match(/v?\d+\.\d+\.\d+/);
       return match ? match[0] : firstLine;
     } catch (error) {
-       console.error(`Error getting version for ${pkg}:`, error);
       return 'unknown';
     }
   }
