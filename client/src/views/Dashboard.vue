@@ -50,6 +50,17 @@ const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 's
   }
 };
 
+const handleUninstall = async (pkg: 'shairport-sync') => {
+  if (!confirm(`Are you sure you want to UNINSTALL ${pkg}? This will remove its binaries and service files.`)) return;
+  try {
+    await systemStore.uninstallPackage(pkg);
+    uiStore.showToast(`${pkg} uninstalled successfully!`, 'success');
+    await systemStore.refreshAll(); // Refresh status
+  } catch (err: any) {
+    uiStore.showToast(`Failed to uninstall ${pkg}: ` + err.message, 'error');
+  }
+};
+
 const handleUpdateNodeJs = async () => {
     if (!confirm(`This will update Node.js to the latest ${selectedNodeVersion.value}.x version. The service might restart briefly. Continue?`)) return;
     try {
@@ -354,6 +365,9 @@ const version = 'v0.1.40';
                 </div>
                 <button @click="handleUpdate('shairport-sync')" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Update Shairport
+                </button>
+                <button @click="handleUninstall('shairport-sync')" class="w-full px-4 py-3 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                    Uninstall AirPlay
                 </button>
             </div>
             <div class="pt-4 border-t border-white/5" v-else>

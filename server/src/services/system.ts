@@ -43,6 +43,25 @@ export class SystemService {
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y --only-upgrade ${pkg}`);
   }
 
+  async uninstallPackage(pkg: string): Promise<string> {
+    if (pkg === 'shairport-sync') {
+      const cmd = `
+        echo "Stopping and disabling services..." && \
+        sudo systemctl stop shairport-sync 2>/dev/null || true && \
+        sudo systemctl disable shairport-sync 2>/dev/null || true && \
+        sudo systemctl stop nqptp 2>/dev/null || true && \
+        sudo systemctl disable nqptp 2>/dev/null || true && \
+        echo "Removing binaries and service files..." && \
+        sudo rm -f /usr/local/bin/shairport-sync /usr/local/bin/nqptp && \
+        sudo rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service && \
+        sudo systemctl daemon-reload && \
+        echo "Shairport-sync and nqptp removed successfully."
+      `;
+      return this.runCommand(cmd);
+    }
+    return this.runCommand(`sudo apt-get remove --purge -y ${pkg}`);
+  }
+
   private async getDistroCodename(): Promise<string> {
     if (this.distroCodename) return this.distroCodename;
 
@@ -131,9 +150,6 @@ export class SystemService {
     `);
   }
 
-  async uninstallPackage(pkg: string): Promise<string> {
-    return this.runCommand(`sudo apt-get remove -y ${pkg}`);
-  }
 
   async isInstalled(pkg: string): Promise<boolean> {
     try {
@@ -342,6 +358,16 @@ export class SystemService {
         ./configure --with-alsa --with-avahi --with-ssl=openssl --with-soxr --with-metadata --with-airplay-2 --with-systemd && \
         make -j$(nproc) && \
         sudo make install && \
+
+        echo "Setting up systemd service and user access..." && \
+        if ! id "shairport-sync" &>/dev/null; then \
+          sudo groupadd -r shairport-sync && \
+          sudo useradd -r -M -g shairport-sync -s /usr/sbin/nologin -G audio shairport-sync; \
+        fi && \
+        if [ -f "scripts/shairport-sync.service" ]; then \
+          sudo cp scripts/shairport-sync.service /etc/systemd/system/shairport-sync.service; \
+        fi && \
+
         sudo systemctl daemon-reload && \
         sudo systemctl enable shairport-sync && \
         sudo systemctl restart shairport-sync && \
