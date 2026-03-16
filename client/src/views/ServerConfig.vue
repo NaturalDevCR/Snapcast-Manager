@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { basicEditor } from 'prism-code-editor/setups';
+import 'prism-code-editor/prism/languages/ini';
+import 'prism-code-editor/layout.css';
+import 'prism-code-editor/themes/dracula.css';
 import { useConfigStore } from '../stores/config';
 import { useSnapshotStore } from '../stores/snapshots';
 import { useSystemStore } from '../stores/system';
@@ -23,6 +27,8 @@ const snapshotStore = useSnapshotStore();
 const activeTab = ref<'standard' | 'expert' | 'snapshots' | 'security'>('standard');
 const activeSection = ref('server');
 const localRawConfig = ref('');
+const editorRef = ref<HTMLElement | null>(null);
+let editorInstance: any = null;
 const localParsedConfig = ref<Record<string, any>>({});
 const configMetadata = ref<Record<string, any>>({});
 const configSections = ref<Record<string, any>>({});
@@ -265,6 +271,35 @@ const fetchBoth = async () => {
 onMounted(async () => {
     await fetchBoth();
     await snapshotStore.fetchSnapshots();
+});
+
+watch(activeTab, async (newTab) => {
+    if (newTab === 'expert') {
+        await nextTick();
+        if (editorRef.value && !editorInstance) {
+            editorInstance = basicEditor(
+                editorRef.value,
+                {
+                    language: 'ini',
+                    theme: 'dracula',
+                    value: localRawConfig.value
+                },
+                () => {
+                    editorInstance.addListener('update', (value: string) => {
+                        localRawConfig.value = value;
+                    });
+                }
+            );
+        } else if (editorInstance) {
+            editorInstance.setOptions({ value: localRawConfig.value });
+        }
+    }
+});
+
+watch(localRawConfig, (newVal) => {
+    if (editorInstance && editorInstance.value !== newVal) {
+        editorInstance.setOptions({ value: newVal });
+    }
 });
 
 const saveParsed = async () => {
@@ -988,38 +1023,66 @@ const removeSourceEntry = (idx: number) => {
       </div>
 
       <!-- ==================== EXPERT TAB ==================== -->
-      <div v-else-if="activeTab === 'expert'" class="animate-in fade-in slide-in-from-right-4 duration-500">
-          <Card>
-              <template #title>
-                <div class="flex items-center justify-between w-full">
-                  <div class="flex items-center space-x-2">
-                    <span class="material-symbols-outlined text-[20px] text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.5)]">code</span>
-                    <span class="font-black text-sm uppercase tracking-widest text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">Raw Editor</span>
-                  </div>
-                </div>
-              </template>
-              <div class="space-y-6">
-                  <p class="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                      Direct access to <code class="bg-black/40 px-2 py-1 rounded text-brand-primary">snapserver.conf</code>
+      <div v-else-if="activeTab === 'expert'" class="animate-in fade-in slide-in-from-right-4 duration-500 space-y-6">
+          <!-- Page Header -->
+          <div class="flex items-center justify-between">
+              <div>
+                  <h2 class="text-xl font-black text-white uppercase tracking-wider drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Raw Editor</h2>
+                  <p class="text-[11px] font-bold text-gray-500 uppercase tracking-widest mt-1">
+                      Directly modify the <code class="bg-brand-primary/20 px-1.5 py-0.5 rounded text-brand-primary text-[10px] font-mono border border-brand-primary/10">snapserver.conf</code> for advanced control.
                   </p>
-                  <div class="relative group">
-                    <div class="absolute -inset-1 bg-gradient-to-r from-brand-primary/50 to-brand-primary rounded-2xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
-                    <textarea 
-                        v-model="localRawConfig" 
-                        class="relative w-full h-[600px] p-6 bg-black/60 border border-white/5 rounded-2xl focus:ring-1 focus:ring-brand-primary/50 outline-none overflow-y-auto selection:bg-brand-primary/30 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] font-mono text-xs text-gray-300"
-                    ></textarea>
+              </div>
+              <div class="flex items-center space-x-3">
+                  <button @click="fetchBoth" class="flex items-center space-x-1.5 px-4 py-2 rounded-xl border border-white/5 bg-black/20 hover:bg-white/5 text-gray-400 hover:text-white transition-all text-xs font-black uppercase tracking-widest">
+                      <span class="material-symbols-outlined text-[16px]">history</span>
+                      <span>Revert</span>
+                  </button>
+                  <button @click="handleExportBackup" class="flex items-center space-x-1.5 px-4 py-2 rounded-xl border border-white/5 bg-black/20 hover:bg-white/5 text-gray-400 hover:text-white transition-all text-xs font-black uppercase tracking-widest">
+                      <span class="material-symbols-outlined text-[16px]">download</span>
+                      <span>Backup</span>
+                  </button>
+              </div>
+          </div>
+
+          <!-- Editor Wrapper -->
+          <div class="rounded-2xl border border-white/5 bg-[#140b1b]/80 backdrop-blur-md overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+              <!-- Frame Header -->
+              <div class="bg-black/30 px-6 py-2.5 flex items-center justify-between text-[10px] font-mono text-gray-500 border-b border-white/5">
+                  <div class="flex items-center space-x-2">
+                      <span class="material-symbols-outlined text-[14px]">description</span>
+                      <span>/etc/snapserver.conf</span>
                   </div>
-                  <div class="flex justify-end">
-                      <button 
-                          @click="saveRaw" 
-                          :disabled="configStore.loading"
-                          class="px-8 py-3 bg-brand-primary text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_20px_rgba(166,13,242,0.6)] hover:bg-[#b526ff] active:scale-95 disabled:opacity-50 transition-all border border-brand-primary"
-                      >
-                          Apply Raw Changes
-                      </button>
+                  <div class="flex items-center space-x-4">
+                      <span>UTF-8</span>
+                      <span>INI</span>
                   </div>
               </div>
-          </Card>
+              
+              <!-- Code Editor Container -->
+              <div ref="editorRef" class="h-[600px] text-xs font-mono pce-custom"></div>
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2 text-amber-500 text-xs font-bold uppercase tracking-widest bg-amber-500/5 px-4 py-2 rounded-xl border border-amber-500/10">
+                  <span class="material-symbols-outlined text-[16px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">warning</span>
+                  <span>Warning: Restart required after applying changes to configuration.</span>
+              </div>
+              <div class="flex items-center space-x-3">
+                  <button @click="fetchBoth" class="py-3.5 px-6 rounded-xl text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest border border-white/5">
+                      Discard Changes
+                  </button>
+                  <button 
+                      @click="saveRaw" 
+                      :disabled="configStore.loading"
+                      class="flex items-center space-x-2 py-3.5 px-6 rounded-xl bg-brand-primary hover:bg-[#b526ff] text-white font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] disabled:opacity-50 transition-all border border-brand-primary/30 active:scale-95"
+                  >
+                      <span v-if="configStore.loading" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                      <span v-else class="material-symbols-outlined text-[16px]">save</span>
+                      <span>Apply Raw Changes</span>
+                  </button>
+              </div>
+          </div>
       </div>
 
       <!-- ==================== SNAPSHOTS TAB ==================== -->
@@ -1360,3 +1423,31 @@ const removeSourceEntry = (idx: number) => {
       />
   </Layout>
 </template>
+
+<style scoped>
+.pce-custom {
+  /* Match the deep purple background from the design */
+  --pce-bg: #140b1b; 
+  --pce-cursor: #bd93f9;
+  --pce-selection: rgba(139, 92, 246, 0.2);
+  --pce-line-number: #4a3856;
+  --pce-widget-bg: #1a1024;
+}
+
+/* Ensure padding and layout look clean */
+.pce-custom :deep(.pce-textarea),
+.pce-custom :deep(.pce-code) {
+  padding: 1.5rem !important;
+  line-height: 1.6 !important;
+}
+
+/* Style line numbers wrapper to look like left gutter */
+.pce-custom :deep(.prism-code-editor .line-numbers) {
+  background: rgba(0, 0, 0, 0.1) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.pce-custom :deep(.active-line) {
+  background: rgba(166, 13, 242, 0.04);
+}
+</style>
