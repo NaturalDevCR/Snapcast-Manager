@@ -52,7 +52,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Update this constant synchronously with the package.json version before release
-const version = 'v0.1.33';
+const version = 'v0.1.34';
 </script>
 
 <template>
@@ -357,7 +357,9 @@ const version = 'v0.1.33';
         <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-gray-400">Node.js</span>
-                <span class="text-[#00ff9d] font-black text-sm tracking-widest leading-none drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">STABLE</span>
+                <span class="text-[#00ff9d] font-black text-sm tracking-widest leading-none drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">
+                    {{ systemStore.packageVersions.node || 'UNKNOWN' }}
+                </span>
             </div>
             <div class="flex flex-col">
                  <div class="flex items-center justify-between mb-2">

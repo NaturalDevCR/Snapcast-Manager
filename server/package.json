@@ -1,8 +1,8 @@
 {
-  "name": "server",
-  "version": "0.1.33",
-  "description": "",
-  "main": "index.js",
+  "name": "snapcast-manager-server",
+  "version": "0.1.34",
+  "description": "Backend API for Snapcast Manager",
+  "main": "dist/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node src/index.ts",

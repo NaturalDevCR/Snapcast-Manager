@@ -23,8 +23,10 @@ echo -e "This script will help you set up Snapcast Manager.\n"
 APP_DIR="/opt/snapcast-manager"
 REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
 NODE_VERSION="20"
+VERSION="v0.1.34"
 
-REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/releases/download/${VERSION}/snapcast-manager-release.zip"
+# Colors for output
+GREEN='\033[0;32m'
 INSTALL_BASE_DIR="/opt/snapcast-manager"
 SERVICE_NAME="snapmanager"
 
