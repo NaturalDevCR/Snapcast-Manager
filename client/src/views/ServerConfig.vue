@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useConfigStore } from '../stores/config';
 import { useSnapshotStore } from '../stores/snapshots';
 import { useSystemStore } from '../stores/system';
@@ -10,19 +10,13 @@ import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import PromptDialog from '../components/PromptDialog.vue';
 
-// Code Editor Highlighting
-import { createEditor } from 'prism-code-editor';
-import 'prism-code-editor/languages/ini';
-import 'prism-code-editor/layout.css';
-import 'prism-code-editor/scrollbar.css';
-import 'prism-code-editor/themes/atom-one-dark.css';
+
 
 const configStore = useConfigStore();
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
 
-const editorRef = ref<any>(null);
-const editorContainer = ref<HTMLElement | null>(null);
+
 
 const snapshotStore = useSnapshotStore();
 
@@ -33,25 +27,7 @@ const localParsedConfig = ref<Record<string, any>>({});
 const configMetadata = ref<Record<string, any>>({});
 const configSections = ref<Record<string, any>>({});
 
-watch([() => activeTab.value, editorContainer], async ([tab, container]) => {
-  if (tab === 'expert' && container && !editorRef.value) {
-      await nextTick();
-      const element = container as HTMLElement;
-      editorRef.value = createEditor(element, {
-          value: localRawConfig.value,
-          language: 'ini',
-          onUpdate(val) {
-              localRawConfig.value = val;
-          }
-      });
-  }
-}, { flush: 'post' });
 
-watch(localRawConfig, (val) => {
-    if (editorRef.value && editorRef.value.value !== val) {
-        editorRef.value.setOptions({ value: val });
-    }
-});
 const sourceTemplates = ref<any[]>([]);
 
 // Tracks which properties are "enabled" (will be saved)
@@ -1028,7 +1004,10 @@ const removeSourceEntry = (idx: number) => {
                   </p>
                   <div class="relative group">
                     <div class="absolute -inset-1 bg-gradient-to-r from-brand-primary/50 to-brand-primary rounded-2xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
-                    <div ref="editorContainer" class="relative w-full h-[600px] bg-black/60 border border-white/5 rounded-2xl focus:ring-1 focus:ring-brand-primary/50 outline-none overflow-hidden selection:bg-brand-primary/30 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] text-xs"></div>
+                    <textarea 
+                        v-model="localRawConfig" 
+                        class="relative w-full h-[600px] p-6 bg-black/60 border border-white/5 rounded-2xl focus:ring-1 focus:ring-brand-primary/50 outline-none overflow-y-auto selection:bg-brand-primary/30 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] font-mono text-xs text-gray-300"
+                    ></textarea>
                   </div>
                   <div class="flex justify-end">
                       <button 
