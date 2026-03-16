@@ -87,8 +87,12 @@ const openEditSourceDialog = (idx: number) => {
   const prefix = detectedType === 'ffmpeg_radio' || detectedType === 'process' ? 'process://' : `${detectedType}://`;
   const withoutPrefix = uri.substring(prefix.length);
   const qIdx = withoutPrefix.indexOf('?');
-  const path = qIdx === -1 ? withoutPrefix : withoutPrefix.substring(0, qIdx);
+  let path = qIdx === -1 ? withoutPrefix : withoutPrefix.substring(0, qIdx);
   const query = qIdx === -1 ? '' : withoutPrefix.substring(qIdx + 1);
+  
+  if (path.startsWith('//')) {
+      path = '/' + path.replace(/^\/+/, '');
+  }
   
   sourceFormPath.value = path;
   const params = new URLSearchParams(query);
@@ -528,8 +532,11 @@ const buildSourceUri = (): string => {
   const template = selectedTemplate.value;
   if (!template) return '';
   
-  const path = sourceFormPath.value || template.pathPlaceholder;
-  let uri = `${template.uriPrefix}/${path}`;
+  let path = sourceFormPath.value || template.pathPlaceholder;
+  if (path.startsWith('//')) {
+      path = '/' + path.replace(/^\/+/, '');
+  }
+  let uri = `${template.uriPrefix}${path}`;
   
   const params: string[] = [];
   
@@ -539,14 +546,14 @@ const buildSourceUri = (): string => {
     const sampleformat = sourceFormParams.value['sampleformat'] || '48000:16:2';
     const [rate, , channels] = sampleformat.split(':');
     const ffmpegArgs = `-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i ${streamUrl} -f s16le -ar ${rate || '48000'} -ac ${channels || '2'} -`;
-    const encodedParams = ffmpegArgs.replace(/ /g, '%20');
+    const encodedParams = encodeURIComponent(ffmpegArgs);
     
-    params.push(`name=${name}`);
+    params.push(`name=${encodeURIComponent(name)}`);
     for (const p of template.params) {
       if (p.key === '_stream_url' || p.key === 'name') continue;
       const val = sourceFormParams.value[p.key];
       if (val !== undefined && val !== '' && val !== p.default) {
-        params.push(`${p.key}=${val}`);
+        params.push(`${p.key}=${encodeURIComponent(val)}`);
       }
     }
     params.push(`params=${encodedParams}`);
@@ -554,9 +561,9 @@ const buildSourceUri = (): string => {
     for (const p of template.params) {
       const val = sourceFormParams.value[p.key];
       if (val !== undefined && val !== '' && val !== p.default) {
-        params.push(`${p.key}=${val}`);
+        params.push(`${p.key}=${encodeURIComponent(val)}`);
       } else if (p.required && val) {
-        params.push(`${p.key}=${val}`);
+        params.push(`${p.key}=${encodeURIComponent(val)}`);
       }
     }
   }
