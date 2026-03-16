@@ -36,7 +36,6 @@ echo -e "This script will help you set up or update Snapcast Manager.\n"
 APP_DIR="/opt/snapcast-manager"
 REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
 NODE_VERSION="20"
-VERSION="v0.1.39"
 
 # Colors for output
 GREEN='\033[0;32m'
