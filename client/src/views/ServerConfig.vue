@@ -3,7 +3,8 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { basicEditor } from 'prism-code-editor/setups';
 import 'prism-code-editor/prism/languages/ini';
 import 'prism-code-editor/layout.css';
-import 'prism-code-editor/themes/prism-tomorrow.css';
+import 'prism-code-editor/themes/github-dark.css';
+import 'prism-code-editor/themes/github-light.css';
 import { useConfigStore } from '../stores/config';
 import { useSnapshotStore } from '../stores/snapshots';
 import { useSystemStore } from '../stores/system';
@@ -281,7 +282,7 @@ watch(activeTab, async (newTab) => {
                 editorRef.value,
                 {
                     language: 'ini',
-                    theme: 'prism-tomorrow',
+                    theme: uiStore.isDark ? 'github-dark' : 'github-light',
                     value: localRawConfig.value
                 },
                 () => {
@@ -295,6 +296,12 @@ watch(activeTab, async (newTab) => {
         }
     } else {
         editorInstance = null;
+    }
+});
+
+watch(() => uiStore.isDark, (isDark) => {
+    if (editorInstance) {
+        editorInstance.setOptions({ theme: isDark ? 'github-dark' : 'github-light' });
     }
 });
 

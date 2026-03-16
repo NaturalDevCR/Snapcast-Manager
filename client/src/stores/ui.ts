@@ -13,6 +13,25 @@ export interface Toast {
 export const useUIStore = defineStore('ui', () => {
   const toasts = ref<Toast[]>([]);
   let nextId = 1;
+  const isDark = ref(localStorage.getItem('theme') !== 'light'); // Default to true (dark)
+
+  function toggleTheme() {
+    isDark.value = !isDark.value;
+    if (isDark.value) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
+  }
+
+  function initTheme() {
+    if (isDark.value) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
 
   function showToast(message: string, type: ToastType = 'info', duration: number = 5000) {
     const id = nextId++;
@@ -31,6 +50,9 @@ export const useUIStore = defineStore('ui', () => {
 
   return {
     toasts,
+    isDark,
+    toggleTheme,
+    initTheme,
     showToast,
     removeToast
   };

@@ -2,9 +2,19 @@
 
 @layer base {
   :root {
-    --brand-bg: #1c1022;
+    --brand-bg: #f8f9fa; 
     --brand-primary: #a60df2;
-    --brand-surface: #f7f5f8;
+    --brand-surface: #ffffff;
+    --text-main: #111827;
+    --text-muted: #4b5563;
+  }
+
+  .dark {
+    --brand-bg: #1c1022; 
+    --brand-primary: #a60df2;
+    --brand-surface: #140b1b;
+    --text-main: #ffffff;
+    --text-muted: #9ca3af;
   }
 }
 
@@ -29,8 +39,8 @@
   }
 }
 
-/* Base body styles are handled by Tailwind classes in index.html, but ensure dark layout */
 body {
   background-color: var(--brand-bg);
-  color: white;
+  color: var(--text-main);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
