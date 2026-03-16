@@ -1,5 +1,3 @@
-import net from 'net';
-
 export class SnapcastRpcError extends Error {
     constructor(message: string) {
         super(message);
@@ -7,73 +5,47 @@ export class SnapcastRpcError extends Error {
     }
 }
 
-export const executeSnapcastRpc = <T = any>(
+export const executeSnapcastRpc = async <T = any>(
     method: string,
     params: any = {},
-    port: number = 1705,
+    port: number = 1780,
     host: string = '127.0.0.1'
 ): Promise<T> => {
-    return new Promise((resolve, reject) => {
-        const client = new net.Socket();
-        const requestId = Date.now() + Math.floor(Math.random() * 1000);
-        
-        const payload = JSON.stringify({
-            id: requestId,
-            jsonrpc: '2.0',
-            method,
-            params
-        }) + '\r\n';
+    const requestId = Date.now() + Math.floor(Math.random() * 1000);
+    
+    const payload = {
+        id: requestId,
+        jsonrpc: '2.0',
+        method,
+        params
+    };
 
-        let buffer = '';
-
-        const cleanup = () => {
-            client.removeAllListeners();
-            client.destroy();
-        };
-
-        client.connect(port, host, () => {
-            client.write(payload);
+    try {
+        const response = await fetch(`http://${host}:${port}/jsonrpc`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload),
+            // Use AbortController for timeout
+            signal: AbortSignal.timeout(5000)
         });
 
-        client.on('data', (data) => {
-            buffer += data.toString();
-            
-            // Snapcast separates JSON messages with \r\n
-            let boundary = buffer.indexOf('\n');
-            while (boundary !== -1) {
-                const line = buffer.slice(0, boundary).trim();
-                buffer = buffer.slice(boundary + 1);
-                boundary = buffer.indexOf('\n');
-                
-                if (!line) continue;
+        if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status}`);
+        }
 
-                try {
-                    const parsed = JSON.parse(line);
-                    if (parsed.id === requestId) {
-                        cleanup();
-                        if (parsed.error) {
-                            reject(new SnapcastRpcError(parsed.error.message || 'RPC Error'));
-                        } else {
-                            resolve(parsed.result as T);
-                        }
-                        return;
-                    }
-                } catch (err) {
-                    console.warn('Failed to parse JSON-RPC response line:', line);
-                }
-            }
-        });
+        const data: any = await response.json();
 
-        client.on('error', (err) => {
-            cleanup();
-            reject(new SnapcastRpcError(`Connection error to Snapserver RPC: ${err.message}`));
-        });
+        if (data.error) {
+            throw new SnapcastRpcError(data.error.message || 'RPC Error');
+        }
 
-        client.on('timeout', () => {
-            cleanup();
-            reject(new SnapcastRpcError('Connection timeout to Snapserver RPC'));
-        });
-
-        client.setTimeout(5000); // 5 second timeout
-    });
+        return data.result as T;
+    } catch (err: any) {
+        if (err.name === 'TimeoutError') {
+            throw new SnapcastRpcError('Connection timeout to Snapserver RPC over HTTP');
+        }
+        throw new SnapcastRpcError(`Connection error to Snapserver RPC: ${err.message}`);
+    }
 };
