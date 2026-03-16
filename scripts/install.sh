@@ -11,13 +11,26 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.33"
+VERSION="v0.1.34"
 
-echo -e "${GREEN}${BOLD}=== Snapcast Manager Installer ($VERSION) ===${NC}"
-echo -e "This script will help you set up Snapcast Manager.\n"
+echo -e "${MAGENTA}${BOLD}"
+cat << "EOF"
+   _____                                 _     __  __                                   
+  / ____|                               | |   |  \/  |                                  
+ | (___  _ __   __ _ _ __   ___ __ _ ___| |_  | \  / | __ _ _ __   __ _  __ _  ___ _ __ 
+  \___ \| '_ \ / _` | '_ \ / __/ _` / __| __| | |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '__|
+  ____) | | | | (_| | |_) | (_| (_| \__ \ |_  | |  | | (_| | | | | (_| | (_| |  __/ |   
+ |_____/|_| |_|\__,_| .__/ \___\__,_|___/\__| |_|  |_|\__,_|_| |_|\__,_|\__, |\___|_|   
+                    | |                                                  __/ |          
+                    |_|                                                 |___/           
+EOF
+echo -e "${NC}"
+echo -e "${GREEN}${BOLD}=== Installer ($VERSION) ===${NC}"
+echo -e "This script will help you set up or update Snapcast Manager.\n"
 
 # Application Configuration
 APP_DIR="/opt/snapcast-manager"
@@ -97,46 +110,61 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
     echo "It looks like you are running this script remotely."
     
     # Check if already installed
+    # Check if already installed
     if [ -d "$INSTALL_BASE_DIR" ]; then
+        # Detect currently installed version
+        INSTALLED_VERSION="unknown"
+        if [ -f "$INSTALL_BASE_DIR/server/package.json" ]; then
+            INSTALLED_VERSION=$(grep -m 1 '"version"' "$INSTALL_BASE_DIR/server/package.json" | cut -d '"' -f 4 || echo "unknown")
+            INSTALLED_VERSION="v$INSTALLED_VERSION"
+        fi
+
         echo -e "${YELLOW}Snapcast Manager is already installed at $INSTALL_BASE_DIR.${NC}"
-        if prompt_yes_no "Do you want to RE-INSTALL and OVERWRITE the existing installation?" "y"; then
+        echo -e "Installed Version: ${CYAN}${INSTALLED_VERSION}${NC}"
+        echo -e "Installer Version: ${CYAN}${VERSION}${NC}"
+        
+        DO_UPDATE=false
+        
+        if [ "$INSTALLED_VERSION" = "unknown" ] || [ "$INSTALLED_VERSION" != "$VERSION" ]; then
+            echo -e "\n${GREEN}An update is available or version mismatch detected.${NC}"
+            if prompt_yes_no "Do you want to safely UPDATE to $VERSION?" "y"; then
+                DO_UPDATE=true
+            fi
+        else
+            echo -e "\n${GREEN}You are already running the latest version ($VERSION).${NC}"
+            if prompt_yes_no "Do you want to FORCE RE-INSTALL and OVERWRITE the existing installation?" "n"; then
+                DO_UPDATE=true
+            fi
+        fi
+
+        if [ "$DO_UPDATE" = true ]; then
+            echo -e "\n${BLUE}Preparing for update/re-install...${NC}"
             echo "Stopping existing service..."
             sudo systemctl stop $SERVICE_NAME 2>/dev/null || true
             sudo systemctl disable $SERVICE_NAME 2>/dev/null || true
             
-            echo "Checking for database data in $INSTALL_BASE_DIR/data..."
-            if [ -d "$INSTALL_BASE_DIR/data" ]; then
-                # Check if there are actually files inside
-                if [ "$(ls -A $INSTALL_BASE_DIR/data)" ]; then
-                    echo -e "${YELLOW}Detected existing database files. Backing up...${NC}"
-                    sudo rm -rf /tmp/snapmgr_data_backup
-                    sudo cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
-                    if [ -d "/tmp/snapmgr_data_backup" ]; then
-                        echo -e "${GREEN}[OK] Database backed up to /tmp/snapmgr_data_backup${NC}"
-                    else
-                        echo -e "${RED}[!] Failed to create backup! Proceeding without backup.${NC}"
-                    fi
-                else
-                    echo "Data directory is empty, skipping backup."
-                fi
+            echo "Backing up database data securely..."
+            if [ -d "$INSTALL_BASE_DIR/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/data 2>/dev/null)" ]; then
+                sudo rm -rf /tmp/snapmgr_data_backup
+                sudo cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
+                echo -e "${GREEN}[OK] Database backed up to /tmp/snapmgr_data_backup${NC}"
             else
-                echo "No data directory found at $INSTALL_BASE_DIR/data."
+                echo "Data directory is empty or missing, skipping backup."
             fi
             
             if [ -f "/etc/snapserver.conf" ]; then
-                echo -e "${YELLOW}Detected existing snapserver.conf. Backing up...${NC}"
                 sudo cp /etc/snapserver.conf /tmp/snapserver_conf_backup
             fi
             
-            echo "Removing existing files..."
+            echo "Wiping existing application files..."
             sudo rm -rf "$INSTALL_BASE_DIR"
         else
-            echo "Installation aborted."
+            echo "Installation aborted by user."
             exit 0
         fi
     fi
 
-    if prompt_yes_no "Do you want to download and install to $INSTALL_BASE_DIR?" "y"; then
+    if [ ! -d "$INSTALL_BASE_DIR" ]; then
         echo "Updating package list and ensuring wget and unzip are installed..."
         sudo apt-get update >/dev/null 2>&1
         sudo apt-get install -y wget unzip >/dev/null 2>&1
@@ -173,20 +201,18 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
 
         # Restore database if backup exists
         if [ -d "/tmp/snapmgr_data_backup" ] || [ -f "/tmp/snapserver_conf_backup" ]; then
-            echo -e "${YELLOW}Existing database or configuration found.${NC}"
-            if prompt_yes_no "Do you want to restore your existing authentication and settings?" "y"; then
-                if [ -d "/tmp/snapmgr_data_backup" ]; then
-                    echo "Restoring database data..."
-                    sudo mkdir -p "$INSTALL_BASE_DIR/data"
-                    sudo cp -rT /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
-                    echo -e "${GREEN}[OK] Database Data restored.${NC}"
-                fi
-                if [ -f "/tmp/snapserver_conf_backup" ]; then
-                    echo "Restoring snapserver.conf..."
-                    sudo cp /tmp/snapserver_conf_backup /etc/snapserver.conf
-                    echo -e "${GREEN}[OK] snapserver.conf restored.${NC}"
-                fi
+            echo -e "\n${YELLOW}Restoring previous configuration and database...${NC}"
+            if [ -d "/tmp/snapmgr_data_backup" ]; then
+                sudo mkdir -p "$INSTALL_BASE_DIR/data"
+                sudo cp -rT /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
+                echo -e "${GREEN}[OK] Database Data restored.${NC}"
             fi
+            if [ -f "/tmp/snapserver_conf_backup" ]; then
+                sudo cp /tmp/snapserver_conf_backup /etc/snapserver.conf
+                echo -e "${GREEN}[OK] snapserver.conf restored.${NC}"
+            fi
+            
+            # Clean up backups
             sudo rm -rf /tmp/snapmgr_data_backup
             sudo rm -f /tmp/snapserver_conf_backup
         fi
