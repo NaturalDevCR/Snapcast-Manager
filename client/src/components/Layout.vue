@@ -72,15 +72,6 @@ const navigation = [
           </div>
           
           <div class="flex items-center space-x-2">
-            <!-- Light/Dark Mode Toggle -->
-            <button 
-              @click="uiStore.toggleTheme"
-              class="p-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl border border-white/5 transition-all duration-300 flex items-center justify-center"
-              title="Toggle Light/Dark Theme"
-            >
-                <span class="material-symbols-outlined text-[1.2rem]">{{ uiStore.isDark ? 'light_mode' : 'dark_mode' }}</span>
-            </button>
-
             <!-- User Profile / Logout -->
             <div class="flex items-center gap-3 pl-3 border-l border-white/10">
                 <div class="text-right hidden sm:block">
