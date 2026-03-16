@@ -16,13 +16,6 @@ NC='\033[0m' # No Color
 
 VERSION="v0.1.29"
 
-echo -e "${CYAN}${BOLD}"
-echo "  ___                    ___      _ "
-echo " / __| _ _  __ _  _ __  / __|__ _| |"
-echo " \__ \| '_|/ _\` || '_ \ | (__/ _\` | |"
-echo " |___/|_|  \__,_|| .__/  \___\__,_|_|"
-echo "                 |_|                 "
-echo -e "${NC}"
 echo -e "${GREEN}${BOLD}=== Snapcast Manager Installer ($VERSION) ===${NC}"
 echo -e "This script will help you set up Snapcast Manager on your Linux server.\n"
 
