@@ -346,6 +346,9 @@ export class SystemService {
         ./configure && \
         make -j$(nproc) && \
         sudo make install && \
+        if [ -f "nqptp.service" ]; then \
+          sudo cp nqptp.service /etc/systemd/system/nqptp.service; \
+        fi && \
         sudo systemctl daemon-reload && \
         sudo systemctl enable nqptp && \
         sudo systemctl restart nqptp && \
