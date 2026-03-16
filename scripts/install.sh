@@ -15,7 +15,7 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.34"
+VERSION="v0.1.37"
 
 echo -e "${MAGENTA}${BOLD}"
 cat << "EOF"
@@ -36,7 +36,7 @@ echo -e "This script will help you set up or update Snapcast Manager.\n"
 APP_DIR="/opt/snapcast-manager"
 REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
 NODE_VERSION="20"
-VERSION="v0.1.34"
+VERSION="v0.1.37"
 
 # Colors for output
 GREEN='\033[0;32m'
