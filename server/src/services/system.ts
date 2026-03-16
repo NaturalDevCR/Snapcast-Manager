@@ -338,6 +338,15 @@ export class SystemService {
           libpopt-dev libconfig-dev libasound2-dev avahi-daemon libavahi-client-dev \
           libssl-dev libsoxr-dev libplist-dev libsodium-dev uuid-dev libgcrypt-dev xxd \
           libplist-utils libavutil-dev libavcodec-dev libavformat-dev && \
+        echo "Cleaning up absolute legacy installations..." && \
+        sudo apt-get remove --purge -y shairport-sync 2>/dev/null || true && \
+        sudo systemctl stop shairport-sync 2>/dev/null || true && \
+        sudo systemctl disable shairport-sync 2>/dev/null || true && \
+        sudo systemctl stop nqptp 2>/dev/null || true && \
+        sudo systemctl disable nqptp 2>/dev/null || true && \
+        sudo rm -f /usr/local/bin/shairport-sync /usr/bin/shairport-sync /usr/local/bin/nqptp /usr/bin/nqptp && \
+        sudo rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service && \
+        sudo rm -f /lib/systemd/system/shairport-sync.service /lib/systemd/system/nqptp.service && \
         
         echo "Building and installing nqptp..." && \
         rm -rf /tmp/nqptp-build && \
