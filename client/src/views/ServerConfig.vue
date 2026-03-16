@@ -611,7 +611,7 @@ const removeSourceEntry = (idx: number) => {
 <template>
   <Layout>
       <!-- Main Tabs Navigation -->
-      <div class="mb-8 flex space-x-2 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl w-fit border border-white/5 shadow-lg">
+      <div class="mb-8 flex overflow-x-auto flex-nowrap space-x-2 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl max-w-full border border-white/5 shadow-lg">
           <button 
             @click="activeTab = 'standard'"
             :class="[
@@ -666,7 +666,7 @@ const removeSourceEntry = (idx: number) => {
       <div v-if="activeTab === 'standard'" class="animate-in fade-in slide-in-from-left-4 duration-500">
           
           <!-- Section Sub-Tabs -->
-          <div class="mb-6 flex flex-wrap gap-2">
+          <div class="mb-6 flex overflow-x-auto flex-nowrap gap-2 max-w-full">
               <button
                 v-for="sKey in orderedSections"
                 :key="sKey"
@@ -1063,19 +1063,19 @@ const removeSourceEntry = (idx: number) => {
           </div>
 
           <!-- Footer Actions -->
-          <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-2 text-amber-500 text-xs font-bold uppercase tracking-widest bg-amber-500/5 px-4 py-2 rounded-xl border border-amber-500/10">
-                  <span class="material-symbols-outlined text-[16px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">warning</span>
-                  <span>Warning: Restart required after applying changes to configuration.</span>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div class="flex items-start sm:items-center space-x-2 text-amber-500 text-xs font-bold uppercase tracking-widest bg-amber-500/5 px-4 py-3 rounded-xl border border-amber-500/10 w-full sm:w-auto">
+                  <span class="material-symbols-outlined text-[16px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)] mt-0.5 sm:mt-0">warning</span>
+                  <span class="leading-relaxed">Warning: Restart required after applying changes to configuration.</span>
               </div>
-              <div class="flex items-center space-x-3">
-                  <button @click="fetchBoth" class="py-3.5 px-6 rounded-xl text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest border border-white/5">
+              <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <button @click="fetchBoth" class="w-full sm:w-auto py-3.5 px-6 rounded-xl text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest border border-white/5 flex items-center justify-center">
                       Discard Changes
                   </button>
                   <button 
                       @click="saveRaw" 
                       :disabled="configStore.loading"
-                      class="flex items-center space-x-2 py-3.5 px-6 rounded-xl bg-brand-primary hover:bg-[#b526ff] text-white font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] disabled:opacity-50 transition-all border border-brand-primary/30 active:scale-95"
+                      class="w-full sm:w-auto flex items-center justify-center space-x-2 py-3.5 px-6 rounded-xl bg-brand-primary hover:bg-[#b526ff] text-white font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] disabled:opacity-50 transition-all border border-brand-primary/30 active:scale-95"
                   >
                       <span v-if="configStore.loading" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
                       <span v-else class="material-symbols-outlined text-[16px]">save</span>
@@ -1083,6 +1083,7 @@ const removeSourceEntry = (idx: number) => {
                   </button>
               </div>
           </div>
+
       </div>
 
       <!-- ==================== SNAPSHOTS TAB ==================== -->
