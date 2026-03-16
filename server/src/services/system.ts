@@ -333,22 +333,19 @@ export class SystemService {
       const cmd = `
         echo "Installing build dependencies..." && \
         sudo apt-get update && \
-        sudo apt-get install -y build-essential git autoconf automake libtool \
-          libpopt-dev libconfig-dev libasound2-dev libavahi-client-dev \
-          libssl-dev libdaemon-dev libgcrypt-dev libavcodec-dev libavformat-dev \
-          libavutil-dev libplist-dev libsoxr-dev xmltoman && \
+        sudo apt-get install -y --no-install-recommends build-essential git autoconf automake libtool \
+          libpopt-dev libconfig-dev libasound2-dev avahi-daemon libavahi-client-dev \
+          libssl-dev libsoxr-dev libplist-dev libsodium-dev uuid-dev libgcrypt-dev xxd \
+          libplist-utils libavutil-dev libavcodec-dev libavformat-dev && \
         
         echo "Building and installing nqptp..." && \
         rm -rf /tmp/nqptp-build && \
         git clone https://github.com/mikebrady/nqptp.git /tmp/nqptp-build && \
         cd /tmp/nqptp-build && \
         autoreconf -fvi && \
-        ./configure && \
+        ./configure --with-systemd-startup && \
         make -j$(nproc) && \
         sudo make install && \
-        if [ -f "nqptp.service" ]; then \
-          sudo cp nqptp.service /etc/systemd/system/nqptp.service; \
-        fi && \
         sudo systemctl daemon-reload && \
         sudo systemctl enable nqptp && \
         sudo systemctl restart nqptp && \
@@ -358,7 +355,7 @@ export class SystemService {
         git clone https://github.com/mikebrady/shairport-sync.git /tmp/shairport-sync-build && \
         cd /tmp/shairport-sync-build && \
         autoreconf -fvi && \
-        ./configure --with-alsa --with-avahi --with-ssl=openssl --with-soxr --with-metadata --with-airplay-2 --with-systemd && \
+        ./configure --sysconfdir=/etc --with-alsa --with-soxr --with-avahi --with-ssl=openssl --with-systemd-startup --with-airplay-2 --with-metadata && \
         make -j$(nproc) && \
         sudo make install && \
 
@@ -366,9 +363,6 @@ export class SystemService {
         if ! id "shairport-sync" &>/dev/null; then \
           sudo groupadd -r shairport-sync && \
           sudo useradd -r -M -g shairport-sync -s /usr/sbin/nologin -G audio shairport-sync; \
-        fi && \
-        if [ -f "scripts/shairport-sync.service" ]; then \
-          sudo cp scripts/shairport-sync.service /etc/systemd/system/shairport-sync.service; \
         fi && \
 
         sudo systemctl daemon-reload && \
