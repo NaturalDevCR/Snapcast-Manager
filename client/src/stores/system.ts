@@ -4,6 +4,7 @@ import { fetchApi } from '../utils/api';
 
 export const useSystemStore = defineStore('system', () => {
   const loading = ref(false);
+  const loadingMessage = ref('');
   const error = ref('');
   const snapserverStatus = ref('unknown');
   const shairportSyncStatus = ref('unknown');
@@ -70,6 +71,7 @@ export const useSystemStore = defineStore('system', () => {
   }
 
   async function controlService(action: 'start' | 'stop' | 'restart' | 'enable' | 'disable', service: 'snapserver' | 'shairport-sync') {
+    loadingMessage.value = `${action === 'start' ? 'Starting' : action === 'stop' ? 'Stopping' : action === 'restart' ? 'Restarting' : action === 'enable' ? 'Enabling' : 'Disabling'} ${service === 'snapserver' ? 'Snapserver' : 'AirPlay'}...`;
     loading.value = true;
     try {
       await fetchApi(`/system/service/${action}/${service}`, { method: 'POST' });
@@ -79,10 +81,12 @@ export const useSystemStore = defineStore('system', () => {
       throw err;
     } finally {
       loading.value = false;
+      loadingMessage.value = '';
     }
   }
 
   async function installPackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync') {
+    loadingMessage.value = `Installing ${pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg}...`;
     loading.value = true;
     try {
       await fetchApi(`/system/install/${pkg}`, { method: 'POST' });
@@ -92,10 +96,12 @@ export const useSystemStore = defineStore('system', () => {
       throw err;
     } finally {
       loading.value = false;
+      loadingMessage.value = '';
     }
   }
 
   async function updatePackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl', clean: boolean = false) {
+    loadingMessage.value = `Updating ${pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay 2)' : pkg}... ${pkg === 'shairport-sync' ? '(This takes a few minutes)' : ''}`;
     loading.value = true;
     try {
       await fetchApi(`/system/update/${pkg}`, { 
@@ -112,6 +118,7 @@ export const useSystemStore = defineStore('system', () => {
       throw err;
     } finally {
       loading.value = false;
+      loadingMessage.value = '';
     }
   }
 
@@ -128,10 +135,12 @@ export const useSystemStore = defineStore('system', () => {
       throw err;
     } finally {
       loading.value = false;
+      loadingMessage.value = '';
     }
   }
 
   async function uninstallPackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync') {
+    loadingMessage.value = `Uninstalling ${pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg}...`;
     loading.value = true;
     try {
       await fetchApi(`/system/uninstall/${pkg}`, { method: 'POST' });
@@ -141,6 +150,7 @@ export const useSystemStore = defineStore('system', () => {
       throw err;
     } finally {
       loading.value = false;
+      loadingMessage.value = '';
     }
   }
 
@@ -156,6 +166,7 @@ export const useSystemStore = defineStore('system', () => {
       throw err;
     } finally {
       loading.value = false;
+      loadingMessage.value = '';
     }
   }
 
@@ -191,6 +202,7 @@ export const useSystemStore = defineStore('system', () => {
       throw err;
     } finally {
       loading.value = false;
+      loadingMessage.value = '';
     }
   }
 
@@ -217,11 +229,13 @@ export const useSystemStore = defineStore('system', () => {
       console.error('Failed to refresh dashboard data:', err);
     } finally {
       loading.value = false;
+      loadingMessage.value = '';
     }
   }
 
   return { 
     loading, 
+    loadingMessage,
     error, 
     snapserverStatus,
     shairportSyncStatus, 
