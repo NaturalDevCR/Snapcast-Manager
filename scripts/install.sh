@@ -15,7 +15,7 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.46"
+VERSION="v0.1.48"
 
 echo -e "${MAGENTA}${BOLD}"
 cat << "EOF"
@@ -35,7 +35,7 @@ echo -e "This script will help you set up or update Snapcast Manager.\n"
 # Application Configuration
 APP_DIR="/opt/snapcast-manager"
 REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
-NODE_VERSION="20"
+NODE_VERSION="22"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -394,8 +394,8 @@ if command -v node >/dev/null 2>&1; then
     echo -e "${GREEN}[OK] Node.js $NODE_VER detected.${NC}"
 else
     echo -e "${RED}[!] Node.js not detected.${NC}"
-    if prompt_yes_no "Install Node.js 20?" "y"; then
-        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    if prompt_yes_no "Install Node.js 22?" "y"; then
+        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
         sudo apt-get install -y nodejs
     else
         echo "Installation aborted."
