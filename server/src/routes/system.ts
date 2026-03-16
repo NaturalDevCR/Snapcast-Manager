@@ -137,7 +137,7 @@ router.post('/update-node', async (req: Request, res: Response) => {
 
 router.post('/uninstall/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'ffmpeg') {
+    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync') {
          return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
