@@ -15,7 +15,7 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.41"
+VERSION="v0.1.42"
 
 echo -e "${MAGENTA}${BOLD}"
 cat << "EOF"
