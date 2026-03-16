@@ -611,7 +611,7 @@ const removeSourceEntry = (idx: number) => {
 <template>
   <Layout>
       <!-- Main Tabs Navigation -->
-      <div class="mb-8 flex overflow-x-auto flex-nowrap space-x-2 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl max-w-full border border-white/5 shadow-lg">
+      <div class="mb-8 flex overflow-x-auto flex-nowrap space-x-2 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl w-fit max-w-full border border-white/5 shadow-lg">
           <button 
             @click="activeTab = 'standard'"
             :class="[
@@ -1010,7 +1010,7 @@ const removeSourceEntry = (idx: number) => {
               </button>
           </div>
 
-          <div class="mt-6 flex justify-end fixed bottom-8 right-8 z-30">
+          <div class="mt-6 flex justify-center fixed bottom-8 left-1/2 -translate-x-1/2 z-30">
               <button 
                   @click="saveParsed" 
                   :disabled="configStore.loading"
