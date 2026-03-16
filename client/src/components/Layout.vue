@@ -10,9 +10,7 @@ const route = useRoute();
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: 'dashboard' },
-  { name: 'Streams', href: '/streams', icon: 'audio_file' },
   { name: 'Configuration', href: '/server', icon: 'settings' },
-  { name: 'Expert Editor', href: '/expert', icon: 'code' },
   { name: 'Logs', href: '/logs', icon: 'terminal' },
 ];
 </script>
