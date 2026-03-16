@@ -24,6 +24,9 @@ export class SystemService {
   }
 
   async installPackage(pkg: string): Promise<string> {
+    if (pkg === 'shairport-sync') {
+      return this.installShairportSync();
+    }
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y ${pkg}`);
   }
 
