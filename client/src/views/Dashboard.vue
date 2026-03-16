@@ -56,8 +56,8 @@ const handleUpdateNodeJs = async () => {
     }
 };
 
-// Version managerStatus.value.version = 'v0.1.28';
-const version = 'v0.1.28';
+// Version 
+const version = 'v0.1.29';
 </script>
 
 <template>
