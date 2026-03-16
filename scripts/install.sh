@@ -15,7 +15,7 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.37"
+VERSION="v0.1.38"
 
 echo -e "${MAGENTA}${BOLD}"
 cat << "EOF"
@@ -36,7 +36,7 @@ echo -e "This script will help you set up or update Snapcast Manager.\n"
 APP_DIR="/opt/snapcast-manager"
 REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
 NODE_VERSION="20"
-VERSION="v0.1.37"
+VERSION="v0.1.38"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -137,7 +137,14 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
                 CHOICE=1
                 echo -e "Select option [Auto-confirmed: 1]"
             else
-                read -p "Select an option (1-4): " CHOICE
+                if [ -t 0 ]; then
+                    read -p "Select an option (1-4): " CHOICE
+                elif [ -c /dev/tty ]; then
+                    read -p "Select an option (1-4): " CHOICE < /dev/tty
+                else
+                    echo -e "${RED}[!] No TTY available for input. Aborting.${NC}"
+                    exit 1
+                fi
             fi
 
             case "$CHOICE" in
@@ -164,7 +171,14 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
                 echo -e "Select option [Auto-confirmed: Abort]"
                 exit 0
             else
-                read -p "Select an option (1-3): " CHOICE
+                if [ -t 0 ]; then
+                    read -p "Select an option (1-3): " CHOICE
+                elif [ -c /dev/tty ]; then
+                    read -p "Select an option (1-3): " CHOICE < /dev/tty
+                else
+                    echo -e "${RED}[!] No TTY available for input. Aborting.${NC}"
+                    exit 1
+                fi
             fi
 
             case "$CHOICE" in
