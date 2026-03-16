@@ -61,7 +61,7 @@ const version = 'v0.1.32';
       <!-- Header Section -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 class="text-3xl font-black text-white tracking-tight drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">System Dashboard</h1>
+          <h1 class="text-3xl font-black tracking-tight drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">System Dashboard</h1>
           <p class="text-gray-400 font-medium mt-1">Manage and monitor your Snapcast infrastructure.</p>
         </div>
         <button @click="systemStore.refreshAll()" :disabled="systemStore.loading" class="inline-flex items-center px-5 py-2.5 bg-brand-primary hover:bg-[#8e0bc9] text-white rounded-xl text-sm font-black transition-all shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_20px_rgba(166,13,242,0.6)] active:scale-95 disabled:opacity-50 group border border-brand-primary/50">
@@ -97,7 +97,7 @@ const version = 'v0.1.32';
                             {{ snapcastStore.status.streams.length }}
                         </div>
                         <div class="space-y-2 max-h-[120px] overflow-y-auto pr-2 no-scrollbar">
-                            <div v-for="stream in snapcastStore.status.streams" :key="stream.id" class="flex items-center justify-between p-2.5 rounded-xl bg-black/20 border border-white/5 hover:border-brand-primary/30 transition-colors">
+                            <div v-for="stream in snapcastStore.status.streams" :key="stream.id" class="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/5 hover:border-brand-primary/30 transition-colors">
                                 <span class="text-xs font-bold text-gray-300 truncate max-w-[120px]" :title="stream.id">
                                     {{ stream.uri?.query?.name || stream.id }}
                                 </span>
@@ -124,7 +124,7 @@ const version = 'v0.1.32';
                         </div>
                         <div class="space-y-2 max-h-[120px] overflow-y-auto pr-2 no-scrollbar">
                             <template v-for="group in snapcastStore.status.groups" :key="group.id">
-                                <div v-for="client in group.clients.filter(c => c.connected)" :key="client.id" class="flex items-center justify-between p-2.5 rounded-xl bg-black/20 border border-white/5 hover:border-brand-primary/30 transition-colors">
+                                <div v-for="client in group.clients.filter(c => c.connected)" :key="client.id" class="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/5 hover:border-brand-primary/30 transition-colors">
                                     <div class="flex flex-col min-w-0">
                                         <span class="text-xs font-bold text-gray-300 truncate" :title="client.host.name">
                                             {{ client.config.name || client.host.name }}
@@ -151,7 +151,7 @@ const version = 'v0.1.32';
                     <div class="space-y-4">
                         <div class="flex items-center justify-between border-b border-white/5 pb-4">
                             <span class="text-sm font-semibold text-gray-400">Daemon Status</span>
-                            <div class="flex items-center space-x-2 bg-black/30 px-3 py-1.5 rounded-lg border border-white/5">
+                            <div class="flex items-center space-x-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/5 shadow-inner">
                                 <span class="relative flex h-2 w-2">
                                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00ff9d] opacity-75"></span>
                                   <span class="relative inline-flex rounded-full h-2 w-2 bg-[#00ff9d]"></span>
@@ -165,7 +165,7 @@ const version = 'v0.1.32';
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Active Groups</span>
-                            <span class="text-sm font-black text-white bg-white/10 border border-white/5 px-3 py-1 rounded-lg">{{ snapcastStore.status.groups.length }}</span>
+                            <span class="text-sm font-black text-white bg-white/5 border border-white/10 px-3 py-1 rounded-lg">{{ snapcastStore.status.groups.length }}</span>
                         </div>
                     </div>
                 </div>
@@ -174,7 +174,7 @@ const version = 'v0.1.32';
       </div>
       
       <!-- System/Daemon Offline State -->
-      <div v-else-if="!snapcastStore.loading && snapcastStore.error" class="bg-[#ff3b30]/10 border border-[#ff3b30]/30 rounded-2xl p-8 text-center backdrop-blur-md">
+      <div v-else-if="!snapcastStore.loading && snapcastStore.error" class="bg-[#ff3b30]/10 border border-[#ff3b30]/30 rounded-2xl p-8 text-center backdrop-blur-xl shadow-[0_0_30px_rgba(255,59,48,0.1)]">
           <span class="material-symbols-outlined text-[3rem] text-[#ff3b30] drop-shadow-[0_0_15px_rgba(255,59,48,0.5)] mb-4">cloud_off</span>
           <h3 class="text-sm font-black text-white uppercase tracking-[0.2em] mb-2">Snapserver Offline or Unreachable</h3>
           <p class="text-xs text-gray-400 max-w-md mx-auto">{{ snapcastStore.error }}</p>
@@ -225,7 +225,7 @@ const version = 'v0.1.32';
 
             <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages.snapserver">
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'snapserver')" class="px-3 py-2.5 bg-white/5 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
+                    <button @click="systemStore.controlService('restart', 'snapserver')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
                     <button v-if="systemStore.snapserverStatus === 'active'" @click="systemStore.controlService('stop', 'snapserver')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
                     <button v-else @click="systemStore.controlService('start', 'snapserver')" class="px-3 py-2.5 bg-[#00ff9d]/10 hover:bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
                 </div>
@@ -234,7 +234,7 @@ const version = 'v0.1.32';
                             'w-full px-4 py-3 rounded-xl text-xs font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 uppercase',
                             systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown'
                             ? 'bg-brand-primary text-white border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)]' 
-                            : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'
+                            : 'bg-black/40 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'
                         ]"
                         :disabled="systemStore.loading">
                     {{ systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' ? 'Install Update' : 'Clean Reinstall' }}
@@ -308,7 +308,7 @@ const version = 'v0.1.32';
                 <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-[inset_0_0_15px_rgba(166,13,242,0.1)]">
                     <p class="text-[10px] font-bold text-brand-primary uppercase tracking-widest leading-relaxed text-center">FFmpeg is optimized and ready for high-fidelity audio transcoding.</p>
                 </div>
-                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-white/5 text-gray-300 rounded-xl hover:bg-white/10 hover:text-white border border-white/5 transition-all text-xs font-black uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Refresh Packages</button>
+                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-300 rounded-xl hover:bg-white/10 hover:text-white border border-white/5 transition-all text-xs font-black uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Refresh Packages</button>
             </div>
         </div>
       </Card>
@@ -333,7 +333,7 @@ const version = 'v0.1.32';
             </div>
             <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages['shairport-sync']">
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'shairport-sync')" class="px-3 py-2.5 bg-white/5 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
+                    <button @click="systemStore.controlService('restart', 'shairport-sync')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
                     <button v-if="systemStore.shairportSyncStatus === 'active'" @click="systemStore.controlService('stop', 'shairport-sync')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
                     <button v-else @click="systemStore.controlService('start', 'shairport-sync')" class="px-3 py-2.5 bg-[#00ff9d]/10 hover:bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
                 </div>
@@ -374,7 +374,7 @@ const version = 'v0.1.32';
                                     'py-2.5 rounded-xl text-xs font-black transition-all border',
                                     selectedNodeVersion === v 
                                     ? 'bg-[#00ff9d]/10 border-[#00ff9d]/30 text-[#00ff9d] drop-shadow-[0_0_8px_rgba(0,255,157,0.4)]' 
-                                    : 'bg-black/20 border-white/5 text-gray-400 hover:border-white/20 hover:text-gray-300'
+                                    : 'bg-black/40 border-white/5 text-gray-400 hover:border-white/20 hover:text-gray-300'
                                 ]"
                         >
                             v{{ v }}
@@ -404,7 +404,7 @@ const version = 'v0.1.32';
                 <p class="text-[10px] font-bold text-brand-primary leading-relaxed text-center tracking-widest uppercase">Everything is synced and running smoothly on version {{ version }}.</p>
             </div>
             <div class="pt-4 border-t border-white/5">
-                 <button disabled class="w-full px-4 py-3 bg-white/5 text-gray-500 rounded-xl font-black text-xs uppercase tracking-widest cursor-default border border-white/5">
+                 <button disabled class="w-full px-4 py-3 bg-black/40 text-gray-500 rounded-xl font-black text-xs uppercase tracking-widest cursor-default border border-white/5">
                     UI Up to Date
                  </button>
             </div>
