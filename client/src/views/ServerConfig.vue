@@ -1426,13 +1426,13 @@ const removeSourceEntry = (idx: number) => {
 
 <style scoped>
 .pce-custom.prism-code-editor {
-  /* Match the deep purple background from the design */
-  --pce-bg: #140b1b !important; 
+  --pce-bg: transparent !important; 
   --pce-cursor: #bd93f9 !important;
   --pce-selection: rgba(139, 92, 246, 0.2) !important;
   --pce-line-number: #4a3856 !important;
   --pce-widget-bg: #1a1024 !important;
-  background-color: #140b1b !important;
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 /* Ensure padding and layout look clean */
@@ -1440,6 +1440,7 @@ const removeSourceEntry = (idx: number) => {
 .pce-custom.prism-code-editor :deep(.pce-code) {
   padding: 1.5rem !important;
   line-height: 1.6 !important;
+  background: transparent !important;
 }
 
 /* Style line numbers wrapper to look like left gutter */
