@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useConfigStore } from '../stores/config';
 import { useSnapshotStore } from '../stores/snapshots';
 import { useSystemStore } from '../stores/system';
@@ -10,10 +10,21 @@ import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import PromptDialog from '../components/PromptDialog.vue';
 
+// Code Editor Highlighting
+import { createEditor } from 'prism-code-editor';
+import 'prism-code-editor/languages/ini';
+import 'prism-code-editor/layout.css';
+import 'prism-code-editor/scrollbar.css';
+import 'prism-code-editor/themes/atom-one-dark.css';
+
 const configStore = useConfigStore();
 const systemStore = useSystemStore();
-const snapshotStore = useSnapshotStore();
 const uiStore = useUIStore();
+
+const editorRef = ref<any>(null);
+const editorContainer = ref<HTMLElement | null>(null);
+
+const snapshotStore = useSnapshotStore();
 
 const activeTab = ref<'standard' | 'expert' | 'snapshots' | 'security'>('standard');
 const activeSection = ref('server');
@@ -21,6 +32,26 @@ const localRawConfig = ref('');
 const localParsedConfig = ref<Record<string, any>>({});
 const configMetadata = ref<Record<string, any>>({});
 const configSections = ref<Record<string, any>>({});
+
+watch([() => activeTab.value, editorContainer], async ([tab, container]) => {
+  if (tab === 'expert' && container && !editorRef.value) {
+      await nextTick();
+      const element = container as HTMLElement;
+      editorRef.value = createEditor(element, {
+          value: localRawConfig.value,
+          language: 'ini',
+          onUpdate(val) {
+              localRawConfig.value = val;
+          }
+      });
+  }
+}, { flush: 'post' });
+
+watch(localRawConfig, (val) => {
+    if (editorRef.value && editorRef.value.value !== val) {
+        editorRef.value.setOptions({ value: val });
+    }
+});
 const sourceTemplates = ref<any[]>([]);
 
 // Tracks which properties are "enabled" (will be saved)
@@ -33,6 +64,68 @@ const showConfirmDeleteSnapshot = ref(false);
 const showConfirmReset = ref(false);
 const showPromptAddProperty = ref(false);
 const showAddSourceDialog = ref(false);
+
+const isEditingSource = ref(false);
+const editingSourceIdx = ref<number | null>(null);
+
+const openEditSourceDialog = (idx: number) => {
+  isEditingSource.value = true;
+  editingSourceIdx.value = idx;
+  
+  const sources = localParsedConfig.value.stream?.source;
+  const uri = Array.isArray(sources) ? sources[idx] : sources;
+  if (!uri) return;
+  
+  const typeMap: Record<string, string> = {
+    'pipe://': 'pipe',
+    'librespot://': 'spotify',
+    'airplay://': 'airplay',
+    'file://': 'file',
+    'tcp://': 'tcp',
+    'alsa://': 'alsa',
+    'meta://': 'meta',
+    'jack://': 'jack'
+  };
+  
+  let detectedType = '';
+  for (const [key, val] of Object.entries(typeMap)) {
+      if (uri.startsWith(key)) {
+          detectedType = val;
+          break;
+      }
+  }
+  if (uri.startsWith('process://')) {
+      detectedType = uri.includes('ffmpeg') ? 'ffmpeg_radio' : 'process';
+  }
+  if (!detectedType) detectedType = 'pipe';
+  
+  selectSourceType(detectedType);
+  
+  const prefix = detectedType === 'ffmpeg_radio' || detectedType === 'process' ? 'process://' : `${detectedType}://`;
+  const withoutPrefix = uri.substring(prefix.length);
+  const qIdx = withoutPrefix.indexOf('?');
+  const path = qIdx === -1 ? withoutPrefix : withoutPrefix.substring(0, qIdx);
+  const query = qIdx === -1 ? '' : withoutPrefix.substring(qIdx + 1);
+  
+  sourceFormPath.value = path;
+  const params = new URLSearchParams(query);
+  sourceFormParams.value = {};
+  
+  for (const [key, val] of params.entries()) {
+      sourceFormParams.value[key] = val;
+  }
+  
+  if (detectedType === 'ffmpeg_radio') {
+       const ffmpegParams = params.get('params') || '';
+       const decoded = decodeURIComponent(ffmpegParams);
+       const streamUrlMatch = decoded.match(/-i\s+([^\s]+)/);
+       if (streamUrlMatch && streamUrlMatch[1]) {
+           sourceFormParams.value['_stream_url'] = streamUrlMatch[1];
+       }
+  }
+  
+  showAddSourceDialog.value = true;
+};
 
 const pendingRestoreId = ref<number | null>(null);
 const pendingDeleteSnapshotId = ref<number | null>(null);
@@ -389,6 +482,8 @@ const handleResetToDefault = async () => {
 
 // Source creation helpers
 const openAddSourceDialog = () => {
+  isEditingSource.value = false;
+  editingSourceIdx.value = null;
   selectedSourceType.value = '';
   sourceFormPath.value = '';
   sourceFormParams.value = {};
@@ -399,10 +494,12 @@ const selectSourceType = (type: string) => {
   selectedSourceType.value = type;
   const template = sourceTemplates.value.find((t: any) => t.type === type);
   if (template) {
-    sourceFormPath.value = template.pathPlaceholder;
-    sourceFormParams.value = {};
-    for (const p of template.params) {
-      sourceFormParams.value[p.key] = p.default || '';
+    if (!isEditingSource.value) {
+      sourceFormPath.value = template.pathPlaceholder;
+      sourceFormParams.value = {};
+      for (const p of template.params) {
+        sourceFormParams.value[p.key] = p.default || '';
+      }
     }
   }
 };
@@ -417,32 +514,23 @@ const buildSourceUri = (): string => {
   const params: string[] = [];
   
   if (template.type === 'ffmpeg_radio') {
-    // Special handling: build ffmpeg params from stream URL
     const streamUrl = sourceFormParams.value['_stream_url'] || '';
     const name = sourceFormParams.value['name'] || 'Radio';
-    
-    // Build the ffmpeg args: -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i <url> -f s16le -ar <rate> -ac <channels> -
     const sampleformat = sourceFormParams.value['sampleformat'] || '48000:16:2';
     const [rate, , channels] = sampleformat.split(':');
     const ffmpegArgs = `-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i ${streamUrl} -f s16le -ar ${rate || '48000'} -ac ${channels || '2'} -`;
     const encodedParams = ffmpegArgs.replace(/ /g, '%20');
     
     params.push(`name=${name}`);
-    
-    // Add standard params (codec, sampleformat, etc.) but skip _stream_url and name
     for (const p of template.params) {
       if (p.key === '_stream_url' || p.key === 'name') continue;
       const val = sourceFormParams.value[p.key];
       if (val !== undefined && val !== '' && val !== p.default) {
         params.push(`${p.key}=${val}`);
-      } else if (p.required && val) {
-        params.push(`${p.key}=${val}`);
       }
     }
-    
     params.push(`params=${encodedParams}`);
   } else {
-    // Standard URI building
     for (const p of template.params) {
       const val = sourceFormParams.value[p.key];
       if (val !== undefined && val !== '' && val !== p.default) {
@@ -468,21 +556,30 @@ const addSourceFromTemplate = () => {
     localParsedConfig.value.stream = {};
   }
   
-  const current = localParsedConfig.value.stream.source;
-  if (Array.isArray(current)) {
-    current.push(uri);
-  } else if (current) {
-    localParsedConfig.value.stream.source = [current, uri];
+  if (isEditingSource.value && editingSourceIdx.value !== null) {
+      const current = localParsedConfig.value.stream.source;
+      if (Array.isArray(current)) {
+          current[editingSourceIdx.value] = uri;
+      } else {
+          localParsedConfig.value.stream.source = uri;
+      }
+      uiStore.showToast('Source updated! Save to apply.', 'success');
   } else {
-    localParsedConfig.value.stream.source = uri;
+      const current = localParsedConfig.value.stream.source;
+      if (Array.isArray(current)) {
+        current.push(uri);
+      } else if (current) {
+        localParsedConfig.value.stream.source = [current, uri];
+      } else {
+        localParsedConfig.value.stream.source = uri;
+      }
+      uiStore.showToast('Source added! Save to apply.', 'success');
   }
   
-  // Ensure source is marked as enabled
   if (!enabledProperties.value.stream) enabledProperties.value.stream = {};
   enabledProperties.value.stream.source = true;
   
   showAddSourceDialog.value = false;
-  uiStore.showToast('Source added! Save to apply.', 'success');
 };
 
 const getMetaForKey = (section: string, key: string) => {
@@ -578,20 +675,20 @@ const removeSourceEntry = (idx: number) => {
           <!-- Section Content -->
           <Card>
               <template #title>
-                  <div class="flex justify-between items-center w-full">
-                      <div class="flex items-center space-x-3">
-                        <span class="material-symbols-outlined text-[20px] text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.5)]">{{ sectionIcons[activeSection] || 'tune' }}</span>
-                        <div>
-                          <span class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">{{ currentSectionMeta.label }}</span>
-                          <p class="text-[10px] font-semibold text-gray-500 mt-0.5">{{ currentSectionMeta.description }}</p>
-                        </div>
-                      </div>
-                      <div v-if="activeSection !== 'stream'" class="flex items-center space-x-2">
-                          <button @click="triggerAddProperty(activeSection)" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-brand-primary hover:text-white hover:bg-brand-primary border border-brand-primary/30 rounded-lg transition-all uppercase tracking-widest shadow-[inset_0_0_10px_rgba(166,13,242,0.1)] hover:shadow-[0_0_15px_rgba(166,13,242,0.5)]" title="Add custom property">
-                            <span class="material-symbols-outlined text-[14px] mr-1">add</span>
-                            Custom
-                          </button>
-                      </div>
+                  <div class="flex items-center space-x-3">
+                    <span class="material-symbols-outlined text-[20px] text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.5)]">{{ sectionIcons[activeSection] || 'tune' }}</span>
+                    <div>
+                      <span class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">{{ currentSectionMeta.label }}</span>
+                      <p class="text-[10px] font-semibold text-gray-500 mt-0.5">{{ currentSectionMeta.description }}</p>
+                    </div>
+                  </div>
+              </template>
+              <template #action>
+                  <div v-if="activeSection !== 'stream'" class="flex items-center space-x-2">
+                      <button @click="triggerAddProperty(activeSection)" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-brand-primary hover:text-white hover:bg-brand-primary border border-brand-primary/30 rounded-lg transition-all uppercase tracking-widest shadow-[inset_0_0_10px_rgba(166,13,242,0.1)] hover:shadow-[0_0_15px_rgba(166,13,242,0.5)]" title="Add custom property">
+                        <span class="material-symbols-outlined text-[14px] mr-1">add</span>
+                        Custom
+                      </button>
                   </div>
               </template>
               
@@ -629,9 +726,14 @@ const removeSourceEntry = (idx: number) => {
                               {{ extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'Unnamed' }}
                             </span>
                           </div>
-                          <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 text-gray-400 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors border border-transparent hover:border-[#ff3b30]/20" title="Remove source">
-                            <span class="material-symbols-outlined text-[16px]">delete</span>
-                          </button>
+                          <div class="flex items-center space-x-1">
+                            <button @click="openEditSourceDialog(idx as number)" class="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors border border-transparent hover:border-brand-primary/20" title="Edit source">
+                              <span class="material-symbols-outlined text-[16px]">edit</span>
+                            </button>
+                            <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 text-gray-400 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors border border-transparent hover:border-[#ff3b30]/20" title="Remove source">
+                              <span class="material-symbols-outlined text-[16px]">delete</span>
+                            </button>
+                          </div>
                         </div>
                         <!-- Source URI input -->
                         <div class="px-3 py-3">
@@ -926,11 +1028,7 @@ const removeSourceEntry = (idx: number) => {
                   </p>
                   <div class="relative group">
                     <div class="absolute -inset-1 bg-gradient-to-r from-brand-primary/50 to-brand-primary rounded-2xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
-                    <textarea 
-                        v-model="localRawConfig" 
-                        class="relative w-full h-[600px] font-mono text-xs px-6 py-6 bg-black/60 border border-white/5 rounded-2xl text-[#00d4ff] focus:ring-1 focus:ring-brand-primary/50 outline-none leading-relaxed selection:bg-brand-primary/30 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)]"
-                        spellcheck="false"
-                    ></textarea>
+                    <div ref="editorContainer" class="relative w-full h-[600px] bg-black/60 border border-white/5 rounded-2xl focus:ring-1 focus:ring-brand-primary/50 outline-none overflow-hidden selection:bg-brand-primary/30 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] text-xs"></div>
                   </div>
                   <div class="flex justify-end">
                       <button 
@@ -1099,8 +1197,8 @@ const removeSourceEntry = (idx: number) => {
               <!-- Header -->
               <div class="sticky top-0 bg-[#1c1022]/90 backdrop-blur-sm border-b border-white/5 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
                 <div>
-                  <h3 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">Add Audio Source</h3>
-                  <p class="text-[10px] text-gray-500 mt-0.5">Select a source type and configure its parameters</p>
+                  <h3 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">{{ isEditingSource ? 'Edit Audio Source' : 'Add Audio Source' }}</h3>
+                  <p class="text-[10px] text-gray-500 mt-0.5">{{ isEditingSource ? 'Modify the source parameters' : 'Select a source type and configure its parameters' }}</p>
                 </div>
                 <button @click="showAddSourceDialog = false" class="p-2 text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all">
                   <span class="material-symbols-outlined text-[20px]">close</span>
@@ -1228,7 +1326,7 @@ const removeSourceEntry = (idx: number) => {
                       @click="addSourceFromTemplate"
                       class="px-6 py-2.5 bg-brand-primary text-white border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_20px_rgba(166,13,242,0.6)] rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#b526ff] active:scale-95 transition-all"
                     >
-                      Add Source
+                      {{ isEditingSource ? 'Update Source' : 'Add Source' }}
                     </button>
                   </div>
                 </div>

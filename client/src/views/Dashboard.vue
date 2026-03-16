@@ -13,8 +13,17 @@ const snapcastStore = useSnapcastStore();
 const selectedNodeVersion = ref('20');
 let pollingInterval: number | undefined;
 
-onMounted(() => {
-  systemStore.refreshAll();
+onMounted(async () => {
+  await systemStore.refreshAll();
+  
+  // Auto-select current installed Node.js version
+  if (systemStore.packageVersions.node) {
+    const match = systemStore.packageVersions.node.match(/v?(\d+)/);
+    if (match && match[1]) {
+      selectedNodeVersion.value = match[1];
+    }
+  }
+
   snapcastStore.fetchStatus();
   // Poll Snapcast status every 3 seconds for live dashboard updates
   pollingInterval = window.setInterval(() => {
@@ -52,7 +61,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Update this constant synchronously with the package.json version before release
-const version = 'v0.1.38';
+const version = 'v0.1.39';
 </script>
 
 <template>
@@ -161,7 +170,7 @@ const version = 'v0.1.38';
                         </div>
                         <div class="flex items-center justify-between py-2">
                             <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Snapserver Version</span>
-                            <span class="text-sm font-mono font-bold text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.3)]">{{ snapcastStore.status.server.version }}</span>
+                            <span class="text-sm font-mono font-bold text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.3)]">{{ systemStore.packageVersions.snapserver || (snapcastStore.status ? snapcastStore.status.server.version : '...') }}</span>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Active Groups</span>
