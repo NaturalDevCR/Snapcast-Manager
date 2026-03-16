@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Snapcast Manager - Configuration</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#a60df2",
+                        "background-light": "#f7f5f8",
+                        "background-dark": "#1c1022",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 px-6 lg:px-40 py-3 bg-background-light dark:bg-background-dark sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-4 text-primary">
+<div class="size-8 flex items-center justify-center bg-primary/10 rounded-lg">
+<span class="material-symbols-outlined text-primary">settings_input_component</span>
+</div>
+<h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-[-0.015em]">Snapcast Manager</h2>
+</div>
+<nav class="hidden md:flex items-center gap-9">
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal transition-colors" href="#">Dashboard</a>
+<a class="text-primary text-sm font-bold leading-normal" href="#">Configurations</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal transition-colors" href="#">Streams</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal transition-colors" href="#">Clients</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal transition-colors" href="#">Logs</a>
+</nav>
+</div>
+<div class="flex flex-1 justify-end gap-4 items-center">
+<label class="hidden sm:flex flex-col min-w-40 h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-xl h-full bg-slate-200/50 dark:bg-slate-800/50">
+<div class="text-slate-500 flex items-center justify-center pl-4">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-transparent focus:ring-0 h-full placeholder:text-slate-500 px-4 pl-2 text-sm font-normal" placeholder="Search settings..." value=""/>
+</div>
+</label>
+<div class="flex gap-2">
+<button class="flex items-center justify-center rounded-xl h-10 w-10 bg-slate-200/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:bg-primary/20 hover:text-primary transition-all">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+<button class="flex items-center justify-center rounded-xl h-10 w-10 bg-slate-200/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:bg-primary/20 hover:text-primary transition-all">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+</div>
+<div class="bg-primary/20 aspect-square rounded-full size-10 flex items-center justify-center overflow-hidden border-2 border-primary/30">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="Stylized user profile avatar portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAwLWL7ndG8cJWLH1DUN8EibYwdaCYRl7Pg0Hf7DDr-L4xI_5L9PAk3_m0tN2X7xJrUt7Kx7EFgl1JihlaN_cpMFD1l1ZdrzeotK6kZkGnKxEeRt-DiZk_nTTzrcfm-tWlnlkxPoe-Gh9GF5zkOrhuVa2JHxsIJkUBCpOPzzFf84oL5X1dsp2d13KQ5ASRyodAj9hCM82hbe2s45EqckQ68Yiqbl_B5_kAYgUuU7PmUuElX45tEIpCNfEL4QZxZ9P8hiyHDfevRw0_p"/>
+</div>
+</div>
+</header>
+<main class="flex-1 px-6 lg:px-40 py-8">
+<div class="max-w-[1200px] mx-auto">
+<div class="flex flex-wrap justify-between items-end gap-4 mb-8">
+<div class="flex flex-col gap-2">
+<h1 class="text-slate-900 dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Configuration</h1>
+<p class="text-slate-500 dark:text-slate-400 text-lg font-normal">Manage your Snapcast server instances and environment variables.</p>
+</div>
+<div class="flex gap-3">
+<button class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Export Config</button>
+<button class="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:brightness-110 transition-all">Apply Changes</button>
+</div>
+</div>
+<div class="mb-6">
+<div class="flex border-b border-slate-200 dark:border-slate-800 gap-8 overflow-x-auto no-scrollbar">
+<a class="flex flex-col items-center justify-center border-b-[3px] border-primary text-primary pb-3 pt-4 px-2" href="#">
+<span class="text-sm font-bold tracking-[0.015em]">Standard</span>
+</a>
+<a class="flex flex-col items-center justify-center border-b-[3px] border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-3 pt-4 px-2" href="#">
+<span class="text-sm font-bold tracking-[0.015em]">Expert</span>
+</a>
+<a class="flex flex-col items-center justify-center border-b-[3px] border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-3 pt-4 px-2" href="#">
+<span class="text-sm font-bold tracking-[0.015em]">Snapshots</span>
+</a>
+<a class="flex flex-col items-center justify-center border-b-[3px] border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-3 pt-4 px-2" href="#">
+<span class="text-sm font-bold tracking-[0.015em]">Security &amp; Backup</span>
+</a>
+</div>
+</div>
+<div class="flex gap-2 mb-8 overflow-x-auto no-scrollbar py-2">
+<button class="px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium">Server</button>
+<button class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-primary/20 hover:text-primary transition-all">SSL/TLS</button>
+<button class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-primary/20 hover:text-primary transition-all">HTTP/Websocket</button>
+<button class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-primary/20 hover:text-primary transition-all">Logging</button>
+<button class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-primary/20 hover:text-primary transition-all">TCP</button>
+<button class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-primary/20 hover:text-primary transition-all">Buffer</button>
+</div>
+<div class="bg-white dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden mb-24">
+<div class="p-6 border-b border-slate-200 dark:border-slate-800">
+<h2 class="text-slate-900 dark:text-white text-xl font-bold">Server Settings</h2>
+<p class="text-slate-500 text-sm mt-1">Core server process and identification parameters.</p>
+</div>
+<div class="divide-y divide-slate-200 dark:divide-slate-800">
+<!-- Worker Threads -->
+<div class="p-6 flex items-start justify-between gap-6 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-slate-900 dark:text-slate-100 font-semibold">Worker Threads</span>
+<span class="material-symbols-outlined text-[16px] text-slate-400 cursor-help">info</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm">Number of threads used for network communication. Default is usually number of CPU cores.</p>
+</div>
+<div class="flex items-center gap-4">
+<input class="w-20 rounded-lg border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark text-sm focus:ring-primary focus:border-primary" type="number" value="4"/>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+<!-- PID File -->
+<div class="p-6 flex items-start justify-between gap-6 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-slate-900 dark:text-slate-100 font-semibold">PID File</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm">Location where the process ID file will be stored.</p>
+<input class="mt-3 w-full max-w-md rounded-lg border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark text-sm focus:ring-primary focus:border-primary" type="text" value="/var/run/snapserver/pid"/>
+</div>
+<label class="relative inline-flex items-center cursor-pointer mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<!-- User -->
+<div class="p-6 flex items-start justify-between gap-6 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-slate-900 dark:text-slate-100 font-semibold">User</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm">User name as which the server should run.</p>
+<div class="mt-3 flex gap-2">
+<select class="rounded-lg border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark text-sm focus:ring-primary focus:border-primary min-w-[200px]">
+<option>snapserver</option>
+<option>root</option>
+<option>nobody</option>
+</select>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<!-- Group -->
+<div class="p-6 flex items-start justify-between gap-6 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-slate-900 dark:text-slate-100 font-semibold">Group</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm">Group name as which the server should run.</p>
+<div class="mt-3 flex gap-2">
+<select class="rounded-lg border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark text-sm focus:ring-primary focus:border-primary min-w-[200px]">
+<option>snapserver</option>
+<option>audio</option>
+<option>nogroup</option>
+</select>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<!-- Data Directory -->
+<div class="p-6 flex items-start justify-between gap-6 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-slate-900 dark:text-slate-100 font-semibold">Data Directory</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm">Directory where persistent data and cache files are stored.</p>
+<div class="mt-3 flex items-center gap-2">
+<input class="w-full max-w-md rounded-lg border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark text-sm focus:ring-primary focus:border-primary" type="text" value="/var/lib/snapserver"/>
+<button class="p-2 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">folder_open</span>
+</button>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<!-- mDNS -->
+<div class="p-6 flex items-start justify-between gap-6 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-slate-900 dark:text-slate-100 font-semibold">mDNS</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm">Enable Avahi/mDNS service discovery for automatic client connection.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Sticky Bar -->
+<div class="fixed bottom-0 left-0 right-0 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-6 lg:px-40 py-4 z-40">
+<div class="max-w-[1200px] mx-auto flex items-center justify-between">
+<div class="flex items-center gap-2 text-sm text-slate-500">
+<span class="material-symbols-outlined text-[18px] text-green-500">check_circle</span>
+                        Last saved 2 minutes ago
+                    </div>
+<div class="flex gap-4">
+<button class="px-6 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Discard</button>
+<button class="px-10 py-2.5 rounded-xl bg-primary text-white text-base font-bold shadow-xl shadow-primary/30 hover:brightness-110 active:scale-95 transition-all">
+                            Save Configuration
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>

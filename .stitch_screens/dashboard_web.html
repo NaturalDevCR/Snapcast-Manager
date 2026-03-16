@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Snapcast Manager Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#a60df2",
+                        "background-light": "#f7f5f8",
+                        "background-dark": "#120b16",
+                        "surface-dark": "#1c1022",
+                        "border-dark": "#332839",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #332839;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen font-display">
+<div class="flex flex-col h-screen overflow-hidden">
+<!-- Top Navigation Bar -->
+<header class="flex items-center justify-between h-16 px-8 border-b border-border-dark bg-surface-dark/50 backdrop-blur-md z-20">
+<div class="flex items-center gap-10">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-xl">settings_input_component</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight">Snapcast <span class="text-primary">Manager</span></h1>
+</div>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-slate-100 font-semibold border-b-2 border-primary pb-1 pt-1 transition-all" href="#">Dashboard</a>
+<a class="text-slate-400 hover:text-slate-100 font-medium transition-colors" href="#">Configuration</a>
+<a class="text-slate-400 hover:text-slate-100 font-medium transition-colors" href="#">Logs</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group hidden sm:block">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined text-lg">search</span>
+<input class="bg-surface-dark border-border-dark rounded-xl pl-10 pr-4 py-1.5 w-64 focus:ring-primary focus:border-primary text-sm transition-all outline-none" placeholder="Search resources..." type="text"/>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-dark hover:bg-border-dark text-sm font-semibold transition-colors border border-border-dark">
+<span class="material-symbols-outlined text-lg">logout</span>
+<span>Logout</span>
+</button>
+<div class="w-10 h-10 rounded-full border-2 border-primary/30 p-0.5">
+<img class="w-full h-full rounded-full object-cover" data-alt="User profile avatar smiling" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAT8TTeIQn9osJFXevnzw9H0AxRxWsGIXC6PMv90j_sovHS_Fw9by-kHErf2UNXsxDqqY53cnLYTeB14LSrmecy9swdTAD8EP72QcMh5X70DTef3pxfe4TocRHYKVYPidOxcZUkyGbiO4VhJ4GLEyylTbLxJNYrf-NbgGYGi4Y1_HF41T9kwyH7DTH4FGTYZUoOyZq7e5xw0hM_seUCex013Zxyw56hEmREfaNCUsfonRFJIH1oc0oWuWP6fgTMUyeNCwVktJ6nbbli"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="w-64 border-r border-border-dark bg-surface-dark/30 hidden lg:flex flex-col p-6 gap-8">
+<div class="space-y-1">
+<p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">Main Menu</p>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-semibold text-sm">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-border-dark/50 hover:text-slate-100 transition-all" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-medium text-sm">Metrics</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-border-dark/50 hover:text-slate-100 transition-all" href="#">
+<span class="material-symbols-outlined">dns</span>
+<span class="font-medium text-sm">Services</span>
+</a>
+</div>
+<div class="space-y-1">
+<p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">System</p>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-border-dark/50 hover:text-slate-100 transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-medium text-sm">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-border-dark/50 hover:text-slate-100 transition-all" href="#">
+<span class="material-symbols-outlined">security</span>
+<span class="font-medium text-sm">Security</span>
+</a>
+</div>
+<div class="mt-auto bg-primary/5 rounded-2xl p-4 border border-primary/10">
+<div class="flex items-center justify-between mb-2">
+<span class="text-xs font-semibold text-primary">System Health</span>
+<span class="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-md uppercase font-bold">Stable</span>
+</div>
+<div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[94%]"></div>
+</div>
+<p class="text-[10px] text-slate-500 mt-2">Server uptime: 14 days, 2h</p>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto custom-scrollbar p-8 bg-background-dark/95">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+<div>
+<h2 class="text-3xl font-extrabold tracking-tight text-white">System Dashboard</h2>
+<p class="text-slate-400 mt-1">Real-time overview of your Snapcast ecosystem</p>
+</div>
+<button class="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold transition-all shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-lg">refresh</span>
+<span>Refresh All</span>
+</button>
+</div>
+<!-- Grid Layout for Dashboard Content -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Live Server Metrics Section -->
+<div class="col-span-12">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-lg font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">sensors</span>
+                                Live Server Metrics
+                            </h3>
+<span class="text-xs text-slate-500 font-medium italic">Auto-updates every 5s</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Metric Card 1 -->
+<div class="bg-surface-dark border border-border-dark p-6 rounded-2xl relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-8 -mt-8 transition-all group-hover:scale-110"></div>
+<div class="flex items-start justify-between">
+<div>
+<p class="text-slate-400 text-sm font-medium">Active Streams</p>
+<h4 class="text-4xl font-bold mt-2">12</h4>
+</div>
+<div class="p-2 bg-primary/20 text-primary rounded-lg">
+<span class="material-symbols-outlined">podcasts</span>
+</div>
+</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="flex items-center text-green-400 text-sm font-bold">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+                                        +2%
+                                    </span>
+<span class="text-slate-500 text-xs">from last hour</span>
+</div>
+</div>
+<!-- Metric Card 2 -->
+<div class="bg-surface-dark border border-border-dark p-6 rounded-2xl relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-8 -mt-8 transition-all group-hover:scale-110"></div>
+<div class="flex items-start justify-between">
+<div>
+<p class="text-slate-400 text-sm font-medium">Connected Clients</p>
+<h4 class="text-4xl font-bold mt-2">48</h4>
+</div>
+<div class="p-2 bg-blue-500/20 text-blue-400 rounded-lg">
+<span class="material-symbols-outlined">devices</span>
+</div>
+</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="flex items-center text-orange-400 text-sm font-bold">
+<span class="material-symbols-outlined text-sm">trending_down</span>
+                                        -5%
+                                    </span>
+<span class="text-slate-500 text-xs">from last hour</span>
+</div>
+</div>
+<!-- Server Health Card -->
+<div class="bg-surface-dark border border-border-dark p-6 rounded-2xl relative overflow-hidden group">
+<div class="flex items-start justify-between mb-4">
+<div>
+<p class="text-slate-400 text-sm font-medium">Server Health</p>
+<div class="flex items-center gap-2 mt-2">
+<div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+<h4 class="text-xl font-bold">Optimal</h4>
+</div>
+</div>
+<div class="p-2 bg-green-500/20 text-green-400 rounded-lg">
+<span class="material-symbols-outlined">health_and_safety</span>
+</div>
+</div>
+<div class="pt-4 border-t border-border-dark flex items-center justify-between">
+<span class="text-xs text-slate-500">Version</span>
+<span class="text-xs font-mono bg-border-dark px-2 py-1 rounded text-slate-200">v0.27.0-stable</span>
+</div>
+</div>
+</div>
+</div>
+<!-- System Services Section -->
+<div class="col-span-12 mt-4">
+<div class="flex items-center gap-2 mb-4">
+<h3 class="text-lg font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">terminal</span>
+                                System Services
+                            </h3>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Snapserver Card -->
+<div class="bg-surface-dark border border-border-dark rounded-2xl flex flex-col">
+<div class="p-6">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined">storage</span>
+</div>
+<div>
+<h5 class="font-bold">Snapserver</h5>
+<p class="text-[10px] text-slate-500 font-mono">PID: 1284</p>
+</div>
+</div>
+<span class="px-2 py-1 rounded text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">RUNNING</span>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-xs">
+<span class="text-slate-400">CPU Usage</span>
+<span class="text-slate-100 font-medium">1.2%</span>
+</div>
+<div class="w-full bg-slate-800 h-1.5 rounded-full">
+<div class="bg-primary h-full w-[12%]"></div>
+</div>
+</div>
+</div>
+<div class="mt-auto border-t border-border-dark p-4 flex gap-2">
+<button class="flex-1 py-1.5 rounded-lg bg-border-dark hover:bg-slate-700 text-xs font-bold transition-colors">RESTART</button>
+<button class="px-3 py-1.5 rounded-lg bg-border-dark hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm">settings</span>
+</button>
+</div>
+</div>
+<!-- Snap-ctrl Card (Alert) -->
+<div class="bg-surface-dark border-2 border-primary/40 rounded-2xl flex flex-col relative">
+<div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-black px-3 py-0.5 rounded-full shadow-lg">UPDATE READY</div>
+<div class="p-6">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">tune</span>
+</div>
+<div>
+<h5 class="font-bold">Snap-ctrl</h5>
+<p class="text-[10px] text-slate-500 font-mono">PID: 3412</p>
+</div>
+</div>
+<span class="px-2 py-1 rounded text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">RUNNING</span>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-xs">
+<span class="text-slate-400">Memory Usage</span>
+<span class="text-slate-100 font-medium">45.8 MB</span>
+</div>
+<div class="w-full bg-slate-800 h-1.5 rounded-full">
+<div class="bg-primary h-full w-[35%]"></div>
+</div>
+</div>
+</div>
+<div class="mt-auto border-t border-border-dark p-4 flex gap-2">
+<button class="flex-1 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all">INSTALL UPDATE</button>
+<button class="px-3 py-1.5 rounded-lg bg-border-dark hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm">more_vert</span>
+</button>
+</div>
+</div>
+<!-- FFmpeg Card -->
+<div class="bg-surface-dark border border-border-dark rounded-2xl flex flex-col">
+<div class="p-6">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined">movie</span>
+</div>
+<div>
+<h5 class="font-bold">FFmpeg</h5>
+<p class="text-[10px] text-slate-500 font-mono">PID: 8901</p>
+</div>
+</div>
+<span class="px-2 py-1 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">IDLE</span>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-xs">
+<span class="text-slate-400">GPU Acceleration</span>
+<span class="text-slate-100 font-medium">Enabled (NVENC)</span>
+</div>
+<div class="w-full bg-slate-800 h-1.5 rounded-full">
+<div class="bg-slate-600 h-full w-[5%]"></div>
+</div>
+</div>
+</div>
+<div class="mt-auto border-t border-border-dark p-4 flex gap-2">
+<button class="flex-1 py-1.5 rounded-lg bg-border-dark hover:bg-slate-700 text-xs font-bold transition-colors">START WORKER</button>
+<button class="px-3 py-1.5 rounded-lg bg-border-dark hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm">history</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Logs/Recent Activity Section (Bonus for Professional look) -->
+<div class="col-span-12 lg:col-span-8 mt-4">
+<div class="bg-surface-dark border border-border-dark rounded-2xl overflow-hidden">
+<div class="px-6 py-4 border-b border-border-dark flex items-center justify-between">
+<h3 class="font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">list_alt</span>
+                                    System Logs
+                                </h3>
+<a class="text-xs text-primary font-bold hover:underline" href="#">View All Logs</a>
+</div>
+<div class="p-0">
+<table class="w-full text-left text-sm">
+<thead class="bg-border-dark/30 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+<tr>
+<th class="px-6 py-3">Timestamp</th>
+<th class="px-6 py-3">Service</th>
+<th class="px-6 py-3">Event</th>
+<th class="px-6 py-3 text-right">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-dark/50">
+<tr class="hover:bg-border-dark/20 transition-colors">
+<td class="px-6 py-4 text-slate-400 font-mono text-xs">2023-11-24 14:02:11</td>
+<td class="px-6 py-4 font-medium">Snapserver</td>
+<td class="px-6 py-4 text-slate-300">Client 'Kitchen' connected</td>
+<td class="px-6 py-4 text-right"><span class="bg-green-500/10 text-green-400 px-2 py-0.5 rounded text-[10px] font-bold">INFO</span></td>
+</tr>
+<tr class="hover:bg-border-dark/20 transition-colors">
+<td class="px-6 py-4 text-slate-400 font-mono text-xs">2023-11-24 14:00:55</td>
+<td class="px-6 py-4 font-medium">Snap-ctrl</td>
+<td class="px-6 py-4 text-slate-300">Update check completed</td>
+<td class="px-6 py-4 text-right"><span class="bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold">NOTIFY</span></td>
+</tr>
+<tr class="hover:bg-border-dark/20 transition-colors">
+<td class="px-6 py-4 text-slate-400 font-mono text-xs">2023-11-24 13:45:22</td>
+<td class="px-6 py-4 font-medium">FFmpeg</td>
+<td class="px-6 py-4 text-slate-300">Stream 'Spotify' encoding started</td>
+<td class="px-6 py-4 text-right"><span class="bg-green-500/10 text-green-400 px-2 py-0.5 rounded text-[10px] font-bold">INFO</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Right Sidebar Stats -->
+<div class="col-span-12 lg:col-span-4 mt-4">
+<div class="bg-gradient-to-br from-primary/20 to-surface-dark border border-primary/30 rounded-2xl p-6 h-full flex flex-col justify-between">
+<div>
+<h3 class="font-bold text-lg mb-2">Network Load</h3>
+<p class="text-sm text-slate-400 mb-6">Current throughput across all nodes</p>
+<div class="flex items-end gap-1 h-32 mb-6">
+<div class="flex-1 bg-primary/20 rounded-t h-[40%]"></div>
+<div class="flex-1 bg-primary/20 rounded-t h-[60%]"></div>
+<div class="flex-1 bg-primary/30 rounded-t h-[35%]"></div>
+<div class="flex-1 bg-primary/40 rounded-t h-[75%]"></div>
+<div class="flex-1 bg-primary/50 rounded-t h-[55%]"></div>
+<div class="flex-1 bg-primary/60 rounded-t h-[90%]"></div>
+<div class="flex-1 bg-primary rounded-t h-[80%]"></div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-dark/60 p-3 rounded-xl border border-border-dark">
+<p class="text-[10px] text-slate-500 font-bold uppercase mb-1">Upload</p>
+<p class="text-lg font-bold">14.2 MB/s</p>
+</div>
+<div class="bg-surface-dark/60 p-3 rounded-xl border border-border-dark">
+<p class="text-[10px] text-slate-500 font-bold uppercase mb-1">Download</p>
+<p class="text-lg font-bold">2.8 MB/s</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

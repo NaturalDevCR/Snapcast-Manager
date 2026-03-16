@@ -61,7 +61,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Update this constant synchronously with the package.json version before release
-const version = 'v0.1.39';
+const version = 'v0.1.40';
 </script>
 
 <template>

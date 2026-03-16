@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SNAPMGR Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#a60df2",
+                        "background-light": "#f7f5f8",
+                        "background-dark": "#1c1022",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .neon-glow {
+            box-shadow: 0 0 15px rgba(166, 13, 242, 0.3);
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex flex-col font-display">
+<!-- Header -->
+<header class="flex items-center justify-between px-6 py-4 border-b border-primary/10 sticky top-0 bg-background-dark/80 backdrop-blur-md z-50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-2xl">sensors</span>
+<h1 class="text-lg font-bold tracking-tighter text-slate-100 uppercase">SNAPMGR</h1>
+</div>
+<button class="size-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30 text-primary">
+<span class="material-symbols-outlined">person</span>
+</button>
+</header>
+<main class="flex-1 overflow-y-auto px-4 py-6 space-y-8">
+<!-- Section 1: Live Metrics -->
+<section>
+<div class="flex items-center justify-between mb-4 px-2">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary">Live Metrics</h2>
+<span class="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<!-- Card 1 -->
+<div class="glass-panel border border-primary/10 p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group">
+<div class="absolute -right-2 -top-2 size-16 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors"></div>
+<span class="material-symbols-outlined text-primary text-3xl">podcasts</span>
+<div>
+<div class="text-2xl font-bold text-slate-100">1</div>
+<div class="text-[10px] uppercase font-medium text-slate-400">Active Streams</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="glass-panel border border-primary/10 p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group">
+<div class="absolute -right-2 -top-2 size-16 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors"></div>
+<span class="material-symbols-outlined text-primary/60 text-3xl">group</span>
+<div>
+<div class="text-2xl font-bold text-slate-400">0</div>
+<div class="text-[10px] uppercase font-medium text-slate-400">Connected Clients</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Service Health -->
+<section>
+<div class="flex items-center justify-between mb-4 px-2">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary">Service Health</h2>
+</div>
+<div class="space-y-2">
+<!-- Snapserver -->
+<div class="flex items-center justify-between p-3 glass-panel border border-primary/10 rounded-lg">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-sm">settings_input_component</span>
+</div>
+<div>
+<p class="text-sm font-semibold text-slate-100">Snapserver</p>
+<p class="text-[10px] text-slate-500">Service Running</p>
+</div>
+</div>
+<div class="flex items-center gap-2 bg-green-500/10 px-2 py-1 rounded border border-green-500/20">
+<div class="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+<span class="text-[10px] font-bold text-green-500 uppercase">Active</span>
+</div>
+</div>
+<!-- Snap-ctrl -->
+<div class="flex items-center justify-between p-3 glass-panel border border-primary/10 rounded-lg">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-sm">terminal</span>
+</div>
+<div>
+<p class="text-sm font-semibold text-slate-100">Snap-ctrl</p>
+<p class="text-[10px] text-slate-500">Installed</p>
+</div>
+</div>
+<div class="bg-primary/10 px-2 py-1 rounded border border-primary/20">
+<span class="text-[10px] font-bold text-primary uppercase tracking-tighter">v1.1.0</span>
+</div>
+</div>
+<!-- FFmpeg -->
+<div class="flex items-center justify-between p-3 glass-panel border border-primary/10 rounded-lg">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-sm">movie_edit</span>
+</div>
+<div>
+<p class="text-sm font-semibold text-slate-100">FFmpeg</p>
+<p class="text-[10px] text-slate-500">Encoder System</p>
+</div>
+</div>
+<div class="bg-slate-500/10 px-2 py-1 rounded border border-slate-500/20">
+<span class="text-[10px] font-bold text-slate-400 uppercase">Ready</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Placeholder for Visual Data -->
+<div class="relative w-full aspect-video rounded-xl border border-primary/10 overflow-hidden glass-panel flex items-center justify-center">
+<div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(circle at 2px 2px, #a60df2 1px, transparent 0); background-size: 20px 20px;"></div>
+<div class="text-center z-10 p-4">
+<span class="material-symbols-outlined text-primary/40 text-4xl mb-2">monitoring</span>
+<p class="text-xs text-slate-500 font-medium">Real-time spectral data offline</p>
+</div>
+<!-- Decorative gradient image -->
+<div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-primary/5 to-transparent pointer-events-none"></div>
+</div>
+</main>
+<!-- Bottom Quick Actions Floating Bar -->
+<nav class="p-4 bg-background-dark/95 backdrop-blur-xl border-t border-primary/10">
+<div class="flex gap-3">
+<button class="flex-1 bg-primary text-slate-100 py-3 rounded-lg flex items-center justify-center gap-2 font-bold text-sm neon-glow">
+<span class="material-symbols-outlined text-lg">refresh</span>
+                Refresh All
+            </button>
+<button class="px-5 bg-primary/10 border border-primary/30 text-primary py-3 rounded-lg flex items-center justify-center gap-2 font-bold text-sm">
+<span class="material-symbols-outlined text-lg">article</span>
+                Logs
+            </button>
+</div>
+</nav>
+<!-- Small Bottom Indicator -->
+<div class="flex justify-center pb-2 bg-background-dark">
+<div class="w-12 h-1 rounded-full bg-primary/20"></div>
+</div>
+</body></html>
