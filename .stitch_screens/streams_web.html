@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Snapcast Manager - Stream Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#a60df2",
+                        "background-light": "#f7f5f8",
+                        "background-dark": "#1c1022",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4c3b54;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 antialiased font-display">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="w-72 bg-white dark:bg-background-dark border-r border-slate-200 dark:border-primary/20 flex flex-col">
+<div class="p-6 flex items-center gap-3">
+<div class="size-10 rounded-full bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined">settings_input_component</span>
+</div>
+<div>
+<h1 class="text-base font-bold leading-tight">Snapcast</h1>
+<p class="text-xs text-slate-500 dark:text-slate-400">Admin Console</p>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-2 py-4">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-primary/10 transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary text-white shadow-lg shadow-primary/20" href="#">
+<span class="material-symbols-outlined">podcasts</span>
+<span class="text-sm font-medium">Streams</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-primary/10 transition-colors" href="#">
+<span class="material-symbols-outlined">devices</span>
+<span class="text-sm font-medium">Clients</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-primary/10 transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="text-sm font-medium">Groups</span>
+</a>
+<div class="pt-4 pb-2 px-4 uppercase text-[10px] font-bold tracking-widest text-slate-400">System</div>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-primary/10 transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-sm font-medium">Settings</span>
+</a>
+</nav>
+<div class="p-4 mt-auto">
+<div class="bg-slate-100 dark:bg-primary/5 rounded-xl p-4 border border-slate-200 dark:border-primary/10">
+<p class="text-xs font-semibold mb-2">Network Status</p>
+<div class="flex items-center gap-2">
+<div class="size-2 rounded-full bg-emerald-500 animate-pulse"></div>
+<span class="text-xs text-slate-500">Connected to Server</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-[#161118]">
+<header class="sticky top-0 z-10 bg-slate-50/80 dark:bg-[#161118]/80 backdrop-blur-md px-8 py-6 border-b border-slate-200 dark:border-primary/10">
+<div class="flex items-center justify-between max-w-6xl mx-auto">
+<div>
+<h2 class="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Stream Management</h2>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Configure global server settings and audio input pipelines</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-primary/10 text-slate-900 dark:text-primary rounded-lg font-bold text-sm hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-lg">history</span>
+                            Logs
+                        </button>
+<button class="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg font-bold text-sm shadow-lg shadow-primary/30 hover:brightness-110 transition-all">
+<span class="material-symbols-outlined text-lg">add</span>
+                            New Stream
+                        </button>
+</div>
+</div>
+</header>
+<div class="max-w-6xl mx-auto p-8 space-y-10">
+<!-- Audio Sources Section -->
+<section>
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">graphic_eq</span>
+<h3 class="text-xl font-bold">Audio Sources</h3>
+</div>
+<button class="text-sm text-primary font-bold hover:underline flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">add_circle</span>
+                            Add Source
+                        </button>
+</div>
+<div class="bg-white dark:bg-background-dark rounded-xl border border-slate-200 dark:border-primary/10 overflow-hidden shadow-sm">
+<table class="w-full text-left">
+<thead class="bg-slate-50 dark:bg-primary/5 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
+<tr>
+<th class="px-6 py-4">Source Name</th>
+<th class="px-6 py-4">Type / Command</th>
+<th class="px-6 py-4">Status</th>
+<th class="px-6 py-4 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-primary/10">
+<tr>
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+<span class="material-symbols-outlined text-xl">radio</span>
+</div>
+<div>
+<p class="font-bold text-sm">Radio Restaurantes</p>
+<p class="text-xs text-slate-400">Stream ID: radio_res_01</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<code class="text-xs bg-slate-100 dark:bg-[#231b27] px-3 py-1.5 rounded text-slate-600 dark:text-primary/80 font-mono">ffmpeg -i http://stream.url -f s16le</code>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400">
+<span class="size-1.5 rounded-full bg-emerald-500"></span>
+                                            Active
+                                        </span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="text-slate-400 hover:text-rose-500 transition-colors ml-2">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+<span class="material-symbols-outlined text-xl">mic</span>
+</div>
+<div>
+<p class="font-bold text-sm">Local Microphone</p>
+<p class="text-xs text-slate-400">Stream ID: mic_hw0</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<code class="text-xs bg-slate-100 dark:bg-[#231b27] px-3 py-1.5 rounded text-slate-600 dark:text-primary/80 font-mono">alsa://default?name=Microphone</code>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+<span class="size-1.5 rounded-full bg-slate-400"></span>
+                                            Idle
+                                        </span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="text-slate-400 hover:text-rose-500 transition-colors ml-2">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Stream Settings Section -->
+<section>
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary">tune</span>
+<h3 class="text-xl font-bold">Stream Settings</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Left Column: Global & Format -->
+<div class="bg-white dark:bg-background-dark rounded-xl border border-slate-200 dark:border-primary/10 p-6 shadow-sm space-y-6">
+<h4 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Pipeline Configuration</h4>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-medium mb-2">Default Audio Source</label>
+<select class="w-full bg-slate-50 dark:bg-[#231b27] border border-slate-200 dark:border-primary/20 rounded-lg px-4 py-2.5 text-sm focus:ring-primary focus:border-primary outline-none">
+<option>Radio Restaurantes</option>
+<option>Local Microphone</option>
+<option>Spotify Connect</option>
+</select>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="block text-sm font-medium mb-2">Sample Format</label>
+<select class="w-full bg-slate-50 dark:bg-[#231b27] border border-slate-200 dark:border-primary/20 rounded-lg px-4 py-2.5 text-sm outline-none">
+<option>44100:16:2</option>
+<option>48000:16:2</option>
+<option>44100:24:2</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-medium mb-2">Codec</label>
+<select class="w-full bg-slate-50 dark:bg-[#231b27] border border-slate-200 dark:border-primary/20 rounded-lg px-4 py-2.5 text-sm outline-none">
+<option>flac (recommended)</option>
+<option>pcm</option>
+<option>opus</option>
+<option>ogg</option>
+</select>
+</div>
+</div>
+<div class="flex items-center justify-between py-2">
+<div>
+<p class="text-sm font-medium">Auto-Restart Stream</p>
+<p class="text-xs text-slate-500">Reconnect automatically if source drops</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Right Column: Performance & Buffering -->
+<div class="bg-white dark:bg-background-dark rounded-xl border border-slate-200 dark:border-primary/10 p-6 shadow-sm space-y-6">
+<h4 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Performance &amp; Buffer</h4>
+<div class="space-y-4">
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="block text-sm font-medium mb-2">Chunk Size (ms)</label>
+<input class="w-full bg-slate-50 dark:bg-[#231b27] border border-slate-200 dark:border-primary/20 rounded-lg px-4 py-2 text-sm focus:ring-primary focus:border-primary outline-none" type="number" value="20"/>
+</div>
+<div>
+<label class="block text-sm font-medium mb-2">Server Buffer (ms)</label>
+<input class="w-full bg-slate-50 dark:bg-[#231b27] border border-slate-200 dark:border-primary/20 rounded-lg px-4 py-2 text-sm focus:ring-primary focus:border-primary outline-none" type="number" value="1000"/>
+</div>
+</div>
+<div>
+<div class="flex items-center justify-between mb-2">
+<label class="text-sm font-medium">Stream Compression</label>
+<span class="text-xs text-primary font-bold">Level 5</span>
+</div>
+<input class="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary" max="10" min="0" type="range" value="5"/>
+<div class="flex justify-between mt-1">
+<span class="text-[10px] text-slate-400">No Compression</span>
+<span class="text-[10px] text-slate-400">Maximum</span>
+</div>
+</div>
+<div class="flex items-center justify-between py-2 border-t border-slate-100 dark:border-primary/10 pt-4">
+<div>
+<p class="text-sm font-medium">Mute on Inactive</p>
+<p class="text-xs text-slate-500">Mute group if no audio signal is detected</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Actions Footer -->
+<div class="mt-8 flex items-center justify-between bg-white dark:bg-background-dark p-4 rounded-xl border border-slate-200 dark:border-primary/10">
+<div class="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+<span class="material-symbols-outlined text-sm">info</span>
+<span class="text-xs italic">Changes require a stream restart to take effect.</span>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                                Reset to Default
+                            </button>
+<button class="px-8 py-2.5 bg-primary text-white rounded-lg font-bold text-sm shadow-xl shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">
+                                Save Configuration
+                            </button>
+</div>
+</div>
+</section>
+<!-- Audio Visualizer (Minimal Placeholder) -->
+<div class="bg-primary/5 rounded-2xl border border-dashed border-primary/30 p-12 flex flex-col items-center justify-center text-center">
+<div class="flex items-end gap-1 h-12 mb-4">
+<div class="w-1.5 bg-primary/20 rounded-full h-4"></div>
+<div class="w-1.5 bg-primary/40 rounded-full h-8"></div>
+<div class="w-1.5 bg-primary/60 rounded-full h-12"></div>
+<div class="w-1.5 bg-primary/80 rounded-full h-6"></div>
+<div class="w-1.5 bg-primary rounded-full h-10"></div>
+<div class="w-1.5 bg-primary/80 rounded-full h-5"></div>
+<div class="w-1.5 bg-primary/60 rounded-full h-9"></div>
+<div class="w-1.5 bg-primary/40 rounded-full h-6"></div>
+<div class="w-1.5 bg-primary/20 rounded-full h-3"></div>
+</div>
+<p class="text-sm font-medium text-primary">Live Monitoring Active</p>
+<p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Real-time throughput: 1.4 Mbps • Clients: 4</p>
+</div>
+</div>
+</main>
+</div>
+</body></html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Snapcast Manager - Server Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#a60df2",
+                        "background-light": "#f7f5f8",
+                        "background-dark": "#1c1022",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(166, 13, 242, 0.2);
+            border-radius: 10px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+<div class="relative flex h-screen w-full flex-col overflow-hidden max-w-md mx-auto border-x border-slate-200 dark:border-primary/10">
+<!-- Header -->
+<header class="flex flex-col shrink-0 bg-background-light dark:bg-background-dark pt-4 px-4 z-10">
+<div class="flex items-center justify-between pb-4">
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-slate-200 dark:hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined text-slate-700 dark:text-slate-200">arrow_back</span>
+</button>
+<h1 class="text-lg font-bold flex-1 text-center pr-10">Server Settings</h1>
+</div>
+<!-- Tabs -->
+<div class="flex border-b border-slate-200 dark:border-primary/20">
+<button class="flex-1 py-3 text-sm font-bold border-b-2 border-primary text-primary transition-all">
+                    Standard
+                </button>
+<button class="flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-primary">
+                    Expert
+                </button>
+<button class="flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-primary">
+                    Snapshots
+                </button>
+</div>
+</header>
+<!-- Scrollable Content -->
+<main class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6 pb-24">
+<!-- Process Settings Group -->
+<section>
+<h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-primary/70 mb-3 px-1">Process Settings</h2>
+<div class="bg-white dark:bg-slate-900/40 rounded-xl overflow-hidden border border-slate-100 dark:border-primary/10">
+<!-- Worker Threads -->
+<div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-primary/5">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">memory</span>
+</div>
+<div>
+<p class="text-sm font-semibold">Worker Threads</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Default: -1</p>
+</div>
+</div>
+<input class="w-16 bg-slate-100 dark:bg-background-dark border-none rounded-lg text-right text-sm font-mono focus:ring-1 focus:ring-primary" type="text" value="-1"/>
+</div>
+<!-- PID File -->
+<div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-primary/5">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">description</span>
+</div>
+<div>
+<p class="text-sm font-semibold">PID File</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">/run/snapserver/pid</p>
+</div>
+</div>
+<button class="text-slate-400 hover:text-primary">
+<span class="material-symbols-outlined text-xl">edit</span>
+</button>
+</div>
+<!-- User -->
+<div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-primary/5">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">person</span>
+</div>
+<div>
+<p class="text-sm font-semibold">User</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">System user context</p>
+</div>
+</div>
+<input class="w-32 bg-slate-100 dark:bg-background-dark border-none rounded-lg text-right text-sm focus:ring-1 focus:ring-primary" type="text" value="snapserver"/>
+</div>
+<!-- Group -->
+<div class="flex items-center justify-between p-4">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">group</span>
+</div>
+<div>
+<p class="text-sm font-semibold">Group</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Permission group</p>
+</div>
+</div>
+<input class="w-32 bg-slate-100 dark:bg-background-dark border-none rounded-lg text-right text-sm focus:ring-1 focus:ring-primary" type="text" value="snapserver"/>
+</div>
+</div>
+</section>
+<!-- Network & Storage Group -->
+<section>
+<h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-primary/70 mb-3 px-1">Network &amp; Storage</h2>
+<div class="bg-white dark:bg-slate-900/40 rounded-xl overflow-hidden border border-slate-100 dark:border-primary/10">
+<!-- Data Directory -->
+<div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-primary/5">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">folder</span>
+</div>
+<div class="overflow-hidden">
+<p class="text-sm font-semibold">Data Directory</p>
+<p class="text-xs text-slate-500 dark:text-slate-400 truncate">/var/lib/snapserver</p>
+</div>
+</div>
+<button class="text-slate-400 hover:text-primary">
+<span class="material-symbols-outlined text-xl">folder_open</span>
+</button>
+</div>
+<!-- MDNS Toggle -->
+<div class="flex items-center justify-between p-4">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">settings_input_antenna</span>
+</div>
+<div>
+<p class="text-sm font-semibold">mDNS Discovery</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Enable local broadcasts</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</section>
+<!-- Additional Info -->
+<div class="p-4 bg-primary/5 border border-primary/10 rounded-xl">
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-primary text-xl">info</span>
+<p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                        Snapserver 0.27.0 - These settings require a service restart to take effect. Expert mode allows manual configuration file editing.
+                    </p>
+</div>
+</div>
+</main>
+<!-- Footer Action -->
+<footer class="absolute bottom-0 left-0 right-0 p-4 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-t border-slate-200 dark:border-primary/20">
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transition-transform active:scale-95">
+<span class="material-symbols-outlined text-xl">save</span>
+                Save Configuration
+            </button>
+</footer>
+</div>
+</body></html>
