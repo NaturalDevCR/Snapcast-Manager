@@ -5,16 +5,26 @@
 
 set -e
 
-# Colors for output
+# Colors and formatting for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.28"
+VERSION="v0.1.29"
 
-echo -e "${GREEN}=== Snapcast Manager Installer ($VERSION) ===${NC}"
-echo "This script will help you set up Snapcast Manager on your Linux server."
+echo -e "${CYAN}${BOLD}"
+echo "  ___                    ___      _ "
+echo " / __| _ _  __ _  _ __  / __|__ _| |"
+echo " \__ \| '_|/ _\` || '_ \ | (__/ _\` | |"
+echo " |___/|_|  \__,_|| .__/  \___\__,_|_|"
+echo "                 |_|                 "
+echo -e "${NC}"
+echo -e "${GREEN}${BOLD}=== Snapcast Manager Installer ($VERSION) ===${NC}"
+echo -e "This script will help you set up Snapcast Manager on your Linux server.\n"
 
 REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/releases/download/${VERSION}/snapcast-manager-release.zip"
 INSTALL_BASE_DIR="/opt/snapcast-manager"
@@ -23,6 +33,8 @@ SERVICE_NAME="snapmanager"
 # Parse arguments
 AUTO_CONFIRM=false
 RESTORE_FILE=""
+APP_PORT=""
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -y|--yes)
@@ -35,6 +47,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --restore=*)
             RESTORE_FILE="${1#*=}"
+            shift
+            ;;
+        --port)
+            APP_PORT="$2"
+            shift 2
+            ;;
+        --port=*)
+            APP_PORT="${1#*=}"
             shift
             ;;
         *)
@@ -176,13 +196,16 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         echo -e "${GREEN}Resuming installation from $INSTALL_BASE_DIR...${NC}"
         cd "$INSTALL_BASE_DIR"
         # Re-run the script from the new location so relative paths work
-        # Pass -y and --restore if they were used initially
+        # Pass -y, --restore, and --port if they were used initially
         EXEC_ARGS=()
         if [ "$AUTO_CONFIRM" = true ]; then
             EXEC_ARGS+=("-y")
         fi
         if [ -n "$RESTORE_FILE" ]; then
             EXEC_ARGS+=("--restore" "$RESTORE_FILE")
+        fi
+        if [ -n "$APP_PORT" ]; then
+            EXEC_ARGS+=("--port" "$APP_PORT")
         fi
         exec bash scripts/install.sh "${EXEC_ARGS[@]}"
     else
@@ -338,8 +361,29 @@ if [ -n "$RESTORE_FILE" ]; then
     fi
 fi
 
-# 5. Systemd Service setup
-echo -e "\n${YELLOW}Step 4: Setting up as a systemd service...${NC}"
+# 5. Configurable Port and Environment File
+echo -e "\n${YELLOW}▶ Step 4: Web Interface Configuration...${NC}"
+
+# If port wasn't provided by argument, ask or use default 3000
+if [ -z "$APP_PORT" ]; then
+    if [ "$AUTO_CONFIRM" = true ]; then
+        APP_PORT=3000
+        echo -e "Web interface port [Auto-confirmed: $APP_PORT]"
+    else
+        read -p "Enter the port for the Snapcast Manager web interface [3000]: " USER_PORT
+        APP_PORT=${USER_PORT:-3000}
+    fi
+fi
+
+echo -e "${GREEN}[OK] Interface will be available on port $APP_PORT.${NC}"
+
+# Write the .env file
+sudo bash -c "cat <<EOF > $INSTALL_BASE_DIR/server/.env
+PORT=$APP_PORT
+EOF"
+
+# 6. Systemd Service setup
+echo -e "\n${YELLOW}▶ Step 5: Setting up as a systemd service...${NC}"
 if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?" "y"; then
     USER_NAME=$(whoami)
     INSTALL_DIR="$INSTALL_BASE_DIR"
@@ -355,6 +399,7 @@ User=$USER_NAME
 WorkingDirectory=$INSTALL_DIR/server
 ExecStart=$(command -v node) dist/index.js
 Restart=always
+EnvironmentFile=$INSTALL_DIR/server/.env
 
 [Install]
 WantedBy=multi-user.target
@@ -372,6 +417,15 @@ EOF
     fi
 fi
 
-echo -e "\n${GREEN}=== Installation Complete! ===${NC}"
-echo "You can now access the manager via the configured port (default 3000)."
-echo "Go to http://<your-server-ip>:3000 to start the Initial Setup Wizard."
+# Detect Local IP
+LOCAL_IP=$(hostname -I | awk '{print $1}')
+if [ -z "$LOCAL_IP" ]; then
+    LOCAL_IP="<your-server-ip>"
+fi
+
+echo -e "\n${GREEN}${BOLD}🎉 === Installation Complete! === 🎉${NC}"
+echo -e "\n${CYAN}Snapcast Manager is now running.${NC}"
+echo -e "You can access the manager via the configured port:\n"
+echo -e "    ${BOLD}👉 http://${LOCAL_IP}:${APP_PORT} 👈${NC}\n"
+echo -e "If this is your first time, the Initial Setup Wizard will greet you."
+echo -e "Made with ❤️ by NaturalDevCR.\n"
