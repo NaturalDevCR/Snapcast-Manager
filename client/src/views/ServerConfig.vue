@@ -27,6 +27,8 @@ import {
     ChevronDownIcon,
     InformationCircleIcon,
     XMarkIcon,
+    ShieldCheckIcon,
+    ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import PromptDialog from '../components/PromptDialog.vue';
@@ -36,7 +38,7 @@ const systemStore = useSystemStore();
 const snapshotStore = useSnapshotStore();
 const uiStore = useUIStore();
 
-const activeTab = ref<'standard' | 'expert' | 'snapshots'>('standard');
+const activeTab = ref<'standard' | 'expert' | 'snapshots' | 'security'>('standard');
 const activeSection = ref('server');
 const localRawConfig = ref('');
 const localParsedConfig = ref<Record<string, any>>({});
@@ -250,6 +252,84 @@ const handleRestartConfirm = async () => {
 
 const snapshotName = ref('');
 const snapshotDescription = ref('');
+
+const currentPassword = ref('');
+const newPassword = ref('');
+const confirmPassword = ref('');
+const isSavingPassword = ref(false);
+const isExporting = ref(false);
+
+const handleChangePassword = async () => {
+  if (newPassword.value !== confirmPassword.value) {
+    uiStore.showToast('Passwords do not match', 'error');
+    return;
+  }
+  if (!currentPassword.value || !newPassword.value) {
+    uiStore.showToast('Current and new passwords are required', 'error');
+    return;
+  }
+  isSavingPassword.value = true;
+  try {
+    await fetchApi('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        currentPassword: currentPassword.value,
+        newPassword: newPassword.value
+      })
+    });
+    uiStore.showToast('Password changed successfully', 'success');
+    currentPassword.value = '';
+    newPassword.value = '';
+    confirmPassword.value = '';
+  } catch (err: any) {
+    uiStore.showToast(err.message || 'Failed to change password', 'error');
+  } finally {
+    isSavingPassword.value = false;
+  }
+};
+
+const handleExportBackup = async () => {
+    isExporting.value = true;
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/system/export', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Export failed: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = `snapcast-backup-${Date.now()}.tar.gz`;
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+            if (filenameMatch && filenameMatch.length === 2) {
+                filename = filenameMatch[1] || filename;
+            }
+        }
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        uiStore.showToast('Backup downloaded successfully', 'success');
+    } catch (e: any) {
+        uiStore.showToast(e.message || 'Failed to download backup', 'error');
+    } finally {
+        isExporting.value = false;
+    }
+};
 
 const handleCreateSnapshot = async () => {
     if (!snapshotName.value) return;
@@ -482,6 +562,18 @@ const removeSourceEntry = (idx: number) => {
           >
               <ClockIcon class="h-4 w-4" />
               <span>Snapshots</span>
+          </button>
+          <button 
+            @click="activeTab = 'security'"
+            :class="[
+                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm',
+                activeTab === 'security' 
+                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+            ]"
+          >
+              <ShieldCheckIcon class="h-4 w-4" />
+              <span>Security & Backup</span>
           </button>
       </div>
 
@@ -940,6 +1032,76 @@ const removeSourceEntry = (idx: number) => {
                       </div>
                   </Card>
               </div>
+          </div>
+      </div>
+
+      <!-- ==================== SECURITY & BACKUP TAB ==================== -->
+      <div v-else-if="activeTab === 'security'" class="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <!-- Change Password -->
+              <Card title="Change Administrator Password">
+                  <template #icon>
+                    <LockClosedIcon class="h-5 w-5 text-rose-500" />
+                  </template>
+                  <div class="space-y-5">
+                      <div>
+                          <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Current Password</label>
+                          <input v-model="currentPassword" type="password" placeholder="Enter current password" 
+                            class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all dark:text-white">
+                      </div>
+                      <div>
+                          <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">New Password</label>
+                          <input v-model="newPassword" type="password" placeholder="Enter new password" 
+                            class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all dark:text-white">
+                      </div>
+                      <div>
+                          <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Confirm New Password</label>
+                          <input v-model="confirmPassword" type="password" placeholder="Re-enter new password" 
+                            class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all dark:text-white">
+                      </div>
+                      <button 
+                        @click="handleChangePassword"
+                        :disabled="isSavingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword"
+                        class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-700 shadow-lg shadow-rose-500/20 disabled:opacity-50 transition-all active:scale-95"
+                      >
+                        <ArrowPathIcon v-if="isSavingPassword" class="h-4 w-4 animate-spin" />
+                        <span>Update Password</span>
+                      </button>
+                  </div>
+              </Card>
+
+              <!-- Export Backup -->
+              <Card title="Export Server Backup">
+                  <template #icon>
+                    <ArrowDownTrayIcon class="h-5 w-5 text-emerald-500" />
+                  </template>
+                  <div class="space-y-5">
+                      <p class="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Download a complete backup of your Snapcast Manager configuration. 
+                          This <span class="text-emerald-500 font-bold">.tar.gz</span> archive includes:
+                      </p>
+                      <ul class="text-xs font-semibold text-slate-600 dark:text-slate-300 space-y-2 mb-6">
+                          <li class="flex items-center"><ShieldCheckIcon class="h-4 w-4 mr-2 text-indigo-500" /> Administrator Account</li>
+                          <li class="flex items-center"><ClockIcon class="h-4 w-4 mr-2 text-blue-500" /> Saved Snapshots</li>
+                          <li class="flex items-center"><AdjustmentsHorizontalIcon class="h-4 w-4 mr-2 text-rose-500" /> Snapserver Configuration</li>
+                      </ul>
+                      
+                      <div class="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-800/50 p-4 rounded-xl">
+                          <p class="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest">Restore Instructions</p>
+                          <p class="text-xs text-amber-600 dark:text-amber-500 mt-1">Keep this file safe. When reinstalling Snapcast Manager on a new device, you can use the flag <code class="bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded text-amber-800 dark:text-amber-300 font-mono">--restore /path/to/backup.tar.gz</code> during setup to restore everything magically.</p>
+                      </div>
+
+                      <button 
+                        @click="handleExportBackup"
+                        :disabled="isExporting"
+                        class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all active:scale-95 mt-4"
+                      >
+                        <ArrowPathIcon v-if="isExporting" class="h-4 w-4 animate-spin" />
+                        <ArrowDownTrayIcon v-else class="h-4 w-4" />
+                        <span>Download Backup</span>
+                      </button>
+                  </div>
+              </Card>
           </div>
       </div>
 
