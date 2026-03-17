@@ -20,7 +20,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 
 router.get('/status/:service', async (req: Request, res: Response) => {
     const { service } = req.params;
-    if (service !== 'snapserver' && service !== 'shairport-sync' && service !== 'snapmanager') {
+    if (service !== 'snapserver' && service !== 'shairport-sync' && service !== 'snapmanager' && service !== 'librespot') {
         return res.status(400).json({ error: 'Invalid service name' });
     }
     try {
@@ -36,7 +36,7 @@ router.get('/status/:service', async (req: Request, res: Response) => {
 
 router.get('/logs/:service', async (req: Request, res: Response) => {
     const { service } = req.params;
-    if (service !== 'snapserver' && service !== 'shairport-sync' && service !== 'snapmanager') {
+    if (service !== 'snapserver' && service !== 'shairport-sync' && service !== 'snapmanager' && service !== 'librespot') {
         return res.status(400).json({ error: 'Invalid service name' });
     }
     try {
@@ -49,7 +49,7 @@ router.get('/logs/:service', async (req: Request, res: Response) => {
 
 router.post('/service/:action/:service', async (req: Request, res: Response) => {
     const { action, service } = req.params;
-    if (service !== 'snapserver' && service !== 'shairport-sync') {
+    if (service !== 'snapserver' && service !== 'shairport-sync' && service !== 'librespot') {
         return res.status(400).json({ error: 'Invalid service name' });
     }
     
@@ -57,23 +57,23 @@ router.post('/service/:action/:service', async (req: Request, res: Response) => 
         let message = '';
         switch (action) {
             case 'start':
-                await systemService.startService(service);
+                await systemService.startService(service as any);
                 message = `${service} started`;
                 break;
             case 'stop':
-                await systemService.stopService(service);
+                await systemService.stopService(service as any);
                 message = `${service} stopped`;
                 break;
             case 'restart':
-                await systemService.restartService(service);
+                await systemService.restartService(service as any);
                 message = `${service} restarted`;
                 break;
             case 'enable':
-                await systemService.enableService(service);
+                await systemService.enableService(service as any);
                 message = `${service} enabled`;
                 break;
             case 'disable':
-                await systemService.disableService(service);
+                await systemService.disableService(service as any);
                 message = `${service} disabled`;
                 break;
             default:

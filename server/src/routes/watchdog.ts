@@ -1,8 +1,19 @@
 import { Router } from 'express';
 import { WatchdogService } from '../services/watchdog';
+import { configService } from '../services/config';
 
 const router = Router();
 const watchdogService = new WatchdogService();
+
+// GET /api/watchdog/sources - List detected TCP sources from config
+router.get('/sources', async (req, res) => {
+  try {
+    const sources = await configService.getTcpSources();
+    res.json(sources);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch TCP sources' });
+  }
+});
 
 // GET /api/watchdog - List all watchdogs
 router.get('/', async (req, res) => {
@@ -31,12 +42,13 @@ router.put('/bulk', async (req, res) => {
 // POST /api/watchdog - Add a watchdog
 router.post('/', async (req, res) => {
   try {
-    const { name, port, description, enabled } = req.body;
-    if (!name || !port) {
-      res.status(400).json({ error: 'Name and Port are required' });
+    let { name, ports, port, description, enabled, autoKillDuplicates } = req.body;
+    if (!ports && port) ports = [port];
+    if (!name || !Array.isArray(ports) || ports.length === 0) {
+      res.status(400).json({ error: 'Name and Ports are required' });
       return;
     }
-    const watchdog = await watchdogService.addWatchdog({ name, port, description, enabled });
+    const watchdog = await watchdogService.addWatchdog({ name, ports, description, enabled, autoKillDuplicates });
     res.status(201).json(watchdog);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create watchdog' });

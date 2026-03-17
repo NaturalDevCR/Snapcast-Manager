@@ -148,6 +148,37 @@ export class ConfigService {
     }
   }
 
+  async getTcpSources(): Promise<{ name: string; port: number }[]> {
+    const config = await this.readServerConfigParsed();
+    const sources: { name: string; port: number }[] = [];
+    
+    if (config.stream && config.stream.source) {
+      const sourceList = Array.isArray(config.stream.source) 
+        ? config.stream.source 
+        : [config.stream.source as any];
+        
+      for (const src of sourceList) {
+        const srcStr = String(src);
+        if (srcStr.startsWith('tcp://')) {
+          try {
+            // URL parses tcp:// as a valid format usually, but might complain about missing host or format.
+            // Let's use Regex for safer extraction, as URL module may sometimes fail on custom URL schemes without SLD
+            const match = srcStr.match(/tcp:\/\/([^:/\s]+):(\d+)/);
+            if (match) {
+              const port = parseInt(match[2], 10);
+              const nameMatch = srcStr.match(/[?&]name=([^&]+)/);
+              const name = nameMatch ? decodeURIComponent(nameMatch[1]) : `TCP Port ${port}`;
+              sources.push({ name, port });
+            }
+          } catch (e) {
+             // Fallback
+          }
+        }
+      }
+    }
+    return sources;
+  }
+
   async resetToDefault(): Promise<void> {
     await fs.writeFile(SNAPSERVER_CONFIG_BASE, DEFAULT_SNAPSERVER_CONF, 'utf-8');
     await this.rebuildMasterConfig();

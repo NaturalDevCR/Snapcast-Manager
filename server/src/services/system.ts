@@ -4,7 +4,7 @@ import { configService } from './config';
 
 const execAsync = util.promisify(exec);
 
-export type PackageName = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node';
+export type PackageName = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node' | 'librespot';
 
 export class SystemService {
   private distroCodename: string | null = null;
@@ -180,7 +180,7 @@ export class SystemService {
     }
   }
 
-  async getServiceStatus(service: 'snapserver' | 'shairport-sync'): Promise<string> {
+  async getServiceStatus(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
     try {
       const { stdout } = await execAsync(`systemctl is-active ${service}`);
       return stdout.trim();
@@ -191,7 +191,7 @@ export class SystemService {
     }
   }
 
-  async getServiceLogs(service: 'snapserver' | 'shairport-sync' | 'snapmanager'): Promise<string> {
+  async getServiceLogs(service: 'snapserver' | 'shairport-sync' | 'snapmanager' | 'librespot'): Promise<string> {
     try {
         // journalctl -n 100 --no-pager
         const output = await this.runCommand(`sudo journalctl -u ${service} -n 100 --no-pager`);
@@ -288,8 +288,8 @@ export class SystemService {
   }
 
   async getDashboardMetrics(): Promise<any> {
-    const packages: PackageName[] = ['snapserver', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node'];
-    const services = ['snapserver', 'shairport-sync'] as const;
+    const packages: PackageName[] = ['snapserver', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node', 'librespot'];
+    const services = ['snapserver', 'shairport-sync', 'librespot'] as const;
     
     const installedPromises = packages.map(pkg => this.isInstalled(pkg).then(res => ({ pkg, val: res })));
     const versionPromises = packages.map(pkg => this.getPackageVersion(pkg).then(res => ({ pkg, val: res })));
@@ -311,23 +311,23 @@ export class SystemService {
     };
   }
   
-  async restartService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
+  async restartService(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
       return this.runCommand(`sudo systemctl restart ${service}`);
   }
 
-  async startService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
+  async startService(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
       return this.runCommand(`sudo systemctl start ${service}`);
   }
 
-  async stopService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
+  async stopService(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
       return this.runCommand(`sudo systemctl stop ${service}`);
   }
 
-  async enableService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
+  async enableService(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
       return this.runCommand(`sudo systemctl enable ${service}`);
   }
 
-  async disableService(service: 'snapserver' | 'shairport-sync'): Promise<string> {
+  async disableService(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
       return this.runCommand(`sudo systemctl disable ${service}`);
   }
 

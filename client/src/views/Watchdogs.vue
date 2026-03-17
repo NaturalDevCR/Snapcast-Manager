@@ -19,9 +19,12 @@ const showExpertMode = ref(false);
 const showConfirmDelete = ref(false);
 const watchdogToDelete = ref<string | null>(null);
 
+const sources = ref<{ name: string; port: number }[]>([]);
+const selectedPorts = ref<number[]>([]);
+const autoKillDuplicates = ref(false);
+
 const newWatchdog = ref({
   name: '',
-  port: 4953,
   description: ''
 });
 
@@ -34,6 +37,7 @@ let statsInterval: any = null;
 
 onMounted(async () => {
   await watchdogStore.fetchWatchdogs();
+  sources.value = await watchdogStore.fetchSources();
   startPolling();
 });
 
@@ -56,9 +60,16 @@ function stopPolling() {
 
 async function handleAddWatchdog() {
   try {
-    if (!newWatchdog.value.name || !newWatchdog.value.port) return;
-    await watchdogStore.addWatchdog(newWatchdog.value);
-    newWatchdog.value = { name: '', port: 4953, description: '' };
+    if (!newWatchdog.value.name || selectedPorts.value.length === 0) return;
+    await watchdogStore.addWatchdog({
+      name: newWatchdog.value.name,
+      ports: selectedPorts.value,
+      description: newWatchdog.value.description,
+      autoKillDuplicates: autoKillDuplicates.value
+    });
+    newWatchdog.value = { name: '', description: '' };
+    selectedPorts.value = [];
+    autoKillDuplicates.value = false;
     showAddDialog.value = false;
     uiStore.showToast('Watchdog added successfully', 'success');
   } catch (error: any) {
@@ -171,7 +182,8 @@ function formatBytes(bytes?: number) {
             <div class="flex items-center justify-between w-full">
                <div>
                   <h2 class="text-lg font-bold text-zinc-200">{{ wd.name }}</h2>
-                  <p class="text-xs text-zinc-500">Port: {{ wd.port }}</p>
+                  <p class="text-xs text-zinc-500">Ports: {{ wd.ports?.join(', ') || 'None' }}</p>
+                  <p v-if="wd.autoKillDuplicates" class="text-xs text-blue-400 mt-0.5">Auto-Cleanup Enabled</p>
                </div>
                <div class="flex items-center space-x-2">
                   <!-- Toggle -->
@@ -225,10 +237,19 @@ function formatBytes(bytes?: number) {
                      <label class="block text-xs text-zinc-400 mb-1">Name</label>
                      <input v-model="newWatchdog.name" type="text" class="w-full bg-zinc-800 border border-zinc-700 rounded p-2 text-sm text-zinc-200" placeholder="e.g. PC Stream Source" />
                  </div>
-                 <div>
-                     <label class="block text-xs text-zinc-400 mb-1">Port</label>
-                     <input v-model="newWatchdog.port" type="number" class="w-full bg-zinc-800 border border-zinc-700 rounded p-2 text-sm text-zinc-200" placeholder="4953" />
-                 </div>
+                  <div>
+                      <label class="block text-xs text-zinc-400 mb-2">Target TCP Sources</label>
+                      <div class="space-y-2 max-h-40 overflow-y-auto border border-zinc-800 rounded p-2 bg-zinc-950">
+                          <div v-for="source in sources" :key="source.port" class="flex items-center space-x-2">
+                              <input type="checkbox" :value="source.port" v-model="selectedPorts" class="rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-500">
+                              <span class="text-sm text-zinc-300">{{ source.name }} <span class="text-zinc-500">(:{{ source.port }})</span></span>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="flex items-center space-x-2 mt-2">
+                      <input type="checkbox" v-model="autoKillDuplicates" id="autoKill" class="rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-500">
+                      <label for="autoKill" class="text-xs text-zinc-400">Auto Kill Duplicates (Last Connection Wins)</label>
+                  </div>
              </div>
              <div class="flex justify-end space-x-3 mt-6">
                  <button @click="showAddDialog = false" class="px-4 py-2 text-xs text-zinc-400 hover:text-zinc-200">Cancel</button>
