@@ -11,9 +11,10 @@ const WATCHDOGS_CONFIG_PATH = path.join(WATCHDOGS_CONFIG_DIR, 'watchdogs.json');
 export interface Watchdog {
   id: string;
   name: string;
-  port: number;
+  ports: number[]; // Array of ports
   description?: string;
   enabled?: boolean;
+  autoKillDuplicates?: boolean; // Last connection wins automation toggle
 }
 
 export interface SocketStat {
@@ -30,6 +31,58 @@ export interface SocketStat {
 
 export class WatchdogService {
   private configPath = WATCHDOGS_CONFIG_PATH;
+  private previousStats: Map<string, SocketStat[]> = new Map();
+  private intervalId: NodeJS.Timeout | null = null;
+
+  constructor() {
+    this.startAutoCleanup();
+  }
+
+  async startAutoCleanup() {
+    if (this.intervalId) return;
+    this.intervalId = setInterval(async () => {
+      try {
+        const watchdogs = await this.load();
+        for (const wd of watchdogs) {
+          if (wd.enabled && wd.autoKillDuplicates) {
+            await this.checkAndCleanupDuplicates(wd);
+          }
+        }
+      } catch (error) {
+        console.error('Watchdog auto-cleanup error:', error);
+      }
+    }, 4000); // check interval
+  }
+
+  async checkAndCleanupDuplicates(wd: Watchdog) {
+    try {
+      const currentStats = await this.getStats(wd.id);
+      const previous = this.previousStats.get(wd.id) || [];
+
+      const active = currentStats.filter(s => s.state === 'ESTAB');
+      
+      if (active.length > 1) {
+        const activeIds = active.map(s => `${s.peerAddress}:${s.peerPort}`);
+        const previousIds = previous.map(s => `${s.peerAddress}:${s.peerPort}`);
+
+        const newConnections = active.filter(s => !previousIds.includes(`${s.peerAddress}:${s.peerPort}`));
+
+        if (newConnections.length > 0) {
+          const latest = newConnections[0];
+          console.log(`[Watchdog] ${wd.name} NEW connection: ${latest.peerAddress}:${latest.peerPort}. Cleaning older targets.`);
+
+          for (const s of active) {
+            if (s.peerAddress !== latest.peerAddress || s.peerPort !== latest.peerPort) {
+              await this.killConnection(wd.id, s.peerAddress, s.peerPort);
+            }
+          }
+        }
+      }
+      this.previousStats.set(wd.id, active);
+    } catch (e) {
+      // Error fetching stats
+    }
+  }
 
   private async ensureConfig(): Promise<string> {
     try {
@@ -99,21 +152,22 @@ export class WatchdogService {
     const watchdog = watchdogs.find(w => w.id === id);
     if (!watchdog) throw new Error('Watchdog not found');
 
-    const port = watchdog.port;
-    try {
-      // Using 'ss -t -i -n -a' on Linux. 
-      // Filter for source OR destination port matching.
-      const { stdout } = await execAsync(`ss -t -i -n -a '( sport = :${port} or dport = :${port} )'`);
-      return this.parseSocketStats(stdout);
-    } catch (error) {
-      console.error(`Failed to get socket stats for port ${port}:`, error);
-      // Fallback or rethrow? Let's return empty array if no connections.
-      // Wait, if ss fails due to command not found (e.g., Mac), try fallback
-      if (process.platform === 'darwin') {
-         return this.getFallbackStatsMac(port);
+    const portStats: SocketStat[] = [];
+    // Support backward compatibility or direct access arrays
+    const ports = Array.isArray(watchdog.ports) ? watchdog.ports : [(watchdog as any).port || 0].filter(Boolean);
+
+    for (const port of ports) {
+      try {
+        const { stdout } = await execAsync(`ss -t -i -n -a '( sport = :${port} or dport = :${port} )'`);
+        portStats.push(...this.parseSocketStats(stdout));
+      } catch (error) {
+        if (process.platform === 'darwin') {
+           const fallback = await this.getFallbackStatsMac(port);
+           portStats.push(...fallback);
+        }
       }
-      return [];
     }
+    return portStats;
   }
 
   private parseSocketStats(output: string): SocketStat[] {
@@ -227,14 +281,18 @@ export class WatchdogService {
      if (!watchdog) throw new Error('Watchdog not found');
 
      try {
-        // ss -K dst peerIp dport = peerPort
-        // Note: ss -K might require root privileges
-        await execAsync(`ss -K dst ${peerIp} dport = ${peerPort}`);
+        // Add sudo in case service isn't running as root
+        await execAsync(`sudo ss -K dst ${peerIp} dport = ${peerPort}`);
         return true;
      } catch (error) {
-        console.error(`Failed to kill connection ${peerIp}:${peerPort}:`, error);
-        // Fallback or error
-        return false;
+        console.error(`Failed to kill connection with sudo ${peerIp}:${peerPort}, trying without...`, error);
+        try {
+           await execAsync(`ss -K dst ${peerIp} dport = ${peerPort}`);
+           return true;
+        } catch (e2) {
+           console.error(`Failed to kill connection without sudo ${peerIp}:${peerPort}:`, e2);
+           return false;
+        }
      }
   }
 }

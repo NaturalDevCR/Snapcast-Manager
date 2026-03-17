@@ -4,9 +4,10 @@ import { fetchApi } from '../utils/api';
 export interface Watchdog {
   id: string;
   name: string;
-  port: number;
+  ports: number[];
   description?: string;
   enabled?: boolean;
+  autoKillDuplicates?: boolean;
 }
 
 export interface SocketStat {
@@ -94,6 +95,15 @@ export const useWatchdogStore = defineStore('watchdog', {
         delete this.stats[id];
       } catch (err: any) {
         throw new Error(err.message || 'Failed to delete watchdog');
+      }
+    },
+
+    async fetchSources(): Promise<{ name: string; port: number }[]> {
+      try {
+        return await fetchApi<{ name: string; port: number }[]>('/watchdog/sources');
+      } catch (err: any) {
+         console.error('Failed to fetch sources:', err);
+         return [];
       }
     },
 

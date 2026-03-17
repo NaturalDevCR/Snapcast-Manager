@@ -61,7 +61,7 @@ const openEditSourceDialog = (idx: number) => {
   
   const typeMap: Record<string, string> = {
     'pipe://': 'pipe',
-    'librespot://': 'spotify',
+    'librespot://': 'librespot',
     'airplay://': 'airplay',
     'file://': 'file',
     'tcp://': 'tcp',
