@@ -4,7 +4,7 @@ import { configService } from './config';
 
 const execAsync = util.promisify(exec);
 
-export type PackageName = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node' | 'librespot';
+export type PackageName = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node';
 
 export class SystemService {
   private distroCodename: string | null = null;
@@ -27,9 +27,6 @@ export class SystemService {
     if (pkg === 'shairport-sync') {
       return this.installShairportSync();
     }
-    if (pkg === 'librespot') {
-      return this.installLibrespot();
-    }
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y ${pkg}`);
   }
 
@@ -44,10 +41,6 @@ export class SystemService {
     
     if (pkg === 'snapserver') {
       return this.updateSnapserverFromGitHub(clean);
-    }
-
-    if (pkg === 'librespot') {
-      return this.installLibrespot();
     }
 
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y --only-upgrade ${pkg}`);
@@ -180,14 +173,6 @@ export class SystemService {
           await execAsync('node -v');
           return true;
       }
-      if (pkg === 'librespot') {
-          try {
-              await execAsync('[ -f /usr/local/bin/librespot ] || command -v librespot');
-              return true;
-          } catch (e) {
-              return false;
-          }
-      }
       await execAsync(`dpkg -s ${pkg}`);
       return true;
     } catch (error) {
@@ -195,7 +180,7 @@ export class SystemService {
     }
   }
 
-  async getServiceStatus(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async getServiceStatus(service: 'snapserver' | 'shairport-sync'): Promise<string> {
     try {
       const { stdout } = await execAsync(`systemctl is-active ${service}`);
       return stdout.trim();
@@ -240,9 +225,6 @@ export class SystemService {
         case 'node':
           cmd = 'node -v';
           break;
-        case 'librespot':
-          cmd = 'if [ -f /usr/local/bin/librespot ]; then /usr/local/bin/librespot --version 2>&1 | head -n 1; else librespot --version 2>&1 | head -n 1; fi';
-          break;
       }
       const { stdout } = await execAsync(cmd);
       // Clean up version string (e.g. "snapserver v0.26.0" -> "v0.26.0")
@@ -276,9 +258,6 @@ export class SystemService {
         return 'v20.x (Latest)'; 
       }
 
-      if (pkg === 'librespot') {
-        return 'Latest from Crates.io';
-      }
       
       // Use apt-cache policy to get the candidate version for others
       const output = await this.runCommand(`apt-cache policy ${pkg} | grep Candidate | awk '{print $2}'`);
@@ -310,8 +289,8 @@ export class SystemService {
   }
 
   async getDashboardMetrics(): Promise<any> {
-    const packages: PackageName[] = ['snapserver', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node', 'librespot'];
-    const services = ['snapserver', 'shairport-sync', 'librespot'] as const;
+    const packages: PackageName[] = ['snapserver', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node'];
+    const services = ['snapserver', 'shairport-sync'] as const;
     
     const installedPromises = packages.map(pkg => this.isInstalled(pkg).then(res => ({ pkg, val: res })));
     const versionPromises = packages.map(pkg => this.getPackageVersion(pkg).then(res => ({ pkg, val: res })));
@@ -458,18 +437,6 @@ export class SystemService {
       return result;
   }
 
-  async installLibrespot(): Promise<string> {
-      console.log('Installing librespot from source via Cargo...');
-      const cmd = `
-        echo "Installing build dependencies..." && \
-        sudo apt-get update && \
-        sudo apt-get install -y --no-install-recommends build-essential cargo libasound2-dev pkg-config && \
-        echo "Building and installing librespot..." && \
-        sudo cargo install librespot --root /usr/local && \
-        echo "Librespot installed successfully to /usr/local/bin/librespot"
-      `;
-      return this.runCommand(cmd);
-  }
 }
 
 export const systemService = new SystemService();

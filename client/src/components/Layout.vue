@@ -19,6 +19,7 @@ const isMobileMenuOpen = ref(false);
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: 'dashboard' },
+  { name: 'Audio Player', href: '/player', icon: 'music_note' },
   { name: 'Audio Matrix', href: '/routing', icon: 'grid_view' },
   { name: 'Configuration', href: '/server', icon: 'settings' },
   { name: 'Logs', href: '/logs', icon: 'terminal' },
