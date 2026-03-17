@@ -1,7 +1,7 @@
 # 🎧 Snapcast Manager
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/NaturalDevCR/Snapcast-Manager/main/client/public/favicon.ico" alt="Logo" width="120">
+  <img src="https://github.com/user-attachments/assets/086e14f6-6758-4c12-90d9-f31af71524dd" alt="Logo" width="120">
   
   **A beautiful, modern, and powerful Web Interface to manage, configure, and monitor your Snapcast infrastructure.**
 
