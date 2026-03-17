@@ -39,8 +39,8 @@ const handleLogin = async () => {
       
       <div class="relative bg-black/40 shadow-2xl rounded-[2rem] p-8 md:p-12 border border-white/5 backdrop-blur-xl animate-in fade-in zoom-in duration-700">
         <div class="text-center mb-10">
-           <div class="inline-flex items-center justify-center p-4 bg-brand-primary/10 rounded-2xl mb-6 shadow-inner border border-brand-primary/20">
-              <span class="material-symbols-outlined text-brand-primary text-4xl drop-shadow-[0_0_15px_rgba(166,13,242,0.4)]">lock</span>
+           <div class="inline-flex items-center justify-center mb-6">
+              <img src="../assets/logo.png" alt="Logo" class="w-20 h-20 rounded-2xl shadow-xl object-cover" />
            </div>
            <h2 class="text-3xl font-black text-white tracking-tight leading-tight drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
             Snapcast Manager
