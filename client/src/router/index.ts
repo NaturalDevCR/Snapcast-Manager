@@ -4,6 +4,7 @@ import Login from '../views/Login.vue'
 import ServerConfig from '../views/ServerConfig.vue'
 import Setup from '../views/Setup.vue'
 import Logs from '../views/Logs.vue'
+import Watchdogs from '../views/Watchdogs.vue'
 
 import { fetchApi } from '../utils/api'
 
@@ -30,6 +31,12 @@ const router = createRouter({
       path: '/server',
       name: 'server-config',
       component: ServerConfig,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/watchdogs',
+      name: 'watchdogs',
+      component: Watchdogs,
       meta: { requiresAuth: true }
     },
     {

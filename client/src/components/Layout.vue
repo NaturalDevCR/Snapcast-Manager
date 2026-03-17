@@ -21,6 +21,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: 'dashboard' },
   { name: 'Configuration', href: '/server', icon: 'settings' },
   { name: 'Logs', href: '/logs', icon: 'terminal' },
+  { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart' },
 ];
 </script>
 
@@ -170,6 +171,21 @@ const navigation = [
         <slot></slot>
       </div>
     </main>
+
+    <!-- Footer -->
+    <footer class="bg-brand-bg/80 backdrop-blur-xl border-t border-white/5 py-6 mt-12 z-10 relative">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-500">
+        <div>
+          &copy; 2026 Snapcast Manager. All rights reserved.
+        </div>
+        <div class="flex items-center gap-4">
+          <a href="https://github.com/NaturalDevCR/TCP-Streamer" target="_blank" class="flex items-center gap-1.5 hover:text-white text-gray-400 font-medium transition-colors duration-300">
+            <span class="material-symbols-outlined text-[1rem]">link</span>
+            TCP-Streamer Project
+          </a>
+        </div>
+      </div>
+    </footer>
 
     <!-- Global Components -->
     <ToastNotification />
