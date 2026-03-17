@@ -8,14 +8,12 @@ export const useSystemStore = defineStore('system', () => {
   const error = ref('');
   const snapserverStatus = ref('unknown');
   const shairportSyncStatus = ref('unknown');
-  const librespotStatus = ref('unknown');
   
   const installedPackages = ref({
     snapserver: false,
     ffmpeg: false,
     'snap-ctrl': false,
     'shairport-sync': false,
-    librespot: false,
     'node': true,
   });
 
@@ -35,18 +33,17 @@ export const useSystemStore = defineStore('system', () => {
     'node': '',
   });
 
-  async function checkStatus(service: 'snapserver' | 'shairport-sync' | 'librespot') {
+  async function checkStatus(service: 'snapserver' | 'shairport-sync') {
      try {
        const data = await fetchApi(`/system/status/${service}`);
        if (service === 'snapserver') snapserverStatus.value = data.status;
        if (service === 'shairport-sync') shairportSyncStatus.value = data.status;
-       if (service === 'librespot') librespotStatus.value = data.status;
      } catch (err) {
        console.error(err);
      }
   }
 
-  async function checkInstalled(pkg: 'snapserver' | 'ffmpeg' | 'snap-ctrl' | 'shairport-sync' | 'librespot') {
+  async function checkInstalled(pkg: 'snapserver' | 'ffmpeg' | 'snap-ctrl' | 'shairport-sync') {
     try {
       const data = await fetchApi(`/system/installed/${pkg}`);
       installedPackages.value[pkg] = data.installed;
@@ -73,8 +70,8 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  async function controlService(action: 'start' | 'stop' | 'restart' | 'enable' | 'disable', service: 'snapserver' | 'shairport-sync' | 'librespot') {
-    loadingMessage.value = `${action === 'start' ? 'Starting' : action === 'stop' ? 'Stopping' : action === 'restart' ? 'Restarting' : action === 'enable' ? 'Enabling' : 'Disabling'} ${service === 'snapserver' ? 'Snapserver' : service === 'shairport-sync' ? 'AirPlay' : 'Librespot'}...`;
+  async function controlService(action: 'start' | 'stop' | 'restart' | 'enable' | 'disable', service: 'snapserver' | 'shairport-sync') {
+    loadingMessage.value = `${action === 'start' ? 'Starting' : action === 'stop' ? 'Stopping' : action === 'restart' ? 'Restarting' : action === 'enable' ? 'Enabling' : 'Disabling'} ${service === 'snapserver' ? 'Snapserver' : 'AirPlay'}...`;
     loading.value = true;
     try {
       await fetchApi(`/system/service/${action}/${service}`, { method: 'POST' });
@@ -88,7 +85,7 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  async function installPackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'librespot') {
+  async function installPackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync') {
     loadingMessage.value = `Installing ${pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg}...`;
     loading.value = true;
     try {
@@ -103,7 +100,7 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  async function updatePackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'librespot', clean: boolean = false) {
+  async function updatePackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl', clean: boolean = false) {
     loadingMessage.value = `Updating ${pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay 2)' : pkg}... ${pkg === 'shairport-sync' ? '(This takes a few minutes)' : ''}`;
     loading.value = true;
     try {
@@ -142,7 +139,7 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  async function uninstallPackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'librespot') {
+  async function uninstallPackage(pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync') {
     loadingMessage.value = `Uninstalling ${pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg}...`;
     loading.value = true;
     try {
@@ -216,7 +213,6 @@ export const useSystemStore = defineStore('system', () => {
       
       if (data.statuses.snapserver) snapserverStatus.value = data.statuses.snapserver;
       if (data.statuses['shairport-sync']) shairportSyncStatus.value = data.statuses['shairport-sync'];
-      if (data.statuses.librespot) librespotStatus.value = data.statuses.librespot;
       
       for (const [pkg, isInstalled] of Object.entries(data.installed)) {
          if (pkg in installedPackages.value) {
@@ -245,7 +241,6 @@ export const useSystemStore = defineStore('system', () => {
     error, 
     snapserverStatus,
     shairportSyncStatus, 
-    librespotStatus,
     installedPackages, 
     packageVersions,
     availableVersions,

@@ -99,10 +99,6 @@ const version = 'v0.1.57';
           </div>
       </div>
 
-      <!-- Player Widget -->
-      <div class="mb-6">
-          <PlayerWidget />
-      </div>
 
       <!-- Snapcast Live Metrics Section -->
       <div v-if="snapcastStore.status" class="space-y-4">
@@ -208,14 +204,13 @@ const version = 'v0.1.57';
 
       <div class="border-t border-white/5 my-10"></div>
 
-      <!-- System Services Section -->
+      <!-- System Services Category -->
       <div class="flex items-center space-x-2 px-1 mb-4">
-          <span class="material-symbols-outlined text-brand-primary">memory</span>
-          <h2 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">System Services</h2>
+          <span class="material-symbols-outlined text-brand-primary">settings_system_daydream</span>
+          <h2 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">Core System Services</h2>
       </div>
 
-      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <!-- server Status -->
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-12">
       <Card title="Snapserver">
         <template #icon>
             <span class="material-symbols-outlined">router</span>
@@ -272,7 +267,6 @@ const version = 'v0.1.57';
         </div>
       </Card>
 
-      <!-- Snap-ctrl Status -->
       <Card title="Snap-ctrl">
         <template #icon>
             <span class="material-symbols-outlined">api</span>
@@ -307,7 +301,6 @@ const version = 'v0.1.57';
         </div>
       </Card>
 
-      <!-- FFmpeg Status -->
       <Card title="FFmpeg">
         <template #icon>
             <span class="material-symbols-outlined">movie_creation</span>
@@ -339,7 +332,77 @@ const version = 'v0.1.57';
         </div>
       </Card>
 
-      <!-- Shairport-sync (AirPlay) Status -->
+      <Card title="Runtime Environment">
+        <template #icon>
+            <span class="material-symbols-outlined">javascript</span>
+        </template>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-400">Node.js</span>
+                <span class="text-[#00ff9d] font-black text-sm tracking-widest leading-none drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">
+                    {{ systemStore.packageVersions.node || 'UNKNOWN' }}
+                </span>
+            </div>
+            <div class="flex flex-col">
+                 <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Engine Version</span>
+                    <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions.node || '...' }}</span>
+                 </div>
+                 
+                 <div class="mt-4 space-y-3">
+                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest block border-b border-white/5 pb-2">Select LTS Release</span>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button v-for="v in ['18', '20', '22']" :key="v"
+                                @click="selectedNodeVersion = v"
+                                :class="[
+                                    'py-2.5 rounded-xl text-xs font-black transition-all border',
+                                    selectedNodeVersion === v 
+                                    ? 'bg-[#00ff9d]/10 border-[#00ff9d]/30 text-[#00ff9d] drop-shadow-[0_0_8px_rgba(0,255,157,0.4)]' 
+                                    : 'bg-black/40 border-white/5 text-gray-400 hover:border-white/20 hover:text-gray-300'
+                                ]"
+                        >
+                            v{{ v }}
+                        </button>
+                    </div>
+                 </div>
+            </div>
+            <div class="pt-5 border-t border-white/5">
+                 <button @click="handleUpdateNodeJs" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                    Update to v{{ selectedNodeVersion }}
+                 </button>
+            </div>
+        </div>
+      </Card>
+
+      <Card title="Management Core">
+        <template #icon>
+            <span class="material-symbols-outlined">dashboard_customize</span>
+        </template>
+        <div class="space-y-4 h-full flex flex-col">
+            <div class="flex flex-col space-y-2 flex-grow">
+                <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Application Version</span>
+                <span class="text-4xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">{{ version }}</span>
+            </div>
+            <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-[inset_0_0_15px_rgba(166,13,242,0.1)] mt-auto mb-4">
+                <p class="text-[10px] font-bold text-brand-primary leading-relaxed text-center tracking-widest uppercase">Everything is synced and running smoothly on version {{ version }}.</p>
+            </div>
+            <div class="pt-4 border-t border-white/5">
+                 <button disabled class="w-full px-4 py-3 bg-black/40 text-gray-500 rounded-xl font-black text-xs uppercase tracking-widest cursor-default border border-white/5">
+                    UI Up to Date
+                 </button>
+            </div>
+        </div>
+      </Card>
+
+      </div>
+
+      <!-- Audio Plugins & Remotes Category -->
+      <div class="flex items-center space-x-2 px-1 mb-4 mt-12">
+          <span class="material-symbols-outlined text-brand-primary">settings_input_antenna</span>
+          <h2 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">Audio Plugins & Remotes</h2>
+      </div>
+
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <Card title="AirPlay Service">
         <template #icon>
             <span class="material-symbols-outlined">cast</span>
@@ -384,7 +447,6 @@ const version = 'v0.1.57';
         </div>
       </Card>
 
-      <!-- Librespot (Spotify) Status -->
       <Card title="Spotify Connect">
         <template #icon>
             <span class="material-symbols-outlined">queue_music</span>
@@ -426,71 +488,7 @@ const version = 'v0.1.57';
         </div>
       </Card>
 
-      <!-- Node.js Status -->
-      <Card title="Runtime Environment">
-        <template #icon>
-            <span class="material-symbols-outlined">javascript</span>
-        </template>
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">Node.js</span>
-                <span class="text-[#00ff9d] font-black text-sm tracking-widest leading-none drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">
-                    {{ systemStore.packageVersions.node || 'UNKNOWN' }}
-                </span>
-            </div>
-            <div class="flex flex-col">
-                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Engine Version</span>
-                    <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions.node || '...' }}</span>
-                 </div>
-                 
-                 <div class="mt-4 space-y-3">
-                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest block border-b border-white/5 pb-2">Select LTS Release</span>
-                    <div class="grid grid-cols-3 gap-3">
-                        <button v-for="v in ['18', '20', '22']" :key="v"
-                                @click="selectedNodeVersion = v"
-                                :class="[
-                                    'py-2.5 rounded-xl text-xs font-black transition-all border',
-                                    selectedNodeVersion === v 
-                                    ? 'bg-[#00ff9d]/10 border-[#00ff9d]/30 text-[#00ff9d] drop-shadow-[0_0_8px_rgba(0,255,157,0.4)]' 
-                                    : 'bg-black/40 border-white/5 text-gray-400 hover:border-white/20 hover:text-gray-300'
-                                ]"
-                        >
-                            v{{ v }}
-                        </button>
-                    </div>
-                 </div>
-            </div>
-            <div class="pt-5 border-t border-white/5">
-                 <button @click="handleUpdateNodeJs" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    Update to v{{ selectedNodeVersion }}
-                 </button>
-            </div>
-        </div>
-      </Card>
-
-      <!-- Snapmanager Core -->
-      <Card title="Management Core">
-        <template #icon>
-            <span class="material-symbols-outlined">dashboard_customize</span>
-        </template>
-        <div class="space-y-4 h-full flex flex-col">
-            <div class="flex flex-col space-y-2 flex-grow">
-                <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Application Version</span>
-                <span class="text-4xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">{{ version }}</span>
-            </div>
-            <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-[inset_0_0_15px_rgba(166,13,242,0.1)] mt-auto mb-4">
-                <p class="text-[10px] font-bold text-brand-primary leading-relaxed text-center tracking-widest uppercase">Everything is synced and running smoothly on version {{ version }}.</p>
-            </div>
-            <div class="pt-4 border-t border-white/5">
-                 <button disabled class="w-full px-4 py-3 bg-black/40 text-gray-500 rounded-xl font-black text-xs uppercase tracking-widest cursor-default border border-white/5">
-                    UI Up to Date
-                 </button>
-            </div>
-        </div>
-      </Card>
-    </div>
-
+      </div>
     <!-- Footer -->
     <div class="mt-16 pt-8 border-t border-white/5 text-center pb-8 opacity-60 hover:opacity-100 transition-opacity">
         <p class="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] flex items-center justify-center space-x-2">
