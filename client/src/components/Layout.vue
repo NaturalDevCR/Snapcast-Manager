@@ -48,8 +48,8 @@ const navigation = [
 
           <!-- Brand centered on mobile, absolute left-1/2 -->
           <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 sm:static sm:translate-x-0 sm:left-auto sm:flex-shrink-0">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-primary to-indigo-600 flex items-center justify-center shadow-lg shadow-brand-primary/20">
-                <span class="material-symbols-outlined text-white text-xl">graphic_eq</span>
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                <img src="../assets/logo.png" alt="Logo" class="w-full h-full rounded-xl object-cover" />
             </div>
             <span class="text-xl font-black tracking-tight text-white hidden sm:block drop-shadow-sm">Snapcast <span class="text-brand-primary">Manager</span></span>
           </div>
@@ -118,8 +118,8 @@ const navigation = [
             <!-- Header -->
             <div class="flex items-center justify-between pb-6 border-b border-white/5">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-primary to-indigo-600 flex items-center justify-center shadow-lg shadow-brand-primary/20">
-                  <span class="material-symbols-outlined text-white text-xl">graphic_eq</span>
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                    <img src="../assets/logo.png" alt="Logo" class="w-full h-full rounded-xl object-cover" />
                 </div>
                 <span class="text-xl font-black text-white">Snapcast <span class="text-brand-primary">Manager</span></span>
               </div>
