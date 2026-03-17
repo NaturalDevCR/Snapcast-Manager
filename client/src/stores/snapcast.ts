@@ -71,10 +71,70 @@ export const useSnapcastStore = defineStore('snapcast', () => {
     }
   }
 
+  async function setGroupStream(groupId: string, streamId: string) {
+    try {
+      await fetchApi(`/snapcast/group/${groupId}/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stream_id: streamId })
+      });
+      await fetchStatus();
+    } catch (err: any) {
+      console.error('Failed to set group stream:', err);
+      error.value = err.message;
+    }
+  }
+
+  async function setGroupMute(groupId: string, muted: boolean) {
+    try {
+      await fetchApi(`/snapcast/group/${groupId}/muted`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ muted })
+      });
+      await fetchStatus();
+    } catch (err: any) {
+      console.error('Failed to mute group:', err);
+      error.value = err.message;
+    }
+  }
+
+  async function setClientVolume(clientId: string, volume: { percent: number, muted: boolean }) {
+    try {
+      await fetchApi(`/snapcast/client/${clientId}/volume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ volume })
+      });
+      await fetchStatus();
+    } catch (err: any) {
+      console.error('Failed to set client volume:', err);
+      error.value = err.message;
+    }
+  }
+
+  async function setClientName(clientId: string, name: string) {
+    try {
+      await fetchApi(`/snapcast/client/${clientId}/name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      await fetchStatus();
+    } catch (err: any) {
+      console.error('Failed to set client name:', err);
+      error.value = err.message;
+    }
+  }
+
   return {
     status,
     loading,
     error,
-    fetchStatus
+    fetchStatus,
+    setGroupStream,
+    setGroupMute,
+    setClientVolume,
+    setClientName
   };
 });

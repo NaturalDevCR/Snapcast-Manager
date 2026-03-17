@@ -33,6 +33,13 @@ router.post('/control', async (req: Request, res: Response) => {
     const response = await mpdService.control(action as any);
     res.json({ status: 'ok', response });
   } catch (err: any) {
+    // Si falla la conexión (MPD offline), devolvemos 400 con un mensaje descriptivo
+    if (err.message && err.message.includes('Failed to connect to MPD')) {
+        return res.status(400).json({ 
+            error: 'MPD is offline', 
+            message: 'No se puede controlar MPD porque parece estar apagado o no instalado (Puerto 6600 inaccesible).' 
+        });
+    }
     res.status(500).json({ error: 'Failed to control MPD', message: err.message });
   }
 });

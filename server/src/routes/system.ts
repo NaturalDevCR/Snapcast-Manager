@@ -87,7 +87,7 @@ router.post('/service/:action/:service', async (req: Request, res: Response) => 
 
 router.get('/installed/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'snap-ctrl' && pkg !== 'shairport-sync') {
+    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'snap-ctrl' && pkg !== 'shairport-sync' && pkg !== 'librespot') {
         return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
@@ -100,7 +100,7 @@ router.get('/installed/:pkg', async (req: Request, res: Response) => {
 
 router.post('/install/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync') {
+    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'librespot') {
         return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
@@ -137,7 +137,7 @@ router.post('/update-node', async (req: Request, res: Response) => {
 
 router.post('/uninstall/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync') {
+    if (pkg !== 'snapserver' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'librespot') {
          return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
