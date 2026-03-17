@@ -111,6 +111,13 @@ const openEditSourceDialog = (idx: number) => {
        }
   }
   
+  // Parse meta-stream path into source list
+  if (detectedType === 'meta') {
+    metaSelectedSources.value = path
+      .split('/')
+      .filter((s: string) => s.length > 0);
+  }
+  
   showAddSourceDialog.value = true;
 };
 
@@ -122,6 +129,37 @@ const activePromptSection = ref('');
 const selectedSourceType = ref('');
 const sourceFormPath = ref('');
 const sourceFormParams = ref<Record<string, string>>({});
+const metaSelectedSources = ref<string[]>([]);
+
+// Get all non-meta source names for the meta-stream picker
+const availableMetaSources = computed((): string[] => {
+  const sources = localParsedConfig.value?.stream?.source;
+  if (!sources) return [];
+  const list = Array.isArray(sources) ? sources : [sources];
+  return list
+    .filter((s: string) => !s.startsWith('meta://'))
+    .map((s: string) => extractSourceName(s))
+    .filter((n: string) => n);
+});
+
+const addMetaSource = (name: string) => {
+  if (!metaSelectedSources.value.includes(name)) {
+    metaSelectedSources.value.push(name);
+  }
+};
+
+const removeMetaSource = (idx: number) => {
+  metaSelectedSources.value.splice(idx, 1);
+};
+
+const moveMetaSource = (idx: number, direction: 'up' | 'down') => {
+  const arr = metaSelectedSources.value;
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= arr.length) return;
+  const temp = arr[idx]!;
+  arr[idx] = arr[swapIdx]!;
+  arr[swapIdx] = temp;
+};
 
 const sectionIcons: Record<string, string> = {
   server: 'router',
@@ -524,6 +562,9 @@ const selectSourceType = (type: string) => {
       for (const p of template.params) {
         sourceFormParams.value[p.key] = p.default || '';
       }
+      if (template.isMeta) {
+        metaSelectedSources.value = [];
+      }
     }
   }
 };
@@ -531,6 +572,25 @@ const selectSourceType = (type: string) => {
 const buildSourceUri = (): string => {
   const template = selectedTemplate.value;
   if (!template) return '';
+  
+  // Meta streams build path from selected sources
+  if (template.isMeta) {
+    const metaPath = '/' + metaSelectedSources.value.join('/');
+    let uri = `${template.uriPrefix}/${metaPath}`;
+    const params: string[] = [];
+    for (const p of template.params) {
+      const val = sourceFormParams.value[p.key];
+      if (val !== undefined && val !== '' && val !== p.default) {
+        params.push(`${p.key}=${encodeURIComponent(val)}`);
+      } else if (p.required && val) {
+        params.push(`${p.key}=${encodeURIComponent(val)}`);
+      }
+    }
+    if (params.length > 0) {
+      uri += '?' + params.join('&');
+    }
+    return uri;
+  }
   
   let path = sourceFormPath.value || template.pathPlaceholder;
   if (path.startsWith('//')) {
@@ -1304,8 +1364,8 @@ const removeSourceEntry = (idx: number) => {
                   </div>
 
                   <div class="space-y-4">
-                    <!-- Path -->
-                    <div>
+                    <!-- Path (non-meta only) -->
+                    <div v-if="!selectedTemplate.isMeta">
                       <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">
                         Path / Host
                       </label>
@@ -1314,6 +1374,111 @@ const removeSourceEntry = (idx: number) => {
                         :placeholder="selectedTemplate.pathPlaceholder"
                         class="w-full text-sm font-mono px-4 py-2 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
                       />
+                    </div>
+
+                    <!-- ===== META STREAM: Source Picker ===== -->
+                    <div v-if="selectedTemplate.isMeta" class="space-y-4">
+                      <!-- Available Sources -->
+                      <div>
+                        <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">
+                          <span class="material-symbols-outlined text-[12px] align-middle mr-1">library_music</span>
+                          Available Sources
+                        </label>
+                        <div v-if="availableMetaSources.length === 0" class="text-center py-6 border border-dashed border-white/10 rounded-xl bg-black/20">
+                          <span class="material-symbols-outlined text-[24px] text-gray-600">info</span>
+                          <p class="text-[10px] text-gray-500 mt-1 font-bold uppercase tracking-widest">No non-meta sources configured yet</p>
+                          <p class="text-[9px] text-gray-600 mt-0.5">Add other audio sources first, then create a meta-stream to combine them</p>
+                        </div>
+                        <div v-else class="flex flex-wrap gap-2">
+                          <button
+                            v-for="srcName in availableMetaSources"
+                            :key="srcName"
+                            @click="addMetaSource(srcName)"
+                            :disabled="metaSelectedSources.includes(srcName)"
+                            :class="[
+                              'inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border',
+                              metaSelectedSources.includes(srcName)
+                                ? 'bg-brand-primary/10 text-brand-primary/50 border-brand-primary/10 cursor-not-allowed'
+                                : 'bg-black/40 text-gray-300 border-white/5 hover:border-[#00ff9d]/40 hover:bg-[#00ff9d]/10 hover:text-[#00ff9d] cursor-pointer'
+                            ]"
+                          >
+                            <span class="material-symbols-outlined text-[14px]">{{ metaSelectedSources.includes(srcName) ? 'check_circle' : 'add_circle' }}</span>
+                            <span>{{ srcName }}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Selected Sources (priority order) -->
+                      <div>
+                        <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">
+                          <span class="material-symbols-outlined text-[12px] align-middle mr-1">sort</span>
+                          Priority Chain
+                          <span class="text-[9px] text-gray-600 font-semibold normal-case tracking-normal ml-1">— first = highest priority (active), last = fallback</span>
+                        </label>
+                        <div v-if="metaSelectedSources.length === 0" class="text-center py-6 border border-dashed border-white/10 rounded-xl bg-black/20">
+                          <span class="material-symbols-outlined text-[24px] text-gray-600">playlist_add</span>
+                          <p class="text-[10px] text-gray-500 mt-1 font-bold uppercase tracking-widest">Click sources above to add them</p>
+                        </div>
+                        <div v-else class="space-y-2">
+                          <div
+                            v-for="(srcName, idx) in metaSelectedSources"
+                            :key="srcName + '-' + idx"
+                            class="flex items-center space-x-2 px-3 py-2 rounded-xl border bg-black/30 transition-all"
+                            :class="idx === 0 ? 'border-[#00ff9d]/30 bg-[#00ff9d]/5' : 'border-white/5'"
+                          >
+                            <!-- Priority badge -->
+                            <span
+                              :class="[
+                                'flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-black',
+                                idx === 0
+                                  ? 'bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/30'
+                                  : 'bg-white/5 text-gray-500 border border-white/5'
+                              ]"
+                            >
+                              {{ idx + 1 }}
+                            </span>
+                            <!-- Name -->
+                            <span class="flex-1 text-sm font-bold" :class="idx === 0 ? 'text-[#00ff9d]' : 'text-gray-300'">{{ srcName }}</span>
+                            <!-- Priority label -->
+                            <span v-if="idx === 0" class="text-[8px] font-black uppercase tracking-widest text-[#00ff9d]/70 px-2 py-0.5 bg-[#00ff9d]/10 rounded border border-[#00ff9d]/20">Primary</span>
+                            <span v-else-if="idx === metaSelectedSources.length - 1" class="text-[8px] font-black uppercase tracking-widest text-amber-500/70 px-2 py-0.5 bg-amber-500/10 rounded border border-amber-500/20">Fallback</span>
+                            <!-- Move buttons -->
+                            <button
+                              @click="moveMetaSource(idx, 'up')"
+                              :disabled="idx === 0"
+                              class="p-1 rounded-lg transition-colors"
+                              :class="idx === 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-white/10'"
+                            >
+                              <span class="material-symbols-outlined text-[16px]">arrow_upward</span>
+                            </button>
+                            <button
+                              @click="moveMetaSource(idx, 'down')"
+                              :disabled="idx === metaSelectedSources.length - 1"
+                              class="p-1 rounded-lg transition-colors"
+                              :class="idx === metaSelectedSources.length - 1 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-white/10'"
+                            >
+                              <span class="material-symbols-outlined text-[16px]">arrow_downward</span>
+                            </button>
+                            <!-- Remove -->
+                            <button
+                              @click="removeMetaSource(idx)"
+                              class="p-1 text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors"
+                            >
+                              <span class="material-symbols-outlined text-[16px]">close</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Tip -->
+                      <div class="p-3 bg-amber-500/5 border border-amber-500/15 rounded-xl">
+                        <div class="flex items-start space-x-2">
+                          <span class="material-symbols-outlined text-[14px] text-amber-500 mt-0.5 flex-shrink-0">tips_and_updates</span>
+                          <p class="text-[10px] text-amber-400/80 leading-relaxed">
+                            <strong class="text-amber-500">Tip:</strong> Use <code class="bg-black/40 px-1 py-0.5 rounded text-amber-300 font-mono border border-amber-500/10">codec=null</code> on sources that should <em>only</em> feed meta-streams and not appear as standalone streams for clients.
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
                     <!-- Parameters -->

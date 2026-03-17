@@ -340,6 +340,7 @@ export interface SourceTemplate {
   uriPrefix: string;
   pathPlaceholder: string;
   fixedSampleFormat?: string;
+  isMeta?: boolean;
   params: SourceParam[];
 }
 
@@ -478,7 +479,8 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
     label: "Meta (Mixer)",
     description: "Mix audio from multiple sources. Plays the active source with highest priority (first listed = highest). Great for fallback chains.",
     uriPrefix: "meta://",
-    pathPlaceholder: "/Source1/Source2",
+    pathPlaceholder: "",
+    isMeta: true,
     params: [
       { key: "name", label: "Name", description: "Unique stream name", required: true, type: "text", placeholder: "Mix" },
       { key: "codec", label: "Codec", description: "Output codec for the mixed stream", required: false, type: "select", options: ["pcm", "flac", "ogg", "opus"] },
