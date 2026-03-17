@@ -5,7 +5,6 @@ import { useUIStore } from '../stores/ui';
 import { useSnapcastStore } from '../stores/snapcast';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
-import PlayerWidget from '../components/PlayerWidget.vue';
 
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
@@ -38,7 +37,7 @@ onUnmounted(() => {
   }
 });
 
-const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'librespot', clean: boolean = false) => {
+const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl', clean: boolean = false) => {
   if (clean && !confirm(`WARNING: This will UNINSTALL ${pkg} and DELETE ALL its configuration and data files before a fresh installation. Continue?`)) {
       return;
   }
@@ -442,47 +441,6 @@ const version = 'v0.1.57';
             <div class="pt-4 border-t border-white/5" v-else>
                  <button @click="systemStore.installPackage('shairport-sync')" class="w-full px-6 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-sm border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Install AirPlay
-                 </button>
-            </div>
-        </div>
-      </Card>
-
-      <Card title="Spotify Connect">
-        <template #icon>
-            <span class="material-symbols-outlined">queue_music</span>
-        </template>
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">Receiver</span>
-                <span :class="systemStore.installedPackages.librespot ? 'text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]' : 'text-[#ff3b30] drop-shadow-[0_0_5px_rgba(255,59,48,0.5)]'" class="text-sm font-black">
-                    {{ systemStore.installedPackages.librespot ? 'ENABLED' : 'DISABLED' }}
-                </span>
-            </div>
-            <div class="flex items-center justify-between" v-if="systemStore.installedPackages.librespot">
-                 <span class="text-sm font-semibold text-gray-400">Status</span>
-                 <span :class="systemStore.librespotStatus === 'active' ? 'text-[#00ff9d] bg-[#00ff9d]/10 border-[#00ff9d]/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
-                     {{ systemStore.librespotStatus }}
-                 </span>
-            </div>
-            <div class="flex items-center justify-between" v-if="systemStore.packageVersions.librespot">
-                  <span class="text-sm font-semibold text-gray-400">Version</span>
-                  <span class="text-sm font-bold text-gray-200">
-                      {{ systemStore.packageVersions.librespot }}
-                  </span>
-             </div>
-            <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages.librespot">
-                <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'librespot')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
-                    <button v-if="systemStore.librespotStatus === 'active'" @click="systemStore.controlService('stop', 'librespot')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
-                    <button v-else @click="systemStore.controlService('start', 'librespot')" class="px-3 py-2.5 bg-[#00ff9d]/10 hover:bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
-                </div>
-                <button @click="handleUpdate('librespot')" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    Update Spotify
-                </button>
-            </div>
-            <div class="pt-4 border-t border-white/5" v-else>
-                 <button @click="systemStore.installPackage('librespot')" class="w-full px-6 py-3 bg-brand-primary text-white rounded-xl font-black tracking-widest uppercase text-sm border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    Install Spotify Connect
                  </button>
             </div>
         </div>
