@@ -27,6 +27,9 @@ export class SystemService {
     if (pkg === 'shairport-sync') {
       return this.installShairportSync();
     }
+    if (pkg === 'librespot') {
+      return this.installLibrespot();
+    }
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y ${pkg}`);
   }
 
@@ -41,6 +44,10 @@ export class SystemService {
     
     if (pkg === 'snapserver') {
       return this.updateSnapserverFromGitHub(clean);
+    }
+
+    if (pkg === 'librespot') {
+      return this.installLibrespot();
     }
 
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y --only-upgrade ${pkg}`);
@@ -173,6 +180,14 @@ export class SystemService {
           await execAsync('node -v');
           return true;
       }
+      if (pkg === 'librespot') {
+          try {
+              await execAsync('[ -f /usr/local/bin/librespot ] || command -v librespot');
+              return true;
+          } catch (e) {
+              return false;
+          }
+      }
       await execAsync(`dpkg -s ${pkg}`);
       return true;
     } catch (error) {
@@ -225,6 +240,9 @@ export class SystemService {
         case 'node':
           cmd = 'node -v';
           break;
+        case 'librespot':
+          cmd = 'if [ -f /usr/local/bin/librespot ]; then /usr/local/bin/librespot --version 2>&1 | head -n 1; else librespot --version 2>&1 | head -n 1; fi';
+          break;
       }
       const { stdout } = await execAsync(cmd);
       // Clean up version string (e.g. "snapserver v0.26.0" -> "v0.26.0")
@@ -256,6 +274,10 @@ export class SystemService {
       if (pkg === 'node') {
         // Simple way to get latest LTS version or just assume we follow nodesource 20.x
         return 'v20.x (Latest)'; 
+      }
+
+      if (pkg === 'librespot') {
+        return 'Latest from Crates.io';
       }
       
       // Use apt-cache policy to get the candidate version for others
@@ -434,6 +456,19 @@ export class SystemService {
       }
       
       return result;
+  }
+
+  async installLibrespot(): Promise<string> {
+      console.log('Installing librespot from source via Cargo...');
+      const cmd = `
+        echo "Installing build dependencies..." && \
+        sudo apt-get update && \
+        sudo apt-get install -y --no-install-recommends build-essential cargo libasound2-dev pkg-config && \
+        echo "Building and installing librespot..." && \
+        sudo cargo install librespot --root /usr/local && \
+        echo "Librespot installed successfully to /usr/local/bin/librespot"
+      `;
+      return this.runCommand(cmd);
   }
 }
 
