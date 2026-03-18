@@ -1,6 +1,6 @@
 {
   "name": "snapcast-manager-server",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Backend API for Snapcast Manager",
   "main": "dist/index.js",
   "scripts": {
