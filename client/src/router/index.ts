@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '../views/Dashboard.vue'
+import ClientDashboard from '../views/ClientDashboard.vue'
 import Login from '../views/Login.vue'
 import ServerConfig from '../views/ServerConfig.vue'
 import Setup from '../views/Setup.vue'
@@ -50,6 +51,12 @@ const router = createRouter({
       path: '/routing',
       name: 'routing',
       component: Routing,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/client',
+      name: 'client-dashboard',
+      component: ClientDashboard,
       meta: { requiresAuth: true }
     },
 

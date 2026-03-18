@@ -4,7 +4,7 @@ import { configService } from './config';
 
 const execAsync = util.promisify(exec);
 
-export type PackageName = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node';
+export type PackageName = 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node';
 
 export class SystemService {
   private distroCodename: string | null = null;
@@ -27,6 +27,12 @@ export class SystemService {
     if (pkg === 'shairport-sync') {
       return this.installShairportSync();
     }
+    if (pkg === 'snapclient') {
+      return this.updateSnapclientFromGitHub(false);
+    }
+    if (pkg === 'snapserver') {
+      return this.updateSnapserverFromGitHub(false);
+    }
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y ${pkg}`);
   }
 
@@ -34,19 +40,32 @@ export class SystemService {
     if (pkg === 'snap-ctrl') {
       return this.installSnapCtrl();
     }
-    
+
     if (pkg === 'shairport-sync') {
       return this.installShairportSync();
     }
-    
+
     if (pkg === 'snapserver') {
       return this.updateSnapserverFromGitHub(clean);
+    }
+
+    if (pkg === 'snapclient') {
+      return this.updateSnapclientFromGitHub(clean);
     }
 
     return this.runCommand(`sudo apt-get update && sudo apt-get install -y --only-upgrade ${pkg}`);
   }
 
   async uninstallPackage(pkg: string): Promise<string> {
+    if (pkg === 'snapclient') {
+      const cmd = `
+        sudo systemctl stop snapclient 2>/dev/null || true && \
+        sudo systemctl disable snapclient 2>/dev/null || true && \
+        sudo dpkg --purge snapclient && \
+        echo "snapclient removed successfully."
+      `;
+      return this.runCommand(cmd);
+    }
     if (pkg === 'shairport-sync') {
       const cmd = `
         echo "Stopping and disabling services..." && \
@@ -117,18 +136,61 @@ export class SystemService {
     return this.executeDebUpdate(asset.browser_download_url, asset.name, clean);
   }
  
-  private async executeDebUpdate(downloadUrl: string, fileName: string, clean: boolean = false): Promise<string> {
+  private async updateSnapclientFromGitHub(clean: boolean = false): Promise<string> {
+    const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
+    const arch = await this.runCommand('dpkg --print-architecture');
+    const archTrimmed = arch.trim();
+    const codename = await this.getDistroCodename();
+
+    const asset = release.assets.find((a: any) =>
+      a.name.startsWith('snapclient') &&
+      a.name.endsWith('.deb') &&
+      !a.name.includes('pipewire') &&
+      a.name.includes(archTrimmed) &&
+      (a.name.includes(codename) || (codename === 'bookworm' && !a.name.includes('bullseye') && !a.name.includes('trixie')))
+    );
+
+    if (!asset) {
+      const fallbackAsset = release.assets.find((a: any) =>
+        a.name.startsWith('snapclient') && a.name.endsWith('.deb') && a.name.includes(archTrimmed)
+      );
+      if (!fallbackAsset) {
+        throw new Error(`Could not find a snapclient .deb asset for architecture ${archTrimmed} (Distro: ${codename}) in Snapcast release ${release.tag_name}`);
+      }
+      return this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name, clean, 'snapclient');
+    }
+
+    return this.executeDebUpdate(asset.browser_download_url, asset.name, clean, 'snapclient');
+  }
+
+  private async executeDebUpdate(downloadUrl: string, fileName: string, clean: boolean = false, pkg: 'snapserver' | 'snapclient' = 'snapserver'): Promise<string> {
     const debFile = `/tmp/${fileName}`;
-    console.log(`Downloading Snapserver from ${downloadUrl}... (Clean: ${clean})`);
-     
+    console.log(`Downloading ${pkg} from ${downloadUrl}... (Clean: ${clean})`);
+
     let cleanCmd = '';
     if (clean) {
-      cleanCmd = `
-        sudo systemctl stop snapserver || true && \
-        sudo dpkg --purge snapserver || true && \
-        sudo rm -rf /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /var/lib/snapserver && \
-      `;
+      if (pkg === 'snapclient') {
+        cleanCmd = `
+          sudo systemctl stop snapclient || true && \
+          sudo dpkg --purge snapclient || true && \
+          sudo rm -f /etc/default/snapclient && \
+        `;
+      } else {
+        cleanCmd = `
+          sudo systemctl stop snapserver || true && \
+          sudo dpkg --purge snapserver || true && \
+          sudo rm -rf /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /var/lib/snapserver && \
+        `;
+      }
     }
+
+    const postInstallCmd = pkg === 'snapclient'
+      ? `sudo systemctl daemon-reload && sudo systemctl restart snapclient`
+      : `sudo mkdir -p /var/lib/snapserver && \
+      sudo chown -R snapserver:snapserver /var/lib/snapserver && \
+      sudo usermod -d /var/lib/snapserver snapserver 2>/dev/null || true && \
+      sudo systemctl daemon-reload && \
+      sudo systemctl restart snapserver`;
 
     return this.runCommand(`
       ${cleanCmd}
@@ -136,11 +198,7 @@ export class SystemService {
       wget -qO ${debFile} "${downloadUrl}" && \
       sudo dpkg -i ${debFile} || sudo apt-get install -f -y && \
       rm -f ${debFile} && \
-      sudo mkdir -p /var/lib/snapserver && \
-      sudo chown -R snapserver:snapserver /var/lib/snapserver && \
-      sudo usermod -d /var/lib/snapserver snapserver 2>/dev/null || true && \
-      sudo systemctl daemon-reload && \
-      sudo systemctl restart snapserver
+      ${postInstallCmd}
     `);
   }
 
@@ -180,7 +238,7 @@ export class SystemService {
     }
   }
 
-  async getServiceStatus(service: 'snapserver' | 'shairport-sync'): Promise<string> {
+  async getServiceStatus(service: 'snapserver' | 'snapclient' | 'shairport-sync'): Promise<string> {
     try {
       const { stdout } = await execAsync(`systemctl is-active ${service}`);
       return stdout.trim();
@@ -191,7 +249,7 @@ export class SystemService {
     }
   }
 
-  async getServiceLogs(service: 'snapserver' | 'shairport-sync' | 'snapmanager' | 'librespot'): Promise<string> {
+  async getServiceLogs(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'snapmanager' | 'librespot'): Promise<string> {
     try {
         // journalctl -n 100 --no-pager
         let cmd = `sudo journalctl -u ${service} -n 100 --no-pager`;
@@ -221,6 +279,9 @@ export class SystemService {
       switch (pkg) {
         case 'snapserver':
           cmd = 'snapserver --version 2>&1 | head -n 1';
+          break;
+        case 'snapclient':
+          cmd = 'snapclient --version 2>&1 | head -n 1';
           break;
         case 'ffmpeg':
           cmd = 'ffmpeg -version 2>&1 | head -n 1';
@@ -257,7 +318,7 @@ export class SystemService {
         return release.tag_name;
       }
 
-      if (pkg === 'snapserver') {
+      if (pkg === 'snapserver' || pkg === 'snapclient') {
         const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
         return release.tag_name;
       }
@@ -303,8 +364,8 @@ export class SystemService {
   }
 
   async getDashboardMetrics(): Promise<any> {
-    const packages: PackageName[] = ['snapserver', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node'];
-    const services = ['snapserver', 'shairport-sync'] as const;
+    const packages: PackageName[] = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node'];
+    const services = ['snapserver', 'snapclient', 'shairport-sync'] as const;
     
     const installedPromises = packages.map(pkg => this.isInstalled(pkg).then(res => ({ pkg, val: res })));
     const versionPromises = packages.map(pkg => this.getPackageVersion(pkg).then(res => ({ pkg, val: res })));
@@ -326,23 +387,23 @@ export class SystemService {
     };
   }
   
-  async restartService(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async restartService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
       return this.runCommand(`sudo systemctl restart ${service}`);
   }
 
-  async startService(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async startService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
       return this.runCommand(`sudo systemctl start ${service}`);
   }
 
-  async stopService(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async stopService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
       return this.runCommand(`sudo systemctl stop ${service}`);
   }
 
-  async enableService(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async enableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
       return this.runCommand(`sudo systemctl enable ${service}`);
   }
 
-  async disableService(service: 'snapserver' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async disableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
       return this.runCommand(`sudo systemctl disable ${service}`);
   }
 
