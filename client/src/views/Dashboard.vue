@@ -72,7 +72,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Update this constant synchronously with the package.json version before release
-const version = 'v0.1.60';
+const version = 'v0.1.61';
 </script>
 
 <template>
@@ -81,10 +81,10 @@ const version = 'v0.1.60';
       <!-- Header Section -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 class="text-3xl font-black tracking-tight drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">System Dashboard</h1>
-          <p class="text-gray-400 font-medium mt-1">Manage and monitor your Snapcast infrastructure.</p>
+          <h1 class="text-3xl font-black tracking-tight text-text-main">System Dashboard</h1>
+          <p class="text-text-muted font-medium mt-1">Manage and monitor your Snapcast infrastructure.</p>
         </div>
-        <button @click="systemStore.refreshAll()" :disabled="systemStore.loading" class="inline-flex items-center px-5 py-2.5 bg-brand-primary hover:bg-[#8e0bc9] text-white rounded-xl text-sm font-black transition-all shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_20px_rgba(166,13,242,0.6)] active:scale-95 disabled:opacity-50 group border border-brand-primary/50">
+        <button @click="systemStore.refreshAll()" :disabled="systemStore.loading" class="inline-flex items-center px-4 py-2 bg-brand-primary hover:bg-blue-600 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-primary/20 active:scale-95 disabled:opacity-50 group border border-brand-primary">
           <span class="material-symbols-outlined text-[1.2rem] mr-2 transition-transform" :class="{'animate-spin': systemStore.loading, 'group-hover:rotate-180': !systemStore.loading}">refresh</span>
           SYNC ALL
         </button>
@@ -102,8 +102,8 @@ const version = 'v0.1.60';
       <!-- Enhanced Snapcast Live Metrics -->
       <div v-if="snapcastStore.status" class="space-y-6">
         <div class="flex items-center space-x-3 px-2">
-            <div class="w-2 h-2 rounded-full bg-[#00ff9d] animate-pulse shadow-[0_0_10px_rgba(0,255,157,0.5)]"></div>
-            <h2 class="text-[10px] font-black text-white/40 uppercase tracking-[0.4em]">Live Infrastructure Metrics</h2>
+            <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+            <h2 class="text-[10px] font-black text-text-muted uppercase tracking-[0.4em]">Live Infrastructure Metrics</h2>
         </div>
         
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
@@ -113,24 +113,24 @@ const version = 'v0.1.60';
                     <span class="material-symbols-outlined text-xl">music_note</span>
                 </template>
                 <div class="flex flex-col">
-                    <div class="flex items-baseline space-x-2 mb-6">
-                        <span class="text-6xl font-black text-white tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                    <div class="flex items-baseline space-x-2 mb-4">
+                        <span class="text-5xl font-black text-text-main tracking-tighter">
                             {{ snapcastStore.status.streams.length }}
                         </span>
-                        <span class="text-[10px] font-black text-white/30 uppercase tracking-widest">Available</span>
+                        <span class="text-[10px] font-bold text-text-muted uppercase tracking-widest">Available</span>
                     </div>
                     
-                    <div class="space-y-2.5 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div class="space-y-2 max-h-[140px] overflow-y-auto pr-2 custom-scrollbar">
                         <div v-for="stream in snapcastStore.status.streams" :key="stream.id" 
-                             class="group/item flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/[0.03] hover:bg-white/[0.05] hover:border-brand-primary/20 transition-all duration-300">
+                             class="group/item flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-brand-primary/30 transition-all duration-300">
                             <div class="flex items-center space-x-3 min-w-0">
-                                <div class="w-1.5 h-1.5 rounded-full transition-colors" :class="stream.status === 'playing' ? 'bg-[#00ff9d] shadow-[0_0_8px_rgba(0,255,157,0.4)]' : 'bg-white/10'"></div>
-                                <span class="text-xs font-bold text-white/70 truncate group-hover/item:text-white transition-colors" :title="stream.id">
+                                <div class="w-1.5 h-1.5 rounded-full transition-colors" :class="stream.status === 'playing' ? 'bg-emerald-400' : 'bg-white/10'"></div>
+                                <span class="text-xs font-semibold text-white/70 truncate group-hover/item:text-white transition-colors" :title="stream.id">
                                     {{ stream.uri?.query?.name || stream.id }}
                                 </span>
                             </div>
-                            <span :class="stream.status === 'playing' ? 'text-[#00ff9d] bg-[#00ff9d]/5 border-[#00ff9d]/10' : 'text-white/20 bg-white/5 border-white/5'" 
-                                  class="px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-all">
+                            <span :class="stream.status === 'playing' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-white/30 bg-white/5 border-white/10'" 
+                                  class="px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider transition-all">
                                 {{ stream.status }}
                             </span>
                         </div>
@@ -148,22 +148,22 @@ const version = 'v0.1.60';
                     <span class="material-symbols-outlined text-xl">sensors</span>
                 </template>
                 <div class="flex flex-col">
-                    <div class="flex items-baseline space-x-2 mb-6">
-                        <span class="text-6xl font-black text-white tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                    <div class="flex items-baseline space-x-2 mb-4">
+                        <span class="text-5xl font-black text-text-main tracking-tighter">
                             {{ snapcastStore.status.groups.reduce((acc, g) => acc + g.clients.filter(c => c.connected).length, 0) }}
                         </span>
-                        <span class="text-[10px] font-black text-white/30 uppercase tracking-widest">Connected</span>
+                        <span class="text-[10px] font-bold text-text-muted uppercase tracking-widest">Connected</span>
                     </div>
 
-                    <div class="space-y-2.5 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div class="space-y-2 max-h-[140px] overflow-y-auto pr-2 custom-scrollbar">
                         <template v-for="group in snapcastStore.status.groups" :key="group.id">
                             <div v-for="client in group.clients.filter(c => c.connected)" :key="client.id" 
-                                 class="group/item flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/[0.03] hover:bg-white/[0.05] hover:border-brand-primary/20 transition-all duration-300">
+                                 class="group/item flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-brand-primary/30 transition-all duration-300">
                                 <div class="flex flex-col min-w-0">
-                                    <span class="text-xs font-bold text-white/70 truncate group-hover/item:text-white transition-colors">
+                                    <span class="text-xs font-semibold text-white/70 truncate group-hover/item:text-white transition-colors">
                                         {{ client.config.name || client.host.name }}
                                     </span>
-                                    <span class="text-[9px] text-white/20 font-mono mt-0.5">{{ client.host.ip }}</span>
+                                    <span class="text-[9px] text-white/30 font-mono mt-0.5">{{ client.host.ip }}</span>
                                 </div>
                                 <div class="flex items-center space-x-2">
                                     <div class="h-1 w-12 bg-white/5 rounded-full overflow-hidden">
@@ -189,41 +189,41 @@ const version = 'v0.1.60';
                 <template #icon>
                     <span class="material-symbols-outlined text-xl">settings_input_component</span>
                 </template>
-                <div class="space-y-6">
+                <div class="space-y-4">
                     <!-- Master Status Indicator -->
-                    <div class="p-4 rounded-3xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
+                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="relative flex h-3 w-3">
-                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00ff9d] opacity-40"></span>
-                                <span class="relative inline-flex rounded-full h-3 w-3 bg-[#00ff9d] shadow-[0_0_10px_rgba(0,255,157,0.5)]"></span>
+                            <div class="relative flex h-2.5 w-2.5">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-40"></span>
+                                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
                             </div>
-                            <span class="text-xs font-black text-white uppercase tracking-[0.2em]">System Normal</span>
+                            <span class="text-xs font-bold text-text-main uppercase tracking-widest">System Normal</span>
                         </div>
-                        <span class="text-[10px] font-bold text-white/30 uppercase tracking-widest">Operational</span>
+                        <span class="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest">Operational</span>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="p-4 rounded-2xl bg-white/[0.01] border border-white/[0.03] flex flex-col items-center justify-center text-center space-y-1">
-                            <span class="text-[8px] font-black text-white/30 uppercase tracking-[0.2em]">Version</span>
-                            <span class="text-xs font-mono font-bold text-brand-primary group-hover:text-white transition-colors">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col items-center justify-center text-center space-y-1">
+                            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">Version</span>
+                            <span class="text-xs font-mono font-semibold text-brand-primary group-hover:text-white transition-colors">
                                 {{ systemStore.packageVersions.snapserver || (snapcastStore.status ? snapcastStore.status.server.version : '...') }}
                             </span>
                         </div>
-                        <div class="p-4 rounded-2xl bg-white/[0.01] border border-white/[0.03] flex flex-col items-center justify-center text-center space-y-1">
-                            <span class="text-[8px] font-black text-white/30 uppercase tracking-[0.2em]">Groups</span>
-                            <span class="text-xs font-black text-white">
+                        <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col items-center justify-center text-center space-y-1">
+                            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">Groups</span>
+                            <span class="text-xs font-semibold text-text-main">
                                 {{ snapcastStore.status.groups.length }}
                             </span>
                         </div>
                     </div>
 
-                    <div class="pt-2">
-                        <div class="flex justify-between items-center mb-2 px-1">
-                            <span class="text-[9px] font-black text-white/20 uppercase tracking-widest">Infrastructure health</span>
-                            <span class="text-[9px] font-black text-[#00ff9d]">100%</span>
+                    <div class="pt-1">
+                        <div class="flex justify-between items-center mb-1.5 px-1">
+                            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">Health</span>
+                            <span class="text-[9px] font-bold text-emerald-400">100%</span>
                         </div>
-                        <div class="h-1 bg-white/5 rounded-full overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-brand-primary to-[#00ff9d] w-full"></div>
+                        <div class="h-1 bg-white/10 rounded-full overflow-hidden">
+                            <div class="h-full bg-brand-primary w-full"></div>
                         </div>
                     </div>
                 </div>
@@ -243,7 +243,7 @@ const version = 'v0.1.60';
       <!-- System Services Category -->
       <div class="flex items-center space-x-2 px-1 mb-4">
           <span class="material-symbols-outlined text-brand-primary">settings_system_daydream</span>
-          <h2 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">Core System Services</h2>
+          <h2 class="text-sm font-bold text-text-main uppercase tracking-widest">Core System Services</h2>
       </div>
 
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-12">
@@ -352,10 +352,10 @@ const version = 'v0.1.60';
         </template>
         <div class="space-y-4 h-full flex flex-col">
             <div class="flex flex-col space-y-2 flex-grow">
-                <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Application Version</span>
-                <span class="text-4xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">{{ version }}</span>
+                <span class="text-[10px] font-bold text-text-muted uppercase tracking-widest">Application Version</span>
+                <span class="text-3xl font-black text-text-main">{{ version }}</span>
             </div>
-            <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-[inset_0_0_15px_rgba(166,13,242,0.1)] mt-auto mb-4">
+            <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-inner shadow-brand-primary/10 mt-auto mb-4">
                 <p class="text-[10px] font-bold text-brand-primary leading-relaxed text-center tracking-widest uppercase">Everything is synced and running smoothly on version {{ version }}.</p>
             </div>
             <div class="pt-4 border-t border-white/5">
@@ -371,7 +371,7 @@ const version = 'v0.1.60';
       <!-- Audio Plugins & Remotes Category -->
       <div class="flex items-center space-x-2 px-1 mb-4 mt-12">
           <span class="material-symbols-outlined text-brand-primary">settings_input_antenna</span>
-          <h2 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">Audio Plugins & Remotes</h2>
+          <h2 class="text-sm font-bold text-text-main uppercase tracking-widest">Audio Plugins & Remotes</h2>
       </div>
 
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -382,7 +382,7 @@ const version = 'v0.1.60';
         <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-gray-400">Status</span>
-                <span :class="systemStore.installedPackages['snap-ctrl'] ? 'text-[#00ff9d] bg-[#00ff9d]/10 border-[#00ff9d]/20 drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
+                <span :class="systemStore.installedPackages['snap-ctrl'] ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
                     {{ systemStore.installedPackages['snap-ctrl'] ? 'INSTALLED' : 'NOT INSTALLED' }}
                 </span>
             </div>
@@ -399,7 +399,7 @@ const version = 'v0.1.60';
             </div>
             <p class="text-[11px] font-medium text-gray-500 leading-relaxed">The ultimate modern web controller for your Snapcast server infrastructure.</p>
             <div class="pt-3 border-t border-white/5">
-                 <button @click="handleUpdate('snap-ctrl')" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                 <button @click="handleUpdate('snap-ctrl')" class="w-full px-4 py-3 bg-brand-primary hover:bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest text-xs border border-brand-primary shadow-lg shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     {{ systemStore.installedPackages['snap-ctrl'] ? 'Update Interface' : 'Install Interface' }}
                  </button>
             </div>
@@ -416,7 +416,7 @@ const version = 'v0.1.60';
         <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-gray-400">Toolkit</span>
-                <span :class="systemStore.installedPackages.ffmpeg ? 'text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]' : 'text-[#ff3b30] drop-shadow-[0_0_5px_rgba(255,59,48,0.5)]'" class="text-sm font-black">
+                <span :class="systemStore.installedPackages.ffmpeg ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-sm font-black">
                     {{ systemStore.installedPackages.ffmpeg ? 'READY' : 'ABSENT' }}
                 </span>
             </div>
@@ -427,15 +427,15 @@ const version = 'v0.1.60';
                  </div>
             </div>
             <div class="pt-3 border-t border-white/5" v-if="!systemStore.installedPackages.ffmpeg">
-                 <button @click="systemStore.installPackage('ffmpeg')" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                 <button @click="systemStore.installPackage('ffmpeg')" class="w-full px-4 py-3 bg-brand-primary hover:bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest text-xs border border-brand-primary shadow-lg shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Install FFmpeg
                  </button>
             </div>
             <div class="pt-4 flex flex-col space-y-4 border-t border-white/5" v-else>
-                <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-[inset_0_0_15px_rgba(166,13,242,0.1)]">
+                <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-inner shadow-brand-primary/10">
                     <p class="text-[10px] font-bold text-brand-primary uppercase tracking-widest leading-relaxed text-center">FFmpeg is optimized and ready for high-fidelity audio transcoding.</p>
                 </div>
-                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-300 rounded-xl hover:bg-white/10 hover:text-white border border-white/5 transition-all text-xs font-black uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Refresh Packages</button>
+                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-300 rounded-xl hover:bg-white/10 hover:text-white border border-white/5 transition-all text-xs font-bold uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Refresh Packages</button>
             </div>
         </div>
       </Card>
@@ -447,13 +447,13 @@ const version = 'v0.1.60';
         <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-gray-400">Receiver</span>
-                <span :class="systemStore.installedPackages['shairport-sync'] ? 'text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]' : 'text-[#ff3b30] drop-shadow-[0_0_5px_rgba(255,59,48,0.5)]'" class="text-sm font-black">
+                <span :class="systemStore.installedPackages['shairport-sync'] ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-sm font-black">
                     {{ systemStore.installedPackages['shairport-sync'] ? 'ENABLED' : 'DISABLED' }}
                 </span>
             </div>
             <div class="flex items-center justify-between" v-if="systemStore.installedPackages['shairport-sync']">
                  <span class="text-sm font-semibold text-gray-400">Status</span>
-                 <span :class="systemStore.shairportSyncStatus === 'active' ? 'text-[#00ff9d] bg-[#00ff9d]/10 border-[#00ff9d]/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
+                 <span :class="systemStore.shairportSyncStatus === 'active' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
                      {{ systemStore.shairportSyncStatus }}
                  </span>
             </div>
@@ -467,9 +467,9 @@ const version = 'v0.1.60';
                 <div class="grid grid-cols-2 gap-3">
                     <button @click="systemStore.controlService('restart', 'shairport-sync')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
                     <button v-if="systemStore.shairportSyncStatus === 'active'" @click="systemStore.controlService('stop', 'shairport-sync')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
-                    <button v-else @click="systemStore.controlService('start', 'shairport-sync')" class="px-3 py-2.5 bg-[#00ff9d]/10 hover:bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
+                    <button v-else @click="systemStore.controlService('start', 'shairport-sync')" class="px-3 py-2.5 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
                 </div>
-                <button @click="handleUpdate('shairport-sync')" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                <button @click="handleUpdate('shairport-sync')" class="w-full px-4 py-3 bg-brand-primary hover:bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest text-xs border border-brand-primary shadow-lg shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Update Shairport
                 </button>
                 <button @click="handleUninstall('shairport-sync')" class="w-full px-4 py-3 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
@@ -477,7 +477,7 @@ const version = 'v0.1.60';
                 </button>
             </div>
             <div class="pt-4 border-t border-white/5" v-else>
-                 <button @click="systemStore.installPackage('shairport-sync')" class="w-full px-6 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-sm border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                 <button @click="systemStore.installPackage('shairport-sync')" class="w-full px-6 py-3 bg-brand-primary hover:bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest text-sm border border-brand-primary shadow-lg shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Install AirPlay
                  </button>
             </div>
