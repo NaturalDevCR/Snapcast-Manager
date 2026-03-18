@@ -33,24 +33,37 @@ const isClientMode = computed(() => route.path.startsWith('/client'));
 const serverPrimaryNav = [
   { name: 'Dashboard', href: '/', icon: 'dashboard' },
   { name: 'Audio Matrix', href: '/routing', icon: 'grid_view' },
-  { name: 'Logs', href: '/logs', icon: 'terminal' },
 ];
 
 // System submenu items
-const serverSystemNav = [
-  { name: 'Configuration', href: '/server', icon: 'settings', description: 'Snapserver settings' },
+const serverSystemNav: Array<{
+  name: string; href: string; icon: string; description: string;
+  to?: string | object;
+  activeWhen?: (r: typeof route) => boolean;
+}> = [
+  { name: 'Logs', href: '/logs', icon: 'terminal', description: 'Service logs' },
+  { name: 'Configuration', href: '/server', icon: 'settings', description: 'Snapserver settings',
+    activeWhen: (r) => r.path.startsWith('/server') && r.query.tab !== 'security' },
+  { name: 'Security', href: '/server', icon: 'security', description: 'Admin access',
+    to: { path: '/server', query: { tab: 'security' } },
+    activeWhen: (r) => r.path.startsWith('/server') && r.query.tab === 'security' },
   { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart', description: 'Service monitors' },
 ];
 
 const clientNavigation = [
   { name: 'Dashboard', href: '/client', icon: 'speaker' },
-  { name: 'Logs', href: '/logs', icon: 'terminal' },
+  { name: 'Logs', href: '/logs', icon: 'terminal', to: { path: '/logs', query: { filter: 'snapclient' } } },
 ];
 
 const navigation = computed(() => isClientMode.value ? clientNavigation : serverPrimaryNav);
 
+const isItemActive = (item: typeof serverSystemNav[number]) => {
+  if (item.activeWhen) return item.activeWhen(route);
+  return isNavActive(item.href);
+};
+
 const isSystemActive = computed(() =>
-  serverSystemNav.some(item => isNavActive(item.href))
+  serverSystemNav.some(item => isItemActive(item))
 );
 
 const isNavActive = (href: string) => {
@@ -175,11 +188,11 @@ function handleClickOutside(e: MouseEvent) {
                 >
                   <router-link
                     v-for="item in serverSystemNav"
-                    :key="item.href"
-                    :to="item.href"
+                    :key="item.name"
+                    :to="item.to ?? item.href"
                     @click="isSystemMenuOpen = false"
                     :class="[
-                      isNavActive(item.href)
+                      isItemActive(item)
                         ? 'bg-brand-primary/15 text-white'
                         : 'text-gray-400 hover:bg-white/5 hover:text-white',
                       'flex items-center gap-3 px-4 py-2.5 transition-all duration-150 mx-1.5 rounded-xl'
@@ -187,13 +200,13 @@ function handleClickOutside(e: MouseEvent) {
                   >
                     <span
                       class="material-symbols-outlined text-[1.1rem] flex-shrink-0"
-                      :class="isNavActive(item.href) ? 'text-brand-primary' : 'text-gray-500'"
+                      :class="isItemActive(item) ? 'text-brand-primary' : 'text-gray-500'"
                     >{{ item.icon }}</span>
                     <div>
                       <p class="text-xs font-black uppercase tracking-wide leading-tight">{{ item.name }}</p>
                       <p class="text-[10px] text-gray-500 font-medium mt-0.5">{{ item.description }}</p>
                     </div>
-                    <span v-if="isNavActive(item.href)" class="ml-auto w-1.5 h-1.5 rounded-full bg-brand-primary shadow-[0_0_6px_rgba(166,13,242,0.8)]"></span>
+                    <span v-if="isItemActive(item)" class="ml-auto w-1.5 h-1.5 rounded-full bg-brand-primary shadow-[0_0_6px_rgba(166,13,242,0.8)]"></span>
                   </router-link>
                 </div>
               </Transition>
@@ -202,7 +215,7 @@ function handleClickOutside(e: MouseEvent) {
 
           <!-- Right: User + Logout -->
           <div class="flex items-center gap-2">
-            <div class="flex items-center gap-2.5 pl-3 border-l border-white/10">
+            <div class="flex items-center gap-2.5 sm:pl-3 sm:border-l sm:border-white/10">
                 <div class="text-right hidden sm:block">
                     <p class="text-xs font-bold text-white leading-tight">Admin</p>
                     <p class="text-[10px] text-brand-primary font-medium">Session Active</p>
@@ -280,7 +293,7 @@ function handleClickOutside(e: MouseEvent) {
               <router-link
                 v-for="item in navigation"
                 :key="item.name"
-                :to="item.href"
+                :to="(item as any).to ?? item.href"
                 @click="isMobileMenuOpen = false"
                 :class="[
                   isNavActive(item.href)
@@ -325,17 +338,17 @@ function handleClickOutside(e: MouseEvent) {
                   <div v-if="isMobileSystemOpen || isSystemActive" class="ml-4 flex flex-col gap-1 border-l border-white/10 pl-3">
                     <router-link
                       v-for="item in serverSystemNav"
-                      :key="item.href"
-                      :to="item.href"
+                      :key="item.name"
+                      :to="item.to ?? item.href"
                       @click="isMobileMenuOpen = false"
                       :class="[
-                        isNavActive(item.href)
+                        isItemActive(item)
                           ? 'text-white'
                           : 'text-gray-500 hover:text-gray-300',
                         'py-2 text-sm font-bold transition-all duration-200 flex items-center gap-2.5'
                       ]"
                     >
-                      <span class="material-symbols-outlined text-[1rem]" :class="isNavActive(item.href) ? 'text-brand-primary' : ''">{{ item.icon }}</span>
+                      <span class="material-symbols-outlined text-[1rem]" :class="isItemActive(item) ? 'text-brand-primary' : ''">{{ item.icon }}</span>
                       {{ item.name }}
                     </router-link>
                   </div>

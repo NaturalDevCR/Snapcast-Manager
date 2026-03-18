@@ -67,4 +67,16 @@ router.post('/client/:id/name', async (req: Request, res: Response) => {
     }
 });
 
+router.post('/group/:id/name', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { name } = req.body;
+    try {
+        const result = await executeSnapcastRpc('Group.SetName', { id, name });
+        res.json({ success: true, result });
+    } catch (error: any) {
+        console.error('Snapcast Group.SetName Error:', error);
+        res.status(500).json({ error: error.message || 'Failed to set group name' });
+    }
+});
+
 export default router;
