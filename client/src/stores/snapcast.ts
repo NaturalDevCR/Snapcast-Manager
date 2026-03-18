@@ -127,6 +127,20 @@ export const useSnapcastStore = defineStore('snapcast', () => {
     }
   }
 
+  async function setGroupName(groupId: string, name: string) {
+    try {
+      await fetchApi(`/snapcast/group/${groupId}/name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      await fetchStatus();
+    } catch (err: any) {
+      console.error('Failed to set group name:', err);
+      error.value = err.message;
+    }
+  }
+
   return {
     status,
     loading,
@@ -134,6 +148,7 @@ export const useSnapcastStore = defineStore('snapcast', () => {
     fetchStatus,
     setGroupStream,
     setGroupMute,
+    setGroupName,
     setClientVolume,
     setClientName
   };

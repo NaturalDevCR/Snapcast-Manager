@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { useRoute } from 'vue-router';
 import { basicEditor } from 'prism-code-editor/setups';
 import 'prism-code-editor/prism/languages/ini';
 import 'prism-code-editor/layout.css';
@@ -17,6 +18,7 @@ import PromptDialog from '../components/PromptDialog.vue';
 
 
 
+const route = useRoute();
 const configStore = useConfigStore();
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
@@ -25,7 +27,16 @@ const uiStore = useUIStore();
 
 const snapshotStore = useSnapshotStore();
 
-const activeTab = ref<'standard' | 'expert' | 'snapshots' | 'security'>('standard');
+const validTabs = ['standard', 'expert', 'snapshots', 'security'] as const;
+const activeTab = ref<typeof validTabs[number]>(
+  (validTabs.includes(route.query.tab as any) ? route.query.tab : 'standard') as typeof validTabs[number]
+);
+
+watch(() => route.query.tab, (tab) => {
+  if (validTabs.includes(tab as any)) {
+    activeTab.value = tab as typeof validTabs[number];
+  }
+});
 const activeSection = ref('server');
 const localRawConfig = ref('');
 const editorRef = ref<HTMLElement | null>(null);

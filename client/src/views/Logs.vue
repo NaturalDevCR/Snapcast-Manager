@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { useSystemStore } from '../stores/system';
 import { useUIStore } from '../stores/ui';
 import { useSnapclientInstancesStore } from '../stores/snapclientInstances';
 
 import Layout from '../components/Layout.vue';
 
+const route = useRoute();
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
 const instanceStore = useSnapclientInstancesStore();
@@ -35,8 +37,13 @@ const switchService = (service: string) => {
 };
 
 onMounted(async () => {
-  if (systemStore.installedPackages.snapclient) {
+  // Always load instances when filter=snapclient is requested (client mode nav)
+  if (systemStore.installedPackages.snapclient || route.query.filter === 'snapclient') {
     await instanceStore.fetchInstances();
+  }
+  // Auto-select first snapclient instance when coming from client mode
+  if (route.query.filter === 'snapclient' && instanceStore.instances.length > 0) {
+    activeService.value = 'snapclient-' + instanceStore.instances[0].id;
   }
   fetchLogs();
   refreshInterval = window.setInterval(() => {
