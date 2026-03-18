@@ -29,20 +29,20 @@ const handleLogin = async () => {
   <div class="min-h-screen bg-brand-bg flex items-center justify-center p-6 transition-colors duration-500">
     <!-- Background Accents -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none">
-        <div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-brand-primary/10 blur-[120px] rounded-full"></div>
-        <div class="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-indigo-500/10 blur-[120px] rounded-full"></div>
+        <div class="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] bg-brand-primary/20 blur-[140px] rounded-full"></div>
+        <div class="absolute -bottom-[20%] -right-[10%] w-[60%] h-[60%] bg-indigo-500/10 blur-[140px] rounded-full"></div>
     </div>
 
     <div class="max-w-md w-full relative group">
-      <div class="relative bg-brand-surface shadow-lg rounded-2xl p-6 md:p-8 border border-white/10 animate-in fade-in zoom-in duration-700">
+      <div class="relative bg-brand-surface/80 backdrop-blur-3xl shadow-2xl shadow-brand-primary/10 rounded-[2.5rem] p-8 md:p-12 border border-white/[0.04] animate-in fade-in zoom-in duration-700">
         <div class="text-center mb-8">
-           <div class="inline-flex items-center justify-center mb-4">
-              <img src="../assets/logo.png" alt="Logo" class="w-16 h-16 rounded-xl shadow-md object-cover border border-white/5" />
+           <div class="inline-flex items-center justify-center w-20 h-20 mb-6 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 shadow-xl shadow-brand-primary/20">
+              <span class="material-symbols-outlined text-4xl text-brand-primary">settings_input_antenna</span>
            </div>
-           <h2 class="text-2xl font-black text-text-main tracking-tight leading-tight">
+           <h2 class="text-3xl font-black text-text-main tracking-tight leading-tight">
             Snapcast Manager
           </h2>
-          <p class="mt-2 text-sm text-text-muted font-medium">Please enter your credentials.</p>
+          <p class="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-white/40">Secure Network Authentication</p>
         </div>
 
         <form class="space-y-6" @submit.prevent="handleLogin">
@@ -78,7 +78,7 @@ const handleLogin = async () => {
           <button 
             type="submit" 
             :disabled="loading"
-            class="group w-full flex items-center justify-center py-3 px-6 bg-brand-primary hover:bg-blue-600 text-white rounded-xl font-bold text-sm uppercase tracking-widest shadow-sm shadow-brand-primary/10 border border-brand-primary transition-all active:scale-[0.98] disabled:opacity-50"
+            class="group w-full flex items-center justify-center py-4 px-6 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-brand-primary/30 border border-brand-primary/50 transition-all active:scale-[0.98] disabled:opacity-50"
           >
             <span v-if="loading" class="animate-pulse flex items-center gap-2"><span class="material-symbols-outlined animate-spin text-lg">sync</span>Authenticating...</span>
             <div v-else class="flex items-center">
