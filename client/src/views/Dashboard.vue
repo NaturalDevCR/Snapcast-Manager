@@ -72,7 +72,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Update this constant synchronously with the package.json version before release
-const version = 'v0.1.57';
+const version = 'v0.1.59';
 </script>
 
 <template>
@@ -266,70 +266,6 @@ const version = 'v0.1.57';
         </div>
       </Card>
 
-      <Card title="Snap-ctrl">
-        <template #icon>
-            <span class="material-symbols-outlined">api</span>
-        </template>
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">Status</span>
-                <span :class="systemStore.installedPackages['snap-ctrl'] ? 'text-[#00ff9d] bg-[#00ff9d]/10 border-[#00ff9d]/20 drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
-                    {{ systemStore.installedPackages['snap-ctrl'] ? 'INSTALLED' : 'NOT INSTALLED' }}
-                </span>
-            </div>
-            <div class="flex flex-col">
-                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Version</span>
-                    <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions['snap-ctrl'] || '...' }}</span>
-                 </div>
-                 <div v-if="systemStore.availableVersions['snap-ctrl'] && systemStore.availableVersions['snap-ctrl'] !== 'unknown' && systemStore.packageVersions['snap-ctrl'] !== systemStore.availableVersions['snap-ctrl']" 
-                       class="mt-2 bg-[#ffcc00]/10 border border-[#ffcc00]/20 text-[#ffcc00] text-[10px] px-3 py-2 rounded-xl font-black flex items-center justify-between">
-                     <span>UPDATE READY</span>
-                     <span class="w-2 h-2 rounded-full bg-[#ffcc00] animate-pulse"></span>
-                 </div>
-            </div>
-            <p class="text-[11px] font-medium text-gray-500 leading-relaxed">The ultimate modern web controller for your Snapcast server infrastructure.</p>
-            <div class="pt-3 border-t border-white/5">
-                 <button @click="handleUpdate('snap-ctrl')" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ systemStore.installedPackages['snap-ctrl'] ? 'Update Interface' : 'Install Interface' }}
-                 </button>
-            </div>
-            <p v-if="systemStore.installedPackages['snap-ctrl']" class="text-[10px] font-black text-center text-gray-600 uppercase tracking-widest">
-                Port 1780
-            </p>
-        </div>
-      </Card>
-
-      <Card title="FFmpeg">
-        <template #icon>
-            <span class="material-symbols-outlined">movie_creation</span>
-        </template>
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">Toolkit</span>
-                <span :class="systemStore.installedPackages.ffmpeg ? 'text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]' : 'text-[#ff3b30] drop-shadow-[0_0_5px_rgba(255,59,48,0.5)]'" class="text-sm font-black">
-                    {{ systemStore.installedPackages.ffmpeg ? 'READY' : 'ABSENT' }}
-                </span>
-            </div>
-            <div class="flex flex-col" v-if="systemStore.installedPackages.ffmpeg">
-                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Version Info</span>
-                    <span class="text-xs font-mono font-bold text-gray-300 truncate max-w-[150px]">{{ systemStore.packageVersions.ffmpeg || '...' }}</span>
-                 </div>
-            </div>
-            <div class="pt-3 border-t border-white/5" v-if="!systemStore.installedPackages.ffmpeg">
-                 <button @click="systemStore.installPackage('ffmpeg')" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    Install FFmpeg
-                 </button>
-            </div>
-            <div class="pt-4 flex flex-col space-y-4 border-t border-white/5" v-else>
-                <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-[inset_0_0_15px_rgba(166,13,242,0.1)]">
-                    <p class="text-[10px] font-bold text-brand-primary uppercase tracking-widest leading-relaxed text-center">FFmpeg is optimized and ready for high-fidelity audio transcoding.</p>
-                </div>
-                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-300 rounded-xl hover:bg-white/10 hover:text-white border border-white/5 transition-all text-xs font-black uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Refresh Packages</button>
-            </div>
-        </div>
-      </Card>
 
       <Card title="Runtime Environment">
         <template #icon>
@@ -402,6 +338,71 @@ const version = 'v0.1.57';
       </div>
 
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <Card title="Snap-ctrl">
+        <template #icon>
+            <span class="material-symbols-outlined">api</span>
+        </template>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-400">Status</span>
+                <span :class="systemStore.installedPackages['snap-ctrl'] ? 'text-[#00ff9d] bg-[#00ff9d]/10 border-[#00ff9d]/20 drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
+                    {{ systemStore.installedPackages['snap-ctrl'] ? 'INSTALLED' : 'NOT INSTALLED' }}
+                </span>
+            </div>
+            <div class="flex flex-col">
+                 <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Version</span>
+                    <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions['snap-ctrl'] || '...' }}</span>
+                 </div>
+                 <div v-if="systemStore.availableVersions['snap-ctrl'] && systemStore.availableVersions['snap-ctrl'] !== 'unknown' && systemStore.packageVersions['snap-ctrl'] !== systemStore.availableVersions['snap-ctrl']" 
+                       class="mt-2 bg-[#ffcc00]/10 border border-[#ffcc00]/20 text-[#ffcc00] text-[10px] px-3 py-2 rounded-xl font-black flex items-center justify-between">
+                     <span>UPDATE READY</span>
+                     <span class="w-2 h-2 rounded-full bg-[#ffcc00] animate-pulse"></span>
+                 </div>
+            </div>
+            <p class="text-[11px] font-medium text-gray-500 leading-relaxed">The ultimate modern web controller for your Snapcast server infrastructure.</p>
+            <div class="pt-3 border-t border-white/5">
+                 <button @click="handleUpdate('snap-ctrl')" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                    {{ systemStore.installedPackages['snap-ctrl'] ? 'Update Interface' : 'Install Interface' }}
+                 </button>
+            </div>
+            <p v-if="systemStore.installedPackages['snap-ctrl']" class="text-[10px] font-black text-center text-gray-600 uppercase tracking-widest">
+                Port 1780
+            </p>
+        </div>
+      </Card>
+
+      <Card title="FFmpeg">
+        <template #icon>
+            <span class="material-symbols-outlined">movie_creation</span>
+        </template>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-400">Toolkit</span>
+                <span :class="systemStore.installedPackages.ffmpeg ? 'text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]' : 'text-[#ff3b30] drop-shadow-[0_0_5px_rgba(255,59,48,0.5)]'" class="text-sm font-black">
+                    {{ systemStore.installedPackages.ffmpeg ? 'READY' : 'ABSENT' }}
+                </span>
+            </div>
+            <div class="flex flex-col" v-if="systemStore.installedPackages.ffmpeg">
+                 <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Version Info</span>
+                    <span class="text-xs font-mono font-bold text-gray-300 truncate max-w-[150px]">{{ systemStore.packageVersions.ffmpeg || '...' }}</span>
+                 </div>
+            </div>
+            <div class="pt-3 border-t border-white/5" v-if="!systemStore.installedPackages.ffmpeg">
+                 <button @click="systemStore.installPackage('ffmpeg')" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                    Install FFmpeg
+                 </button>
+            </div>
+            <div class="pt-4 flex flex-col space-y-4 border-t border-white/5" v-else>
+                <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-[inset_0_0_15px_rgba(166,13,242,0.1)]">
+                    <p class="text-[10px] font-bold text-brand-primary uppercase tracking-widest leading-relaxed text-center">FFmpeg is optimized and ready for high-fidelity audio transcoding.</p>
+                </div>
+                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-300 rounded-xl hover:bg-white/10 hover:text-white border border-white/5 transition-all text-xs font-black uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Refresh Packages</button>
+            </div>
+        </div>
+      </Card>
+
       <Card title="AirPlay Service">
         <template #icon>
             <span class="material-symbols-outlined">cast</span>
@@ -447,17 +448,6 @@ const version = 'v0.1.57';
       </Card>
 
       </div>
-    <!-- Footer -->
-    <div class="mt-16 pt-8 border-t border-white/5 text-center pb-8 opacity-60 hover:opacity-100 transition-opacity">
-        <p class="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] flex items-center justify-center space-x-2">
-            <span class="material-symbols-outlined text-[14px]">terminal</span>
-            <span>2026 Snapcast Manager Ecosystem &bull; VERSION {{ version }}</span>
-        </p>
-        <a href="https://github.com/jdavidoa91/Snapcast-Manager" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 mt-4 text-xs font-black text-brand-primary hover:text-[#8e0bc9] transition-colors group">
-           <span>Developed by NaturalDevCR</span>
-           <span class="material-symbols-outlined text-[14px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
-        </a>
-    </div>
   </div>
 </Layout>
 </template>

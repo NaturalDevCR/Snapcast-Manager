@@ -6,7 +6,6 @@ import Setup from '../views/Setup.vue'
 import Logs from '../views/Logs.vue'
 import Watchdogs from '../views/Watchdogs.vue'
 import Routing from '../views/Routing.vue'
-import Player from '../views/Player.vue'
 
 import { fetchApi } from '../utils/api'
 
@@ -27,12 +26,6 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: Dashboard,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/player',
-      name: 'player',
-      component: Player,
       meta: { requiresAuth: true }
     },
     {

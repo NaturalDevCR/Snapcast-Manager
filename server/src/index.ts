@@ -8,7 +8,6 @@ import configRouter from './routes/config';
 import snapshotRouter from './routes/snapshot';
 import snapcastRouter from './routes/snapcast';
 import watchdogRouter from './routes/watchdog';
-import mpdRouter from './routes/mpd';
 
 dotenv.config();
 
@@ -24,7 +23,6 @@ app.use('/api/config', configRouter);
 app.use('/api/snapshots', snapshotRouter);
 app.use('/api/snapcast', snapcastRouter);
 app.use('/api/watchdog', watchdogRouter);
-app.use('/api/mpd', mpdRouter);
 
 // Basic status route
 app.get('/api/status', (req, res) => {
