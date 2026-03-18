@@ -3,6 +3,7 @@ import Dashboard from '../views/Dashboard.vue'
 import ClientDashboard from '../views/ClientDashboard.vue'
 import Login from '../views/Login.vue'
 import ServerConfig from '../views/ServerConfig.vue'
+import Security from '../views/Security.vue'
 import Setup from '../views/Setup.vue'
 import Logs from '../views/Logs.vue'
 import Watchdogs from '../views/Watchdogs.vue'
@@ -33,6 +34,12 @@ const router = createRouter({
       path: '/server',
       name: 'server-config',
       component: ServerConfig,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/security',
+      name: 'security',
+      component: Security,
       meta: { requiresAuth: true }
     },
     {
