@@ -577,7 +577,7 @@ const buildSourceUri = (): string => {
   
   // Meta streams build path from selected sources
   if (template.isMeta) {
-    const metaPath = '/' + metaSelectedSources.value.join('/');
+    const metaPath = metaSelectedSources.value.map(s => encodeURIComponent(s)).join('/');
     let uri = `${template.uriPrefix}/${metaPath}`;
     const params: string[] = [];
     for (const p of template.params) {

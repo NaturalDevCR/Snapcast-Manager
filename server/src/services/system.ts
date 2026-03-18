@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import util from 'util';
 import { configService } from './config';
+import { snapclientInstanceService } from './snapclientInstances';
 
 const execAsync = util.promisify(exec);
 
@@ -157,10 +158,22 @@ export class SystemService {
       if (!fallbackAsset) {
         throw new Error(`Could not find a snapclient .deb asset for architecture ${archTrimmed} (Distro: ${codename}) in Snapcast release ${release.tag_name}`);
       }
-      return this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name, clean, 'snapclient');
+      const result = await this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name, clean, 'snapclient');
+      await this.postSnapclientInstall();
+      return result;
     }
 
-    return this.executeDebUpdate(asset.browser_download_url, asset.name, clean, 'snapclient');
+    const result = await this.executeDebUpdate(asset.browser_download_url, asset.name, clean, 'snapclient');
+    await this.postSnapclientInstall();
+    return result;
+  }
+
+  private async postSnapclientInstall(): Promise<void> {
+    // Stop and disable the default package service — we manage our own instances
+    await this.runCommand('sudo systemctl stop snapclient 2>/dev/null || true').catch(() => {});
+    await this.runCommand('sudo systemctl disable snapclient 2>/dev/null || true').catch(() => {});
+    // Disable the default package service; we manage per-instance services ourselves
+    await snapclientInstanceService.postInstallSetup();
   }
 
   private async executeDebUpdate(downloadUrl: string, fileName: string, clean: boolean = false, pkg: 'snapserver' | 'snapclient' = 'snapserver'): Promise<string> {

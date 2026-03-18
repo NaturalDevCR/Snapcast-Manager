@@ -15,7 +15,8 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.0.5"
+VERSION="v0.0.7"
+APP_VERSION="$VERSION"
 
 # Determine if SUDO is needed
 if [ "$(id -u)" -eq 0 ]; then

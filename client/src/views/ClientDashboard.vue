@@ -1,76 +1,136 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { useSystemStore } from '../stores/system';
 import { useUIStore } from '../stores/ui';
-import { fetchApi } from '../utils/api';
+import { useSnapclientInstancesStore, type SnapclientInstance } from '../stores/snapclientInstances';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
 
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
+const instanceStore = useSnapclientInstancesStore();
 
-const snapclientConfig = ref('');
-const configLoading = ref(false);
+// ── Modal state ──────────────────────────────────────────────────────────────
+const showModal = ref(false);
+const editingInstance = ref<SnapclientInstance | null>(null);
 
-onMounted(async () => {
-  await systemStore.refreshAll();
-  await loadSnapclientConfig();
+const form = ref({ name: '', host: '127.0.0.1', port: 1704, soundcard: '', hostId: '' });
+
+function openCreate() {
+  editingInstance.value = null;
+  form.value = { name: '', host: '127.0.0.1', port: 1704, soundcard: '', hostId: '' };
+  showModal.value = true;
+}
+
+function openEdit(inst: SnapclientInstance) {
+  editingInstance.value = inst;
+  form.value = { name: inst.name, host: inst.host, port: inst.port, soundcard: inst.soundcard, hostId: inst.hostId || '' };
+  showModal.value = true;
+}
+
+function closeModal() {
+  showModal.value = false;
+  editingInstance.value = null;
+}
+
+// Available devices excluding already-used ones (except the current instance's own device)
+const availableDevices = computed(() => {
+  return instanceStore.devices.filter(d => {
+    if (!d.inUse) return true;
+    // Allow if this device belongs to the instance being edited
+    return editingInstance.value?.soundcard === d.hwId;
+  });
 });
 
-async function loadSnapclientConfig() {
-  try {
-    const data = await fetchApi('/config/snapclient');
-    snapclientConfig.value = data.content;
-  } catch (err) {
-    console.error('Failed to load snapclient config:', err);
+async function submitForm() {
+  if (!form.value.name || !form.value.soundcard) {
+    uiStore.showToast('Name and audio device are required.', 'error');
+    return;
   }
-}
-
-async function saveSnapclientConfig() {
-  configLoading.value = true;
   try {
-    await fetchApi('/config/snapclient', {
-      method: 'POST',
-      body: JSON.stringify({ content: snapclientConfig.value }),
-    });
-    uiStore.showToast('Snapclient config saved successfully!', 'success');
+    if (editingInstance.value) {
+      await instanceStore.updateInstance(editingInstance.value.id, {
+        name: form.value.name,
+        host: form.value.host,
+        port: form.value.port,
+        soundcard: form.value.soundcard,
+        hostId: form.value.hostId || undefined,
+      });
+      uiStore.showToast('Instance updated successfully!', 'success');
+    } else {
+      await instanceStore.createInstance({
+        name: form.value.name,
+        host: form.value.host,
+        port: form.value.port,
+        soundcard: form.value.soundcard,
+        hostId: form.value.hostId || undefined,
+      });
+      uiStore.showToast('Instance created successfully!', 'success');
+    }
+    closeModal();
+    await instanceStore.fetchDevices();
   } catch (err: any) {
-    uiStore.showToast('Failed to save config: ' + err.message, 'error');
-  } finally {
-    configLoading.value = false;
+    uiStore.showToast('Error: ' + err.message, 'error');
   }
 }
 
-const handleUpdate = async (clean: boolean = false) => {
+async function handleDelete(inst: SnapclientInstance) {
+  if (!confirm(`Delete instance "${inst.name}"? This will stop its service and remove all its files.`)) return;
+  try {
+    await instanceStore.deleteInstance(inst.id);
+    uiStore.showToast(`Instance "${inst.name}" deleted.`, 'success');
+    await instanceStore.fetchDevices();
+  } catch (err: any) {
+    uiStore.showToast('Delete failed: ' + err.message, 'error');
+  }
+}
+
+async function handleControl(inst: SnapclientInstance, action: 'start' | 'stop' | 'restart') {
+  try {
+    await instanceStore.controlInstance(inst.id, action);
+  } catch (err: any) {
+    uiStore.showToast(`Failed to ${action} "${inst.name}": ` + err.message, 'error');
+  }
+}
+
+async function handleUpdate(clean = false) {
   if (clean && !confirm('WARNING: This will UNINSTALL snapclient and DELETE its config before a fresh installation. Continue?')) return;
   try {
     await systemStore.updatePackage('snapclient', clean);
     uiStore.showToast(`snapclient ${clean ? 'reinstalled' : 'updated'} successfully!`, 'success');
   } catch (err: any) {
-    uiStore.showToast(`Failed to ${clean ? 'reinstall' : 'update'} snapclient: ` + err.message, 'error');
+    uiStore.showToast(`Failed: ` + err.message, 'error');
   }
-};
+}
 
-const handleUninstall = async () => {
-  if (!confirm('Are you sure you want to UNINSTALL snapclient?')) return;
+async function handleUninstall() {
+  if (!confirm('Are you sure you want to UNINSTALL snapclient? All instances will be deleted.')) return;
   try {
     await systemStore.uninstallPackage('snapclient');
     uiStore.showToast('snapclient uninstalled successfully!', 'success');
     await systemStore.refreshAll();
   } catch (err: any) {
-    uiStore.showToast('Failed to uninstall snapclient: ' + err.message, 'error');
+    uiStore.showToast('Failed: ' + err.message, 'error');
   }
-};
+}
+
+onMounted(async () => {
+  await systemStore.refreshAll();
+  if (systemStore.installedPackages.snapclient) {
+    await Promise.all([instanceStore.fetchInstances(), instanceStore.fetchDevices()]);
+  }
+});
 </script>
 
 <template>
   <Layout>
     <div class="relative min-h-[60vh] space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
       <!-- Header -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 class="text-3xl font-black tracking-tight text-text-main">Client Dashboard</h1>
-          <p class="text-text-muted font-medium mt-1">Manage and monitor your Snapclient audio receiver.</p>
+          <p class="text-text-muted font-medium mt-1">Manage Snapclient audio receiver instances.</p>
         </div>
         <button @click="systemStore.refreshAll()" :disabled="systemStore.loading" class="inline-flex items-center px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-brand-primary/30 active:scale-95 disabled:opacity-50 group border border-brand-primary/50">
           <span class="material-symbols-outlined text-[1.2rem] mr-2 transition-transform" :class="{'animate-spin': systemStore.loading, 'group-hover:rotate-180': !systemStore.loading}">refresh</span>
@@ -79,25 +139,22 @@ const handleUninstall = async () => {
       </div>
 
       <!-- Loading Overlay -->
-      <div v-if="systemStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-[#1c1022]/40 backdrop-blur-sm pointer-events-none">
+      <div v-if="systemStore.loading || instanceStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-[#1c1022]/40 backdrop-blur-sm pointer-events-none">
         <div class="bg-[#2a1c31]/90 p-5 rounded-2xl shadow-2xl flex items-center space-x-3 border border-brand-primary/20 animate-in fade-in zoom-in duration-300 pointer-events-auto backdrop-blur-xl">
           <span class="material-symbols-outlined animate-spin text-brand-primary text-2xl">sync</span>
-          <span class="text-sm font-bold text-white tracking-widest uppercase">{{ systemStore.loadingMessage || 'Syncing...' }}</span>
+          <span class="text-sm font-bold text-white tracking-widest uppercase">{{ instanceStore.loadingMessage || systemStore.loadingMessage || 'Syncing...' }}</span>
         </div>
       </div>
 
-      <!-- Section Label -->
+      <!-- ── Snapclient Package Section ───────────────────────────────── -->
       <div class="flex items-center space-x-2 px-1">
         <span class="material-symbols-outlined text-brand-primary">speaker</span>
-        <h2 class="text-sm font-bold text-text-main uppercase tracking-widest">Snapclient Service</h2>
+        <h2 class="text-sm font-bold text-text-main uppercase tracking-widest">Snapclient Package</h2>
       </div>
 
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <!-- Snapclient Package Card -->
         <Card title="Snapclient">
-          <template #icon>
-            <span class="material-symbols-outlined">speaker</span>
-          </template>
+          <template #icon><span class="material-symbols-outlined">speaker</span></template>
           <div class="space-y-4">
             <div class="flex items-center justify-between">
               <span class="text-sm font-semibold text-gray-400">Installed</span>
@@ -105,54 +162,35 @@ const handleUninstall = async () => {
                 {{ systemStore.installedPackages.snapclient ? 'YES' : 'NO' }}
               </span>
             </div>
-
-            <div class="flex items-center justify-between" v-if="systemStore.installedPackages.snapclient">
-              <span class="text-sm font-semibold text-gray-400">Status</span>
-              <span :class="systemStore.snapclientStatus === 'active' ? 'text-[#00ff9d] bg-[#00ff9d]/10 border-[#00ff9d]/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
-                {{ systemStore.snapclientStatus }}
-              </span>
-            </div>
-
-            <div class="flex flex-col" v-if="systemStore.installedPackages.snapclient">
-              <div class="flex items-center justify-between mb-2">
+            <div v-if="systemStore.installedPackages.snapclient" class="flex flex-col gap-2">
+              <div class="flex items-center justify-between">
                 <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Version</span>
                 <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions.snapclient || '...' }}</span>
               </div>
               <div v-if="systemStore.availableVersions.snapclient && systemStore.availableVersions.snapclient !== 'unknown' && systemStore.packageVersions.snapclient !== systemStore.availableVersions.snapclient"
-                   class="mt-2 bg-[#ffcc00]/10 border border-[#ffcc00]/20 text-[#ffcc00] text-[10px] px-3 py-2 rounded-xl font-black flex items-center justify-between">
+                   class="bg-[#ffcc00]/10 border border-[#ffcc00]/20 text-[#ffcc00] text-[10px] px-3 py-2 rounded-xl font-black flex items-center justify-between">
                 <span>NEW VERSION: {{ systemStore.availableVersions.snapclient }}</span>
                 <span class="w-2 h-2 rounded-full bg-[#ffcc00] animate-pulse"></span>
               </div>
               <div v-else-if="systemStore.availableVersions.snapclient && systemStore.availableVersions.snapclient !== 'unknown'"
-                   class="mt-2 bg-[#00ff9d]/5 border border-[#00ff9d]/20 text-[#00ff9d] text-[10px] px-3 py-1.5 rounded-xl font-black font-sans uppercase tracking-[0.2em] text-center drop-shadow-[0_0_5px_rgba(0,255,157,0.3)]">
+                   class="bg-[#00ff9d]/5 border border-[#00ff9d]/20 text-[#00ff9d] text-[10px] px-3 py-1.5 rounded-xl font-black text-center uppercase tracking-[0.2em]">
                 UP TO DATE
               </div>
             </div>
-
-            <!-- Service Controls -->
-            <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages.snapclient">
-              <div class="grid grid-cols-2 gap-3">
-                <button @click="systemStore.controlService('restart', 'snapclient')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
-                <button v-if="systemStore.snapclientStatus === 'active'" @click="systemStore.controlService('stop', 'snapclient')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
-                <button v-else @click="systemStore.controlService('start', 'snapclient')" class="px-3 py-2.5 bg-[#00ff9d]/10 hover:bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
-              </div>
-              <button
-                @click="handleUpdate(systemStore.packageVersions.snapclient === systemStore.availableVersions.snapclient || systemStore.availableVersions.snapclient === 'unknown')"
-                :class="[
-                  'w-full px-4 py-3 rounded-xl text-xs font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 uppercase',
-                  systemStore.packageVersions.snapclient !== systemStore.availableVersions.snapclient && systemStore.availableVersions.snapclient !== 'unknown'
-                  ? 'bg-brand-primary text-white border border-brand-primary/50 shadow-xl shadow-brand-primary/30 hover:shadow-brand-primary/50 hover:bg-brand-primary/80'
-                  : 'bg-black/40 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'
-                ]"
-                :disabled="systemStore.loading">
+            <div class="pt-4 border-t border-white/5 flex flex-col gap-2" v-if="systemStore.installedPackages.snapclient">
+              <button @click="handleUpdate(systemStore.packageVersions.snapclient === systemStore.availableVersions.snapclient || systemStore.availableVersions.snapclient === 'unknown')"
+                      :class="[
+                        'w-full px-4 py-3 rounded-xl text-xs font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 uppercase',
+                        systemStore.packageVersions.snapclient !== systemStore.availableVersions.snapclient && systemStore.availableVersions.snapclient !== 'unknown'
+                        ? 'bg-brand-primary text-white border border-brand-primary/50 shadow-xl shadow-brand-primary/30 hover:bg-brand-primary/80'
+                        : 'bg-black/40 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'
+                      ]" :disabled="systemStore.loading">
                 {{ systemStore.packageVersions.snapclient !== systemStore.availableVersions.snapclient && systemStore.availableVersions.snapclient !== 'unknown' ? 'Install Update' : 'Clean Reinstall' }}
               </button>
               <button @click="handleUninstall" class="w-full px-4 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                 Uninstall
               </button>
             </div>
-
-            <!-- Install Button -->
             <div class="pt-4 border-t border-white/5" v-else>
               <button @click="systemStore.installPackage('snapclient')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black tracking-widest uppercase text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                 Install Snapclient
@@ -160,86 +198,151 @@ const handleUninstall = async () => {
             </div>
           </div>
         </Card>
-
-        <!-- Connection Info -->
-        <Card title="Connection">
-          <template #icon>
-            <span class="material-symbols-outlined">network_node</span>
-          </template>
-          <div class="space-y-3">
-            <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-              <p class="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">About Snapclient</p>
-              <p class="text-xs text-gray-400 leading-relaxed">Snapclient is an audio receiver that connects to a Snapserver. Configure the server host in <span class="font-mono text-brand-primary">/etc/default/snapclient</span> via the config editor below.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
-              <span class="text-[10px] font-bold text-text-muted uppercase tracking-widest">Service</span>
-              <span :class="systemStore.snapclientStatus === 'active' ? 'text-[#00ff9d]' : 'text-[#ff3b30]'" class="text-xs font-black uppercase">
-                {{ systemStore.snapclientStatus }}
-              </span>
-            </div>
-            <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
-              <span class="text-[10px] font-bold text-text-muted uppercase tracking-widest">Version</span>
-              <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions.snapclient || 'N/A' }}</span>
-            </div>
-          </div>
-        </Card>
-
-        <!-- Runtime Environment (reused from server dashboard) -->
-        <Card title="Runtime Environment">
-          <template #icon>
-            <span class="material-symbols-outlined">javascript</span>
-          </template>
-          <div class="space-y-4">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-semibold text-gray-400">Node.js</span>
-              <span class="text-[#00ff9d] font-black text-sm tracking-widest leading-none drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">
-                {{ systemStore.packageVersions.node || 'UNKNOWN' }}
-              </span>
-            </div>
-            <p class="text-xs text-gray-500">Used by Snapcast Manager itself. Upgrade from the Server dashboard if needed.</p>
-          </div>
-        </Card>
       </div>
 
-      <!-- Snapclient Config Editor -->
-      <div v-if="systemStore.installedPackages.snapclient" class="border-t border-white/5 pt-8">
-        <div class="flex items-center space-x-2 px-1 mb-6">
-          <span class="material-symbols-outlined text-brand-primary">edit_note</span>
-          <h2 class="text-sm font-bold text-text-main uppercase tracking-widest">Snapclient Configuration</h2>
-          <span class="text-[10px] text-gray-500 font-mono ml-2">/etc/default/snapclient</span>
+      <!-- ── Instances Section ────────────────────────────────────────── -->
+      <template v-if="systemStore.installedPackages.snapclient">
+        <div class="border-t border-white/5 pt-8">
+          <div class="flex items-center justify-between px-1 mb-6">
+            <div class="flex items-center space-x-2">
+              <span class="material-symbols-outlined text-brand-primary">dynamic_feed</span>
+              <h2 class="text-sm font-bold text-text-main uppercase tracking-widest">Output Instances</h2>
+              <span class="ml-2 px-2 py-0.5 rounded-lg bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black">{{ instanceStore.instances.length }}</span>
+            </div>
+            <button @click="openCreate" :disabled="instanceStore.loading" class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-brand-primary/30 active:scale-95 disabled:opacity-50 border border-brand-primary/50">
+              <span class="material-symbols-outlined text-[1rem]">add</span>
+              New Instance
+            </button>
+          </div>
+
+          <!-- Empty state -->
+          <div v-if="instanceStore.instances.length === 0" class="flex flex-col items-center justify-center py-16 rounded-2xl border border-white/5 bg-white/[0.02] text-center">
+            <span class="material-symbols-outlined text-[3rem] text-white/10 mb-3">speaker_notes_off</span>
+            <p class="text-sm font-black text-white/20 uppercase tracking-widest">No instances configured</p>
+            <p class="text-xs text-gray-600 mt-1">Create an instance for each audio output device.</p>
+          </div>
+
+          <!-- Instance cards -->
+          <div v-else class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Card v-for="inst in instanceStore.instances" :key="inst.id" :title="inst.name">
+              <template #icon>
+                <span class="material-symbols-outlined">speaker</span>
+              </template>
+              <div class="space-y-3">
+                <!-- Status row -->
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Status</span>
+                  <span :class="inst.status === 'active' ? 'text-[#00ff9d] bg-[#00ff9d]/10 border-[#00ff9d]/20' : 'text-[#ff3b30] bg-[#ff3b30]/10 border-[#ff3b30]/20'" class="px-2 py-0.5 rounded-lg text-[9px] border font-black uppercase tracking-widest">
+                    {{ inst.status ?? 'unknown' }}
+                  </span>
+                </div>
+                <!-- Server -->
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Server</span>
+                  <span class="text-xs font-mono text-gray-300">{{ inst.host }}:{{ inst.port }}</span>
+                </div>
+                <!-- Soundcard -->
+                <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                  <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest block mb-1">Audio Output</span>
+                  <span class="text-[11px] font-mono text-brand-primary break-all">{{ inst.soundcard }}</span>
+                </div>
+                <!-- Host ID -->
+                <div v-if="inst.hostId" class="flex items-center justify-between">
+                  <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Host ID</span>
+                  <span class="text-xs font-mono text-gray-400">{{ inst.hostId }}</span>
+                </div>
+
+                <!-- Controls -->
+                <div class="pt-3 border-t border-white/5 space-y-2">
+                  <div class="grid grid-cols-3 gap-2">
+                    <button @click="handleControl(inst, 'restart')" class="py-2 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">Restart</button>
+                    <button v-if="inst.status === 'active'" @click="handleControl(inst, 'stop')" class="py-2 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">Stop</button>
+                    <button v-else @click="handleControl(inst, 'start')" class="py-2 bg-[#00ff9d]/10 hover:bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/20 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">Start</button>
+                    <button @click="openEdit(inst)" class="py-2 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-[10px] font-bold active:scale-95">Edit</button>
+                  </div>
+                  <button @click="handleDelete(inst)" class="w-full py-2 bg-[#ff3b30]/5 hover:bg-[#ff3b30]/15 text-[#ff3b30]/60 hover:text-[#ff3b30] border border-[#ff3b30]/10 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">
+                    Delete Instance
+                  </button>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
-        <Card title="Config Editor">
-          <template #icon>
-            <span class="material-symbols-outlined">tune</span>
-          </template>
-          <div class="space-y-4">
-            <p class="text-xs text-gray-400">Edit the environment file used by the snapclient systemd service. Set <span class="font-mono text-brand-primary">SNAPCLIENT_OPTS</span> to configure the server host (<code class="text-brand-primary">-h</code>), port (<code class="text-brand-primary">-p</code>), sound card (<code class="text-brand-primary">-s</code>), etc.</p>
-            <p class="text-[10px] text-gray-500 font-mono">Example: <span class="text-brand-primary">SNAPCLIENT_OPTS="-h 192.168.1.10 -p 1704"</span></p>
-            <textarea
-              v-model="snapclientConfig"
-              rows="8"
-              class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-xs font-mono text-gray-300 focus:outline-none focus:border-brand-primary/50 resize-y"
-              placeholder="# snapclient default options&#10;SNAPCLIENT_OPTS=&quot;&quot;"
-            ></textarea>
-            <div class="flex gap-3">
-              <button
-                @click="saveSnapclientConfig"
-                :disabled="configLoading || systemStore.loading"
-                class="flex-1 px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50"
-              >
-                {{ configLoading ? 'Saving...' : 'Save & Apply' }}
+      </template>
+
+      <!-- ── Create / Edit Modal ─────────────────────────────────────── -->
+      <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
+        <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="closeModal"></div>
+          <div class="relative bg-[#1c1022] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 duration-200">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+              <h3 class="text-sm font-black text-white uppercase tracking-widest">{{ editingInstance ? 'Edit Instance' : 'New Instance' }}</h3>
+              <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+                <span class="material-symbols-outlined text-[1.1rem]">close</span>
               </button>
-              <button
-                @click="systemStore.controlService('restart', 'snapclient')"
-                :disabled="systemStore.loading"
-                class="px-4 py-3 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50"
-              >
-                Restart Service
+            </div>
+
+            <div class="p-6 space-y-4">
+              <!-- Name -->
+              <div>
+                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">Instance Name</label>
+                <input v-model="form.name" type="text" placeholder="e.g. Living Room DAC" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
+              </div>
+
+              <!-- Audio Device -->
+              <div>
+                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">Audio Output Device</label>
+                <div v-if="instanceStore.devices.length === 0" class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] text-xs text-gray-500 italic">No ALSA devices detected. Make sure audio hardware is connected.</div>
+                <div v-else class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  <label v-for="d in availableDevices" :key="d.hwId"
+                    :class="[
+                      'flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all',
+                      d.inUse && d.hwId !== form.soundcard
+                        ? 'border-white/5 bg-white/[0.01] opacity-40 cursor-not-allowed'
+                        : form.soundcard === d.hwId
+                          ? 'border-brand-primary/50 bg-brand-primary/10'
+                          : 'border-white/5 bg-white/[0.02] hover:border-brand-primary/30 hover:bg-white/[0.05]'
+                    ]"
+                  >
+                    <input type="radio" :value="d.hwId" v-model="form.soundcard" :disabled="d.inUse && d.hwId !== form.soundcard" class="mt-0.5 accent-brand-primary" />
+                    <div class="flex-1 min-w-0">
+                      <p class="text-xs font-bold text-white truncate">{{ d.cardName }}</p>
+                      <p class="text-[10px] text-gray-400">{{ d.deviceName }}</p>
+                      <p class="text-[10px] font-mono text-brand-primary mt-0.5">{{ d.hwId }}</p>
+                      <span v-if="d.inUse && d.hwId !== form.soundcard" class="inline-block mt-1 px-1.5 py-0.5 bg-[#ff3b30]/10 border border-[#ff3b30]/20 text-[#ff3b30] text-[9px] font-black rounded uppercase">In Use</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Host + Port -->
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">Snapserver Host</label>
+                  <input v-model="form.host" type="text" placeholder="192.168.1.10" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
+                </div>
+                <div>
+                  <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">Port</label>
+                  <input v-model.number="form.port" type="number" placeholder="1704" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
+                </div>
+              </div>
+
+              <!-- Host ID -->
+              <div>
+                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">Host ID <span class="text-gray-600 normal-case font-normal">(optional — for stable ID across reboots)</span></label>
+                <input v-model="form.hostId" type="text" placeholder="e.g. living-room-dac" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
+              </div>
+            </div>
+
+            <div class="flex gap-3 px-6 pb-6">
+              <button @click="closeModal" class="flex-1 py-3 bg-black/40 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5 rounded-xl text-xs font-black uppercase tracking-widest transition-all">Cancel</button>
+              <button @click="submitForm" :disabled="!form.name || !form.soundcard || instanceStore.loading" class="flex-1 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-brand-primary/30 border border-brand-primary/50 disabled:opacity-50 active:scale-95">
+                {{ editingInstance ? 'Save Changes' : 'Create Instance' }}
               </button>
             </div>
           </div>
-        </Card>
-      </div>
+        </div>
+      </Transition>
 
     </div>
   </Layout>
