@@ -11,6 +11,8 @@ const snapcastStore = useSnapcastStore();
 let refreshInterval: any = null;
 const renamingClientId = ref<string | null>(null);
 const newClientName = ref('');
+const renamingGroupId = ref<string | null>(null);
+const newGroupName = ref('');
 
 // Container refs for coordinate calculation
 const containerRef = ref<HTMLElement | null>(null);
@@ -280,6 +282,19 @@ const submitRename = async (clientId: string) => {
     }
 };
 
+const startGroupRename = (groupId: string, currentName: string, event: Event) => {
+    event.stopPropagation();
+    renamingGroupId.value = groupId;
+    newGroupName.value = currentName || '';
+};
+
+const submitGroupRename = async (groupId: string) => {
+    if (newGroupName.value.trim()) {
+        await snapcastStore.setGroupName(groupId, newGroupName.value.trim());
+    }
+    renamingGroupId.value = null;
+};
+
 const updateVolume = (client: any, event: Event) => {
     const target = event.target as HTMLInputElement;
     if (target) {
@@ -425,7 +440,22 @@ const updateVolume = (client: any, event: Event) => {
                           <div class="flex items-center gap-4 ml-6 overflow-hidden">
                               <div class="truncate">
                                   <h3 class="text-base font-black text-text-main tracking-tight flex items-center gap-3 truncate">
-                                    <span class="truncate">{{ group.name || 'Zone ' + group.id.slice(0,4) }}</span>
+                                    <!-- Zone name: inline edit on click -->
+                                    <div v-if="renamingGroupId === group.id" class="flex items-center gap-2" @click.stop>
+                                        <input
+                                          type="text"
+                                          v-model="newGroupName"
+                                          @keyup.enter="submitGroupRename(group.id)"
+                                          @keyup.esc="renamingGroupId = null"
+                                          @blur="submitGroupRename(group.id)"
+                                          class="bg-brand-surface border border-brand-primary/50 outline-none rounded-lg px-2 py-1 text-sm text-text-main focus:ring-2 focus:ring-brand-primary/30 w-40 transition-all"
+                                          v-focus
+                                        />
+                                    </div>
+                                    <div v-else class="flex items-center gap-2 group/zonename cursor-pointer" @click.stop="startGroupRename(group.id, group.name || 'Zone ' + group.id.slice(0,4), $event)">
+                                        <span class="truncate">{{ group.name || 'Zone ' + group.id.slice(0,4) }}</span>
+                                        <span class="material-symbols-outlined text-[13px] text-text-muted opacity-0 group-hover/zonename:opacity-100 transition-all">edit</span>
+                                    </div>
                                     <span v-if="group.stream_id" class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-white/10 shrink-0" :style="{ color: getStreamColor(group.stream_id) }">
                                         {{ getStreamLabel(snapcastStore.status?.streams?.find(s => s.id === group.stream_id) || {}) }}
                                     </span>
