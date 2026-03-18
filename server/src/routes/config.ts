@@ -1,7 +1,10 @@
 import express, { Request, Response } from 'express';
+import fs from 'fs/promises';
 import { configService } from '../services/config';
 import { authenticateToken } from '../auth';
 import { CONFIG_METADATA, CONFIG_SECTIONS, SOURCE_TEMPLATES } from '../constants/defaultConfig';
+
+const SNAPCLIENT_CONFIG_PATH = '/etc/default/snapclient';
 
 const router = express.Router();
 
@@ -117,6 +120,29 @@ router.post('/reset', authenticateToken, async (req, res) => {
     try {
         await configService.resetToDefault();
         res.json({ message: 'Configuration reset to default' });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Snapclient config (/etc/default/snapclient)
+router.get('/snapclient', async (req: Request, res: Response) => {
+    try {
+        const content = await fs.readFile(SNAPCLIENT_CONFIG_PATH, 'utf-8').catch(() => '# snapclient default options\nSNAPCLIENT_OPTS=""\n');
+        res.json({ content });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/snapclient', async (req: Request, res: Response) => {
+    const { content } = req.body;
+    if (typeof content !== 'string') {
+        return res.status(400).json({ error: 'Content must be a string' });
+    }
+    try {
+        await fs.writeFile(SNAPCLIENT_CONFIG_PATH, content, 'utf-8');
+        res.json({ message: 'Snapclient config updated' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

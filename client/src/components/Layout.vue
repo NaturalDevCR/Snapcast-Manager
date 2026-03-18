@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useUIStore } from '../stores/ui';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import ToastNotification from './ToastNotification.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import PromptDialog from './PromptDialog.vue';
@@ -11,6 +11,7 @@ import { version } from '../../package.json';
 const authStore = useAuthStore();
 const uiStore = useUIStore();
 const route = useRoute();
+const router = useRouter();
 
 onMounted(() => {
   uiStore.initTheme();
@@ -18,13 +19,33 @@ onMounted(() => {
 
 const isMobileMenuOpen = ref(false);
 
-const navigation = [
+const isClientMode = computed(() => route.path.startsWith('/client'));
+
+const serverNavigation = [
   { name: 'Dashboard', href: '/', icon: 'dashboard' },
   { name: 'Audio Matrix', href: '/routing', icon: 'grid_view' },
   { name: 'Configuration', href: '/server', icon: 'settings' },
   { name: 'Logs', href: '/logs', icon: 'terminal' },
   { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart' },
 ];
+
+const clientNavigation = [
+  { name: 'Dashboard', href: '/client', icon: 'speaker' },
+  { name: 'Logs', href: '/logs', icon: 'terminal' },
+];
+
+const navigation = computed(() => isClientMode.value ? clientNavigation : serverNavigation);
+
+const isNavActive = (href: string) => {
+  if (href === '/') return route.path === '/';
+  return route.path.startsWith(href);
+};
+
+function switchMode(mode: 'server' | 'client') {
+  if (mode === 'server') router.push('/');
+  else router.push('/client');
+  isMobileMenuOpen.value = false;
+}
 </script>
 
 <template>
@@ -57,19 +78,37 @@ const navigation = [
           </div>
           
           <!-- Desktop Nav (Desktop Only) -->
-          <div class="hidden sm:ml-10 sm:flex sm:space-x-2 sm:items-center sm:mr-auto">
+          <div class="hidden sm:ml-6 sm:flex sm:items-center sm:mr-auto sm:gap-1">
+            <!-- Mode Switcher -->
+            <div class="flex items-center bg-white/5 rounded-xl p-1 border border-white/5 mr-4">
+              <button
+                @click="switchMode('server')"
+                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5']"
+              >
+                <span class="material-symbols-outlined text-[0.9rem]">dns</span>
+                Server
+              </button>
+              <button
+                @click="switchMode('client')"
+                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5']"
+              >
+                <span class="material-symbols-outlined text-[0.9rem]">speaker</span>
+                Client
+              </button>
+            </div>
+            <!-- Nav Links -->
             <router-link
               v-for="item in navigation"
               :key="item.name"
               :to="item.href"
               :class="[
-                route.path === item.href
+                isNavActive(item.href)
                   ? 'bg-white/10 text-white shadow-inner border border-white/5'
                   : 'text-gray-400 hover:bg-white/5 hover:text-white',
                 'px-4 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 flex items-center gap-2'
               ]"
             >
-              <span class="material-symbols-outlined text-[1.1rem]" :class="route.path === item.href ? 'text-brand-primary' : ''">{{ item.icon }}</span>
+              <span class="material-symbols-outlined text-[1.1rem]" :class="isNavActive(item.href) ? 'text-brand-primary' : ''">{{ item.icon }}</span>
               {{ item.name }}
             </router-link>
           </div>
@@ -130,21 +169,39 @@ const navigation = [
               </button>
             </div>
 
+            <!-- Mode Switcher (Mobile) -->
+            <div class="flex items-center bg-white/5 rounded-xl p-1 border border-white/5 mt-6">
+              <button
+                @click="switchMode('server')"
+                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
+              >
+                <span class="material-symbols-outlined text-[0.9rem]">dns</span>
+                Server
+              </button>
+              <button
+                @click="switchMode('client')"
+                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
+              >
+                <span class="material-symbols-outlined text-[0.9rem]">speaker</span>
+                Client
+              </button>
+            </div>
+
             <!-- Navigation Links -->
-            <div class="flex flex-col gap-2 mt-6">
+            <div class="flex flex-col gap-2 mt-4">
               <router-link
                 v-for="item in navigation"
                 :key="item.name"
                 :to="item.href"
                 @click="isMobileMenuOpen = false"
                 :class="[
-                  route.path === item.href
+                  isNavActive(item.href)
                     ? 'bg-white/10 text-white shadow-inner border border-white/5'
                     : 'text-gray-400 hover:bg-white/5 hover:text-white',
                   'px-4 py-3 rounded-xl font-bold text-sm transition-all duration-300 flex items-center gap-3'
                 ]"
               >
-                <span class="material-symbols-outlined text-[1.2rem]" :class="route.path === item.href ? 'text-brand-primary' : ''">{{ item.icon }}</span>
+                <span class="material-symbols-outlined text-[1.2rem]" :class="isNavActive(item.href) ? 'text-brand-primary' : ''">{{ item.icon }}</span>
                 {{ item.name }}
               </router-link>
             </div>

@@ -486,6 +486,7 @@ const handleRestoreSnapshot = async () => {
         await snapshotStore.restoreSnapshot(pendingRestoreId.value);
         await fetchBoth();
         uiStore.showToast('Snapshot restored successfully!', 'success');
+        showConfirmRestart.value = true;
     } catch (e: any) {
         uiStore.showToast('Failed to restore snapshot: ' + e.message, 'error');
     }
@@ -534,6 +535,7 @@ const handleResetToDefault = async () => {
         if (response.ok) {
           await fetchBoth();
           uiStore.showToast('Configuration reset to defaults', 'success');
+          showConfirmRestart.value = true;
         } else {
           throw new Error('Failed to reset');
         }
@@ -682,60 +684,82 @@ const removeSourceEntry = (idx: number) => {
     }
   }
 };
+const handleSave = () => {
+    if (activeTab.value === 'standard') {
+        saveParsed();
+    } else if (activeTab.value === 'expert') {
+        saveRaw();
+    }
+};
 </script>
 
 <template>
   <Layout>
-      <!-- Main Tabs Navigation -->
-      <div class="mb-8 flex overflow-x-auto flex-nowrap space-x-2 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl w-fit max-w-full border border-white/5 shadow-lg">
-          <button 
-            @click="activeTab = 'standard'"
-            :class="[
-                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                activeTab === 'standard' 
-                ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            ]"
-          >
-              <span class="material-symbols-outlined text-[18px]">tune</span>
-              <span>Standard</span>
-          </button>
-          <button 
-            @click="activeTab = 'expert'"
-            :class="[
-                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                activeTab === 'expert' 
-                ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            ]"
-          >
-              <span class="material-symbols-outlined text-[18px]">code</span>
-              <span>Expert</span>
-          </button>
-          <button 
-            @click="activeTab = 'snapshots'"
-            :class="[
-                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                activeTab === 'snapshots' 
-                ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            ]"
-          >
-              <span class="material-symbols-outlined text-[18px]">history</span>
-              <span>Snapshots</span>
-          </button>
-          <button 
-            @click="activeTab = 'security'"
-            :class="[
-                'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                activeTab === 'security' 
-                ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            ]"
-          >
-              <span class="material-symbols-outlined text-[18px]">security</span>
-              <span>Security</span>
-          </button>
+      <!-- Main Tabs Navigation & Actions -->
+      <div class="sticky top-[81px] z-30 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 p-2 bg-brand-bg/60 backdrop-blur-xl border border-white/5 rounded-3xl shadow-2xl">
+          <div class="flex overflow-x-auto flex-nowrap space-x-2 bg-black/40 p-1.5 rounded-2xl w-fit max-w-full border border-white/10">
+              <button 
+                @click="activeTab = 'standard'"
+                :class="[
+                    'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
+                    activeTab === 'standard' 
+                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                ]"
+              >
+                  <span class="material-symbols-outlined text-[18px]">tune</span>
+                  <span>Standard</span>
+              </button>
+              <button 
+                @click="activeTab = 'expert'"
+                :class="[
+                    'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
+                    activeTab === 'expert' 
+                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                ]"
+              >
+                  <span class="material-symbols-outlined text-[18px]">code</span>
+                  <span>Expert</span>
+              </button>
+              <button 
+                @click="activeTab = 'snapshots'"
+                :class="[
+                    'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
+                    activeTab === 'snapshots' 
+                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                ]"
+              >
+                  <span class="material-symbols-outlined text-[18px]">history</span>
+                  <span>Snapshots</span>
+              </button>
+              <button 
+                @click="activeTab = 'security'"
+                :class="[
+                    'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
+                    activeTab === 'security' 
+                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                ]"
+              >
+                  <span class="material-symbols-outlined text-[18px]">security</span>
+                  <span>Security</span>
+              </button>
+          </div>
+
+          <!-- Quick Actions (Save) -->
+          <div v-if="activeTab === 'standard' || activeTab === 'expert'" class="flex items-center px-2">
+              <button 
+                  @click="handleSave" 
+                  :disabled="configStore.loading"
+                  class="w-full md:w-auto flex items-center justify-center space-x-3 px-8 py-3 rounded-2xl shadow-[0_0_20px_rgba(166,13,242,0.4)] text-[11px] font-black text-white bg-brand-primary hover:bg-[#b526ff] hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 transition-all duration-300 border border-white/10 uppercase tracking-[0.2em]"
+              >
+                  <span v-if="configStore.loading" class="material-symbols-outlined text-[18px] animate-spin">sync</span>
+                  <span v-else class="material-symbols-outlined text-[18px]">save</span>
+                  <span>Save Configuration</span>
+              </button>
+          </div>
       </div>
 
       <!-- ==================== STANDARD TAB ==================== -->
@@ -1086,16 +1110,7 @@ const removeSourceEntry = (idx: number) => {
               </button>
           </div>
 
-          <div class="mt-6 flex justify-center fixed bottom-8 left-1/2 -translate-x-1/2 z-30">
-              <button 
-                  @click="saveParsed" 
-                  :disabled="configStore.loading"
-                  class="flex items-center space-x-2 px-8 py-4 rounded-2xl shadow-[0_0_20px_rgba(166,13,242,0.6)] text-sm font-black text-white bg-brand-primary hover:bg-[#b526ff] hover:-translate-y-1 active:scale-95 disabled:opacity-50 transition-all duration-300"
-              >
-                  <span v-if="configStore.loading" class="material-symbols-outlined text-[20px] animate-spin">sync</span>
-                  <span>SAVE CONFIGURATION</span>
-              </button>
-          </div>
+
       </div>
 
       <!-- ==================== EXPERT TAB ==================== -->
@@ -1147,15 +1162,6 @@ const removeSourceEntry = (idx: number) => {
               <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   <button @click="fetchBoth" class="w-full sm:w-auto py-3.5 px-6 rounded-xl text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest border border-white/5 flex items-center justify-center">
                       Discard Changes
-                  </button>
-                  <button 
-                      @click="saveRaw" 
-                      :disabled="configStore.loading"
-                      class="w-full sm:w-auto flex items-center justify-center space-x-2 py-3.5 px-6 rounded-xl bg-brand-primary hover:bg-[#b526ff] text-white font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] disabled:opacity-50 transition-all border border-brand-primary/30 active:scale-95"
-                  >
-                      <span v-if="configStore.loading" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
-                      <span v-else class="material-symbols-outlined text-[16px]">save</span>
-                      <span>Apply Raw Changes</span>
                   </button>
               </div>
           </div>
