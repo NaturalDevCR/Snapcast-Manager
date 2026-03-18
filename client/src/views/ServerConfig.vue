@@ -696,55 +696,67 @@ const handleSave = () => {
 <template>
   <Layout>
       <!-- Main Tabs Navigation & Actions -->
-      <div class="sticky top-[81px] z-30 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 p-2 bg-brand-bg/60 backdrop-blur-xl border border-white/5 rounded-3xl shadow-2xl">
+      <div class="sticky top-[57px] z-30 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 p-2 bg-brand-bg/60 backdrop-blur-xl border border-white/5 rounded-3xl shadow-2xl">
           <div class="flex overflow-x-auto flex-nowrap space-x-2 bg-black/40 p-1.5 rounded-2xl w-fit max-w-full border border-white/10">
-              <button 
+              <button
                 @click="activeTab = 'standard'"
                 :class="[
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                    activeTab === 'standard' 
-                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                    activeTab === 'standard'
+                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 ]"
               >
                   <span class="material-symbols-outlined text-[18px]">tune</span>
-                  <span>Standard</span>
+                  <div class="flex flex-col items-start">
+                    <span>Standard</span>
+                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">Visual editor</span>
+                  </div>
               </button>
-              <button 
+              <button
                 @click="activeTab = 'expert'"
                 :class="[
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                    activeTab === 'expert' 
-                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                    activeTab === 'expert'
+                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 ]"
               >
                   <span class="material-symbols-outlined text-[18px]">code</span>
-                  <span>Expert</span>
+                  <div class="flex flex-col items-start">
+                    <span>Expert</span>
+                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">Raw INI file</span>
+                  </div>
               </button>
-              <button 
+              <button
                 @click="activeTab = 'snapshots'"
                 :class="[
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                    activeTab === 'snapshots' 
-                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                    activeTab === 'snapshots'
+                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 ]"
               >
                   <span class="material-symbols-outlined text-[18px]">history</span>
-                  <span>Snapshots</span>
+                  <div class="flex flex-col items-start">
+                    <span>Snapshots</span>
+                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">Version history</span>
+                  </div>
               </button>
-              <button 
+              <button
                 @click="activeTab = 'security'"
                 :class="[
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                    activeTab === 'security' 
-                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]' 
+                    activeTab === 'security'
+                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 ]"
               >
                   <span class="material-symbols-outlined text-[18px]">security</span>
-                  <span>Security</span>
+                  <div class="flex flex-col items-start">
+                    <span>Security</span>
+                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">Admin access</span>
+                  </div>
               </button>
           </div>
 
@@ -766,25 +778,32 @@ const handleSave = () => {
       <div v-if="activeTab === 'standard'" class="animate-in fade-in slide-in-from-left-4 duration-500">
           
           <!-- Section Sub-Tabs -->
-          <div class="mb-6 flex overflow-x-auto flex-nowrap gap-2 max-w-full">
+          <div class="relative border-b border-white/10 flex overflow-x-auto flex-nowrap no-scrollbar">
               <button
                 v-for="sKey in orderedSections"
                 :key="sKey"
                 @click="activeSection = sKey"
                 :class="[
-                    'flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap border',
-                    activeSection === sKey
-                    ? 'bg-brand-primary text-white border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)]'
-                    : 'bg-black/20 text-gray-400 border-white/5 hover:bg-white/5 hover:text-white'
+                    'relative flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-200 flex-shrink-0',
+                    activeSection === sKey ? 'text-brand-primary' : 'text-gray-500 hover:text-gray-300'
                 ]"
               >
-                  <span class="material-symbols-outlined text-[14px]">{{ sectionIcons[sKey] || 'tune' }}</span>
+                  <span
+                    class="material-symbols-outlined text-[15px] transition-all duration-200"
+                    :class="activeSection === sKey ? 'drop-shadow-[0_0_6px_rgba(166,13,242,0.6)]' : ''"
+                  >{{ sectionIcons[sKey] || 'tune' }}</span>
                   <span>{{ configSections[sKey]?.label || sKey }}</span>
+                  <span
+                    :class="[
+                      'absolute bottom-0 left-0 right-0 h-[2px] bg-brand-primary rounded-full shadow-[0_0_8px_rgba(166,13,242,0.7)] transition-opacity duration-200',
+                      activeSection === sKey ? 'opacity-100' : 'opacity-0'
+                    ]"
+                  ></span>
               </button>
           </div>
 
           <!-- Section Content -->
-          <Card>
+          <Card class="!rounded-t-none border-t-0">
               <template #title>
                   <div class="flex items-center space-x-3">
                     <span class="material-symbols-outlined text-[20px] text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.5)]">{{ sectionIcons[activeSection] || 'tune' }}</span>
