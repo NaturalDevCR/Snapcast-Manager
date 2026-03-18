@@ -58,11 +58,11 @@ const updateVolume = (client: any, event: Event) => {
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-brand-surface/40 backdrop-blur-3xl border border-white/[0.03] p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
         <div class="absolute inset-0 bg-gradient-to-r from-brand-primary/5 to-transparent pointer-events-none"></div>
         <div class="relative z-10 flex items-center space-x-4">
-            <div class="p-4 bg-brand-primary/10 rounded-2xl border border-brand-primary/20 shadow-[0_0_20px_rgba(166,13,242,0.2)] group-hover:shadow-[0_0_30px_rgba(166,13,242,0.4)] transition-all duration-500">
+            <div class="p-4 bg-brand-primary/10 rounded-2xl border border-brand-primary/20 shadow-lg shadow-brand-primary/20 group-hover:shadow-xl group-hover:shadow-brand-primary/40 transition-all duration-500">
                 <span class="material-symbols-outlined text-brand-primary text-3xl">hub</span>
             </div>
             <div>
-                <h1 class="text-3xl font-black text-white tracking-tight">Audio Matrix</h1>
+                <h1 class="text-3xl font-black text-text-main tracking-tight">Audio Matrix</h1>
                 <p class="text-[10px] text-white/40 font-black uppercase tracking-[0.3em] mt-1">Infrastructure Routing & Zone Control</p>
             </div>
         </div>
@@ -105,7 +105,7 @@ const updateVolume = (client: any, event: Event) => {
                         @click="snapcastStore.setGroupStream(group.id, stream.id)"
                         class="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all duration-300 relative overflow-hidden"
                         :class="group.stream_id === stream.id 
-                          ? 'border-brand-primary bg-brand-primary/20 text-white shadow-[0_0_20px_rgba(166,13,242,0.2)]' 
+                          ? 'border-brand-primary bg-brand-primary/20 text-white shadow-lg shadow-brand-primary/20' 
                           : 'border-white/[0.05] bg-white/[0.02] text-white/40 hover:text-white/80 hover:border-white/20'">
                   <div v-if="group.stream_id === stream.id" class="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
                   <span class="relative z-10 flex items-center gap-2">
@@ -194,7 +194,7 @@ input[type=range]::-webkit-slider-thumb {
   height: 12px;
   width: 12px;
   border-radius: 50%;
-  background: #a60df2;
-  box-shadow: 0 0 10px rgba(166, 13, 242, 0.4);
+  background: var(--brand-primary, #3b82f6);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
 }
 </style>

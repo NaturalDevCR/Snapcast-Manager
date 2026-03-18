@@ -10,12 +10,12 @@
   }
 
   .dark {
-    --brand-bg: #0a050e; 
-    --brand-primary: #a60df2;
-    --brand-surface: #140b1e;
-    --text-main: #ffffff;
-    --text-muted: #94a3b8;
-    --brand-accent: #00ff9d;
+    --brand-bg: #09090b; 
+    --brand-primary: #3b82f6;
+    --brand-surface: #18181b;
+    --text-main: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --brand-accent: #10b981;
   }
 }
 
@@ -29,11 +29,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(166, 13, 242, 0.2);
+    background: rgba(59, 130, 246, 0.2);
     border-radius: 10px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(166, 13, 242, 0.4);
+    background: rgba(59, 130, 246, 0.4);
   }
 
   .no-scrollbar::-webkit-scrollbar {
