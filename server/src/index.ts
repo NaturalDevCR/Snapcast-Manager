@@ -8,6 +8,7 @@ import configRouter from './routes/config';
 import snapshotRouter from './routes/snapshot';
 import snapcastRouter from './routes/snapcast';
 import watchdogRouter from './routes/watchdog';
+import snapclientInstancesRouter from './routes/snapclientInstances';
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.use('/api/config', configRouter);
 app.use('/api/snapshots', snapshotRouter);
 app.use('/api/snapcast', snapcastRouter);
 app.use('/api/watchdog', watchdogRouter);
+app.use('/api/snapclient-instances', snapclientInstancesRouter);
 
 // Basic status route
 app.get('/api/status', (req, res) => {
