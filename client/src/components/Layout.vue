@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useUIStore } from '../stores/ui';
 import { useRoute, useRouter } from 'vue-router';
@@ -15,18 +15,31 @@ const router = useRouter();
 
 onMounted(() => {
   uiStore.initTheme();
+  document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
 });
 
 const isMobileMenuOpen = ref(false);
+const isSystemMenuOpen = ref(false);
+const isMobileSystemOpen = ref(false);
+const systemMenuRef = ref<HTMLElement | null>(null);
 
 const isClientMode = computed(() => route.path.startsWith('/client'));
 
-const serverNavigation = [
+// Primary nav links (always visible)
+const serverPrimaryNav = [
   { name: 'Dashboard', href: '/', icon: 'dashboard' },
   { name: 'Audio Matrix', href: '/routing', icon: 'grid_view' },
-  { name: 'Configuration', href: '/server', icon: 'settings' },
   { name: 'Logs', href: '/logs', icon: 'terminal' },
-  { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart' },
+];
+
+// System submenu items
+const serverSystemNav = [
+  { name: 'Configuration', href: '/server', icon: 'settings', description: 'Snapserver settings' },
+  { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart', description: 'Service monitors' },
 ];
 
 const clientNavigation = [
@@ -34,7 +47,11 @@ const clientNavigation = [
   { name: 'Logs', href: '/logs', icon: 'terminal' },
 ];
 
-const navigation = computed(() => isClientMode.value ? clientNavigation : serverNavigation);
+const navigation = computed(() => isClientMode.value ? clientNavigation : serverPrimaryNav);
+
+const isSystemActive = computed(() =>
+  serverSystemNav.some(item => isNavActive(item.href))
+);
 
 const isNavActive = (href: string) => {
   if (href === '/') return route.path === '/';
@@ -46,11 +63,17 @@ function switchMode(mode: 'server' | 'client') {
   else router.push('/client');
   isMobileMenuOpen.value = false;
 }
+
+function handleClickOutside(e: MouseEvent) {
+  if (systemMenuRef.value && !systemMenuRef.value.contains(e.target as Node)) {
+    isSystemMenuOpen.value = false;
+  }
+}
 </script>
 
 <template>
   <div class="min-h-screen bg-brand-bg text-white font-sans flex flex-col transition-colors duration-500 relative">
-    <!-- Background Accents (From Stitch Login/Dashboard) -->
+    <!-- Background Accents -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div class="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-brand-primary/10 blur-[120px] rounded-full"></div>
         <div class="absolute -bottom-[20%] -right-[10%] w-[50%] h-[50%] bg-indigo-500/10 blur-[120px] rounded-full"></div>
@@ -59,73 +82,137 @@ function switchMode(mode: 'server' | 'client') {
     <!-- Navigation Bar -->
     <nav class="sticky top-0 z-40 bg-brand-bg/80 backdrop-blur-xl border-b border-white/5 shadow-2xl">
       <div class="px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-20 items-center relative">
-          <!-- Burger Button (Mobile Left) -->
-          <button 
+        <div class="flex justify-between h-14 items-center relative">
+
+          <!-- Burger Button (Mobile) -->
+          <button
             @click="isMobileMenuOpen = !isMobileMenuOpen"
-            class="p-2 mr-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl border border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center self-center"
+            class="p-2 mr-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl border border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center"
             title="Open Menu"
           >
-            <span class="material-symbols-outlined text-[1.3rem]">menu</span>
+            <span class="material-symbols-outlined text-[1.2rem]">menu</span>
           </button>
 
-          <!-- Brand centered on mobile, absolute left-1/2 -->
-          <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 sm:static sm:translate-x-0 sm:left-auto sm:flex-shrink-0">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
-                <img src="../assets/logo.png" alt="Logo" class="w-full h-full rounded-xl object-cover" />
+          <!-- Brand -->
+          <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-2.5 sm:static sm:translate-x-0 sm:left-auto sm:flex-shrink-0">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                <img src="../assets/logo.png" alt="Logo" class="w-full h-full rounded-lg object-cover" />
             </div>
-            <span class="text-xl font-black tracking-tight text-white hidden sm:block drop-shadow-sm">Snapcast <span class="text-brand-primary">Manager</span></span>
+            <span class="text-base font-black tracking-tight text-white hidden sm:block drop-shadow-sm">Snapcast <span class="text-brand-primary">Manager</span></span>
           </div>
-          
-          <!-- Desktop Nav (Desktop Only) -->
-          <div class="hidden sm:ml-6 sm:flex sm:items-center sm:mr-auto sm:gap-1">
+
+          <!-- Desktop Nav -->
+          <div class="hidden sm:ml-5 sm:flex sm:items-center sm:mr-auto sm:gap-0.5">
+
             <!-- Mode Switcher -->
-            <div class="flex items-center bg-white/5 rounded-xl p-1 border border-white/5 mr-4">
+            <div class="flex items-center bg-white/5 rounded-lg p-0.5 border border-white/5 mr-3">
               <button
                 @click="switchMode('server')"
-                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5']"
+                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
               >
-                <span class="material-symbols-outlined text-[0.9rem]">dns</span>
+                <span class="material-symbols-outlined text-[0.85rem]">dns</span>
                 Server
               </button>
               <button
                 @click="switchMode('client')"
-                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5']"
+                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
               >
-                <span class="material-symbols-outlined text-[0.9rem]">speaker</span>
+                <span class="material-symbols-outlined text-[0.85rem]">speaker</span>
                 Client
               </button>
             </div>
-            <!-- Nav Links -->
+
+            <!-- Divider -->
+            <div class="h-5 w-px bg-white/10 mr-3"></div>
+
+            <!-- Primary Nav Links -->
             <router-link
               v-for="item in navigation"
               :key="item.name"
               :to="item.href"
               :class="[
                 isNavActive(item.href)
-                  ? 'bg-white/10 text-white shadow-inner border border-white/5'
-                  : 'text-gray-400 hover:bg-white/5 hover:text-white',
-                'px-4 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 flex items-center gap-2'
+                  ? 'bg-white/10 text-white border border-white/5'
+                  : 'text-gray-400 hover:bg-white/5 hover:text-white border border-transparent',
+                'px-3 py-1.5 rounded-lg font-bold text-xs transition-all duration-200 flex items-center gap-1.5 uppercase tracking-wide'
               ]"
             >
-              <span class="material-symbols-outlined text-[1.1rem]" :class="isNavActive(item.href) ? 'text-brand-primary' : ''">{{ item.icon }}</span>
+              <span class="material-symbols-outlined text-[1rem]" :class="isNavActive(item.href) ? 'text-brand-primary' : ''">{{ item.icon }}</span>
               {{ item.name }}
             </router-link>
-          </div>
-          
-          <div class="flex items-center space-x-2">
-            <!-- User Profile / Logout -->
-            <div class="flex items-center gap-3 pl-3 border-l border-white/10">
-                <div class="text-right hidden sm:block">
-                    <p class="text-sm font-bold text-white leading-tight">Admin</p>
-                    <p class="text-xs text-brand-primary font-medium">Session Active</p>
+
+            <!-- System Dropdown (Server mode only) -->
+            <div v-if="!isClientMode" ref="systemMenuRef" class="relative ml-0.5">
+              <button
+                @click.stop="isSystemMenuOpen = !isSystemMenuOpen"
+                :class="[
+                  isSystemActive
+                    ? 'bg-white/10 text-white border-white/5'
+                    : 'text-gray-400 hover:bg-white/5 hover:text-white border-transparent',
+                  'px-3 py-1.5 rounded-lg font-bold text-xs transition-all duration-200 flex items-center gap-1.5 uppercase tracking-wide border'
+                ]"
+              >
+                <span class="material-symbols-outlined text-[1rem]" :class="isSystemActive ? 'text-brand-primary' : ''">build</span>
+                System
+                <span
+                  class="material-symbols-outlined text-[0.85rem] transition-transform duration-200 opacity-60"
+                  :class="isSystemMenuOpen ? 'rotate-180' : ''"
+                >expand_more</span>
+              </button>
+
+              <!-- Dropdown Panel -->
+              <Transition
+                enter-active-class="transition duration-150 ease-out"
+                enter-from-class="opacity-0 scale-95 -translate-y-1"
+                enter-to-class="opacity-100 scale-100 translate-y-0"
+                leave-active-class="transition duration-100 ease-in"
+                leave-from-class="opacity-100 scale-100 translate-y-0"
+                leave-to-class="opacity-0 scale-95 -translate-y-1"
+              >
+                <div
+                  v-if="isSystemMenuOpen"
+                  class="absolute top-full left-0 mt-2 w-52 bg-[#1a0e24]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50 py-1.5"
+                >
+                  <router-link
+                    v-for="item in serverSystemNav"
+                    :key="item.href"
+                    :to="item.href"
+                    @click="isSystemMenuOpen = false"
+                    :class="[
+                      isNavActive(item.href)
+                        ? 'bg-brand-primary/15 text-white'
+                        : 'text-gray-400 hover:bg-white/5 hover:text-white',
+                      'flex items-center gap-3 px-4 py-2.5 transition-all duration-150 mx-1.5 rounded-xl'
+                    ]"
+                  >
+                    <span
+                      class="material-symbols-outlined text-[1.1rem] flex-shrink-0"
+                      :class="isNavActive(item.href) ? 'text-brand-primary' : 'text-gray-500'"
+                    >{{ item.icon }}</span>
+                    <div>
+                      <p class="text-xs font-black uppercase tracking-wide leading-tight">{{ item.name }}</p>
+                      <p class="text-[10px] text-gray-500 font-medium mt-0.5">{{ item.description }}</p>
+                    </div>
+                    <span v-if="isNavActive(item.href)" class="ml-auto w-1.5 h-1.5 rounded-full bg-brand-primary shadow-[0_0_6px_rgba(166,13,242,0.8)]"></span>
+                  </router-link>
                 </div>
-                <button 
+              </Transition>
+            </div>
+          </div>
+
+          <!-- Right: User + Logout -->
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2.5 pl-3 border-l border-white/10">
+                <div class="text-right hidden sm:block">
+                    <p class="text-xs font-bold text-white leading-tight">Admin</p>
+                    <p class="text-[10px] text-brand-primary font-medium">Session Active</p>
+                </div>
+                <button
                   @click="authStore.logout()"
-                  class="p-2.5 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300 group flex items-center justify-center"
+                  class="p-2 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300 group flex items-center justify-center"
                   title="Sign out"
                 >
-                    <span class="material-symbols-outlined text-[1.2rem] group-hover:scale-110 transition-transform">logout</span>
+                    <span class="material-symbols-outlined text-[1.1rem] group-hover:scale-110 transition-transform">logout</span>
                 </button>
             </div>
           </div>
@@ -157,12 +244,12 @@ function switchMode(mode: 'server' | 'client') {
         >
           <div v-if="isMobileMenuOpen" class="absolute inset-y-0 left-0 w-72 bg-brand-bg/95 border-r border-white/5 backdrop-blur-xl p-6 flex flex-col shadow-3xl">
             <!-- Header -->
-            <div class="flex items-center justify-between pb-6 border-b border-white/5">
+            <div class="flex items-center justify-between pb-5 border-b border-white/5">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
                     <img src="../assets/logo.png" alt="Logo" class="w-full h-full rounded-xl object-cover" />
                 </div>
-                <span class="text-xl font-black text-white">Snapcast <span class="text-brand-primary">Manager</span></span>
+                <span class="text-lg font-black text-white">Snapcast <span class="text-brand-primary">Manager</span></span>
               </div>
               <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5">
                 <span class="material-symbols-outlined">close</span>
@@ -170,7 +257,7 @@ function switchMode(mode: 'server' | 'client') {
             </div>
 
             <!-- Mode Switcher (Mobile) -->
-            <div class="flex items-center bg-white/5 rounded-xl p-1 border border-white/5 mt-6">
+            <div class="flex items-center bg-white/5 rounded-xl p-1 border border-white/5 mt-5">
               <button
                 @click="switchMode('server')"
                 :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
@@ -188,7 +275,8 @@ function switchMode(mode: 'server' | 'client') {
             </div>
 
             <!-- Navigation Links -->
-            <div class="flex flex-col gap-2 mt-4">
+            <div class="flex flex-col gap-1 mt-4">
+              <!-- Primary links -->
               <router-link
                 v-for="item in navigation"
                 :key="item.name"
@@ -196,23 +284,72 @@ function switchMode(mode: 'server' | 'client') {
                 @click="isMobileMenuOpen = false"
                 :class="[
                   isNavActive(item.href)
-                    ? 'bg-white/10 text-white shadow-inner border border-white/5'
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white',
-                  'px-4 py-3 rounded-xl font-bold text-sm transition-all duration-300 flex items-center gap-3'
+                    ? 'bg-white/10 text-white border border-white/5'
+                    : 'text-gray-400 hover:bg-white/5 hover:text-white border border-transparent',
+                  'px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200 flex items-center gap-3'
                 ]"
               >
                 <span class="material-symbols-outlined text-[1.2rem]" :class="isNavActive(item.href) ? 'text-brand-primary' : ''">{{ item.icon }}</span>
                 {{ item.name }}
               </router-link>
+
+              <!-- System Section (Server mode only) -->
+              <template v-if="!isClientMode">
+                <!-- System collapsible header -->
+                <button
+                  @click="isMobileSystemOpen = !isMobileSystemOpen"
+                  :class="[
+                    isSystemActive
+                      ? 'bg-white/10 text-white border-white/5'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-white border-transparent',
+                    'px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200 flex items-center gap-3 border w-full text-left mt-1'
+                  ]"
+                >
+                  <span class="material-symbols-outlined text-[1.2rem]" :class="isSystemActive ? 'text-brand-primary' : ''">build</span>
+                  <span class="flex-1">System</span>
+                  <span
+                    class="material-symbols-outlined text-[1rem] opacity-50 transition-transform duration-200"
+                    :class="isMobileSystemOpen || isSystemActive ? 'rotate-180' : ''"
+                  >expand_more</span>
+                </button>
+
+                <!-- System submenu items -->
+                <Transition
+                  enter-active-class="transition-all duration-200 ease-out overflow-hidden"
+                  enter-from-class="opacity-0 max-h-0"
+                  enter-to-class="opacity-100 max-h-40"
+                  leave-active-class="transition-all duration-150 ease-in overflow-hidden"
+                  leave-from-class="opacity-100 max-h-40"
+                  leave-to-class="opacity-0 max-h-0"
+                >
+                  <div v-if="isMobileSystemOpen || isSystemActive" class="ml-4 flex flex-col gap-1 border-l border-white/10 pl-3">
+                    <router-link
+                      v-for="item in serverSystemNav"
+                      :key="item.href"
+                      :to="item.href"
+                      @click="isMobileMenuOpen = false"
+                      :class="[
+                        isNavActive(item.href)
+                          ? 'text-white'
+                          : 'text-gray-500 hover:text-gray-300',
+                        'py-2 text-sm font-bold transition-all duration-200 flex items-center gap-2.5'
+                      ]"
+                    >
+                      <span class="material-symbols-outlined text-[1rem]" :class="isNavActive(item.href) ? 'text-brand-primary' : ''">{{ item.icon }}</span>
+                      {{ item.name }}
+                    </router-link>
+                  </div>
+                </Transition>
+              </template>
             </div>
 
             <!-- User Info (Bottom) -->
-            <div class="mt-auto pt-6 border-t border-white/5 flex items-center justify-between">
+            <div class="mt-auto pt-5 border-t border-white/5 flex items-center justify-between">
               <div>
                 <p class="text-sm font-bold text-white">Admin</p>
                 <p class="text-xs text-brand-primary font-medium">Session Active</p>
               </div>
-              <button 
+              <button
                 @click="authStore.logout(); isMobileMenuOpen = false"
                 class="p-2.5 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300"
               >
