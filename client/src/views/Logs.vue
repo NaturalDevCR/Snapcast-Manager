@@ -42,7 +42,7 @@ onMounted(async () => {
     await instanceStore.fetchInstances();
   }
   // Auto-select first snapclient instance when coming from client mode
-  if (route.query.filter === 'snapclient' && instanceStore.instances.length > 0) {
+  if (route.query.filter === 'snapclient' && instanceStore.instances[0]) {
     activeService.value = 'snapclient-' + instanceStore.instances[0].id;
   }
   fetchLogs();

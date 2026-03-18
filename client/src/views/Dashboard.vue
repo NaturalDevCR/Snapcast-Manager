@@ -72,7 +72,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Update this constant synchronously with the package.json version before release
-const version = 'v0.0.8';
+const version = 'v0.0.9';
 </script>
 
 <template>
