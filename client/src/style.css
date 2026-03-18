@@ -10,25 +10,48 @@
   }
 
   .dark {
-    --brand-bg: #1c1022; 
+    --brand-bg: #0a050e; 
     --brand-primary: #a60df2;
-    --brand-surface: #140b1b;
+    --brand-surface: #140b1e;
     --text-main: #ffffff;
-    --text-muted: #9ca3af;
+    --text-muted: #94a3b8;
+    --brand-accent: #00ff9d;
   }
 }
 
 @layer utilities {
-  /* Hide scrollbar for Chrome, Safari and Opera */
+  /* Premium Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(166, 13, 242, 0.2);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(166, 13, 242, 0.4);
+  }
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  /* Hide scrollbar for IE, Edge and Firefox */
   .no-scrollbar {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
   
+  /* Glassmorphism utility */
+  .glass {
+    background: rgba(20, 11, 30, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
   /* Material Symbols Defaults */
   .material-symbols-outlined {
     font-variation-settings:
@@ -42,5 +65,6 @@
 body {
   background-color: var(--brand-bg);
   color: var(--text-main);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1), color 0.5s ease;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }

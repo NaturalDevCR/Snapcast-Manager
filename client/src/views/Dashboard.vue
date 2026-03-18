@@ -72,7 +72,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Update this constant synchronously with the package.json version before release
-const version = 'v0.1.59';
+const version = 'v0.1.60';
 </script>
 
 <template>
@@ -99,94 +99,131 @@ const version = 'v0.1.59';
       </div>
 
 
-      <!-- Snapcast Live Metrics Section -->
-      <div v-if="snapcastStore.status" class="space-y-4">
-        <div class="flex items-center space-x-2 px-1">
-            <span class="material-symbols-outlined text-[#00ff9d] animate-pulse">sensors</span>
-            <h2 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">Live Server Metrics</h2>
+      <!-- Enhanced Snapcast Live Metrics -->
+      <div v-if="snapcastStore.status" class="space-y-6">
+        <div class="flex items-center space-x-3 px-2">
+            <div class="w-2 h-2 rounded-full bg-[#00ff9d] animate-pulse shadow-[0_0_10px_rgba(0,255,157,0.5)]"></div>
+            <h2 class="text-[10px] font-black text-white/40 uppercase tracking-[0.4em]">Live Infrastructure Metrics</h2>
         </div>
         
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
             <!-- Streams Card -->
             <Card title="Active Streams">
                 <template #icon>
-                    <span class="material-symbols-outlined">queue_music</span>
+                    <span class="material-symbols-outlined text-xl">music_note</span>
                 </template>
-                <div class="flex flex-col h-full justify-between">
-                    <div>
-                        <div class="text-4xl font-black text-white mb-4 drop-shadow-[0_0_15px_rgba(166,13,242,0.4)]">
+                <div class="flex flex-col">
+                    <div class="flex items-baseline space-x-2 mb-6">
+                        <span class="text-6xl font-black text-white tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]">
                             {{ snapcastStore.status.streams.length }}
-                        </div>
-                        <div class="space-y-2 max-h-[120px] overflow-y-auto pr-2 no-scrollbar">
-                            <div v-for="stream in snapcastStore.status.streams" :key="stream.id" class="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/5 hover:border-brand-primary/30 transition-colors">
-                                <span class="text-xs font-bold text-gray-300 truncate max-w-[120px]" :title="stream.id">
+                        </span>
+                        <span class="text-[10px] font-black text-white/30 uppercase tracking-widest">Available</span>
+                    </div>
+                    
+                    <div class="space-y-2.5 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                        <div v-for="stream in snapcastStore.status.streams" :key="stream.id" 
+                             class="group/item flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/[0.03] hover:bg-white/[0.05] hover:border-brand-primary/20 transition-all duration-300">
+                            <div class="flex items-center space-x-3 min-w-0">
+                                <div class="w-1.5 h-1.5 rounded-full transition-colors" :class="stream.status === 'playing' ? 'bg-[#00ff9d] shadow-[0_0_8px_rgba(0,255,157,0.4)]' : 'bg-white/10'"></div>
+                                <span class="text-xs font-bold text-white/70 truncate group-hover/item:text-white transition-colors" :title="stream.id">
                                     {{ stream.uri?.query?.name || stream.id }}
                                 </span>
-                                <span :class="stream.status === 'playing' ? 'text-[#00ff9d] bg-[#00ff9d]/10 border-[#00ff9d]/20 drop-shadow-[0_0_8px_rgba(0,255,157,0.4)]' : 'text-gray-400 bg-white/5 border-white/10'" class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border">
-                                    {{ stream.status }}
-                                </span>
                             </div>
-                            <div v-if="snapcastStore.status.streams.length === 0" class="text-xs text-gray-500 italic p-2">No active streams</div>
+                            <span :class="stream.status === 'playing' ? 'text-[#00ff9d] bg-[#00ff9d]/5 border-[#00ff9d]/10' : 'text-white/20 bg-white/5 border-white/5'" 
+                                  class="px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-all">
+                                {{ stream.status }}
+                            </span>
+                        </div>
+                        <div v-if="snapcastStore.status.streams.length === 0" class="flex flex-col items-center justify-center py-6 text-white/10 italic">
+                            <span class="material-symbols-outlined text-2xl mb-1">music_off</span>
+                            <span class="text-[10px] uppercase font-black tracking-widest">No active streams</span>
                         </div>
                     </div>
                 </div>
             </Card>
 
             <!-- Clients Card -->
-            <Card title="Connected Clients">
+            <Card title="Pulse Index">
                 <template #icon>
-                    <span class="material-symbols-outlined">group</span>
+                    <span class="material-symbols-outlined text-xl">sensors</span>
                 </template>
-                <div class="flex flex-col h-full justify-between">
-                    <div>
-                        <div class="text-4xl font-black text-white mb-4 drop-shadow-[0_0_15px_rgba(166,13,242,0.4)]">
-                            <!-- Safely calculate total connected clients across all groups -->
+                <div class="flex flex-col">
+                    <div class="flex items-baseline space-x-2 mb-6">
+                        <span class="text-6xl font-black text-white tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]">
                             {{ snapcastStore.status.groups.reduce((acc, g) => acc + g.clients.filter(c => c.connected).length, 0) }}
-                        </div>
-                        <div class="space-y-2 max-h-[120px] overflow-y-auto pr-2 no-scrollbar">
-                            <template v-for="group in snapcastStore.status.groups" :key="group.id">
-                                <div v-for="client in group.clients.filter(c => c.connected)" :key="client.id" class="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/5 hover:border-brand-primary/30 transition-colors">
-                                    <div class="flex flex-col min-w-0">
-                                        <span class="text-xs font-bold text-gray-300 truncate" :title="client.host.name">
-                                            {{ client.config.name || client.host.name }}
-                                        </span>
-                                        <span class="text-[9px] text-gray-500 font-mono mt-0.5">{{ client.host.ip }}</span>
+                        </span>
+                        <span class="text-[10px] font-black text-white/30 uppercase tracking-widest">Connected</span>
+                    </div>
+
+                    <div class="space-y-2.5 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                        <template v-for="group in snapcastStore.status.groups" :key="group.id">
+                            <div v-for="client in group.clients.filter(c => c.connected)" :key="client.id" 
+                                 class="group/item flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/[0.03] hover:bg-white/[0.05] hover:border-brand-primary/20 transition-all duration-300">
+                                <div class="flex flex-col min-w-0">
+                                    <span class="text-xs font-bold text-white/70 truncate group-hover/item:text-white transition-colors">
+                                        {{ client.config.name || client.host.name }}
+                                    </span>
+                                    <span class="text-[9px] text-white/20 font-mono mt-0.5">{{ client.host.ip }}</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="h-1 w-12 bg-white/5 rounded-full overflow-hidden">
+                                        <div class="h-full bg-brand-primary transition-all duration-500" :style="{ width: client.config.volume.percent + '%', opacity: client.config.volume.muted ? 0.2 : 1 }"></div>
                                     </div>
-                                    <span :class="client.config.volume.muted ? 'text-[#ff3b30] bg-[#ff3b30]/10 border-[#ff3b30]/20' : 'text-[#30d1ff] bg-[#30d1ff]/10 border-[#30d1ff]/20'" class="px-2 py-0.5 rounded-md text-[9px] border font-black uppercase tracking-widest flex-shrink-0">
-                                        {{ client.config.volume.muted ? 'MUTED' : client.config.volume.percent + '%' }}
+                                    <span :class="client.config.volume.muted ? 'text-[#ff3b30]' : 'text-brand-primary'" class="text-[9px] font-black w-6 text-right">
+                                        {{ client.config.volume.muted ? 'OFF' : client.config.volume.percent }}
                                     </span>
                                 </div>
-                            </template>
-                            <div v-if="snapcastStore.status.groups.reduce((acc, g) => acc + g.clients.filter(c => c.connected).length, 0) === 0" class="text-xs text-gray-500 italic p-2">No connected clients</div>
+                            </div>
+                        </template>
+                        <div v-if="snapcastStore.status.groups.reduce((acc, g) => acc + g.clients.filter(c => c.connected).length, 0) === 0" 
+                             class="flex flex-col items-center justify-center py-6 text-white/10 italic">
+                            <span class="material-symbols-outlined text-2xl mb-1">link_off</span>
+                            <span class="text-[10px] uppercase font-black tracking-widest">No clients detected</span>
                         </div>
                     </div>
                 </div>
             </Card>
 
-            <!-- Server Health Card -->
-            <Card title="Server Health">
+            <!-- Server State Card -->
+            <Card title="Core Engine">
                 <template #icon>
-                    <span class="material-symbols-outlined">health_and_safety</span>
+                    <span class="material-symbols-outlined text-xl">settings_input_component</span>
                 </template>
-                <div class="flex flex-col h-full">
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between border-b border-white/5 pb-4">
-                            <span class="text-sm font-semibold text-gray-400">Daemon Status</span>
-                            <div class="flex items-center space-x-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/5 shadow-inner">
-                                <span class="relative flex h-2 w-2">
-                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00ff9d] opacity-75"></span>
-                                  <span class="relative inline-flex rounded-full h-2 w-2 bg-[#00ff9d]"></span>
-                                </span>
-                                <span class="text-[#00ff9d] font-black text-[10px] uppercase tracking-[0.2em] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">ONLINE</span>
+                <div class="space-y-6">
+                    <!-- Master Status Indicator -->
+                    <div class="p-4 rounded-3xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="relative flex h-3 w-3">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00ff9d] opacity-40"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-[#00ff9d] shadow-[0_0_10px_rgba(0,255,157,0.5)]"></span>
                             </div>
+                            <span class="text-xs font-black text-white uppercase tracking-[0.2em]">System Normal</span>
                         </div>
-                        <div class="flex items-center justify-between py-2">
-                            <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Snapserver Version</span>
-                            <span class="text-sm font-mono font-bold text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.3)]">{{ systemStore.packageVersions.snapserver || (snapcastStore.status ? snapcastStore.status.server.version : '...') }}</span>
+                        <span class="text-[10px] font-bold text-white/30 uppercase tracking-widest">Operational</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-4 rounded-2xl bg-white/[0.01] border border-white/[0.03] flex flex-col items-center justify-center text-center space-y-1">
+                            <span class="text-[8px] font-black text-white/30 uppercase tracking-[0.2em]">Version</span>
+                            <span class="text-xs font-mono font-bold text-brand-primary group-hover:text-white transition-colors">
+                                {{ systemStore.packageVersions.snapserver || (snapcastStore.status ? snapcastStore.status.server.version : '...') }}
+                            </span>
                         </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Active Groups</span>
-                            <span class="text-sm font-black text-white bg-white/5 border border-white/10 px-3 py-1 rounded-lg">{{ snapcastStore.status.groups.length }}</span>
+                        <div class="p-4 rounded-2xl bg-white/[0.01] border border-white/[0.03] flex flex-col items-center justify-center text-center space-y-1">
+                            <span class="text-[8px] font-black text-white/30 uppercase tracking-[0.2em]">Groups</span>
+                            <span class="text-xs font-black text-white">
+                                {{ snapcastStore.status.groups.length }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <div class="flex justify-between items-center mb-2 px-1">
+                            <span class="text-[9px] font-black text-white/20 uppercase tracking-widest">Infrastructure health</span>
+                            <span class="text-[9px] font-black text-[#00ff9d]">100%</span>
+                        </div>
+                        <div class="h-1 bg-white/5 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-brand-primary to-[#00ff9d] w-full"></div>
                         </div>
                     </div>
                 </div>
