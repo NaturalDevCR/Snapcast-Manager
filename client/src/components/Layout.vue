@@ -27,7 +27,10 @@ const isSystemMenuOpen = ref(false);
 const isMobileSystemOpen = ref(false);
 const systemMenuRef = ref<HTMLElement | null>(null);
 
-const isClientMode = computed(() => route.path.startsWith('/client'));
+const isClientMode = computed(() =>
+  route.path.startsWith('/client') ||
+  (route.path === '/logs' && route.query.filter === 'snapclient')
+);
 
 // Primary nav links (always visible)
 const serverPrimaryNav = [
@@ -42,11 +45,8 @@ const serverSystemNav: Array<{
   activeWhen?: (r: typeof route) => boolean;
 }> = [
   { name: 'Logs', href: '/logs', icon: 'terminal', description: 'Service logs' },
-  { name: 'Configuration', href: '/server', icon: 'settings', description: 'Snapserver settings',
-    activeWhen: (r) => r.path.startsWith('/server') && r.query.tab !== 'security' },
-  { name: 'Security', href: '/server', icon: 'security', description: 'Admin access',
-    to: { path: '/server', query: { tab: 'security' } },
-    activeWhen: (r) => r.path.startsWith('/server') && r.query.tab === 'security' },
+  { name: 'Configuration', href: '/server', icon: 'settings', description: 'Snapserver settings' },
+  { name: 'Security', href: '/security', icon: 'security', description: 'Admin access' },
   { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart', description: 'Service monitors' },
 ];
 
