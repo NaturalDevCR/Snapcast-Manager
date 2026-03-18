@@ -21,7 +21,7 @@ router.post('/group/:id/stream', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { stream_id } = req.body;
     try {
-        const result = await executeSnapcastRpc('Group.SetStream', { id, streamId: stream_id });
+        const result = await executeSnapcastRpc('Group.SetStream', { id, stream_id });
         res.json({ success: true, result });
     } catch (error: any) {
         console.error('Snapcast Group.SetStream Error:', error);

@@ -72,7 +72,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Update this constant synchronously with the package.json version before release
-const version = 'v0.1.62';
+const version = 'v0.1.63';
 </script>
 
 <template>
@@ -84,7 +84,7 @@ const version = 'v0.1.62';
           <h1 class="text-3xl font-black tracking-tight text-text-main">System Dashboard</h1>
           <p class="text-text-muted font-medium mt-1">Manage and monitor your Snapcast infrastructure.</p>
         </div>
-        <button @click="systemStore.refreshAll()" :disabled="systemStore.loading" class="inline-flex items-center px-4 py-2 bg-brand-primary hover:bg-blue-600 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-primary/20 active:scale-95 disabled:opacity-50 group border border-brand-primary">
+        <button @click="systemStore.refreshAll()" :disabled="systemStore.loading" class="inline-flex items-center px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-brand-primary/30 active:scale-95 disabled:opacity-50 group border border-brand-primary/50">
           <span class="material-symbols-outlined text-[1.2rem] mr-2 transition-transform" :class="{'animate-spin': systemStore.loading, 'group-hover:rotate-180': !systemStore.loading}">refresh</span>
           SYNC ALL
         </button>
@@ -290,7 +290,7 @@ const version = 'v0.1.62';
                         :class="[
                             'w-full px-4 py-3 rounded-xl text-xs font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 uppercase',
                             systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown'
-                            ? 'bg-brand-primary text-white border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)]' 
+                            ? 'bg-brand-primary text-white border border-brand-primary/50 shadow-xl shadow-brand-primary/30 hover:shadow-brand-primary/50 hover:bg-brand-primary/80' 
                             : 'bg-black/40 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'
                         ]"
                         :disabled="systemStore.loading">
@@ -298,7 +298,7 @@ const version = 'v0.1.62';
                 </button>
             </div>
             <div class="pt-4 border-t border-white/5" v-else>
-                 <button @click="systemStore.installPackage('snapserver')" class="w-full px-6 py-3 bg-brand-primary text-white rounded-xl font-black tracking-widest uppercase text-sm border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Install Snapserver</button>
+                 <button @click="systemStore.installPackage('snapserver')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black tracking-widest uppercase text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Install Snapserver</button>
             </div>
         </div>
       </Card>
@@ -339,7 +339,7 @@ const version = 'v0.1.62';
                  </div>
             </div>
             <div class="pt-5 border-t border-white/5">
-                 <button @click="handleUpdateNodeJs" class="w-full px-4 py-3 bg-brand-primary text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                 <button @click="handleUpdateNodeJs" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Update to v{{ selectedNodeVersion }}
                  </button>
             </div>
@@ -399,7 +399,7 @@ const version = 'v0.1.62';
             </div>
             <p class="text-[11px] font-medium text-gray-500 leading-relaxed">The ultimate modern web controller for your Snapcast server infrastructure.</p>
             <div class="pt-3 border-t border-white/5">
-                 <button @click="handleUpdate('snap-ctrl')" class="w-full px-4 py-3 bg-brand-primary hover:bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest text-xs border border-brand-primary shadow-lg shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                 <button @click="handleUpdate('snap-ctrl')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     {{ systemStore.installedPackages['snap-ctrl'] ? 'Update Interface' : 'Install Interface' }}
                  </button>
             </div>
@@ -427,7 +427,7 @@ const version = 'v0.1.62';
                  </div>
             </div>
             <div class="pt-3 border-t border-white/5" v-if="!systemStore.installedPackages.ffmpeg">
-                 <button @click="systemStore.installPackage('ffmpeg')" class="w-full px-4 py-3 bg-brand-primary hover:bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest text-xs border border-brand-primary shadow-lg shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                 <button @click="systemStore.installPackage('ffmpeg')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Install FFmpeg
                  </button>
             </div>
@@ -469,7 +469,7 @@ const version = 'v0.1.62';
                     <button v-if="systemStore.shairportSyncStatus === 'active'" @click="systemStore.controlService('stop', 'shairport-sync')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
                     <button v-else @click="systemStore.controlService('start', 'shairport-sync')" class="px-3 py-2.5 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
                 </div>
-                <button @click="handleUpdate('shairport-sync')" class="w-full px-4 py-3 bg-brand-primary hover:bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest text-xs border border-brand-primary shadow-lg shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                <button @click="handleUpdate('shairport-sync')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Update Shairport
                 </button>
                 <button @click="handleUninstall('shairport-sync')" class="w-full px-4 py-3 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
@@ -477,7 +477,7 @@ const version = 'v0.1.62';
                 </button>
             </div>
             <div class="pt-4 border-t border-white/5" v-else>
-                 <button @click="systemStore.installPackage('shairport-sync')" class="w-full px-6 py-3 bg-brand-primary hover:bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest text-sm border border-brand-primary shadow-lg shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                 <button @click="systemStore.installPackage('shairport-sync')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Install AirPlay
                  </button>
             </div>

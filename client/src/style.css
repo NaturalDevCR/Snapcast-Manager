@@ -10,12 +10,12 @@
   }
 
   .dark {
-    --brand-bg: #09090b; 
-    --brand-primary: #3b82f6;
-    --brand-surface: #18181b;
+    --brand-bg: #0a0612; 
+    --brand-primary: #c084fc;
+    --brand-surface: #160e24;
     --text-main: #f4f4f5;
     --text-muted: #a1a1aa;
-    --brand-accent: #10b981;
+    --brand-accent: #00ff9d;
   }
 }
 
