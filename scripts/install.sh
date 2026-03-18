@@ -15,7 +15,20 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.66"
+VERSION="v0.0.1"
+
+# Determine if $SUDO is needed
+if [ "$(id -u)" -eq 0 ]; then
+    SUDO=""
+else
+    if command -v $SUDO >/dev/null 2>&1; then
+        SUDO="sudo"
+    else
+        echo -e "${RED}[!] Error: This script requires root privileges or $SUDO to be installed.${NC}"
+        exit 1
+    fi
+fi
+
 
 echo -e "${MAGENTA}${BOLD}"
 cat << "EOF"
@@ -198,29 +211,29 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         if [ "$DO_UPDATE" = true ]; then
             echo -e "\n${BLUE}Preparing for installation...${NC}"
             echo "Stopping existing service..."
-            sudo systemctl stop $SERVICE_NAME 2>/dev/null || true
-            sudo systemctl disable $SERVICE_NAME 2>/dev/null || true
+            $SUDO systemctl stop $SERVICE_NAME 2>/dev/null || true
+            $SUDO systemctl disable $SERVICE_NAME 2>/dev/null || true
             
             if [ "$PRESERVE_DATA" = true ]; then
                 echo "Backing up database data securely..."
                 if [ -d "$INSTALL_BASE_DIR/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/data 2>/dev/null)" ]; then
-                    sudo rm -rf /tmp/snapmgr_data_backup
-                    sudo cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
+                    $SUDO rm -rf /tmp/snapmgr_data_backup
+                    $SUDO cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
                     echo -e "${GREEN}[OK] Database backed up to /tmp/snapmgr_data_backup${NC}"
                 else
                     echo "Data directory is empty or missing, skipping backup."
                 fi
                 
                 if [ -f "/etc/snapserver.conf" ]; then
-                    sudo cp /etc/snapserver.conf /tmp/snapserver_conf_backup
+                    $SUDO cp /etc/snapserver.conf /tmp/snapserver_conf_backup
                 fi
             else
                 echo -e "${RED}[!] Clean re-install: Skipping configuration backups.${NC}"
-                sudo rm -rf /tmp/snapmgr_data_backup /tmp/snapserver_conf_backup 2>/dev/null || true
+                $SUDO rm -rf /tmp/snapmgr_data_backup /tmp/snapserver_conf_backup 2>/dev/null || true
             fi
             
             echo "Wiping existing application files..."
-            sudo rm -rf "$INSTALL_BASE_DIR"
+            $SUDO rm -rf "$INSTALL_BASE_DIR"
         else
             echo "Installation aborted by user."
             exit 0
@@ -229,42 +242,43 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
 
     if [ ! -d "$INSTALL_BASE_DIR" ]; then
         echo "Updating package list and ensuring wget and unzip are installed..."
-        sudo apt-get update >/dev/null 2>&1
-        sudo apt-get install -y wget unzip >/dev/null 2>&1
+        $SUDO apt-get update
+        $SUDO apt-get install -y wget unzip
         
         echo "Downloading pre-built release $VERSION..."
-        sudo rm -rf "$INSTALL_BASE_DIR"
-        sudo mkdir -p "$INSTALL_BASE_DIR"
+
+        $SUDO rm -rf "$INSTALL_BASE_DIR"
+        $SUDO mkdir -p "$INSTALL_BASE_DIR"
         
         # Fetch the download URL for any attached ZIP files in the release
         API_URL="https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/tags/${VERSION}"
         ASSETS=$(curl -sL "$API_URL" | grep "browser_download_url" || true)
         REPO_ZIP_URL=$(echo "$ASSETS" | grep ".zip" | head -n 1 | cut -d '"' -f 4 || true)
         
-        sudo wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL" || {
+        $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL" || {
             echo -e "${RED}[!] Pre-built asset $VERSION not found. Falling back to tagged source code...${NC}"
             REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/archive/refs/tags/${VERSION}.zip"
-            sudo wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"
+            $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"
         }
         
         echo "Extracting source..."
         TEMP_EXTRACT="/tmp/snapmgr_extract"
-        sudo rm -rf "$TEMP_EXTRACT"
-        sudo mkdir -p "$TEMP_EXTRACT"
-        sudo unzip -qo /tmp/snapmanager.zip -d "$TEMP_EXTRACT"
+        $SUDO rm -rf "$TEMP_EXTRACT"
+        $SUDO mkdir -p "$TEMP_EXTRACT"
+        $SUDO unzip -qo /tmp/snapmanager.zip -d "$TEMP_EXTRACT"
         
         # Move contents to INSTALL_BASE_DIR. Note: source zip has a root folder, release zip does not.
         if [ -d $TEMP_EXTRACT/Snapcast-Manager-* ]; then
             ROOT_FOLDER=$(ls -d $TEMP_EXTRACT/Snapcast-Manager-*)
-            sudo cp -r $ROOT_FOLDER/. "$INSTALL_BASE_DIR/"
+            $SUDO cp -r $ROOT_FOLDER/. "$INSTALL_BASE_DIR/"
             # Create flag to force rebuild since this is source code
-            sudo touch "$INSTALL_BASE_DIR/.rebuilding"
+            $SUDO touch "$INSTALL_BASE_DIR/.rebuilding"
         else
-            sudo cp -r $TEMP_EXTRACT/. "$INSTALL_BASE_DIR/"
+            $SUDO cp -r $TEMP_EXTRACT/. "$INSTALL_BASE_DIR/"
         fi
         
-        sudo rm -rf "$TEMP_EXTRACT"
-        sudo rm -f /tmp/snapmanager.zip
+        $SUDO rm -rf "$TEMP_EXTRACT"
+        $SUDO rm -f /tmp/snapmanager.zip
 
         # (Flag handled above)
 
@@ -272,21 +286,21 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         if [ -d "/tmp/snapmgr_data_backup" ] || [ -f "/tmp/snapserver_conf_backup" ]; then
             echo -e "\n${YELLOW}Restoring previous configuration and database...${NC}"
             if [ -d "/tmp/snapmgr_data_backup" ]; then
-                sudo mkdir -p "$INSTALL_BASE_DIR/data"
-                sudo cp -rT /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
+                $SUDO mkdir -p "$INSTALL_BASE_DIR/data"
+                $SUDO cp -rT /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
                 echo -e "${GREEN}[OK] Database Data restored.${NC}"
             fi
             if [ -f "/tmp/snapserver_conf_backup" ]; then
-                sudo cp /tmp/snapserver_conf_backup /etc/snapserver.conf
+                $SUDO cp /tmp/snapserver_conf_backup /etc/snapserver.conf
                 echo -e "${GREEN}[OK] snapserver.conf restored.${NC}"
             fi
             
             # Clean up backups
-            sudo rm -rf /tmp/snapmgr_data_backup
-            sudo rm -f /tmp/snapserver_conf_backup
+            $SUDO rm -rf /tmp/snapmgr_data_backup
+            $SUDO rm -f /tmp/snapserver_conf_backup
         fi
         
-        sudo chown -R $USER:$USER "$INSTALL_BASE_DIR"
+        $SUDO chown -R $USER:$USER "$INSTALL_BASE_DIR"
         
         echo -e "${GREEN}Resuming installation from $INSTALL_BASE_DIR...${NC}"
         cd "$INSTALL_BASE_DIR"
@@ -338,25 +352,25 @@ install_latest_snapserver() {
 
     if [ -z "$download_url" ]; then
         echo -e "${RED}[!] Could not find a suitable Snapserver release on GitHub. Falling back to apt.${NC}"
-        sudo apt-get install -y snapserver
+        $SUDO apt-get install -y snapserver
         return
     fi
 
     local deb_file="/tmp/snapserver_latest.deb"
     echo "Downloading: $(basename "$download_url")"
-    sudo wget -qO "$deb_file" "$download_url"
-    sudo dpkg -i "$deb_file" || sudo apt-get install -f -y
-    sudo rm -f "$deb_file"
+    $SUDO wget -qO "$deb_file" "$download_url"
+    $SUDO dpkg -i "$deb_file" || $SUDO apt-get install -f -y
+    $SUDO rm -f "$deb_file"
     
     # CRITICAL: Fix permission/home directory issue
     echo "Applying system configuration fixes..."
-    sudo mkdir -p /var/lib/snapserver
-    sudo chown -R snapserver:snapserver /var/lib/snapserver
+    $SUDO mkdir -p /var/lib/snapserver
+    $SUDO chown -R snapserver:snapserver /var/lib/snapserver
     # Ensure snapserver user has /var/lib/snapserver as HOME
-    sudo usermod -d /var/lib/snapserver snapserver 2>/dev/null || true
+    $SUDO usermod -d /var/lib/snapserver snapserver 2>/dev/null || true
     
-    sudo systemctl daemon-reload
-    sudo systemctl restart snapserver || echo -e "${YELLOW}[!] Warning: Snapserver failed to start. You may need to check logs.${NC}"
+    $SUDO systemctl daemon-reload
+    $SUDO systemctl restart snapserver || echo -e "${YELLOW}[!] Warning: Snapserver failed to start. You may need to check logs.${NC}"
 }
 
 SNAPSERVER_INSTALLED=false
@@ -367,15 +381,15 @@ fi
 
 if [ "$SNAPSERVER_INSTALLED" = false ]; then
     if prompt_yes_no "Snapserver not found. Do you want to install it from GitHub (Recommended)?" "y"; then
-        sudo apt-get update
-        sudo apt-get install -y curl wget ffmpeg lsb-release
+        $SUDO apt-get update
+        $SUDO apt-get install -y curl wget ffmpeg lsb-release
         install_latest_snapserver
     fi
 else
     # Even if installed, we might want to ensure permissions are correct if running this script
-    sudo mkdir -p /var/lib/snapserver
-    sudo chown -R snapserver:snapserver /var/lib/snapserver
-    sudo usermod -d /var/lib/snapserver snapserver 2>/dev/null || true
+    $SUDO mkdir -p /var/lib/snapserver
+    $SUDO chown -R snapserver:snapserver /var/lib/snapserver
+    $SUDO usermod -d /var/lib/snapserver snapserver 2>/dev/null || true
 fi
 
 # 2.5 Check for Build Essentials (for native modules like better-sqlite3)
@@ -383,7 +397,7 @@ echo -e "\n${YELLOW}Step 2.5: Checking for build tools...${NC}"
 if ! command -v make >/dev/null 2>&1; then
     echo -e "${YELLOW}[!] Build tools (make/gcc) not detected.${NC}"
     if prompt_yes_no "Install build-essential? (Highly recommended for database performance)" "y"; then
-        sudo apt-get update && sudo apt-get install -y build-essential
+        $SUDO apt-get update && $SUDO apt-get install -y build-essential
     fi
 fi
 
@@ -395,8 +409,8 @@ if command -v node >/dev/null 2>&1; then
 else
     echo -e "${RED}[!] Node.js not detected.${NC}"
     if prompt_yes_no "Install Node.js 22?" "y"; then
-        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-        sudo apt-get install -y nodejs
+        curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash -
+        $SUDO apt-get install -y nodejs
     else
         echo "Installation aborted."
         exit 1
@@ -432,25 +446,25 @@ if [ -n "$RESTORE_FILE" ]; then
     echo -e "\n${YELLOW}Step 3.5: Restoring from backup file...${NC}"
     if [ -f "$RESTORE_FILE" ]; then
         echo "Extracting $RESTORE_FILE to temporary directory..."
-        sudo mkdir -p /tmp/snapmgr_restore
-        sudo tar -xzf "$RESTORE_FILE" -C /tmp/snapmgr_restore
+        $SUDO mkdir -p /tmp/snapmgr_restore
+        $SUDO tar -xzf "$RESTORE_FILE" -C /tmp/snapmgr_restore
         
         if [ -d "/tmp/snapmgr_restore/data" ]; then
             echo "Restoring database data..."
-            sudo mkdir -p "$INSTALL_BASE_DIR/data"
-            sudo cp -rT /tmp/snapmgr_restore/data "$INSTALL_BASE_DIR/data"
-            sudo chown -R $USER:$USER "$INSTALL_BASE_DIR/data"
+            $SUDO mkdir -p "$INSTALL_BASE_DIR/data"
+            $SUDO cp -rT /tmp/snapmgr_restore/data "$INSTALL_BASE_DIR/data"
+            $SUDO chown -R $USER:$USER "$INSTALL_BASE_DIR/data"
             echo -e "${GREEN}[OK] Database Data restored.${NC}"
         fi
         
         if [ -f "/tmp/snapmgr_restore/snapserver.conf" ]; then
             echo "Restoring snapserver.conf..."
-            sudo cp /tmp/snapmgr_restore/snapserver.conf /etc/snapserver.conf
-            sudo chown snapserver:snapserver /etc/snapserver.conf
+            $SUDO cp /tmp/snapmgr_restore/snapserver.conf /etc/snapserver.conf
+            $SUDO chown snapserver:snapserver /etc/snapserver.conf
             echo -e "${GREEN}[OK] snapserver.conf restored.${NC}"
         fi
         
-        sudo rm -rf /tmp/snapmgr_restore
+        $SUDO rm -rf /tmp/snapmgr_restore
     else
         echo -e "${RED}[!] Backup file not found: $RESTORE_FILE${NC}"
     fi
@@ -473,7 +487,7 @@ fi
 echo -e "${GREEN}[OK] Interface will be available on port $APP_PORT.${NC}"
 
 # Write the .env file
-sudo bash -c "cat <<EOF > $INSTALL_BASE_DIR/server/.env
+$SUDO bash -c "cat <<EOF > $INSTALL_BASE_DIR/server/.env
 PORT=$APP_PORT
 EOF"
 
@@ -483,7 +497,7 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     USER_NAME=$(whoami)
     INSTALL_DIR="$INSTALL_BASE_DIR"
     
-    cat <<EOF | sudo tee /etc/systemd/system/${SERVICE_NAME}.service
+    cat <<EOF | $SUDO tee /etc/systemd/system/${SERVICE_NAME}.service
 [Unit]
 Description=Snapcast Manager Service
 After=network.target snapserver.service
@@ -500,14 +514,14 @@ EnvironmentFile=$INSTALL_DIR/server/.env
 WantedBy=multi-user.target
 EOF
 
-    sudo systemctl daemon-reload
-    sudo systemctl enable $SERVICE_NAME
-    if sudo systemctl restart $SERVICE_NAME; then
+    $SUDO systemctl daemon-reload
+    $SUDO systemctl enable $SERVICE_NAME
+    if $SUDO systemctl restart $SERVICE_NAME; then
         echo -e "${GREEN}[OK] Service installed and started.${NC}"
     else
         echo -e "${RED}[!] Service failed to start.${NC}"
         echo "Checking logs..."
-        sudo journalctl -u $SERVICE_NAME -n 50 --no-pager
+        $SUDO journalctl -u $SERVICE_NAME -n 50 --no-pager
         exit 1
     fi
 fi
