@@ -6,6 +6,7 @@ import { useRoute } from 'vue-router';
 import ToastNotification from './ToastNotification.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import PromptDialog from './PromptDialog.vue';
+import { version } from '../../package.json';
 
 const authStore = useAuthStore();
 const uiStore = useUIStore();
@@ -19,7 +20,6 @@ const isMobileMenuOpen = ref(false);
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: 'dashboard' },
-  { name: 'Audio Player', href: '/player', icon: 'music_note' },
   { name: 'Audio Matrix', href: '/routing', icon: 'grid_view' },
   { name: 'Configuration', href: '/server', icon: 'settings' },
   { name: 'Logs', href: '/logs', icon: 'terminal' },
@@ -177,13 +177,20 @@ const navigation = [
     <!-- Footer -->
     <footer class="bg-brand-bg/80 backdrop-blur-xl border-t border-white/5 py-6 mt-12 z-10 relative">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-500">
-        <div>
-          &copy; 2026 Snapcast Manager. All rights reserved.
+        <div class="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+          <span class="font-black tracking-widest uppercase text-[10px]">&copy; 2026 Snapcast Manager Ecosystem</span>
+          <span class="hidden sm:inline-block text-white/20">&bull;</span>
+          <span class="font-black tracking-widest uppercase text-[10px]">VERSION {{ version }}</span>
         </div>
-        <div class="flex items-center gap-4">
-          <a href="https://github.com/NaturalDevCR/TCP-Streamer" target="_blank" class="flex items-center gap-1.5 hover:text-white text-gray-400 font-medium transition-colors duration-300">
+        <div class="flex flex-col sm:flex-row items-center gap-4">
+          <a href="https://github.com/NaturalDevCR/TCP-Streamer" target="_blank" class="flex items-center gap-1 hover:text-white text-gray-400 font-bold transition-colors duration-300">
             <span class="material-symbols-outlined text-[1rem]">link</span>
-            TCP-Streamer Project
+            TCP-Streamer
+          </a>
+          <span class="hidden sm:inline-block text-white/20">&bull;</span>
+          <a href="https://github.com/jdavidoa91/Snapcast-Manager" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1 text-brand-primary hover:text-[#8e0bc9] font-black transition-colors group">
+             <span>Developed by NaturalDevCR</span>
+             <span class="material-symbols-outlined text-[14px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
           </a>
         </div>
       </div>

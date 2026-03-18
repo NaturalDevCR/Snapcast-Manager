@@ -91,12 +91,6 @@ const handleLogin = async () => {
           </button>
         </form>
 
-        <div class="mt-10 text-center">
-            <p class="text-[10px] font-bold text-gray-600 uppercase tracking-[0.3em] flex items-center justify-center gap-2">
-                <span class="material-symbols-outlined text-[14px]">terminal</span>
-                &copy; 2026 Snapcast Manager
-            </p>
-        </div>
       </div>
     </div>
   </div>
