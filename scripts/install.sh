@@ -17,14 +17,14 @@ NC='\033[0m' # No Color
 
 VERSION="v0.0.1"
 
-# Determine if $SUDO is needed
+# Determine if SUDO is needed
 if [ "$(id -u)" -eq 0 ]; then
     SUDO=""
 else
-    if command -v $SUDO >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
     else
-        echo -e "${RED}[!] Error: This script requires root privileges or $SUDO to be installed.${NC}"
+        echo -e "${RED}[!] Error: This script requires root privileges or sudo to be installed.${NC}"
         exit 1
     fi
 fi
