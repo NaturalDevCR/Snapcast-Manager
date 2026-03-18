@@ -16,12 +16,29 @@ const newClientName = ref('');
 const containerRef = ref<HTMLElement | null>(null);
 const sourceRefs = ref<Record<string, HTMLElement>>({});
 const zoneRefs = ref<Record<string, HTMLElement>>({});
+const zoneCardRefs = ref<Record<string, HTMLElement>>({}); // For hit testing the entire card
 
 // Dragging state
 const isDragging = ref(false);
 const draggedStreamId = ref<string | null>(null);
 const mousePos = ref({ x: 0, y: 0 });
 const hoverZoneId = ref<string | null>(null);
+const expandedGroups = ref<Set<string>>(new Set());
+
+const toggleGroup = (groupId: string) => {
+    if (expandedGroups.value.has(groupId)) {
+        expandedGroups.value.delete(groupId);
+    } else {
+        expandedGroups.value.add(groupId);
+    }
+    // Force reactivity update for the Set
+    expandedGroups.value = new Set(expandedGroups.value);
+    
+    // Redraw connections because height changed
+    setTimeout(triggerRedraw, 50);
+    setTimeout(triggerRedraw, 150);
+    setTimeout(triggerRedraw, 300); // multiple times to catch animation frames
+};
 
 // Force reactive updates for connections on resize/scroll
 const connectionsVersion = ref(0);
@@ -75,9 +92,14 @@ const setSourceRef = (id: string) => (el: any) => {
     if (el) sourceRefs.value[id] = el as HTMLElement;
 };
 
-// Set zone ref
+// Set zone ref (connector node)
 const setZoneRef = (id: string) => (el: any) => {
     if (el) zoneRefs.value[id] = el as HTMLElement;
+};
+
+// Set zone card ref (entire card for hit testing)
+const setZoneCardRef = (id: string) => (el: any) => {
+    if (el) zoneCardRefs.value[id] = el as HTMLElement;
 };
 
 const getConnectorCoordinates = (el: HTMLElement) => {
@@ -187,12 +209,13 @@ const updateMousePos = (clientX: number, clientY: number) => {
 
     // Find hover zone via bounding rects (better for drag & drop than mouseenter)
     let foundHover = false;
-    for (const [zoneId, el] of Object.entries(zoneRefs.value)) {
+    // Use zoneCardRefs for hit testing
+    for (const [zoneId, el] of Object.entries(zoneCardRefs.value)) {
         if (!el) continue;
         const zoneRect = el.getBoundingClientRect();
-        // Expand hit area to make dropping easier (especially to the left)
-        if (clientX >= zoneRect.left - 60 && clientX <= zoneRect.right &&
-            clientY >= zoneRect.top - 60 && clientY <= zoneRect.bottom + 40) {
+        // Generous bounding box for the entire card
+        if (clientX >= zoneRect.left - 60 && clientX <= zoneRect.right + 20 &&
+            clientY >= zoneRect.top - 20 && clientY <= zoneRect.bottom + 20) {
             hoverZoneId.value = zoneId;
             foundHover = true;
             break;
@@ -221,7 +244,16 @@ const handleMouseUp = async () => {
     if (draggedStreamId.value && hoverZoneId.value) {
         const currentGroup = snapcastStore.status?.groups.find(g => g.id === hoverZoneId.value);
         if (currentGroup && currentGroup.stream_id !== draggedStreamId.value) {
-            await snapcastStore.setGroupStream(hoverZoneId.value, draggedStreamId.value);
+            const newStreamId = draggedStreamId.value;
+            const groupId = hoverZoneId.value;
+            // Optimistic UI update
+            currentGroup.stream_id = newStreamId;
+            triggerRedraw();
+            
+            // Send request to server (without blocking the UI cleanup)
+            snapcastStore.setGroupStream(groupId, newStreamId).catch(err => {
+                console.error("Failed to set stream, resetting optimistic update", err);
+            });
         }
     }
     
@@ -318,10 +350,10 @@ const updateVolume = (client: any, event: Event) => {
                   class="cable-animated opacity-100 drop-shadow-[0_0_12px_rgba(255,255,255,0.4)] pointer-events-none" />
          </svg>
          
-         <div class="relative z-20 flex flex-col lg:flex-row gap-8 lg:gap-32 w-full px-2 sm:px-4">
+         <div class="relative z-20 flex flex-col lg:flex-row gap-8 lg:gap-16 xl:gap-24 w-full px-2 sm:px-4">
              
              <!-- SOURCES COLUMN (Left) -->
-             <div class="w-full lg:w-1/3 flex flex-col gap-4">
+             <div class="w-full lg:w-1/2 flex flex-col gap-4">
                  <h2 class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 flex items-center gap-2 px-2">
                     <span class="material-symbols-outlined text-sm">input</span> Virtual Sources
                  </h2>
@@ -359,16 +391,17 @@ const updateVolume = (client: any, event: Event) => {
                            <div class="w-3 h-3 absolute rounded-full" :style="{ backgroundColor: getStreamColor(stream.id) }"></div>
                       </div>
                  </div>
-             </div>
+              </div>
              
              <!-- ZONES COLUMN (Right) -->
-             <div class="w-full lg:w-2/3 flex flex-col gap-6 mt-8 lg:mt-0">
+             <div class="w-full lg:w-1/2 flex flex-col gap-4 mt-8 lg:mt-0">
                  <h2 class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 flex items-center gap-2 px-2">
                     <span class="material-symbols-outlined text-sm">speaker_group</span> Output Zones
                  </h2>
                  
                  <div v-for="group in snapcastStore.status?.groups || []" :key="group.id"
-                      class="bg-brand-surface/80 backdrop-blur-3xl border rounded-[2rem] shadow-xl transition-all duration-500 relative flex flex-col group/zone"
+                      :ref="setZoneCardRef(group.id)"
+                      class="bg-brand-surface/80 backdrop-blur-3xl border rounded-[1.5rem] shadow-xl transition-all duration-500 relative flex flex-col group/zone"
                       :class="[
                          hoverZoneId === group.id ? 'border-brand-primary bg-brand-primary/5 scale-[1.02] shadow-[0_0_30px_rgba(59,130,246,0.15)] z-20' : 'border-white/5 hover:border-white/10',
                          !group.stream_id ? 'border-red-500/20 shadow-red-500/5' : ''
@@ -376,7 +409,7 @@ const updateVolume = (client: any, event: Event) => {
                       
                       <!-- Input Connector Node (Drop Target) -->
                       <div :ref="setZoneRef(group.id)"
-                           class="w-10 h-10 rounded-full bg-brand-surface border-[3px] flex items-center justify-center transition-all duration-300 z-30 shrink-0 absolute left-[-20px] top-8 shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                           class="w-10 h-10 rounded-full bg-brand-surface border-[3px] flex items-center justify-center transition-all duration-300 z-30 shrink-0 absolute left-[-20px] top-[20px] shadow-[0_0_15px_rgba(0,0,0,0.5)]"
                            :class="hoverZoneId === group.id ? 'scale-125' : ''"
                            :style="{ borderColor: group.stream_id ? getStreamColor(group.stream_id) : '#4b5563' }">
                            <div class="w-4 h-4 rounded-full transition-all duration-300"
@@ -386,30 +419,38 @@ const updateVolume = (client: any, event: Event) => {
                       </div>
                       
                       <!-- Zone Header -->
-                      <div class="pl-12 pr-6 pt-6 pb-6 flex items-start sm:items-center justify-between gap-4 border-b border-white/[0.02]">
+                      <div class="p-4 flex items-center justify-between gap-4 cursor-pointer min-h-[72px]" @click="toggleGroup(group.id)">
+                          <div class="w-2 h-2 rounded-full absolute opacity-0"></div> <!-- spacing component -->
                           <!-- Identity -->
-                          <div class="flex items-center gap-4">
-                              <div>
-                                  <h3 class="text-xl font-bold text-text-main tracking-tight flex items-center gap-3">
-                                    {{ group.name || 'Zone ' + group.id.slice(0,4) }}
-                                    <span v-if="group.stream_id" class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-white/10" :style="{ color: getStreamColor(group.stream_id) }">
+                          <div class="flex items-center gap-4 ml-6 overflow-hidden">
+                              <div class="truncate">
+                                  <h3 class="text-base font-black text-text-main tracking-tight flex items-center gap-3 truncate">
+                                    <span class="truncate">{{ group.name || 'Zone ' + group.id.slice(0,4) }}</span>
+                                    <span v-if="group.stream_id" class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-white/10 shrink-0" :style="{ color: getStreamColor(group.stream_id) }">
                                         {{ getStreamLabel(snapcastStore.status?.streams?.find(s => s.id === group.stream_id) || {}) }}
                                     </span>
                                   </h3>
-                                  <p class="text-[10px] font-black text-text-muted mt-1 uppercase tracking-[0.1em]">{{ group.clients.length }} TARGET DESTINATIONS</p>
+                                  <p class="text-[9px] font-black text-text-muted mt-0.5 uppercase tracking-[0.1em]">{{ group.clients.length }} DESTINATIONS</p>
                               </div>
                           </div>
                           
                           <!-- Group Controls -->
-                          <button @click="snapcastStore.setGroupMute(group.id, !group.muted)" 
-                                  class="w-12 h-12 rounded-2xl transition-all duration-300 border flex items-center justify-center group/mute shadow-md hover:shadow-lg shrink-0"
-                                  :class="group.muted ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-brand-surface text-text-muted border-white/5 hover:text-text-main hover:border-white/10'">
-                              <span class="material-symbols-outlined transition-transform group-hover/mute:scale-110">{{ group.muted ? 'volume_off' : 'volume_up' }}</span>
-                          </button>
+                          <div class="flex items-center gap-2 shrink-0">
+                            <button @click.stop="snapcastStore.setGroupMute(group.id, !group.muted)" 
+                                    class="w-8 h-8 rounded-xl transition-all duration-300 border flex items-center justify-center group/mute shadow-md shrink-0"
+                                    :class="group.muted ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-brand-surface text-text-muted border-white/5 hover:text-text-main hover:border-white/10'">
+                                <span class="material-symbols-outlined text-sm transition-transform group-hover/mute:scale-110">{{ group.muted ? 'volume_off' : 'volume_up' }}</span>
+                            </button>
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-text-muted transition-transform duration-300"
+                                 :class="{'rotate-180': expandedGroups.has(group.id)}">
+                                <span class="material-symbols-outlined">expand_more</span>
+                            </div>
+                          </div>
                       </div>
 
-                      <!-- Clients List -->
-                      <div class="bg-black/20 rounded-b-[2rem] p-4 sm:p-6 space-y-2 relative z-10 w-full overflow-hidden">
+                      <!-- Clients List (Expanded) -->
+                      <transition name="slide">
+                        <div v-if="expandedGroups.has(group.id)" class="bg-black/20 rounded-b-[2rem] p-4 sm:p-6 space-y-2 relative z-10 w-full overflow-hidden transition-all duration-500">
                           <div v-for="client in group.clients" :key="client.id" 
                                class="p-4 rounded-2xl bg-brand-surface/40 backdrop-blur-md border border-white/5 hover:border-white/10 transition-all duration-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full group/client">
                               
@@ -456,6 +497,7 @@ const updateVolume = (client: any, event: Event) => {
                               </div>
                           </div>
                       </div>
+                      </transition>
                  </div>
              </div>
              
@@ -473,6 +515,21 @@ const updateVolume = (client: any, event: Event) => {
 @keyframes flow {
     from { stroke-dashoffset: 24; }
     to { stroke-dashoffset: 0; }
+}
+
+.slide-enter-active, .slide-leave-active {
+    transition: all 0.3s ease-in-out;
+    max-height: 1000px;
+    opacity: 1;
+}
+.slide-enter-from, .slide-leave-to {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    overflow: hidden;
 }
 
 input[type=range]::-webkit-slider-thumb {

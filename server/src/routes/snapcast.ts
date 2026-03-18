@@ -20,12 +20,14 @@ router.get('/status', async (req: Request, res: Response) => {
 router.post('/group/:id/stream', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { stream_id } = req.body;
+    console.log(`[Snapcast RPC] Setting stream for group ${id} to ${stream_id}...`);
     try {
         const result = await executeSnapcastRpc('Group.SetStream', { id, stream_id });
-        res.json({ success: true, result });
+        console.log(`[Snapcast RPC] Group.SetStream response:`, JSON.stringify(result));
+        res.json(result);
     } catch (error: any) {
-        console.error('Snapcast Group.SetStream Error:', error);
-        res.status(500).json({ error: error.message || 'Failed to set group stream' });
+        console.error(`[Snapcast RPC] Group.SetStream FAILED:`, error.message);
+        res.status(500).json({ error: error.message });
     }
 });
 
