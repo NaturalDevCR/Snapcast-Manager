@@ -194,10 +194,24 @@ export class SystemService {
   async getServiceLogs(service: 'snapserver' | 'shairport-sync' | 'snapmanager' | 'librespot'): Promise<string> {
     try {
         // journalctl -n 100 --no-pager
-        const output = await this.runCommand(`sudo journalctl -u ${service} -n 100 --no-pager`);
+        let cmd = `sudo journalctl -u ${service} -n 100 --no-pager`;
+        
+        // Fallback to non-sudo if running as root or if user is in systemd-journal group
+        if (process.getuid && process.getuid() === 0) {
+            cmd = `journalctl -u ${service} -n 100 --no-pager`;
+        }
+        
+        const output = await this.runCommand(cmd);
         return output;
-    } catch (error) {
-        return 'Failed to retrieve logs';
+    } catch (error: any) {
+        console.error(`[getServiceLogs] Failed for ${service}:`, error.message || error);
+        // Attempt without sudo as a fallback if sudo failed
+        try {
+            const output = await this.runCommand(`journalctl -u ${service} -n 100 --no-pager`);
+            return output;
+        } catch (fallbackError: any) {
+            return `Failed to retrieve logs:\\n${error.message || error}\\nFallback error:\\n${fallbackError.message || fallbackError}`;
+        }
     }
   }
 
