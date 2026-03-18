@@ -409,7 +409,12 @@ if command -v node >/dev/null 2>&1; then
 else
     echo -e "${RED}[!] Node.js not detected.${NC}"
     if prompt_yes_no "Install Node.js 22?" "y"; then
-        curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash -
+        if [ -n "$SUDO" ]; then
+            curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash -
+        else
+            curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+        fi
+
         $SUDO apt-get install -y nodejs
     else
         echo "Installation aborted."
