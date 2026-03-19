@@ -15,46 +15,73 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.0.10"
+VERSION="v0.1.0"
 APP_VERSION="$VERSION"
-
-# Determine if SUDO is needed
-if [ "$(id -u)" -eq 0 ]; then
-    SUDO=""
-else
-    if command -v sudo >/dev/null 2>&1; then
-        SUDO="sudo"
-    else
-        echo -e "${RED}[!] Error: This script requires root privileges or sudo to be installed.${NC}"
-        exit 1
-    fi
-fi
-
-
-echo -e "${MAGENTA}${BOLD}"
-cat << "EOF"
-   _____                                 _     __  __                                   
-  / ____|                               | |   |  \/  |                                  
- | (___  _ __   __ _ _ __   ___ __ _ ___| |_  | \  / | __ _ _ __   __ _  __ _  ___ _ __ 
-  \___ \| '_ \ / _` | '_ \ / __/ _` / __| __| | |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '__|
-  ____) | | | | (_| | |_) | (_| (_| \__ \ |_  | |  | | (_| | | | | (_| | (_| |  __/ |   
- |_____/|_| |_|\__,_| .__/ \___\__,_|___/\__| |_|  |_|\__,_|_| |_|\__,_|\__, |\___|_|   
-                    | |                                                  __/ |          
-                    |_|                                                 |___/           
-EOF
-echo -e "${NC}"
-echo -e "${GREEN}${BOLD}=== Installer ($VERSION) ===${NC}"
-echo -e "This script will help you set up or update Snapcast Manager.\n"
-
-# Application Configuration
-APP_DIR="/opt/snapcast-manager"
-REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
-NODE_VERSION="22"
 
 # Colors for output
 GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
 INSTALL_BASE_DIR="/opt/snapcast-manager"
 SERVICE_NAME="snapmanager"
+AUTO_CONFIRM=false
+
+# Helper to ask questions or auto-confirm
+prompt_yes_no() {
+    local prompt="$1"
+    local default="$2"
+    
+    if [ "$AUTO_CONFIRM" = true ]; then
+        echo -e "${prompt} [Auto-confirmed: y]"
+        return 0
+    fi
+
+    local ans
+    if [ -t 0 ]; then
+        # Standard interactive terminal
+        read -p "$prompt (y/n): " ans
+    elif [ -c /dev/tty ]; then
+        # Piped execution (curl | bash), but TTY is available
+        read -p "$prompt (y/n): " ans < /dev/tty
+    else
+        # Truly headless (no TTY), use default
+        echo -e "${prompt} [Auto-answered: ${default}]"
+        [[ "$default" == "y" ]]
+        return $?
+    fi
+    
+    [[ "$ans" == "y" || "$ans" == "Y" ]]
+}
+
+uninstall_snapmanager() {
+    echo -e "\n${RED}${BOLD}=== Uninstalling Snapcast Manager ===${NC}"
+    if prompt_yes_no "Are you sure you want to completely remove Snapcast Manager?" "n"; then
+        echo "Stopping and disabling service..."
+        $SUDO systemctl stop $SERVICE_NAME 2>/dev/null || true
+        $SUDO systemctl disable $SERVICE_NAME 2>/dev/null || true
+        $SUDO rm -f /etc/systemd/system/${SERVICE_NAME}.service
+        $SUDO systemctl daemon-reload
+        
+        if [ -d "$INSTALL_BASE_DIR/data" ]; then
+            if prompt_yes_no "Do you want to delete all application data (Database and settings)?" "n"; then
+                echo "Removing application and data..."
+                $SUDO rm -rf "$INSTALL_BASE_DIR"
+            else
+                echo "Removing application files but keeping $INSTALL_BASE_DIR/data..."
+                # Remove everything EXCEPT 'data'
+                $SUDO find "$INSTALL_BASE_DIR" -mindepth 1 -maxdepth 1 ! -name 'data' -exec rm -rf {} +
+            fi
+        else
+            $SUDO rm -rf "$INSTALL_BASE_DIR"
+        fi
+        
+        echo -e "${GREEN}[OK] Snapcast Manager has been uninstalled.${NC}"
+        exit 0
+    else
+        echo "Uninstallation cancelled."
+        exit 0
+    fi
+}
 
 # Parse arguments
 AUTO_CONFIRM=false
@@ -89,32 +116,51 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Helper to ask questions or auto-confirm
-prompt_yes_no() {
-    local prompt="$1"
-    local default="$2"
-    
-    if [ "$AUTO_CONFIRM" = true ]; then
-        echo -e "${prompt} [Auto-confirmed: y]"
-        return 0
-    fi
-
-    local ans
-    if [ -t 0 ]; then
-        # Standard interactive terminal
-        read -p "$prompt (y/n): " ans
-    elif [ -c /dev/tty ]; then
-        # Piped execution (curl | bash), but TTY is available
-        read -p "$prompt (y/n): " ans < /dev/tty
+# Determine if SUDO is needed
+if [ "$(id -u)" -eq 0 ]; then
+    SUDO=""
+else
+    if command -v sudo >/dev/null 2>&1; then
+        SUDO="sudo"
     else
-        # Truly headless (no TTY), use default
-        echo -e "${prompt} [Auto-answered: ${default}]"
-        [[ "$default" == "y" ]]
-        return $?
+        echo -e "${RED}[!] Error: This script requires root privileges or sudo to be installed.${NC}"
+        exit 1
     fi
-    
-    [[ "$ans" == "y" || "$ans" == "Y" ]]
-}
+fi
+
+echo -e "${MAGENTA}${BOLD}"
+cat << "EOF"
+   _____                                 _     __  __                                   
+  / ____|                               | |   |  \/  |                                  
+ | (___  _ __   __ _ _ __   ___ __ _ ___| |_  | \  / | __ _ _ __   __ _  __ _  ___ _ __ 
+  \___ \| '_ \ / _` | '_ \ / __/ _` / __| __| | |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '__|
+  ____) | | | | (_| | |_) | (_| (_| \__ \ |_  | |  | | (_| | | | | (_| | (_| |  __/ |   
+ |_____/|_| |_|\__,_| .__/ \___\__,_|___/\__| |_|  |_|\__,_|_| |_|\__,_|\__, |\___|_|   
+                    | |                                                  __/ |          
+                    |_|                                                 |___/           
+EOF
+echo -e "${NC}"
+echo -e "${GREEN}${BOLD}=== Snapcast Manager Installer ($VERSION) ===${NC}"
+echo -e "This script will set up Snapcast Manager on your system.\n"
+echo -e "${CYAN}What will be installed:${NC}"
+echo -e "  - ${BOLD}Snapcast Manager${NC}: The web dashboard and control server."
+echo -e "  - ${BOLD}Node.js${NC}: The JavaScript runtime required to run the server."
+echo -e "  - ${BOLD}System Tools${NC}: Utilities like curl, ffmpeg, and build-essential."
+echo -e "\n${YELLOW}Note: Snapserver/Snapclient will NOT be installed automatically.${NC}"
+echo -e "You can install them later directly from the web interface.\n"
+
+if [ "$AUTO_CONFIRM" != true ]; then
+    if ! prompt_yes_no "Do you want to proceed?" "y"; then
+        echo "Installation aborted."
+        exit 0
+    fi
+fi
+
+# Application Configuration
+APP_DIR="/opt/snapcast-manager"
+REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
+NODE_VERSION="22"
+
 
 # 0. Check if we need to download the source
 if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
@@ -144,16 +190,17 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
             echo -e "1) ${CYAN}Update / Upgrade${NC} (Preserves Database & Settings) - Recommended"
             echo -e "2) ${RED}Force Re-install${NC} (Wipes installation bundle but still backs up data)"
             echo -e "3) ${RED}Clean Re-install${NC} (Wipes everything, starting fresh)"
-            echo -e "4) ${YELLOW}Abort${NC}"
+            echo -e "4) ${RED}Uninstall${NC}"
+            echo -e "5) ${YELLOW}Abort${NC}"
             
             if [ "$AUTO_CONFIRM" = true ]; then
                 CHOICE=1
                 echo -e "Select option [Auto-confirmed: 1]"
             else
                 if [ -t 0 ]; then
-                    read -p "Select an option (1-4): " CHOICE
+                    read -p "Select an option (1-5): " CHOICE
                 elif [ -c /dev/tty ]; then
-                    read -p "Select an option (1-4): " CHOICE < /dev/tty
+                    read -p "Select an option (1-5): " CHOICE < /dev/tty
                 else
                     echo -e "${RED}[!] No TTY available for input. Aborting.${NC}"
                     exit 1
@@ -168,6 +215,9 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
                     DO_UPDATE=true
                     PRESERVE_DATA=false
                     ;;
+                4)
+                    uninstall_snapmanager
+                    ;;
                 *)
                     echo "Installation aborted."
                     exit 0
@@ -177,17 +227,18 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
             echo -e "\n${GREEN}You are already running the latest version ($VERSION).${NC}"
             echo -e "1) ${RED}Update / Force Re-install${NC} (Preserves Database & Settings)"
             echo -e "2) ${RED}Clean Re-install${NC} (Wipes everything, starting fresh)"
-            echo -e "3) ${YELLOW}Abort${NC}"
+            echo -e "3) ${RED}Uninstall${NC}"
+            echo -e "4) ${YELLOW}Abort${NC}"
 
             if [ "$AUTO_CONFIRM" = true ]; then
-                CHOICE=3
+                CHOICE=4
                 echo -e "Select option [Auto-confirmed: Abort]"
                 exit 0
             else
                 if [ -t 0 ]; then
-                    read -p "Select an option (1-3): " CHOICE
+                    read -p "Select an option (1-4): " CHOICE
                 elif [ -c /dev/tty ]; then
-                    read -p "Select an option (1-3): " CHOICE < /dev/tty
+                    read -p "Select an option (1-4): " CHOICE < /dev/tty
                 else
                     echo -e "${RED}[!] No TTY available for input. Aborting.${NC}"
                     exit 1
@@ -201,6 +252,9 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
                 2)
                     DO_UPDATE=true
                     PRESERVE_DATA=false
+                    ;;
+                3)
+                    uninstall_snapmanager
                     ;;
                 *)
                     echo "Installation aborted."
@@ -242,9 +296,16 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
     fi
 
     if [ ! -d "$INSTALL_BASE_DIR" ]; then
-        echo "Updating package list and ensuring wget and unzip are installed..."
-        $SUDO apt-get update
-        $SUDO apt-get install -y wget unzip
+        if ! command -v wget >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
+            echo -e "${YELLOW}Step 0: Checking for essential tools...${NC}"
+            if prompt_yes_no "Missing wget or unzip. Install them?" "y"; then
+                $SUDO apt-get update
+                $SUDO apt-get install -y wget unzip
+            else
+                echo "Cannot proceed without wget and unzip. Installation aborted."
+                exit 1
+            fi
+        fi
         
         echo "Downloading pre-built release $VERSION..."
 
@@ -330,71 +391,26 @@ if [[ "$OSTYPE" != "linux-gnu"* ]]; then
     exit 1
 fi
 
-# 2. Check for Snapcast
-echo -e "\n${YELLOW}Step 1: Checking for Snapcast...${NC}"
+# 2. Check for System Prerequisites (Prerequisites)
+echo -e "\n${YELLOW}Step 1: Checking for system prerequisites (curl, ffmpeg, lsb-release)...${NC}"
+PREREQS=()
+if ! command -v curl >/dev/null 2>&1; then PREREQS+=("curl"); fi
+if ! command -v ffmpeg >/dev/null 2>&1; then PREREQS+=("ffmpeg"); fi
+if ! command -v lsb_release >/dev/null 2>&1; then PREREQS+=("lsb-release"); fi
 
-install_latest_snapserver() {
-    echo "Fetching latest Snapserver from GitHub..."
-    local arch=$(dpkg --print-architecture)
-    local codename=$(lsb_release -cs 2>/dev/null || grep VERSION_CODENAME /etc/os-release | cut -d= -f2 | sed 's/"//g')
-    [ -z "$codename" ] && codename="bookworm"
-    
-    local api_url="https://api.github.com/repos/snapcast/snapcast/releases/latest"
-    local assets=$(curl -sL "$api_url" | grep "browser_download_url")
-    
-    # Try to find exact match: arch + codename, excluding pipewire
-    local download_url=$(echo "$assets" | grep "$arch" | grep "$codename" | grep ".deb" | grep -v "pipewire" | head -n 1 | cut -d '"' -f 4)
-    
-    # Fallback to arch only if codename match fails
-    if [ -z "$download_url" ]; then
-        echo "No exact distro match found, falling back to architecture match..."
-        download_url=$(echo "$assets" | grep "$arch" | grep ".deb" | grep -v "pipewire" | head -n 1 | cut -d '"' -f 4)
-    fi
-
-    if [ -z "$download_url" ]; then
-        echo -e "${RED}[!] Could not find a suitable Snapserver release on GitHub. Falling back to apt.${NC}"
-        $SUDO apt-get install -y snapserver
-        return
-    fi
-
-    local deb_file="/tmp/snapserver_latest.deb"
-    echo "Downloading: $(basename "$download_url")"
-    $SUDO wget -qO "$deb_file" "$download_url"
-    $SUDO dpkg -i "$deb_file" || $SUDO apt-get install -f -y
-    $SUDO rm -f "$deb_file"
-    
-    # CRITICAL: Fix permission/home directory issue
-    echo "Applying system configuration fixes..."
-    $SUDO mkdir -p /var/lib/snapserver
-    $SUDO chown -R snapserver:snapserver /var/lib/snapserver
-    # Ensure snapserver user has /var/lib/snapserver as HOME
-    $SUDO usermod -d /var/lib/snapserver snapserver 2>/dev/null || true
-    
-    $SUDO systemctl daemon-reload
-    $SUDO systemctl restart snapserver || echo -e "${YELLOW}[!] Warning: Snapserver failed to start. You may need to check logs.${NC}"
-}
-
-SNAPSERVER_INSTALLED=false
-if command -v snapserver >/dev/null 2>&1; then
-    echo -e "${GREEN}[OK] snapserver detected.${NC}"
-    SNAPSERVER_INSTALLED=true
-fi
-
-if [ "$SNAPSERVER_INSTALLED" = false ]; then
-    if prompt_yes_no "Snapserver not found. Do you want to install it from GitHub (Recommended)?" "y"; then
+if [ ${#PREREQS[@]} -gt 0 ]; then
+    echo -e "${YELLOW}[!] Missing prerequisites: ${PREREQS[*]}${NC}"
+    if prompt_yes_no "Do you want to install them?" "y"; then
         $SUDO apt-get update
-        $SUDO apt-get install -y curl wget ffmpeg lsb-release
-        install_latest_snapserver
+        $SUDO apt-get install -y "${PREREQS[@]}"
     fi
 else
-    # Even if installed, we might want to ensure permissions are correct if running this script
-    $SUDO mkdir -p /var/lib/snapserver
-    $SUDO chown -R snapserver:snapserver /var/lib/snapserver
-    $SUDO usermod -d /var/lib/snapserver snapserver 2>/dev/null || true
+    echo -e "${GREEN}[OK] All system prerequisites detected.${NC}"
 fi
 
+
 # 2.5 Check for Build Essentials (for native modules like better-sqlite3)
-echo -e "\n${YELLOW}Step 2.5: Checking for build tools...${NC}"
+echo -e "\n${YELLOW}Step 2: Checking for build tools...${NC}"
 if ! command -v make >/dev/null 2>&1; then
     echo -e "${YELLOW}[!] Build tools (make/gcc) not detected.${NC}"
     if prompt_yes_no "Install build-essential? (Highly recommended for database performance)" "y"; then
@@ -403,7 +419,7 @@ if ! command -v make >/dev/null 2>&1; then
 fi
 
 # 3. Check for Node.js
-echo -e "\n${YELLOW}Step 2: Checking for Node.js...${NC}"
+echo -e "\n${YELLOW}Step 3: Checking for Node.js...${NC}"
 if command -v node >/dev/null 2>&1; then
     NODE_VER=$(node -v)
     echo -e "${GREEN}[OK] Node.js $NODE_VER detected.${NC}"
@@ -424,7 +440,7 @@ else
 fi
 
 # 4. Install Dependencies & Build
-echo -e "\n${YELLOW}Step 3: Installing dependencies and building project...${NC}"
+echo -e "\n${YELLOW}Step 4: Installing dependencies and building project...${NC}"
 
 if [ -d "server/dist" ] && [ -d "client/dist" ] && [ ! -f ".rebuilding" ]; then
     echo -e "${GREEN}[OK] Pre-compiled release detected! Skipping long build process.${NC}"
@@ -477,7 +493,7 @@ if [ -n "$RESTORE_FILE" ]; then
 fi
 
 # 5. Configurable Port and Environment File
-echo -e "\n${YELLOW}▶ Step 4: Web Interface Configuration...${NC}"
+echo -e "\n${YELLOW}▶ Step 5: Web Interface Configuration...${NC}"
 
 # If port wasn't provided by argument, ask or use default 3000
 if [ -z "$APP_PORT" ]; then
@@ -498,7 +514,7 @@ PORT=$APP_PORT
 EOF"
 
 # 6. Systemd Service setup
-echo -e "\n${YELLOW}▶ Step 5: Setting up as a systemd service...${NC}"
+echo -e "\n${YELLOW}▶ Step 6: Setting up as a systemd service...${NC}"
 if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?" "y"; then
     USER_NAME=$(whoami)
     INSTALL_DIR="$INSTALL_BASE_DIR"
