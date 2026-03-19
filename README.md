@@ -27,17 +27,17 @@ Snapcast Manager turns your raw Debian/Ubuntu server or Raspberry Pi into a prem
 
 ---
 
-<img width="500" height="auto" alt="image" src="https://github.com/user-attachments/assets/a9fe0eef-cd9c-41f9-9c63-e64309a55699" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/a9fe0eef-cd9c-41f9-9c63-e64309a55699" />
 
-<img width="500" height="auto" alt="image" src="https://github.com/user-attachments/assets/30ba0850-7181-44bc-b201-e74adbb5c7ec" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/30ba0850-7181-44bc-b201-e74adbb5c7ec" />
 
-<img width="500" height="auto" alt="image" src="https://github.com/user-attachments/assets/df9b71d8-af84-4726-82a8-563ee4f43ba1" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/df9b71d8-af84-4726-82a8-563ee4f43ba1" />
 
-<img width="500" height="auto" alt="image" src="https://github.com/user-attachments/assets/186525ea-6fda-4242-a6a8-40a8f3202a35" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/186525ea-6fda-4242-a6a8-40a8f3202a35" />
 
-<img width="500" height="auto" alt="image" src="https://github.com/user-attachments/assets/56507eb1-51e4-4af5-80c2-0911e74c0dd6" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/56507eb1-51e4-4af5-80c2-0911e74c0dd6" />
 
-<img width="500" height="auto" alt="image" src="https://github.com/user-attachments/assets/90928d89-339d-4ac4-a91a-4938f907f408" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/90928d89-339d-4ac4-a91a-4938f907f408" />
 
 
 
