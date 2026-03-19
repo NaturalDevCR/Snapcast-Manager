@@ -35,7 +35,7 @@ Snapcast Manager turns your raw Debian/Ubuntu server or Raspberry Pi into a prem
 
 <img width="500" height="auto" alt="image" src="https://github.com/user-attachments/assets/186525ea-6fda-4242-a6a8-40a8f3202a35" />
 
-<img width="500" height="auto" alt="image" src="https://github.com/user-attachments/assets/9b2ceb53-68cd-4fc1-9fed-aec10217591d" />
+<img width="500" height="auto" alt="image" src="https://github.com/user-attachments/assets/56507eb1-51e4-4af5-80c2-0911e74c0dd6" />
 
 <img width="500" height="auto" alt="image" src="https://github.com/user-attachments/assets/90928d89-339d-4ac4-a91a-4938f907f408" />
 
