@@ -15,7 +15,7 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.0"
+VERSION="v0.1.1"
 APP_VERSION="$VERSION"
 
 # Colors for output
@@ -87,6 +87,7 @@ uninstall_snapmanager() {
 AUTO_CONFIRM=false
 RESTORE_FILE=""
 APP_PORT=""
+APP_MODE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -108,6 +109,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --port=*)
             APP_PORT="${1#*=}"
+            shift
+            ;;
+        --mode)
+            APP_MODE="$2"
+            shift 2
+            ;;
+        --mode=*)
+            APP_MODE="${1#*=}"
             shift
             ;;
         *)
@@ -154,6 +163,34 @@ if [ "$AUTO_CONFIRM" != true ]; then
         echo "Installation aborted."
         exit 0
     fi
+fi
+
+# Choose installation mode (skip if already provided via --mode)
+if [ -z "$APP_MODE" ]; then
+    if [ "$AUTO_CONFIRM" = true ]; then
+        APP_MODE="both"
+        echo -e "Installation mode [Auto-confirmed: both]"
+    else
+        echo -e "\n${CYAN}${BOLD}Choose Installation Mode:${NC}"
+        echo -e "  1) ${BOLD}Snapclient Manager Only${NC}  - Manage audio output clients"
+        echo -e "  2) ${BOLD}Snapserver Manager Only${NC}  - Manage the audio server"
+        echo -e "  3) ${BOLD}Snapcast Manager (both)${NC}  - Full server + client management"
+
+        if [ -t 0 ]; then
+            read -p "Select mode (1-3) [3]: " MODE_CHOICE
+        elif [ -c /dev/tty ]; then
+            read -p "Select mode (1-3) [3]: " MODE_CHOICE < /dev/tty
+        else
+            MODE_CHOICE=3
+        fi
+
+        case "${MODE_CHOICE:-3}" in
+            1) APP_MODE="client" ;;
+            2) APP_MODE="server" ;;
+            *) APP_MODE="both" ;;
+        esac
+    fi
+    echo -e "${GREEN}[OK] Mode set to: ${BOLD}$APP_MODE${NC}\n"
 fi
 
 # Application Configuration
@@ -378,6 +415,9 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         if [ -n "$APP_PORT" ]; then
             EXEC_ARGS+=("--port" "$APP_PORT")
         fi
+        if [ -n "$APP_MODE" ]; then
+            EXEC_ARGS+=("--mode" "$APP_MODE")
+        fi
         exec bash scripts/install.sh "${EXEC_ARGS[@]}"
     else
         echo "Installation aborted."
@@ -511,6 +551,7 @@ echo -e "${GREEN}[OK] Interface will be available on port $APP_PORT.${NC}"
 # Write the .env file
 $SUDO bash -c "cat <<EOF > $INSTALL_BASE_DIR/server/.env
 PORT=$APP_PORT
+SNAPCAST_MODE=${APP_MODE:-both}
 EOF"
 
 # 6. Systemd Service setup

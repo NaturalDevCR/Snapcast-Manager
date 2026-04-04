@@ -28,7 +28,11 @@ app.use('/api/snapclient-instances', snapclientInstancesRouter);
 
 // Basic status route
 app.get('/api/status', (req, res) => {
-  res.json({ status: 'online', service: 'Snapcast Manager' });
+  res.json({
+    status: 'online',
+    service: 'Snapcast Manager',
+    mode: (process.env.SNAPCAST_MODE as 'client' | 'server' | 'both') || 'both',
+  });
 });
 
 // Serve frontend static files

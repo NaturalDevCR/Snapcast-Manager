@@ -61,6 +61,11 @@ function buildEnvContent(instance: Omit<SnapclientInstance, 'status'>): string {
 }
 
 export class SnapclientInstanceService {
+  /** Returns 'sudo ' when not root, or '' when already root (e.g. on bare Debian). */
+  private get SUDO(): string {
+    return (process as any).getuid?.() === 0 ? '' : 'sudo ';
+  }
+
   private async run(cmd: string): Promise<string> {
     try {
       const { stdout, stderr } = await execAsync(cmd);
@@ -79,18 +84,18 @@ export class SnapclientInstanceService {
     await fs.writeFile(tmpEnv, buildEnvContent(instance), 'utf-8');
     await fs.writeFile(tmpSvc, buildServiceContent(instance), 'utf-8');
 
-    await this.run(`sudo mkdir -p ${ENV_DIR}`);
-    await this.run(`sudo mv ${tmpEnv} ${envFileName(instance.id)}`);
-    await this.run(`sudo chmod 644 ${envFileName(instance.id)}`);
-    await this.run(`sudo mv ${tmpSvc} ${serviceFileName(instance.id)}`);
-    await this.run(`sudo chmod 644 ${serviceFileName(instance.id)}`);
-    await this.run('sudo systemctl daemon-reload');
+    await this.run(`${this.SUDO}mkdir -p ${ENV_DIR}`);
+    await this.run(`${this.SUDO}mv ${tmpEnv} ${envFileName(instance.id)}`);
+    await this.run(`${this.SUDO}chmod 644 ${envFileName(instance.id)}`);
+    await this.run(`${this.SUDO}mv ${tmpSvc} ${serviceFileName(instance.id)}`);
+    await this.run(`${this.SUDO}chmod 644 ${serviceFileName(instance.id)}`);
+    await this.run(`${this.SUDO}systemctl daemon-reload`);
   }
 
   private async removeFiles(id: string): Promise<void> {
-    await this.run(`sudo rm -f ${envFileName(id)}`).catch(() => {});
-    await this.run(`sudo rm -f ${serviceFileName(id)}`).catch(() => {});
-    await this.run('sudo systemctl daemon-reload').catch(() => {});
+    await this.run(`${this.SUDO}rm -f ${envFileName(id)}`).catch(() => {});
+    await this.run(`${this.SUDO}rm -f ${serviceFileName(id)}`).catch(() => {});
+    await this.run(`${this.SUDO}systemctl daemon-reload`).catch(() => {});
   }
 
   async listInstances(): Promise<SnapclientInstance[]> {
@@ -124,8 +129,8 @@ export class SnapclientInstanceService {
     };
 
     await this.writeFiles(instance);
-    await this.run(`sudo systemctl enable snapclient-manager-${id}`).catch(() => {});
-    await this.run(`sudo systemctl start snapclient-manager-${id}`).catch(err => {
+    await this.run(`${this.SUDO}systemctl enable snapclient-manager-${id}`).catch(() => {});
+    await this.run(`${this.SUDO}systemctl start snapclient-manager-${id}`).catch(err => {
       console.warn(`Instance ${id} start warning: ${err.message}`);
     });
 
@@ -151,20 +156,20 @@ export class SnapclientInstanceService {
     ).run(updated.name, updated.host, updated.port, updated.soundcard, updated.hostId, id);
 
     await this.writeFiles(updated);
-    await this.run(`sudo systemctl restart snapclient-manager-${id}`).catch(() => {});
+    await this.run(`${this.SUDO}systemctl restart snapclient-manager-${id}`).catch(() => {});
 
     return { ...updated, status: await this.getInstanceStatus(id) };
   }
 
   async deleteInstance(id: string): Promise<void> {
-    await this.run(`sudo systemctl stop snapclient-manager-${id}`).catch(() => {});
-    await this.run(`sudo systemctl disable snapclient-manager-${id}`).catch(() => {});
+    await this.run(`${this.SUDO}systemctl stop snapclient-manager-${id}`).catch(() => {});
+    await this.run(`${this.SUDO}systemctl disable snapclient-manager-${id}`).catch(() => {});
     await this.removeFiles(id);
     db.prepare('DELETE FROM snapclient_instances WHERE id = ?').run(id);
   }
 
   async controlInstance(id: string, action: 'start' | 'stop' | 'restart' | 'enable' | 'disable'): Promise<void> {
-    await this.run(`sudo systemctl ${action} snapclient-manager-${id}`);
+    await this.run(`${this.SUDO}systemctl ${action} snapclient-manager-${id}`);
   }
 
   async getInstanceStatus(id: string): Promise<string> {
@@ -179,10 +184,7 @@ export class SnapclientInstanceService {
 
   async getInstanceLogs(id: string): Promise<string> {
     try {
-      let cmd = `sudo journalctl -u snapclient-manager-${id} -n 100 --no-pager`;
-      if (process.getuid && process.getuid() === 0) {
-        cmd = `journalctl -u snapclient-manager-${id} -n 100 --no-pager`;
-      }
+      const cmd = `${this.SUDO}journalctl -u snapclient-manager-${id} -n 100 --no-pager`;
       return await this.run(cmd);
     } catch (err: any) {
       try {
@@ -220,9 +222,9 @@ export class SnapclientInstanceService {
 
   // Called after snapclient package install to disable the default service
   async postInstallSetup(): Promise<void> {
-    await this.run('sudo systemctl stop snapclient 2>/dev/null || true').catch(() => {});
-    await this.run('sudo systemctl disable snapclient 2>/dev/null || true').catch(() => {});
-    await this.run(`sudo mkdir -p ${ENV_DIR}`).catch(() => {});
+    await this.run(`${this.SUDO}systemctl stop snapclient 2>/dev/null || true`).catch(() => {});
+    await this.run(`${this.SUDO}systemctl disable snapclient 2>/dev/null || true`).catch(() => {});
+    await this.run(`${this.SUDO}mkdir -p ${ENV_DIR}`).catch(() => {});
   }
 }
 
