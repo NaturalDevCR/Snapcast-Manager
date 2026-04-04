@@ -195,13 +195,85 @@ export class SnapclientInstanceService {
     }
   }
 
+  /** Returns true if the device is an audio output (not HDMI/SPDIF/DisplayPort). */
+  private isAudioOutputDevice(cardName: string, deviceName: string): boolean {
+    const nonOutput = /hdmi|displayport|vc4[.\-_]?hdmi|mai\s*pcm|s\/pdif|spdif|iec958|digital\s+output/i;
+    return !nonOutput.test(cardName) && !nonOutput.test(deviceName);
+  }
+
   async listAudioDevices(): Promise<AudioDevice[]> {
+    // Run both sources in parallel: aplay -l and /proc/asound (readable without audio group)
+    const [aplayDevices, procDevices] = await Promise.all([
+      this.getDevicesViaAplay(),
+      this.getDevicesViaProc(),
+    ]);
+
+    // Merge: use aplay as primary, fill in any cards /proc knows about that aplay missed
+    const seen = new Set(aplayDevices.map(d => d.hwId));
+    const merged = [...aplayDevices];
+    for (const d of procDevices) {
+      if (!seen.has(d.hwId)) {
+        merged.push(d);
+        seen.add(d.hwId);
+      }
+    }
+
+    // Return only real audio output devices (exclude HDMI, SPDIF, DisplayPort, etc.)
+    return merged.filter(d => this.isAudioOutputDevice(d.cardName, d.deviceName));
+  }
+
+  private async getDevicesViaAplay(): Promise<AudioDevice[]> {
     try {
       const output = await this.run('aplay -l 2>/dev/null');
       return this.parseAplayOutput(output);
     } catch {
       return [];
     }
+  }
+
+  private async getDevicesViaProc(): Promise<AudioDevice[]> {
+    try {
+      const [pcmOutput, cardsOutput] = await Promise.all([
+        this.run('cat /proc/asound/pcm 2>/dev/null').catch(() => ''),
+        this.run('cat /proc/asound/cards 2>/dev/null').catch(() => ''),
+      ]);
+      return this.parseProcAsound(pcmOutput, cardsOutput);
+    } catch {
+      return [];
+    }
+  }
+
+  /** Parse /proc/asound/cards + /proc/asound/pcm to enumerate all playback devices. */
+  private parseProcAsound(pcmOutput: string, cardsOutput: string): AudioDevice[] {
+    // Parse cards: " 0 [Headphones     ]: driver - Long Card Name"
+    const cardMap: Record<number, { id: string; name: string }> = {};
+    const cardLineRegex = /^\s*(\d+)\s+\[(\S+)\s*\]\s*:\s*\S+\s+-\s*(.+)$/gm;
+    let m: RegExpExecArray | null;
+    while ((m = cardLineRegex.exec(cardsOutput)) !== null) {
+      cardMap[parseInt(m[1])] = { id: m[2].trim(), name: m[3].trim() };
+    }
+
+    // Parse PCM: "00-00: Device Name : Device Name : playback N"
+    const devices: AudioDevice[] = [];
+    const pcmLineRegex = /^(\d+)-(\d+):\s+([^:]+):[^:]+:\s*playback/gm;
+    while ((m = pcmLineRegex.exec(pcmOutput)) !== null) {
+      const cardNum = parseInt(m[1]);
+      const devNum = parseInt(m[2]);
+      const deviceName = m[3].trim();
+      const card = cardMap[cardNum];
+      if (!card) continue;
+      const hwId = `hw:CARD=${card.id},DEV=${devNum}`;
+      devices.push({
+        cardNumber: cardNum,
+        cardId: card.id,
+        cardName: card.name,
+        device: devNum,
+        deviceName,
+        hwId,
+        label: `${card.name} — ${deviceName} (${hwId})`,
+      });
+    }
+    return devices;
   }
 
   private parseAplayOutput(output: string): AudioDevice[] {
