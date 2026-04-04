@@ -119,14 +119,14 @@ async function handleUninstall() {
 const alsaState = ref<Record<string, { expanded: boolean; controls: AlsaControl[]; saving: boolean; saved: boolean }>>({});
 
 function cardIdFromHwId(hwId: string): string {
-  return hwId.replace(/^hw:CARD=/, '').split(',')[0];
+  return (hwId.replace(/^hw:CARD=/, '').split(',')[0]) ?? hwId;
 }
 
 async function toggleAlsa(inst: SnapclientInstance) {
   if (!alsaState.value[inst.id]) {
     alsaState.value[inst.id] = { expanded: false, controls: [], saving: false, saved: false };
   }
-  const state = alsaState.value[inst.id];
+  const state = alsaState.value[inst.id]!;
   state.expanded = !state.expanded;
   if (state.expanded && state.controls.length === 0) {
     const cardId = cardIdFromHwId(inst.soundcard);
