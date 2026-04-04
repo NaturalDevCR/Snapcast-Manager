@@ -12,8 +12,14 @@ export interface SnapclientInstance {
   port: number;
   soundcard: string;
   hostId: string | null;
+  instanceNum: number;
   enabled: boolean;
   status?: string;
+}
+
+export interface AlsaControl {
+  name: string;
+  percent: number;
 }
 
 export interface AudioDevice {
@@ -55,8 +61,11 @@ WantedBy=multi-user.target
 }
 
 function buildEnvContent(instance: Omit<SnapclientInstance, 'status'>): string {
-  let opts = `-h ${instance.host} -p ${instance.port} -s ${instance.soundcard}`;
-  if (instance.hostId) opts += ` --hostID ${instance.hostId}`;
+  // Always set --hostID (user-provided or instance's own unique DB id) so each
+  // instance registers as a distinct client on the snapserver even on the same machine.
+  // Always set --instance N so the snapserver shows the correct instance number.
+  const hostId = instance.hostId || instance.id;
+  const opts = `-h ${instance.host} -p ${instance.port} -s ${instance.soundcard} --hostID ${hostId} --instance ${instance.instanceNum}`;
   return `# Snapclient instance: ${instance.name}\nSNAPCLIENT_OPTS="${opts}"\n`;
 }
 
@@ -98,6 +107,12 @@ export class SnapclientInstanceService {
     await this.run(`${this.SUDO}systemctl daemon-reload`).catch(() => {});
   }
 
+  /** Returns the next available sequential instance number. */
+  private getNextInstanceNum(): number {
+    const result = db.prepare('SELECT MAX(instance_num) as max FROM snapclient_instances').get() as any;
+    return (result?.max ?? 0) + 1;
+  }
+
   async listInstances(): Promise<SnapclientInstance[]> {
     const rows = db.prepare('SELECT * FROM snapclient_instances ORDER BY created_at ASC').all() as any[];
     return Promise.all(rows.map(async r => ({
@@ -107,6 +122,7 @@ export class SnapclientInstanceService {
       port: r.port,
       soundcard: r.soundcard,
       hostId: r.host_id,
+      instanceNum: r.instance_num ?? 1,
       enabled: r.enabled === 1,
       status: await this.getInstanceStatus(r.id),
     })));
@@ -114,17 +130,19 @@ export class SnapclientInstanceService {
 
   async createInstance(data: { name: string; host: string; port: number; soundcard: string; hostId?: string }): Promise<SnapclientInstance> {
     const id = `inst-${Date.now()}`;
+    const instanceNum = this.getNextInstanceNum();
     db.prepare(
-      'INSERT INTO snapclient_instances (id, name, host, port, soundcard, host_id) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(id, data.name, data.host, data.port, data.soundcard, data.hostId || null);
+      'INSERT INTO snapclient_instances (id, name, host, port, soundcard, host_id, instance_num) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, data.name, data.host, data.port, data.soundcard, data.hostId || null, instanceNum);
 
     const instance: Omit<SnapclientInstance, 'status'> = {
       id,
       name: data.name,
-      host: data.host,
-      port: data.port,
+      host: data.host || '127.0.0.1',
+      port: data.port || 1704,
       soundcard: data.soundcard,
       hostId: data.hostId || null,
+      instanceNum,
       enabled: true,
     };
 
@@ -148,6 +166,7 @@ export class SnapclientInstanceService {
       port: data.port ?? row.port,
       soundcard: data.soundcard ?? row.soundcard,
       hostId: data.hostId !== undefined ? data.hostId : row.host_id,
+      instanceNum: row.instance_num ?? 1,
       enabled: row.enabled === 1,
     };
 
@@ -290,6 +309,66 @@ export class SnapclientInstanceService {
       devices.push({ cardNumber, cardId, cardName, device, deviceName, hwId, label: `${cardName} — ${deviceName} (${hwId})` });
     }
     return devices;
+  }
+
+  // ── ALSA mixer ───────────────────────────────────────────────────────────
+
+  /** Extract the ALSA card short-ID from a hwId string like "hw:CARD=PCH,DEV=0". */
+  private cardIdFromHwId(hwId: string): string {
+    return hwId.replace(/^hw:CARD=/, '').split(',')[0];
+  }
+
+  /** Validate a card ID / control name to prevent command injection. */
+  private isValidAlsaId(value: string): boolean {
+    return /^[\w\-. ]+$/.test(value);
+  }
+
+  /**
+   * List all playback volume controls for a given ALSA card short-ID,
+   * with their current percentage values.
+   */
+  async listAlsaControls(cardId: string): Promise<AlsaControl[]> {
+    if (!this.isValidAlsaId(cardId)) return [];
+    try {
+      const raw = await this.run(`amixer -D hw:CARD=${cardId} scontrols 2>/dev/null`).catch(() => '');
+      const nameRegex = /Simple mixer control '([^']+)'/g;
+      const controls: AlsaControl[] = [];
+      let m: RegExpExecArray | null;
+      while ((m = nameRegex.exec(raw)) !== null) {
+        const name = m[1];
+        const percent = await this.getAlsaPercent(cardId, name);
+        if (percent !== null) controls.push({ name, percent });
+      }
+      return controls;
+    } catch {
+      return [];
+    }
+  }
+
+  private async getAlsaPercent(cardId: string, controlName: string): Promise<number | null> {
+    if (!this.isValidAlsaId(controlName)) return null;
+    try {
+      const out = await this.run(`amixer -D hw:CARD=${cardId} sget '${controlName}' 2>/dev/null`);
+      // Only include controls that have playback volume (pvolume capability or Playback N [X%])
+      if (!out.match(/Playback \d+ \[\d+%\]/) && !out.includes('pvolume')) return null;
+      const match = out.match(/\[(\d+)%\]/);
+      return match ? parseInt(match[1]) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Set the volume for a specific ALSA control and persist with alsactl store.
+   */
+  async setAlsaVolume(cardId: string, controlName: string, percent: number): Promise<void> {
+    if (!this.isValidAlsaId(cardId) || !this.isValidAlsaId(controlName)) {
+      throw new Error('Invalid cardId or controlName');
+    }
+    const pct = Math.min(100, Math.max(0, Math.round(percent)));
+    await this.run(`amixer -D hw:CARD=${cardId} sset '${controlName}' ${pct}% 2>/dev/null`);
+    // Persist so settings survive reboots
+    await this.run(`${this.SUDO}alsactl store 2>/dev/null`).catch(() => {});
   }
 
   // Called after snapclient package install to disable the default service

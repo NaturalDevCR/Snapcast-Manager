@@ -89,4 +89,31 @@ router.get('/:id/logs', async (req: Request, res: Response) => {
   }
 });
 
+// ── ALSA mixer endpoints ──────────────────────────────────────────────────
+
+// GET /snapclient-instances/alsa/:cardId  — list playback controls + current %
+router.get('/alsa/:cardId', async (req: Request, res: Response) => {
+  try {
+    const controls = await snapclientInstanceService.listAlsaControls(req.params.cardId);
+    res.json({ controls });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /snapclient-instances/alsa/:cardId  — set volume and persist
+// body: { control: string, percent: number }
+router.post('/alsa/:cardId', async (req: Request, res: Response) => {
+  const { control, percent } = req.body;
+  if (typeof control !== 'string' || typeof percent !== 'number') {
+    return res.status(400).json({ error: 'control (string) and percent (number) are required' });
+  }
+  try {
+    await snapclientInstanceService.setAlsaVolume(req.params.cardId, control, percent);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
