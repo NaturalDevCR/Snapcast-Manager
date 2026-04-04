@@ -9,9 +9,9 @@ export default {
     extend: {
       colors: {
         brand: {
-          primary: '#a60df2',
-          bg: '#1c1022',
-          surface: '#f7f5f8', // Used very sparingly/never in pure dark
+          primary: 'rgb(var(--brand-primary-rgb) / <alpha-value>)',
+          bg: 'rgb(var(--brand-bg-rgb) / <alpha-value>)',
+          surface: 'var(--brand-surface)', // Used very sparingly/never in pure dark
         }
       },
       fontFamily: {

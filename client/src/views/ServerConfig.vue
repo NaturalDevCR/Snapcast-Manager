@@ -1229,10 +1229,10 @@ const handleSave = () => {
         >
           <div v-if="showAddSourceDialog" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="fixed inset-0 bg-black/80 backdrop-blur-md" @click="showAddSourceDialog = false"></div>
-            <div class="relative bg-[#1c1022] rounded-2xl shadow-[0_0_30px_rgba(166,13,242,0.3)] border border-white/5 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <div class="relative bg-brand-bg rounded-2xl shadow-[0_0_30px_rgb(var(--brand-primary-rgb)/0.3)] border border-white/5 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
               
               <!-- Header -->
-              <div class="sticky top-0 bg-[#1c1022]/90 backdrop-blur-sm border-b border-white/5 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+              <div class="sticky top-0 bg-brand-bg/90 backdrop-blur-sm border-b border-white/5 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
                 <div>
                   <h3 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">{{ isEditingSource ? 'Edit Audio Source' : 'Add Audio Source' }}</h3>
                   <p class="text-[10px] text-gray-500 mt-0.5">{{ isEditingSource ? 'Modify the source parameters' : 'Select a source type and configure its parameters' }}</p>
@@ -1412,8 +1412,8 @@ const handleSave = () => {
                         <button 
                           @click="sourceFormParams[param.key] = sourceFormParams[param.key] === 'true' ? 'false' : 'true'"
                           :class="[
-                            'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:ring-2 focus:ring-brand-primary focus:outline-none focus:ring-offset-2 focus:ring-offset-[#1c1022]',
-                            sourceFormParams[param.key] === 'true' ? 'bg-brand-primary shadow-[0_0_10px_rgba(166,13,242,0.4)]' : 'bg-gray-700'
+                            'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:ring-2 focus:ring-brand-primary focus:outline-none focus:ring-offset-2 focus:ring-offset-brand-bg',
+                            sourceFormParams[param.key] === 'true' ? 'bg-brand-primary shadow-[0_0_10px_rgb(var(--brand-primary-rgb)/0.4)]' : 'bg-gray-700'
                           ]"
                         >
                           <span :class="[sourceFormParams[param.key] === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200']" />
