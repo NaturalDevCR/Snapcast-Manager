@@ -460,11 +460,11 @@ export class SystemService {
         ${this.SUDO}make install && \
 
         echo "Setting up systemd service and user access..." && \
-        if ! getent group "shairport-sync" &>/dev/null; then \
-          ${this.SUDO}groupadd -r shairport-sync; \
+        if ! getent group "shairport-sync" >/dev/null 2>&1; then \
+          ${this.SUDO}groupadd -r shairport-sync || true; \
         fi && \
-        if ! id "shairport-sync" &>/dev/null; then \
-          ${this.SUDO}useradd -r -M -g shairport-sync -s /usr/sbin/nologin -G audio shairport-sync; \
+        if ! id "shairport-sync" >/dev/null 2>&1; then \
+          ${this.SUDO}useradd -r -M -g shairport-sync -s /usr/sbin/nologin -G audio shairport-sync || true; \
         fi && \
 
         ${this.SUDO}systemctl daemon-reload && \
