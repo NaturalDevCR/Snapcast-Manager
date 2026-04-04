@@ -9,6 +9,7 @@ export const useSystemStore = defineStore('system', () => {
   const snapserverStatus = ref('unknown');
   const snapclientStatus = ref('unknown');
   const shairportSyncStatus = ref('unknown');
+  const snapcastMode = ref<'client' | 'server' | 'both'>('both');
 
   const installedPackages = ref({
     snapserver: false,
@@ -212,6 +213,15 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
+  async function fetchMode() {
+    try {
+      const data = await fetchApi('/status');
+      if (data.mode) snapcastMode.value = data.mode;
+    } catch (err) {
+      console.error('Failed to fetch snapcast mode:', err);
+    }
+  }
+
   async function refreshAll() {
     loading.value = true;
     try {
@@ -249,11 +259,12 @@ export const useSystemStore = defineStore('system', () => {
     snapserverStatus,
     snapclientStatus,
     shairportSyncStatus,
-    installedPackages, 
+    snapcastMode,
+    installedPackages,
     packageVersions,
     availableVersions,
-    controlService, 
-    installPackage, 
+    controlService,
+    installPackage,
     updatePackage,
     uninstallPackage,
     installSnapCtrl,
@@ -261,6 +272,7 @@ export const useSystemStore = defineStore('system', () => {
     getLogs,
     fetchServerConfig,
     saveServerConfig,
-    refreshAll 
+    fetchMode,
+    refreshAll
   };
 });

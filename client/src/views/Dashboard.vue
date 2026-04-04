@@ -72,7 +72,7 @@ const handleUpdateNodeJs = async () => {
 };
 
 // Update this constant synchronously with the package.json version before release
-const version = 'v0.1.0';
+const version = 'v0.1.1';
 </script>
 
 <template>
@@ -100,7 +100,7 @@ const version = 'v0.1.0';
 
 
       <!-- Enhanced Snapcast Live Metrics -->
-      <div v-if="snapcastStore.status" class="space-y-6">
+      <div v-if="snapcastStore.status && systemStore.snapcastMode !== 'client'" class="space-y-6">
         <div class="flex items-center space-x-3 px-2">
             <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
             <h2 class="text-[10px] font-black text-text-muted uppercase tracking-[0.4em]">Live Infrastructure Metrics</h2>
@@ -247,7 +247,7 @@ const version = 'v0.1.0';
       </div>
 
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-12">
-      <Card title="Snapserver">
+      <Card v-if="systemStore.snapcastMode !== 'client'" title="Snapserver">
         <template #icon>
             <span class="material-symbols-outlined">router</span>
         </template>
@@ -375,7 +375,7 @@ const version = 'v0.1.0';
       </div>
 
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <Card title="Snap-ctrl">
+      <Card v-if="systemStore.snapcastMode !== 'client'" title="Snap-ctrl">
         <template #icon>
             <span class="material-symbols-outlined">api</span>
         </template>

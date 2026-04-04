@@ -11,7 +11,12 @@ export class SystemService {
   private distroCodename: string | null = null;
   private releaseCache: Record<string, { timestamp: number, data: any }> = {};
   private readonly CACHE_TTL = 60 * 60 * 1000; // 1 hour
-  
+
+  /** Returns 'sudo ' when not root, or '' when already root (e.g. on bare Debian). */
+  private get SUDO(): string {
+    return (process as any).getuid?.() === 0 ? '' : 'sudo ';
+  }
+
   private async runCommand(command: string): Promise<string> {
     try {
       console.log(`Executing: ${command}`);
@@ -34,7 +39,7 @@ export class SystemService {
     if (pkg === 'snapserver') {
       return this.updateSnapserverFromGitHub(false);
     }
-    return this.runCommand(`sudo apt-get update && sudo apt-get install -y ${pkg}`);
+    return this.runCommand(`${this.SUDO}apt-get update && ${this.SUDO}apt-get install -y ${pkg}`);
   }
 
   async updatePackage(pkg: PackageName, clean: boolean = false): Promise<string> {
@@ -54,15 +59,15 @@ export class SystemService {
       return this.updateSnapclientFromGitHub(clean);
     }
 
-    return this.runCommand(`sudo apt-get update && sudo apt-get install -y --only-upgrade ${pkg}`);
+    return this.runCommand(`${this.SUDO}apt-get update && ${this.SUDO}apt-get install -y --only-upgrade ${pkg}`);
   }
 
   async uninstallPackage(pkg: string): Promise<string> {
     if (pkg === 'snapclient') {
       const cmd = `
-        sudo systemctl stop snapclient 2>/dev/null || true && \
-        sudo systemctl disable snapclient 2>/dev/null || true && \
-        sudo dpkg --purge snapclient && \
+        ${this.SUDO}systemctl stop snapclient 2>/dev/null || true && \
+        ${this.SUDO}systemctl disable snapclient 2>/dev/null || true && \
+        ${this.SUDO}dpkg --purge snapclient && \
         echo "snapclient removed successfully."
       `;
       return this.runCommand(cmd);
@@ -70,19 +75,19 @@ export class SystemService {
     if (pkg === 'shairport-sync') {
       const cmd = `
         echo "Stopping and disabling services..." && \
-        sudo systemctl stop shairport-sync 2>/dev/null || true && \
-        sudo systemctl disable shairport-sync 2>/dev/null || true && \
-        sudo systemctl stop nqptp 2>/dev/null || true && \
-        sudo systemctl disable nqptp 2>/dev/null || true && \
+        ${this.SUDO}systemctl stop shairport-sync 2>/dev/null || true && \
+        ${this.SUDO}systemctl disable shairport-sync 2>/dev/null || true && \
+        ${this.SUDO}systemctl stop nqptp 2>/dev/null || true && \
+        ${this.SUDO}systemctl disable nqptp 2>/dev/null || true && \
         echo "Removing binaries and service files..." && \
-        sudo rm -f /usr/local/bin/shairport-sync /usr/local/bin/nqptp && \
-        sudo rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service && \
-        sudo systemctl daemon-reload && \
+        ${this.SUDO}rm -f /usr/local/bin/shairport-sync /usr/local/bin/nqptp && \
+        ${this.SUDO}rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service && \
+        ${this.SUDO}systemctl daemon-reload && \
         echo "Shairport-sync and nqptp removed successfully."
       `;
       return this.runCommand(cmd);
     }
-    return this.runCommand(`sudo apt-get remove --purge -y ${pkg}`);
+    return this.runCommand(`${this.SUDO}apt-get remove --purge -y ${pkg}`);
   }
 
   private async getDistroCodename(): Promise<string> {
@@ -111,12 +116,12 @@ export class SystemService {
     const arch = await this.runCommand('dpkg --print-architecture');
     const archTrimmed = arch.trim();
     const codename = await this.getDistroCodename();
-    
+
     // Find the deb file for the current architecture and distro
     // Example: snapserver_0.35.0-1_amd64_bookworm.deb
-    const asset = release.assets.find((a: any) => 
-      a.name.startsWith('snapserver') && 
-      a.name.endsWith('.deb') && 
+    const asset = release.assets.find((a: any) =>
+      a.name.startsWith('snapserver') &&
+      a.name.endsWith('.deb') &&
       !a.name.includes('pipewire') && // Prefer standard version for now
       a.name.includes(archTrimmed) &&
       (a.name.includes(codename) || (codename === 'bookworm' && !a.name.includes('bullseye') && !a.name.includes('trixie'))) // Heuristic if codename match is literal
@@ -124,19 +129,19 @@ export class SystemService {
 
     if (!asset) {
       // Fallback: search just by arch if codename specific not found
-      const fallbackAsset = release.assets.find((a: any) => 
+      const fallbackAsset = release.assets.find((a: any) =>
         a.name.startsWith('snapserver') && a.name.endsWith('.deb') && a.name.includes(archTrimmed)
       );
-      
+
       if (!fallbackAsset) {
         throw new Error(`Could not find a .deb asset for architecture ${archTrimmed} (Distro: ${codename}) in Snapcast release ${release.tag_name}`);
       }
       return this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name, clean);
     }
- 
+
     return this.executeDebUpdate(asset.browser_download_url, asset.name, clean);
   }
- 
+
   private async updateSnapclientFromGitHub(clean: boolean = false): Promise<string> {
     const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
     const arch = await this.runCommand('dpkg --print-architecture');
@@ -170,8 +175,8 @@ export class SystemService {
 
   private async postSnapclientInstall(): Promise<void> {
     // Stop and disable the default package service — we manage our own instances
-    await this.runCommand('sudo systemctl stop snapclient 2>/dev/null || true').catch(() => {});
-    await this.runCommand('sudo systemctl disable snapclient 2>/dev/null || true').catch(() => {});
+    await this.runCommand(`${this.SUDO}systemctl stop snapclient 2>/dev/null || true`).catch(() => {});
+    await this.runCommand(`${this.SUDO}systemctl disable snapclient 2>/dev/null || true`).catch(() => {});
     // Disable the default package service; we manage per-instance services ourselves
     await snapclientInstanceService.postInstallSetup();
   }
@@ -184,32 +189,32 @@ export class SystemService {
     if (clean) {
       if (pkg === 'snapclient') {
         cleanCmd = `
-          sudo systemctl stop snapclient || true && \
-          sudo dpkg --purge snapclient || true && \
-          sudo rm -f /etc/default/snapclient && \
+          ${this.SUDO}systemctl stop snapclient || true && \
+          ${this.SUDO}dpkg --purge snapclient || true && \
+          ${this.SUDO}rm -f /etc/default/snapclient && \
         `;
       } else {
         cleanCmd = `
-          sudo systemctl stop snapserver || true && \
-          sudo dpkg --purge snapserver || true && \
-          sudo rm -rf /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /var/lib/snapserver && \
+          ${this.SUDO}systemctl stop snapserver || true && \
+          ${this.SUDO}dpkg --purge snapserver || true && \
+          ${this.SUDO}rm -rf /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /var/lib/snapserver && \
         `;
       }
     }
 
     const postInstallCmd = pkg === 'snapclient'
-      ? `sudo systemctl daemon-reload && sudo systemctl restart snapclient`
-      : `sudo mkdir -p /var/lib/snapserver && \
-      sudo chown -R snapserver:snapserver /var/lib/snapserver && \
-      sudo usermod -d /var/lib/snapserver snapserver 2>/dev/null || true && \
-      sudo systemctl daemon-reload && \
-      sudo systemctl restart snapserver`;
+      ? `${this.SUDO}systemctl daemon-reload && ${this.SUDO}systemctl restart snapclient`
+      : `${this.SUDO}mkdir -p /var/lib/snapserver && \
+      ${this.SUDO}chown -R snapserver:snapserver /var/lib/snapserver && \
+      ${this.SUDO}usermod -d /var/lib/snapserver snapserver 2>/dev/null || true && \
+      ${this.SUDO}systemctl daemon-reload && \
+      ${this.SUDO}systemctl restart snapserver`;
 
     return this.runCommand(`
       ${cleanCmd}
-      sudo apt-get update && \
+      ${this.SUDO}apt-get update && \
       wget -qO ${debFile} "${downloadUrl}" && \
-      sudo dpkg -i ${debFile} || sudo apt-get install -f -y && \
+      ${this.SUDO}dpkg -i ${debFile} || ${this.SUDO}apt-get install -f -y && \
       rm -f ${debFile} && \
       ${postInstallCmd}
     `);
@@ -217,10 +222,10 @@ export class SystemService {
 
   async updateNodeJs(version: string = '20'): Promise<string> {
     console.log(`Updating Node.js to version ${version}...`);
-    // Using NodeSource setup script for version specified
+    const pipeCmd = this.SUDO ? 'sudo -E bash -' : 'bash -';
     return this.runCommand(`
-      curl -fsSL https://deb.nodesource.com/setup_${version}.x | sudo -E bash - && \
-      sudo apt-get install -y nodejs
+      curl -fsSL https://deb.nodesource.com/setup_${version}.x | ${pipeCmd} && \
+      ${this.SUDO}apt-get install -y nodejs
     `);
   }
 
@@ -264,19 +269,12 @@ export class SystemService {
 
   async getServiceLogs(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'snapmanager' | 'librespot'): Promise<string> {
     try {
-        // journalctl -n 100 --no-pager
-        let cmd = `sudo journalctl -u ${service} -n 100 --no-pager`;
-        
-        // Fallback to non-sudo if running as root or if user is in systemd-journal group
-        if (process.getuid && process.getuid() === 0) {
-            cmd = `journalctl -u ${service} -n 100 --no-pager`;
-        }
-        
+        const cmd = `${this.SUDO}journalctl -u ${service} -n 100 --no-pager`;
         const output = await this.runCommand(cmd);
         return output;
     } catch (error: any) {
         console.error(`[getServiceLogs] Failed for ${service}:`, error.message || error);
-        // Attempt without sudo as a fallback if sudo failed
+        // Attempt without sudo as a fallback
         try {
             const output = await this.runCommand(`journalctl -u ${service} -n 100 --no-pager`);
             return output;
@@ -343,10 +341,10 @@ export class SystemService {
 
       if (pkg === 'node') {
         // Simple way to get latest LTS version or just assume we follow nodesource 20.x
-        return 'v20.x (Latest)'; 
+        return 'v20.x (Latest)';
       }
 
-      
+
       // Use apt-cache policy to get the candidate version for others
       const output = await this.runCommand(`apt-cache policy ${pkg} | grep Candidate | awk '{print $2}'`);
       const version = output.trim();
@@ -371,7 +369,7 @@ export class SystemService {
     if (!release.tag_name) {
       throw new Error(`Invalid response from GitHub API for ${owner}/${repo}`);
     }
-    
+
     this.releaseCache[cacheKey] = { timestamp: now, data: release };
     return release;
   }
@@ -379,7 +377,7 @@ export class SystemService {
   async getDashboardMetrics(): Promise<any> {
     const packages: PackageName[] = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node'];
     const services = ['snapserver', 'snapclient', 'shairport-sync'] as const;
-    
+
     const installedPromises = packages.map(pkg => this.isInstalled(pkg).then(res => ({ pkg, val: res })));
     const versionPromises = packages.map(pkg => this.getPackageVersion(pkg).then(res => ({ pkg, val: res })));
     const availablePromises = packages.map(pkg => this.getLatestAvailableVersion(pkg).then(res => ({ pkg, val: res })));
@@ -399,47 +397,47 @@ export class SystemService {
       statuses: Object.fromEntries(statusResults.map(r => [r.svc, r.val]))
     };
   }
-  
+
   async restartService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
-      return this.runCommand(`sudo systemctl restart ${service}`);
+      return this.runCommand(`${this.SUDO}systemctl restart ${service}`);
   }
 
   async startService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
-      return this.runCommand(`sudo systemctl start ${service}`);
+      return this.runCommand(`${this.SUDO}systemctl start ${service}`);
   }
 
   async stopService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
-      return this.runCommand(`sudo systemctl stop ${service}`);
+      return this.runCommand(`${this.SUDO}systemctl stop ${service}`);
   }
 
   async enableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
-      return this.runCommand(`sudo systemctl enable ${service}`);
+      return this.runCommand(`${this.SUDO}systemctl enable ${service}`);
   }
 
   async disableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
-      return this.runCommand(`sudo systemctl disable ${service}`);
+      return this.runCommand(`${this.SUDO}systemctl disable ${service}`);
   }
 
   async installShairportSync(): Promise<string> {
       console.log('Installing shairport-sync and nqptp from source... (AirPlay 2)');
       const cmd = `
         echo "Installing build dependencies..." && \
-        sudo apt-get update && \
-        (sudo apt-get install -y --no-install-recommends systemd-dev 2>/dev/null || true) && \
-        sudo apt-get install -y --no-install-recommends build-essential git autoconf automake libtool \
+        ${this.SUDO}apt-get update && \
+        (${this.SUDO}apt-get install -y --no-install-recommends systemd-dev 2>/dev/null || true) && \
+        ${this.SUDO}apt-get install -y --no-install-recommends build-essential git autoconf automake libtool \
           libpopt-dev libconfig-dev libasound2-dev avahi-daemon libavahi-client-dev \
           libssl-dev libsoxr-dev libplist-dev libsodium-dev uuid-dev libgcrypt-dev xxd \
           libplist-utils libavutil-dev libavcodec-dev libavformat-dev && \
         echo "Cleaning up absolute legacy installations..." && \
-        sudo apt-get remove --purge -y shairport-sync 2>/dev/null || true && \
-        sudo systemctl stop shairport-sync 2>/dev/null || true && \
-        sudo systemctl disable shairport-sync 2>/dev/null || true && \
-        sudo systemctl stop nqptp 2>/dev/null || true && \
-        sudo systemctl disable nqptp 2>/dev/null || true && \
-        sudo rm -f /usr/local/bin/shairport-sync /usr/bin/shairport-sync /usr/local/bin/nqptp /usr/bin/nqptp && \
-        sudo rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service && \
-        sudo rm -f /lib/systemd/system/shairport-sync.service /lib/systemd/system/nqptp.service && \
-        
+        ${this.SUDO}apt-get remove --purge -y shairport-sync 2>/dev/null || true && \
+        ${this.SUDO}systemctl stop shairport-sync 2>/dev/null || true && \
+        ${this.SUDO}systemctl disable shairport-sync 2>/dev/null || true && \
+        ${this.SUDO}systemctl stop nqptp 2>/dev/null || true && \
+        ${this.SUDO}systemctl disable nqptp 2>/dev/null || true && \
+        ${this.SUDO}rm -f /usr/local/bin/shairport-sync /usr/bin/shairport-sync /usr/local/bin/nqptp /usr/bin/nqptp && \
+        ${this.SUDO}rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service && \
+        ${this.SUDO}rm -f /lib/systemd/system/shairport-sync.service /lib/systemd/system/nqptp.service && \
+
         echo "Building and installing nqptp..." && \
         rm -rf /tmp/nqptp-build && \
         git clone https://github.com/mikebrady/nqptp.git /tmp/nqptp-build && \
@@ -447,10 +445,10 @@ export class SystemService {
         autoreconf -fvi && \
         ./configure --with-systemd-startup && \
         make -j$(nproc) && \
-        sudo make install && \
-        sudo systemctl daemon-reload && \
-        sudo systemctl enable nqptp && \
-        sudo systemctl restart nqptp && \
+        ${this.SUDO}make install && \
+        ${this.SUDO}systemctl daemon-reload && \
+        ${this.SUDO}systemctl enable nqptp && \
+        ${this.SUDO}systemctl restart nqptp && \
 
         echo "Building and installing shairport-sync..." && \
         rm -rf /tmp/shairport-sync-build && \
@@ -459,19 +457,19 @@ export class SystemService {
         autoreconf -fvi && \
         ./configure --sysconfdir=/etc --with-alsa --with-soxr --with-avahi --with-ssl=openssl --with-systemd-startup --with-airplay-2 --with-metadata && \
         make -j$(nproc) && \
-        sudo make install && \
+        ${this.SUDO}make install && \
 
         echo "Setting up systemd service and user access..." && \
         if ! getent group "shairport-sync" &>/dev/null; then \
-          sudo groupadd -r shairport-sync; \
+          ${this.SUDO}groupadd -r shairport-sync; \
         fi && \
         if ! id "shairport-sync" &>/dev/null; then \
-          sudo useradd -r -M -g shairport-sync -s /usr/sbin/nologin -G audio shairport-sync; \
+          ${this.SUDO}useradd -r -M -g shairport-sync -s /usr/sbin/nologin -G audio shairport-sync; \
         fi && \
 
-        sudo systemctl daemon-reload && \
-        sudo systemctl enable shairport-sync && \
-        sudo systemctl restart shairport-sync && \
+        ${this.SUDO}systemctl daemon-reload && \
+        ${this.SUDO}systemctl enable shairport-sync && \
+        ${this.SUDO}systemctl restart shairport-sync && \
         echo "Shairport-sync and nqptp installed successfully."
       `;
       return this.runCommand(cmd);
@@ -482,38 +480,38 @@ export class SystemService {
       const apiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
       const installPath = '/usr/share/snapserver/snap-ctrl';
       const docRootPath = '/usr/share/snapserver/snap-ctrl/dist';
-      
+
       console.log(`Installing snap-ctrl from ${apiUrl}...`);
-      
+
       // Improved robust command using -L for redirects and better grep
       const cmd = `
         mkdir -p /tmp/snap-ctrl-download && \
         cd /tmp/snap-ctrl-download && \
         DOWNLOAD_URL=$(curl -sL ${apiUrl} | grep "browser_download_url" | grep "dist.zip" | head -n 1 | cut -d '"' -f 4) && \
-        if [ -z "$DOWNLOAD_URL" ]; then 
+        if [ -z "$DOWNLOAD_URL" ]; then
             echo "Searching for any zip release...";
             DOWNLOAD_URL=$(curl -sL ${apiUrl} | grep "browser_download_url" | grep ".zip" | head -n 1 | cut -d '"' -f 4);
         fi && \
-        if [ -z "$DOWNLOAD_URL" ]; then 
-            echo "Fallback to zipball_url"; 
-            DOWNLOAD_URL=$(curl -sL ${apiUrl} | grep "zipball_url" | head -n 1 | cut -d '"' -f 4); 
+        if [ -z "$DOWNLOAD_URL" ]; then
+            echo "Fallback to zipball_url";
+            DOWNLOAD_URL=$(curl -sL ${apiUrl} | grep "zipball_url" | head -n 1 | cut -d '"' -f 4);
         fi && \
         if [ -z "$DOWNLOAD_URL" ]; then echo "Error: Could not find download URL" && exit 1; fi && \
         echo "Downloading: $DOWNLOAD_URL" && \
         wget --no-check-certificate -qO snap-ctrl.zip "$DOWNLOAD_URL" && \
-        sudo mkdir -p ${installPath} && \
-        sudo rm -rf ${installPath}/* && \
-        sudo unzip -qo snap-ctrl.zip -d ${installPath} && \
+        ${this.SUDO}mkdir -p ${installPath} && \
+        ${this.SUDO}rm -rf ${installPath}/* && \
+        ${this.SUDO}unzip -qo snap-ctrl.zip -d ${installPath} && \
         if [ -d "${installPath}/NaturalDevCR-snap-ctrl-"* ]; then
             echo "Flattening zipball directory..."
-            sudo mv ${installPath}/NaturalDevCR-snap-ctrl-*/. ${installPath}/
-            sudo rm -rf ${installPath}/NaturalDevCR-snap-ctrl-*
+            ${this.SUDO}mv ${installPath}/NaturalDevCR-snap-ctrl-*/. ${installPath}/
+            ${this.SUDO}rm -rf ${installPath}/NaturalDevCR-snap-ctrl-*
         fi && \
         rm -rf /tmp/snap-ctrl-download
       `;
-      
+
       const result = await this.runCommand(cmd);
-      
+
       // Update snapserver config to use this doc_root
       try {
           await configService.setSnapserverDocRoot(docRootPath);
@@ -521,7 +519,7 @@ export class SystemService {
       } catch (err) {
           console.error('Failed to update snapserver config for snap-ctrl:', err);
       }
-      
+
       return result;
   }
 

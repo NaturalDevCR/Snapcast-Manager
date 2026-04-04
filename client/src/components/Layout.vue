@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useUIStore } from '../stores/ui';
+import { useSystemStore } from '../stores/system';
 import { useRoute, useRouter } from 'vue-router';
 import ToastNotification from './ToastNotification.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
@@ -10,12 +11,18 @@ import { version } from '../../package.json';
 
 const authStore = useAuthStore();
 const uiStore = useUIStore();
+const systemStore = useSystemStore();
 const route = useRoute();
 const router = useRouter();
 
-onMounted(() => {
+onMounted(async () => {
   uiStore.initTheme();
   document.addEventListener('click', handleClickOutside);
+  await systemStore.fetchMode();
+  // Auto-redirect to the correct view based on install mode
+  if (systemStore.snapcastMode === 'client' && !route.path.startsWith('/client') && route.path === '/') {
+    router.replace('/client');
+  }
 });
 
 onUnmounted(() => {
@@ -117,8 +124,8 @@ function handleClickOutside(e: MouseEvent) {
           <!-- Desktop Nav -->
           <div class="hidden sm:ml-5 sm:flex sm:items-center sm:mr-auto sm:gap-0.5">
 
-            <!-- Mode Switcher -->
-            <div class="flex items-center bg-white/5 rounded-lg p-0.5 border border-white/5 mr-3">
+            <!-- Mode Switcher (only shown when both modes are available) -->
+            <div v-if="systemStore.snapcastMode === 'both'" class="flex items-center bg-white/5 rounded-lg p-0.5 border border-white/5 mr-3">
               <button
                 @click="switchMode('server')"
                 :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
@@ -133,6 +140,11 @@ function handleClickOutside(e: MouseEvent) {
                 <span class="material-symbols-outlined text-[0.85rem]">speaker</span>
                 Client
               </button>
+            </div>
+            <!-- Single-mode label when not in 'both' mode -->
+            <div v-else class="flex items-center bg-brand-primary/10 border border-brand-primary/20 rounded-lg px-2.5 py-1 mr-3">
+              <span class="material-symbols-outlined text-[0.85rem] text-brand-primary mr-1">{{ systemStore.snapcastMode === 'client' ? 'speaker' : 'dns' }}</span>
+              <span class="text-[11px] font-black uppercase tracking-wider text-brand-primary">{{ systemStore.snapcastMode === 'client' ? 'Client Mode' : 'Server Mode' }}</span>
             </div>
 
             <!-- Divider -->
@@ -270,7 +282,7 @@ function handleClickOutside(e: MouseEvent) {
             </div>
 
             <!-- Mode Switcher (Mobile) -->
-            <div class="flex items-center bg-white/5 rounded-xl p-1 border border-white/5 mt-5">
+            <div v-if="systemStore.snapcastMode === 'both'" class="flex items-center bg-white/5 rounded-xl p-1 border border-white/5 mt-5">
               <button
                 @click="switchMode('server')"
                 :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
@@ -285,6 +297,11 @@ function handleClickOutside(e: MouseEvent) {
                 <span class="material-symbols-outlined text-[0.9rem]">speaker</span>
                 Client
               </button>
+            </div>
+            <!-- Single-mode label (Mobile) -->
+            <div v-else class="flex items-center justify-center bg-brand-primary/10 border border-brand-primary/20 rounded-xl px-3 py-2 mt-5 gap-2">
+              <span class="material-symbols-outlined text-[1rem] text-brand-primary">{{ systemStore.snapcastMode === 'client' ? 'speaker' : 'dns' }}</span>
+              <span class="text-xs font-black uppercase tracking-wider text-brand-primary">{{ systemStore.snapcastMode === 'client' ? 'Client Mode' : 'Server Mode' }}</span>
             </div>
 
             <!-- Navigation Links -->
