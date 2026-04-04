@@ -52,6 +52,18 @@ const init = () => {
     );
   `);
 
+  // Migration: add instance_num column for unique per-machine snapclient identification
+  try {
+    db.exec('ALTER TABLE snapclient_instances ADD COLUMN instance_num INTEGER DEFAULT 1');
+    // Backfill existing rows with sequential numbers ordered by creation time
+    const rows = db.prepare('SELECT id FROM snapclient_instances ORDER BY created_at ASC').all() as any[];
+    rows.forEach((row, i) => {
+      db.prepare('UPDATE snapclient_instances SET instance_num = ? WHERE id = ?').run(i + 1, row.id);
+    });
+  } catch (_) {
+    // Column already exists — no-op
+  }
+
   // Check for users count (for setup wizard)
   const stmt = db.prepare('SELECT count(*) as count FROM users');
   const result = stmt.get() as { count: number };

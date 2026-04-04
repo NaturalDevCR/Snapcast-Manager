@@ -9,8 +9,14 @@ export interface SnapclientInstance {
   port: number;
   soundcard: string;
   hostId: string | null;
+  instanceNum: number;
   enabled: boolean;
   status: string;
+}
+
+export interface AlsaControl {
+  name: string;
+  percent: number;
 }
 
 export interface AudioDevice {
@@ -110,6 +116,18 @@ export const useSnapclientInstancesStore = defineStore('snapclientInstances', ()
     return data.logs;
   }
 
+  async function fetchAlsaControls(cardId: string): Promise<AlsaControl[]> {
+    const data = await fetchApi(`/snapclient-instances/alsa/${encodeURIComponent(cardId)}`);
+    return data.controls as AlsaControl[];
+  }
+
+  async function setAlsaVolume(cardId: string, control: string, percent: number): Promise<void> {
+    await fetchApi(`/snapclient-instances/alsa/${encodeURIComponent(cardId)}`, {
+      method: 'POST',
+      body: JSON.stringify({ control, percent }),
+    });
+  }
+
   return {
     instances,
     devices,
@@ -122,5 +140,7 @@ export const useSnapclientInstancesStore = defineStore('snapclientInstances', ()
     deleteInstance,
     controlInstance,
     fetchInstanceLogs,
+    fetchAlsaControls,
+    setAlsaVolume,
   };
 });

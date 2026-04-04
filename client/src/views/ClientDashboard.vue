@@ -2,7 +2,7 @@
 import { onMounted, ref, computed } from 'vue';
 import { useSystemStore } from '../stores/system';
 import { useUIStore } from '../stores/ui';
-import { useSnapclientInstancesStore, type SnapclientInstance } from '../stores/snapclientInstances';
+import { useSnapclientInstancesStore, type SnapclientInstance, type AlsaControl } from '../stores/snapclientInstances';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
 
@@ -111,6 +111,43 @@ async function handleUninstall() {
     await systemStore.refreshAll();
   } catch (err: any) {
     uiStore.showToast('Failed: ' + err.message, 'error');
+  }
+}
+
+// ── ALSA mixer state ─────────────────────────────────────────────────────
+// Map of instanceId → { expanded, controls, saving }
+const alsaState = ref<Record<string, { expanded: boolean; controls: AlsaControl[]; saving: boolean; saved: boolean }>>({});
+
+function cardIdFromHwId(hwId: string): string {
+  return hwId.replace(/^hw:CARD=/, '').split(',')[0];
+}
+
+async function toggleAlsa(inst: SnapclientInstance) {
+  if (!alsaState.value[inst.id]) {
+    alsaState.value[inst.id] = { expanded: false, controls: [], saving: false, saved: false };
+  }
+  const state = alsaState.value[inst.id];
+  state.expanded = !state.expanded;
+  if (state.expanded && state.controls.length === 0) {
+    const cardId = cardIdFromHwId(inst.soundcard);
+    state.controls = await instanceStore.fetchAlsaControls(cardId).catch(() => []);
+  }
+}
+
+async function handleAlsaChange(inst: SnapclientInstance, control: AlsaControl) {
+  const state = alsaState.value[inst.id];
+  if (!state) return;
+  state.saving = true;
+  state.saved = false;
+  try {
+    const cardId = cardIdFromHwId(inst.soundcard);
+    await instanceStore.setAlsaVolume(cardId, control.name, control.percent);
+    state.saved = true;
+    setTimeout(() => { if (state) state.saved = false; }, 2000);
+  } catch (err: any) {
+    uiStore.showToast('ALSA error: ' + err.message, 'error');
+  } finally {
+    state.saving = false;
   }
 }
 
@@ -236,20 +273,67 @@ onMounted(async () => {
                     {{ inst.status ?? 'unknown' }}
                   </span>
                 </div>
-                <!-- Server -->
+                <!-- Server + Instance number -->
                 <div class="flex items-center justify-between">
                   <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Server</span>
                   <span class="text-xs font-mono text-gray-300">{{ inst.host }}:{{ inst.port }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Instance #</span>
+                  <span class="text-xs font-mono text-brand-primary">{{ inst.instanceNum }}</span>
                 </div>
                 <!-- Soundcard -->
                 <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
                   <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest block mb-1">Audio Output</span>
                   <span class="text-[11px] font-mono text-brand-primary break-all">{{ inst.soundcard }}</span>
                 </div>
-                <!-- Host ID -->
-                <div v-if="inst.hostId" class="flex items-center justify-between">
-                  <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Host ID</span>
-                  <span class="text-xs font-mono text-gray-400">{{ inst.hostId }}</span>
+
+                <!-- ALSA Mixer toggle + panel -->
+                <div class="rounded-xl border border-white/[0.06] overflow-hidden">
+                  <button
+                    @click="toggleAlsa(inst)"
+                    class="w-full flex items-center justify-between px-3 py-2 bg-white/[0.02] hover:bg-white/[0.05] transition-colors"
+                  >
+                    <div class="flex items-center gap-2">
+                      <span class="material-symbols-outlined text-[0.95rem] text-brand-primary">tune</span>
+                      <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">ALSA Volume</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span v-if="alsaState[inst.id]?.saved" class="text-[9px] font-black text-[#00ff9d] uppercase tracking-widest">Saved</span>
+                      <span v-if="alsaState[inst.id]?.saving" class="material-symbols-outlined text-[0.85rem] text-brand-primary animate-spin">sync</span>
+                      <span class="material-symbols-outlined text-[0.85rem] text-gray-500 transition-transform" :class="alsaState[inst.id]?.expanded ? 'rotate-180' : ''">expand_more</span>
+                    </div>
+                  </button>
+
+                  <Transition
+                    enter-active-class="transition-all duration-200 ease-out"
+                    enter-from-class="opacity-0 max-h-0"
+                    enter-to-class="opacity-100 max-h-96"
+                    leave-active-class="transition-all duration-150 ease-in"
+                    leave-from-class="opacity-100 max-h-96"
+                    leave-to-class="opacity-0 max-h-0"
+                  >
+                    <div v-if="alsaState[inst.id]?.expanded" class="px-3 py-3 space-y-3 border-t border-white/5 overflow-hidden">
+                      <div v-if="alsaState[inst.id]?.controls.length === 0" class="text-[11px] text-gray-600 italic text-center py-2">
+                        No playback controls found for this device.
+                      </div>
+                      <div v-for="ctrl in alsaState[inst.id]?.controls" :key="ctrl.name" class="space-y-1.5">
+                        <div class="flex items-center justify-between">
+                          <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ ctrl.name }}</span>
+                          <span class="text-[11px] font-mono font-bold text-white">{{ ctrl.percent }}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0" max="100"
+                          :value="ctrl.percent"
+                          @input="ctrl.percent = parseInt(($event.target as HTMLInputElement).value)"
+                          @change="handleAlsaChange(inst, ctrl)"
+                          class="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-white/10"
+                          style="accent-color: var(--color-brand-primary, #a60df2)"
+                        />
+                      </div>
+                    </div>
+                  </Transition>
                 </div>
 
                 <!-- Controls -->
