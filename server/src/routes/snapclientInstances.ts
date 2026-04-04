@@ -66,30 +66,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/:id/:action', async (req: Request, res: Response) => {
-  const { action } = req.params;
-  if (!['start', 'stop', 'restart', 'enable', 'disable'].includes(action)) {
-    return res.status(400).json({ error: 'Invalid action' });
-  }
-  try {
-    await snapclientInstanceService.controlInstance(req.params.id, action as any);
-    const status = await snapclientInstanceService.getInstanceStatus(req.params.id);
-    res.json({ message: `Instance ${action}ed`, status });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get('/:id/logs', async (req: Request, res: Response) => {
-  try {
-    const logs = await snapclientInstanceService.getInstanceLogs(req.params.id);
-    res.json({ logs });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── ALSA mixer endpoints ──────────────────────────────────────────────────
+// ── ALSA mixer endpoints — must be before /:id/:action to avoid route collision ──
 
 // GET /snapclient-instances/alsa/:cardId  — list playback controls + current %
 router.get('/alsa/:cardId', async (req: Request, res: Response) => {
@@ -111,6 +88,29 @@ router.post('/alsa/:cardId', async (req: Request, res: Response) => {
   try {
     await snapclientInstanceService.setAlsaVolume(req.params.cardId, control, percent);
     res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/:action', async (req: Request, res: Response) => {
+  const { action } = req.params;
+  if (!['start', 'stop', 'restart', 'enable', 'disable'].includes(action)) {
+    return res.status(400).json({ error: 'Invalid action' });
+  }
+  try {
+    await snapclientInstanceService.controlInstance(req.params.id, action as any);
+    const status = await snapclientInstanceService.getInstanceStatus(req.params.id);
+    res.json({ message: `Instance ${action}ed`, status });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/:id/logs', async (req: Request, res: Response) => {
+  try {
+    const logs = await snapclientInstanceService.getInstanceLogs(req.params.id);
+    res.json({ logs });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

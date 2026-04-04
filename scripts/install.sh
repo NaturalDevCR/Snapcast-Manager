@@ -15,7 +15,7 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-VERSION="v0.1.4"
+VERSION="v0.1.5"
 APP_VERSION="$VERSION"
 
 # Colors for output
@@ -308,10 +308,19 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
             
             if [ "$PRESERVE_DATA" = true ]; then
                 echo "Backing up database data securely..."
+                # DB can be in root data/ (production) or server/data/ (legacy installs missing NODE_ENV)
+                DB_SOURCE=""
                 if [ -d "$INSTALL_BASE_DIR/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/data 2>/dev/null)" ]; then
+                    DB_SOURCE="$INSTALL_BASE_DIR/data"
+                elif [ -d "$INSTALL_BASE_DIR/server/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/server/data 2>/dev/null)" ]; then
+                    DB_SOURCE="$INSTALL_BASE_DIR/server/data"
+                    echo -e "${YELLOW}[!] Found DB in legacy path (server/data/), migrating to data/${NC}"
+                fi
+
+                if [ -n "$DB_SOURCE" ]; then
                     $SUDO rm -rf /tmp/snapmgr_data_backup
-                    $SUDO cp -r "$INSTALL_BASE_DIR/data" /tmp/snapmgr_data_backup
-                    echo -e "${GREEN}[OK] Database backed up to /tmp/snapmgr_data_backup${NC}"
+                    $SUDO cp -r "$DB_SOURCE" /tmp/snapmgr_data_backup
+                    echo -e "${GREEN}[OK] Database backed up from $DB_SOURCE${NC}"
                 else
                     echo "Data directory is empty or missing, skipping backup."
                 fi
@@ -552,6 +561,7 @@ echo -e "${GREEN}[OK] Interface will be available on port $APP_PORT.${NC}"
 $SUDO bash -c "cat <<EOF > $INSTALL_BASE_DIR/server/.env
 PORT=$APP_PORT
 SNAPCAST_MODE=${APP_MODE:-both}
+NODE_ENV=production
 EOF"
 
 # 6. Systemd Service setup
