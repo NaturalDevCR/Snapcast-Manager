@@ -176,8 +176,8 @@ onMounted(async () => {
       </div>
 
       <!-- Loading Overlay -->
-      <div v-if="systemStore.loading || instanceStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-[#1c1022]/40 backdrop-blur-sm pointer-events-none">
-        <div class="bg-[#2a1c31]/90 p-5 rounded-2xl shadow-2xl flex items-center space-x-3 border border-brand-primary/20 animate-in fade-in zoom-in duration-300 pointer-events-auto backdrop-blur-xl">
+      <div v-if="systemStore.loading || instanceStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-brand-bg/40 backdrop-blur-sm pointer-events-none">
+        <div class="bg-brand-surface/90 p-5 rounded-2xl shadow-2xl flex items-center space-x-3 border border-brand-primary/20 animate-in fade-in zoom-in duration-300 pointer-events-auto backdrop-blur-xl">
           <span class="material-symbols-outlined animate-spin text-brand-primary text-2xl">sync</span>
           <span class="text-sm font-bold text-white tracking-widest uppercase">{{ instanceStore.loadingMessage || systemStore.loadingMessage || 'Syncing...' }}</span>
         </div>
@@ -329,7 +329,7 @@ onMounted(async () => {
                           @input="ctrl.percent = parseInt(($event.target as HTMLInputElement).value)"
                           @change="handleAlsaChange(inst, ctrl)"
                           class="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-white/10"
-                          style="accent-color: var(--color-brand-primary, #a60df2)"
+                          style="accent-color: var(--brand-primary, #0ea5e9)"
                         />
                       </div>
                     </div>
@@ -358,7 +358,7 @@ onMounted(async () => {
       <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
         <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="closeModal"></div>
-          <div class="relative bg-[#1c1022] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 duration-200">
+          <div class="relative bg-brand-bg border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 duration-200">
             <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
               <h3 class="text-sm font-black text-white uppercase tracking-widest">{{ editingInstance ? 'Edit Instance' : 'New Instance' }}</h3>
               <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors">

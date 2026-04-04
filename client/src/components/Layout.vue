@@ -92,7 +92,7 @@ function handleClickOutside(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-brand-bg text-white font-sans flex flex-col transition-colors duration-500 relative">
+  <div :class="['min-h-screen bg-brand-bg text-white font-sans flex flex-col transition-colors duration-500 relative', isClientMode ? 'theme-client' : 'theme-server']">
     <!-- Background Accents -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div class="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-brand-primary/10 blur-[120px] rounded-full"></div>
@@ -196,7 +196,7 @@ function handleClickOutside(e: MouseEvent) {
               >
                 <div
                   v-if="isSystemMenuOpen"
-                  class="absolute top-full left-0 mt-2 w-52 bg-[#1a0e24]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50 py-1.5"
+                  class="absolute top-full left-0 mt-2 w-52 bg-brand-bg/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50 py-1.5"
                 >
                   <router-link
                     v-for="item in serverSystemNav"
@@ -218,7 +218,7 @@ function handleClickOutside(e: MouseEvent) {
                       <p class="text-xs font-black uppercase tracking-wide leading-tight">{{ item.name }}</p>
                       <p class="text-[10px] text-gray-500 font-medium mt-0.5">{{ item.description }}</p>
                     </div>
-                    <span v-if="isItemActive(item)" class="ml-auto w-1.5 h-1.5 rounded-full bg-brand-primary shadow-[0_0_6px_rgba(166,13,242,0.8)]"></span>
+                    <span v-if="isItemActive(item)" class="ml-auto w-1.5 h-1.5 rounded-full bg-brand-primary shadow-md shadow-brand-primary/80"></span>
                   </router-link>
                 </div>
               </Transition>

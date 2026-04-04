@@ -2,19 +2,41 @@
 
 @layer base {
   :root {
-    --brand-bg: #f8f9fa; 
+    --brand-bg: #f8f9fa;
+    --brand-bg-rgb: 248 249 250;
     --brand-primary: #a60df2;
+    --brand-primary-rgb: 166 13 242;
     --brand-surface: #ffffff;
     --text-main: #111827;
     --text-muted: #4b5563;
   }
 
+  /* Default / Server theme */
   .dark {
-    --brand-bg: #1c1022; 
+    --brand-bg: #1c1022;
+    --brand-bg-rgb: 28 16 34;
     --brand-primary: #a60df2;
+    --brand-primary-rgb: 166 13 242;
     --brand-surface: #140b1b;
     --text-main: #ffffff;
     --text-muted: #9ca3af;
+    --brand-accent: #00ff9d;
+  }
+
+  /* Client theme variant */
+  .theme-client {
+    --brand-bg: #f0fdfa; /* teal 50 */
+    --brand-bg-rgb: 240 253 250;
+    --brand-primary: #0ea5e9; /* sky 500 */
+    --brand-primary-rgb: 14 165 233;
+  }
+
+  .theme-client.dark, .dark .theme-client {
+    --brand-bg: #0f172a; /* slate 900 */
+    --brand-bg-rgb: 15 23 42;
+    --brand-primary: #0ea5e9; /* sky 500 */
+    --brand-primary-rgb: 14 165 233;
+    --brand-surface: #1e293b; /* slate 800 */
     --brand-accent: #00ff9d;
   }
 }

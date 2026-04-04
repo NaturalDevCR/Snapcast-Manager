@@ -91,8 +91,8 @@ const version = 'v0.1.5';
       </div>
 
       <!-- Loading Overlay (more subtle now) -->
-      <div v-if="systemStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-[#1c1022]/40 backdrop-blur-sm pointer-events-none">
-          <div class="bg-[#2a1c31]/90 p-5 rounded-2xl shadow-2xl flex items-center space-x-3 border border-brand-primary/20 animate-in fade-in zoom-in duration-300 pointer-events-auto backdrop-blur-xl">
+      <div v-if="systemStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-brand-bg/40 backdrop-blur-sm pointer-events-none">
+          <div class="bg-brand-surface/90 p-5 rounded-2xl shadow-2xl flex items-center space-x-3 border border-brand-primary/20 animate-in fade-in zoom-in duration-300 pointer-events-auto backdrop-blur-xl">
               <span class="material-symbols-outlined animate-spin text-brand-primary text-2xl">sync</span>
               <span class="text-sm font-bold text-white tracking-widest uppercase">{{ systemStore.loadingMessage || 'Syncing...' }}</span>
           </div>
