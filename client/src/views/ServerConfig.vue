@@ -120,6 +120,12 @@ const openEditSourceDialog = (idx: number) => {
        if (streamUrlMatch && streamUrlMatch[1]) {
            sourceFormParams.value['_stream_url'] = streamUrlMatch[1];
        }
+       sourceFormParams.value['_reconnect']                = decoded.includes('-reconnect ') ? 'true' : 'false';
+       sourceFormParams.value['_reconnect_streamed']       = decoded.includes('-reconnect_streamed') ? 'true' : 'false';
+       sourceFormParams.value['_reconnect_at_eof']         = decoded.includes('-reconnect_at_eof') ? 'true' : 'false';
+       sourceFormParams.value['_reconnect_on_network_error'] = decoded.includes('-reconnect_on_network_error') ? 'true' : 'false';
+       const delayMatch = decoded.match(/-reconnect_delay_max\s+(\d+)/);
+       if (delayMatch) sourceFormParams.value['_reconnect_delay_max'] = delayMatch[1] ?? '5';
   }
   
   // Parse meta-stream path into source list
@@ -585,12 +591,26 @@ const buildSourceUri = (): string => {
     const name = sourceFormParams.value['name'] || 'Radio';
     const sampleformat = sourceFormParams.value['sampleformat'] || '48000:16:2';
     const [rate, , channels] = sampleformat.split(':');
-    const ffmpegArgs = `-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i ${streamUrl} -f s16le -ar ${rate || '48000'} -ac ${channels || '2'} -`;
+
+    const getBool = (key: string, def: boolean) => {
+      const v = sourceFormParams.value[key];
+      return v === undefined ? def : v === 'true' || (v as unknown) === true;
+    };
+    const reconnectFlags: string[] = [];
+    if (getBool('_reconnect', true))                  reconnectFlags.push('-reconnect 1');
+    if (getBool('_reconnect_streamed', true))          reconnectFlags.push('-reconnect_streamed 1');
+    if (getBool('_reconnect_at_eof', false))           reconnectFlags.push('-reconnect_at_eof 1');
+    if (getBool('_reconnect_on_network_error', false)) reconnectFlags.push('-reconnect_on_network_error 1');
+    const delayMax = sourceFormParams.value['_reconnect_delay_max'] ?? '5';
+    reconnectFlags.push(`-reconnect_delay_max ${delayMax}`);
+
+    const ffmpegArgs = `${reconnectFlags.join(' ')} -i ${streamUrl} -f s16le -ar ${rate || '48000'} -ac ${channels || '2'} -`;
     const encodedParams = encodeURIComponent(ffmpegArgs);
-    
+
+    const ffmpegInternalKeys = new Set(['_stream_url', 'name', '_reconnect', '_reconnect_streamed', '_reconnect_at_eof', '_reconnect_on_network_error', '_reconnect_delay_max']);
     params.push(`name=${encodeURIComponent(name)}`);
     for (const p of template.params) {
-      if (p.key === '_stream_url' || p.key === 'name') continue;
+      if (ffmpegInternalKeys.has(p.key)) continue;
       const val = sourceFormParams.value[p.key];
       if (val !== undefined && val !== '' && val !== p.default) {
         params.push(`${p.key}=${encodeURIComponent(val)}`);
