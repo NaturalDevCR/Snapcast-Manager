@@ -1,0 +1,8 @@
+{
+  "name": "snapcast-manager",
+  "private": true,
+  "version": "0.1.10",
+  "scripts": {
+    "version": "node scripts/sync-version.js && git add client/package.json server/package.json scripts/install.sh"
+  }
+}
