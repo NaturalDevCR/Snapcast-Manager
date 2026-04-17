@@ -412,6 +412,11 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
       { key: "idle_threshold", label: "Idle Threshold (ms)", description: "Switch to idle after this many ms of silence", required: false, type: "number", default: "15000" },
       { key: "send_silence", label: "Send Silence", description: "Keep sending silence when stream is inactive", required: false, type: "boolean", default: "true" },
       { key: "log_stderr", label: "Log stderr", description: "Forward FFmpeg stderr output to Snapserver log", required: false, type: "boolean", default: "false" },
+      { key: "_reconnect", label: "Reconnect on error", description: "Reconnect automatically if the stream drops or returns an error", required: false, type: "boolean", default: "true" },
+      { key: "_reconnect_streamed", label: "Reconnect streamed", description: "Reconnect when the server closes the connection mid-stream", required: false, type: "boolean", default: "true" },
+      { key: "_reconnect_at_eof", label: "Reconnect at EOF", description: "Reconnect when the server sends a clean EOF (common on HLS and Icecast chunk rotation)", required: false, type: "boolean", default: "false" },
+      { key: "_reconnect_on_network_error", label: "Reconnect on network error", description: "Reconnect on low-level network failures (TCP reset, DNS failure, etc.)", required: false, type: "boolean", default: "false" },
+      { key: "_reconnect_delay_max", label: "Max reconnect delay (s)", description: "Maximum seconds to wait between reconnection attempts", required: false, type: "number", default: "5" },
     ],
   },
   {
