@@ -1,9 +1,10 @@
 {
   "name": "snapcast-manager",
   "private": true,
-  "version": "0.1.11",
+  "version": "0.1.12",
   "scripts": {
-    "version": "node scripts/sync-version.js",
-    "postversion": "git add client/package.json server/package.json scripts/install.sh && git commit --amend --no-edit"
+    "bump:patch": "bash scripts/bump.sh patch",
+    "bump:minor": "bash scripts/bump.sh minor",
+    "bump:major": "bash scripts/bump.sh major"
   }
 }
