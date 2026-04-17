@@ -5,6 +5,7 @@ import { useUIStore } from '../stores/ui';
 import { useSnapcastStore } from '../stores/snapcast';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
+import { version } from '../../package.json';
 
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
@@ -71,8 +72,6 @@ const handleUpdateNodeJs = async () => {
     }
 };
 
-// Update this constant synchronously with the package.json version before release
-const version = 'v0.1.9';
 </script>
 
 <template>
@@ -353,10 +352,10 @@ const version = 'v0.1.9';
         <div class="space-y-4 h-full flex flex-col">
             <div class="flex flex-col space-y-2 flex-grow">
                 <span class="text-[10px] font-bold text-text-muted uppercase tracking-widest">Application Version</span>
-                <span class="text-3xl font-black text-text-main">{{ version }}</span>
+                <span class="text-3xl font-black text-text-main">v{{ version }}</span>
             </div>
             <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-inner shadow-brand-primary/10 mt-auto mb-4">
-                <p class="text-[10px] font-bold text-brand-primary leading-relaxed text-center tracking-widest uppercase">Everything is synced and running smoothly on version {{ version }}.</p>
+                <p class="text-[10px] font-bold text-brand-primary leading-relaxed text-center tracking-widest uppercase">Everything is synced and running smoothly on version v{{ version }}.</p>
             </div>
             <div class="pt-4 border-t border-white/5">
                  <button disabled class="w-full px-4 py-3 bg-black/40 text-gray-500 rounded-xl font-black text-xs uppercase tracking-widest cursor-default border border-white/5">
