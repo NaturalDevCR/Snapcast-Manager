@@ -5,7 +5,7 @@ import { snapclientInstanceService } from './snapclientInstances';
 
 const execAsync = util.promisify(exec);
 
-export type PackageName = 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node';
+export type PackageName = 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node' | 'mpd';
 
 export class SystemService {
   private distroCodename: string | null = null;
@@ -39,7 +39,21 @@ export class SystemService {
     if (pkg === 'snapserver') {
       return this.updateSnapserverFromGitHub(false);
     }
+    if (pkg === 'mpd') {
+      return this.installMpd();
+    }
     return this.runCommand(`${this.SUDO}apt-get update && ${this.SUDO}apt-get install -y ${pkg}`);
+  }
+
+  private async installMpd(): Promise<string> {
+    const cmd = `
+      ${this.SUDO}apt-get update && \
+      ${this.SUDO}apt-get install -y mpd && \
+      ${this.SUDO}systemctl enable mpd && \
+      ${this.SUDO}systemctl start mpd && \
+      echo "MPD installed and started successfully."
+    `;
+    return this.runCommand(cmd);
   }
 
   async updatePackage(pkg: PackageName, clean: boolean = false): Promise<string> {
@@ -84,6 +98,15 @@ export class SystemService {
         ${this.SUDO}rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service && \
         ${this.SUDO}systemctl daemon-reload && \
         echo "Shairport-sync and nqptp removed successfully."
+      `;
+      return this.runCommand(cmd);
+    }
+    if (pkg === 'mpd') {
+      const cmd = `
+        ${this.SUDO}systemctl stop mpd 2>/dev/null || true && \
+        ${this.SUDO}systemctl disable mpd 2>/dev/null || true && \
+        ${this.SUDO}apt-get remove --purge -y mpd && \
+        echo "MPD removed successfully."
       `;
       return this.runCommand(cmd);
     }
@@ -256,7 +279,7 @@ export class SystemService {
     }
   }
 
-  async getServiceStatus(service: 'snapserver' | 'snapclient' | 'shairport-sync'): Promise<string> {
+  async getServiceStatus(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'mpd'): Promise<string> {
     try {
       const { stdout } = await execAsync(`systemctl is-active ${service}`);
       return stdout.trim();
@@ -267,7 +290,7 @@ export class SystemService {
     }
   }
 
-  async getServiceLogs(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'snapmanager' | 'librespot'): Promise<string> {
+  async getServiceLogs(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'snapmanager' | 'librespot' | 'mpd'): Promise<string> {
     try {
         const cmd = `${this.SUDO}journalctl -u ${service} -n 100 --no-pager`;
         const output = await this.runCommand(cmd);
@@ -310,6 +333,9 @@ export class SystemService {
           }
         case 'node':
           cmd = 'node -v';
+          break;
+        case 'mpd':
+          cmd = 'mpd --version 2>&1 | head -n 1';
           break;
       }
       const { stdout } = await execAsync(cmd);
@@ -375,8 +401,8 @@ export class SystemService {
   }
 
   async getDashboardMetrics(): Promise<any> {
-    const packages: PackageName[] = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node'];
-    const services = ['snapserver', 'snapclient', 'shairport-sync'] as const;
+    const packages: PackageName[] = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node', 'mpd'];
+    const services = ['snapserver', 'snapclient', 'shairport-sync', 'mpd'] as const;
 
     const installedPromises = packages.map(pkg => this.isInstalled(pkg).then(res => ({ pkg, val: res })));
     const versionPromises = packages.map(pkg => this.getPackageVersion(pkg).then(res => ({ pkg, val: res })));
@@ -398,23 +424,23 @@ export class SystemService {
     };
   }
 
-  async restartService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async restartService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd'): Promise<string> {
       return this.runCommand(`${this.SUDO}systemctl restart ${service}`);
   }
 
-  async startService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async startService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd'): Promise<string> {
       return this.runCommand(`${this.SUDO}systemctl start ${service}`);
   }
 
-  async stopService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async stopService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd'): Promise<string> {
       return this.runCommand(`${this.SUDO}systemctl stop ${service}`);
   }
 
-  async enableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async enableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd'): Promise<string> {
       return this.runCommand(`${this.SUDO}systemctl enable ${service}`);
   }
 
-  async disableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot'): Promise<string> {
+  async disableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd'): Promise<string> {
       return this.runCommand(`${this.SUDO}systemctl disable ${service}`);
   }
 

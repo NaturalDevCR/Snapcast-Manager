@@ -102,6 +102,12 @@ onUnmounted(() => {
           <span class="material-symbols-outlined text-[1.1rem]">dashboard_customize</span>
           <span>Manager</span>
         </button>
+        <button v-if="systemStore.installedPackages['mpd']" @click="switchService('mpd')"
+          :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
+            activeService === 'mpd' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+          <span class="material-symbols-outlined text-[1.1rem]">queue_music</span>
+          <span>MPD</span>
+        </button>
 
         <!-- Snapclient instance buttons (shown when instances exist) -->
         <template v-if="instanceStore.instances.length > 0">

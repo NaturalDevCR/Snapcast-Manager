@@ -53,6 +53,7 @@ const serverSystemNav: Array<{
 }> = [
   { name: 'Logs', href: '/logs', icon: 'terminal', description: 'Service logs' },
   { name: 'Configuration', href: '/server', icon: 'settings', description: 'Snapserver settings' },
+  { name: 'Tools', href: '/tools', icon: 'build_circle', description: 'Crontab, scripts & MPD' },
   { name: 'Security', href: '/security', icon: 'security', description: 'Admin access' },
   { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart', description: 'Service monitors' },
 ];
@@ -196,7 +197,8 @@ function handleClickOutside(e: MouseEvent) {
               >
                 <div
                   v-if="isSystemMenuOpen"
-                  class="absolute top-full left-0 mt-2 w-52 bg-brand-bg/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50 py-1.5"
+                  class="absolute top-full left-0 mt-2 w-52 border border-white/10 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden z-50 py-1.5"
+                  style="background-color: var(--brand-bg);"
                 >
                   <router-link
                     v-for="item in serverSystemNav"

@@ -50,6 +50,13 @@ const init = () => {
       enabled INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS script_paths (
+      id TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      path TEXT NOT NULL UNIQUE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Migration: add instance_num column for unique per-machine snapclient identification
