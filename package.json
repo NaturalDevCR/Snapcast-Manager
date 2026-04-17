@@ -1,7 +1,7 @@
 {
   "name": "snapcast-manager",
   "private": true,
-  "version": "0.1.12",
+  "version": "0.1.13",
   "scripts": {
     "bump:patch": "bash scripts/bump.sh patch",
     "bump:minor": "bash scripts/bump.sh minor",
