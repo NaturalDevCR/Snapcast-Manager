@@ -8,6 +8,7 @@ import Setup from '../views/Setup.vue'
 import Logs from '../views/Logs.vue'
 import Watchdogs from '../views/Watchdogs.vue'
 import Routing from '../views/Routing.vue'
+import Tools from '../views/Tools.vue'
 
 import { fetchApi } from '../utils/api'
 
@@ -64,6 +65,12 @@ const router = createRouter({
       path: '/client',
       name: 'client-dashboard',
       component: ClientDashboard,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/tools',
+      name: 'tools',
+      component: Tools,
       meta: { requiresAuth: true }
     },
 
