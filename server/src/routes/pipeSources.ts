@@ -76,6 +76,16 @@ router.post('/:id/control', async (req, res) => {
   }
 });
 
+// POST /api/pipe-sources/:id/regenerate
+router.post('/:id/regenerate', async (req, res) => {
+  try {
+    await pipeSourceService.regenerateService(req.params.id);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(err.message.includes('not found') ? 404 : 500).json({ error: err.message });
+  }
+});
+
 // GET /api/pipe-sources/:id/logs
 router.get('/:id/logs', async (req, res) => {
   try {

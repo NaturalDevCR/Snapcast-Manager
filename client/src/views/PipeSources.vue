@@ -85,13 +85,25 @@ async function saveDialog() {
   saving.value = true;
   try {
     if (editingId.value) {
+      const existingPipe = store.pipes.find(p => p.id === editingId.value);
+      const snapserverConfigChanged = !!existingPipe && (
+        existingPipe.name !== form.value.name ||
+        existingPipe.type !== form.value.type ||
+        existingPipe.idleThreshold !== form.value.idleThreshold
+      );
       await store.updatePipe(editingId.value, form.value);
-      uiStore.showToast('Source updated. Restart snapserver to apply changes.', 'success');
+      uiStore.showToast(
+        snapserverConfigChanged
+          ? 'Source updated and service config applied. Restart snapserver to load source changes.'
+          : 'Source updated and service config applied',
+        'success'
+      );
+      needsRestart.value = needsRestart.value || snapserverConfigChanged;
     } else {
       await store.createPipe(form.value);
-      uiStore.showToast('Source created. Restart snapserver to apply changes.', 'success');
+      uiStore.showToast('Source created and service config applied. Restart snapserver to load it.', 'success');
+      needsRestart.value = true;
     }
-    needsRestart.value = true;
     closeDialog();
   } catch (err: any) {
     uiStore.showToast(err.message || 'Failed to save', 'error');
@@ -113,7 +125,7 @@ async function handleDelete() {
   if (!deletingId.value) return;
   try {
     await store.deletePipe(deletingId.value);
-    uiStore.showToast('Source deleted. Restart snapserver to apply changes.', 'success');
+    uiStore.showToast('Source deleted and service removed. Restart snapserver to unload it.', 'success');
     needsRestart.value = true;
   } catch (err: any) {
     uiStore.showToast(err.message || 'Failed to delete', 'error');
@@ -125,6 +137,7 @@ async function handleDelete() {
 
 // ---- service control ----
 const controllingId = ref<string | null>(null);
+const regeneratingId = ref<string | null>(null);
 
 async function control(id: string, action: 'start' | 'stop' | 'restart') {
   controllingId.value = id;
@@ -135,6 +148,23 @@ async function control(id: string, action: 'start' | 'stop' | 'restart') {
     uiStore.showToast(err.message || `Failed to ${action}`, 'error');
   } finally {
     controllingId.value = null;
+  }
+}
+
+async function regenerateService(pipe: PipeSource) {
+  regeneratingId.value = pipe.id;
+  try {
+    await store.regenerateService(pipe.id);
+    uiStore.showToast(
+      pipe.type === 'radio'
+        ? (pipe.enabled ? 'Service file regenerated and radio service restarted' : 'Service file regenerated')
+        : 'MPD output regenerated and mpd restarted',
+      'success'
+    );
+  } catch (err: any) {
+    uiStore.showToast(err.message || 'Failed to regenerate service', 'error');
+  } finally {
+    regeneratingId.value = null;
   }
 }
 
@@ -445,14 +475,6 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                   class="p-1.5 rounded bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 transition" title="View Logs">
                   <span class="material-symbols-outlined text-[1rem]">terminal</span>
                 </button>
-                <button @click="openConfigEditor(pipe)"
-                  class="p-1.5 rounded bg-zinc-700/50 hover:bg-amber-600/30 text-zinc-300 hover:text-amber-400 transition" title="Edit Service File">
-                  <span class="material-symbols-outlined text-[1rem]">description</span>
-                </button>
-                <button @click="openEdit(pipe)"
-                  class="p-1.5 rounded bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 transition" title="Edit">
-                  <span class="material-symbols-outlined text-[1rem]">edit</span>
-                </button>
                 <button @click="confirmDelete(pipe.id)"
                   class="p-1.5 rounded bg-zinc-700/50 hover:bg-red-600/30 text-zinc-500 hover:text-red-400 transition" title="Delete">
                   <span class="material-symbols-outlined text-[1rem]">delete</span>
@@ -478,6 +500,24 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
               <span class="px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">idle={{ pipe.idleThreshold }}ms</span>
               <span class="px-2 py-0.5 bg-blue-900/40 rounded text-blue-400">Writes via mpd.conf</span>
             </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-zinc-800/80 flex flex-wrap gap-2">
+            <button @click="openEdit(pipe)"
+              class="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[1rem]">edit</span>
+              Edit settings
+            </button>
+            <button @click="regenerateService(pipe)" :disabled="regeneratingId === pipe.id"
+              class="px-3 py-1.5 rounded bg-purple-600/20 hover:bg-purple-600/35 text-purple-300 text-xs font-medium transition disabled:opacity-50 flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[1rem]" :class="{ 'animate-spin': regeneratingId === pipe.id }">sync</span>
+              {{ regeneratingId === pipe.id ? 'Regenerating...' : (pipe.type === 'radio' ? 'Regenerate service' : 'Regenerate MPD') }}
+            </button>
+            <button @click="openConfigEditor(pipe)"
+              class="px-3 py-1.5 rounded bg-amber-600/15 hover:bg-amber-600/30 text-amber-300 text-xs font-medium transition flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[1rem]">description</span>
+              {{ pipe.type === 'radio' ? 'Service file' : 'MPD block' }}
+            </button>
           </div>
         </Card>
       </div>

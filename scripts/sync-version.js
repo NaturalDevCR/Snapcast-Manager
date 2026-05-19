@@ -35,7 +35,12 @@ console.log(`  ✓ server/package.json → ${version}`);
 
 // ── scripts/install.sh ──────────────────────────────────────────────────────
 let sh = fs.readFileSync(installSh, 'utf8');
-sh = sh.replace(/^VERSION="v[0-9]+\.[0-9]+\.[0-9]+"$/m, `VERSION="v${version}"`);
+sh = sh.replace(
+  /^VERSION="(?:v[0-9]+\.[0-9]+\.[0-9]+|\$\{LATEST_RELEASE:-v[0-9]+\.[0-9]+\.[0-9]+\})"$/m,
+  line => line.includes('LATEST_RELEASE')
+    ? `VERSION="\${LATEST_RELEASE:-v${version}}"`
+    : `VERSION="v${version}"`
+);
 fs.writeFileSync(installSh, sh);
 console.log(`  ✓ scripts/install.sh  → v${version}`);
 
