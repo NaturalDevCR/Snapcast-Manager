@@ -86,6 +86,28 @@ router.get('/:id/logs', async (req, res) => {
   }
 });
 
+// GET /api/pipe-sources/:id/config
+router.get('/:id/config', async (req, res) => {
+  try {
+    const result = await pipeSourceService.getConfigContent(req.params.id);
+    res.json(result);
+  } catch (err: any) {
+    res.status(err.message.includes('not found') ? 404 : 500).json({ error: err.message });
+  }
+});
+
+// PUT /api/pipe-sources/:id/config
+router.put('/:id/config', async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (typeof content !== 'string') return res.status(400).json({ error: 'content is required' });
+    await pipeSourceService.setConfigContent(req.params.id, content);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(err.message.includes('not found') ? 404 : 500).json({ error: err.message });
+  }
+});
+
 // GET /api/pipe-sources/system/zombies
 router.get('/system/zombies', async (req, res) => {
   try {

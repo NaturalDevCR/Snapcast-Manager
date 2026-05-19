@@ -106,6 +106,17 @@ export const usePipeSourcesStore = defineStore('pipeSources', () => {
     return fetchApi<DiscoveredPipe[]>('/pipe-sources/discover');
   }
 
+  async function getConfig(id: string): Promise<{ content: string; filePath: string }> {
+    return fetchApi<{ content: string; filePath: string }>(`/pipe-sources/${id}/config`);
+  }
+
+  async function setConfig(id: string, content: string): Promise<void> {
+    await fetchApi(`/pipe-sources/${id}/config`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    });
+  }
+
   async function adoptPipe(data: AdoptInput): Promise<PipeSource> {
     const pipe = await fetchApi<PipeSource>('/pipe-sources/adopt', {
       method: 'POST',
@@ -118,6 +129,6 @@ export const usePipeSourcesStore = defineStore('pipeSources', () => {
   return {
     pipes, loading, zombieCount,
     fetchPipes, createPipe, updatePipe, deletePipe, controlPipe, getLogs,
-    fetchZombieCount, discoverPipes, adoptPipe,
+    fetchZombieCount, discoverPipes, adoptPipe, getConfig, setConfig,
   };
 });

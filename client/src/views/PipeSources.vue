@@ -154,6 +154,47 @@ async function restartSnapserver() {
   }
 }
 
+// ---- config editor ----
+const showConfigEditor = ref(false);
+const configEditorPipe = ref<PipeSource | null>(null);
+const configContent = ref('');
+const configFilePath = ref('');
+const loadingConfig = ref(false);
+const savingConfig = ref(false);
+
+async function openConfigEditor(pipe: PipeSource) {
+  configEditorPipe.value = pipe;
+  configContent.value = '';
+  configFilePath.value = '';
+  showConfigEditor.value = true;
+  loadingConfig.value = true;
+  try {
+    const result = await store.getConfig(pipe.id);
+    configContent.value = result.content;
+    configFilePath.value = result.filePath;
+  } catch (err: any) {
+    uiStore.showToast(err.message || 'Failed to load config', 'error');
+    showConfigEditor.value = false;
+  } finally {
+    loadingConfig.value = false;
+  }
+}
+
+async function saveConfigEditor() {
+  if (!configEditorPipe.value) return;
+  savingConfig.value = true;
+  try {
+    await store.setConfig(configEditorPipe.value.id, configContent.value);
+    uiStore.showToast('Config saved and service restarted', 'success');
+    showConfigEditor.value = false;
+    await store.fetchPipes();
+  } catch (err: any) {
+    uiStore.showToast(err.message || 'Failed to save config', 'error');
+  } finally {
+    savingConfig.value = false;
+  }
+}
+
 // ---- logs ----
 const showLogs = ref(false);
 const logsContent = ref('');
@@ -404,6 +445,10 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                   class="p-1.5 rounded bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 transition" title="View Logs">
                   <span class="material-symbols-outlined text-[1rem]">terminal</span>
                 </button>
+                <button @click="openConfigEditor(pipe)"
+                  class="p-1.5 rounded bg-zinc-700/50 hover:bg-amber-600/30 text-zinc-300 hover:text-amber-400 transition" title="Edit Service File">
+                  <span class="material-symbols-outlined text-[1rem]">description</span>
+                </button>
                 <button @click="openEdit(pipe)"
                   class="p-1.5 rounded bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 transition" title="Edit">
                   <span class="material-symbols-outlined text-[1rem]">edit</span>
@@ -482,9 +527,8 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                 type="text"
                 placeholder="e.g. Radio Gym"
                 class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:border-purple-500 focus:outline-none"
-                :disabled="!!editingId"
               />
-              <p v-if="editingId" class="text-xs text-zinc-600 mt-1">Name cannot be changed after creation (affects FIFO path).</p>
+              <p v-if="editingId" class="text-xs text-zinc-600 mt-1">Renaming will migrate the FIFO path and recreate the service file automatically.</p>
             </div>
 
             <!-- Radio-only fields -->
@@ -700,6 +744,56 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
           <div class="px-6 py-4 border-t border-zinc-800 flex justify-end">
             <button @click="showImportModal = false" class="px-4 py-2 border border-zinc-700 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 text-sm transition">
               Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Config File Editor Modal -->
+    <Teleport to="body">
+      <div v-if="showConfigEditor" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-3xl flex flex-col shadow-2xl" style="max-height: 85vh;">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-800 flex-shrink-0">
+            <div>
+              <h3 class="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[1rem] text-amber-400">description</span>
+                {{ configEditorPipe?.type === 'mpd' ? 'MPD audio_output block' : 'Systemd Service File' }}
+                — {{ configEditorPipe?.name }}
+              </h3>
+              <p class="text-xs text-zinc-500 mt-0.5 font-mono">{{ configFilePath }}</p>
+            </div>
+            <button @click="showConfigEditor = false" class="text-zinc-500 hover:text-zinc-300 transition">
+              <span class="material-symbols-outlined text-[1.2rem]">close</span>
+            </button>
+          </div>
+
+          <div class="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
+            <div v-if="loadingConfig" class="text-zinc-500 text-sm text-center py-8">Loading…</div>
+            <template v-else>
+              <p v-if="configEditorPipe?.type === 'mpd'" class="text-xs text-blue-300 bg-blue-500/5 border border-blue-500/20 rounded px-3 py-2">
+                Editing only the <code>audio_output</code> block managed by Snapcast Manager. Other mpd.conf content is preserved.
+              </p>
+              <p v-else class="text-xs text-amber-300 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2">
+                Changes are written directly to the service file and trigger a <code>daemon-reload</code> + restart. Be careful with syntax.
+              </p>
+              <textarea
+                v-model="configContent"
+                spellcheck="false"
+                class="flex-1 w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-xs text-zinc-200 font-mono leading-5 focus:border-amber-500 focus:outline-none resize-none min-h-0"
+                style="min-height: 300px;"
+              ></textarea>
+            </template>
+          </div>
+
+          <div class="flex justify-end gap-3 px-5 py-4 border-t border-zinc-800 flex-shrink-0">
+            <button @click="showConfigEditor = false" class="px-4 py-2 border border-zinc-700 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 text-sm transition">
+              Cancel
+            </button>
+            <button @click="saveConfigEditor" :disabled="savingConfig || loadingConfig"
+              class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded text-sm font-medium transition disabled:opacity-50 flex items-center gap-2">
+              <span v-if="savingConfig" class="material-symbols-outlined animate-spin text-[1rem]">refresh</span>
+              {{ savingConfig ? 'Saving…' : 'Save & Restart Service' }}
             </button>
           </div>
         </div>
