@@ -114,6 +114,33 @@ WantedBy=multi-user.target
 `;
 }
 
+// ---- MPD: extract single audio_output block ----
+function extractMpdOutputBlock(content: string, fifoPath: string): string {
+  const lines = content.split('\n');
+  let inBlock = false;
+  let blockContainsFifo = false;
+  let blockLines: string[] = [];
+
+  for (const line of lines) {
+    if (!inBlock) {
+      if (/^\s*audio_output\s*\{/.test(line)) {
+        inBlock = true;
+        blockLines = [line];
+        blockContainsFifo = false;
+      }
+    } else {
+      blockLines.push(line);
+      if (line.includes(fifoPath)) blockContainsFifo = true;
+      if (/^\s*\}/.test(line)) {
+        inBlock = false;
+        if (blockContainsFifo) return blockLines.join('\n');
+        blockLines = [];
+      }
+    }
+  }
+  return '';
+}
+
 // ---- MPD: audio_output block management ----
 const MPD_CONF_PATHS = ['/etc/mpd.conf', '/var/lib/mpd/mpd.conf'];
 
@@ -477,6 +504,48 @@ export class PipeSourceService {
 
     // Source already in snapserver config — do NOT call addStreamSource
     return pipe;
+  }
+
+  async getConfigContent(id: string): Promise<{ content: string; filePath: string }> {
+    const pipe = this.getById(id);
+    if (!pipe) throw new Error(`Pipe source ${id} not found`);
+
+    if (pipe.type === 'radio') {
+      const filePath = getServiceFilePath(pipe.name);
+      const content = await fs.readFile(filePath, 'utf-8');
+      return { content, filePath };
+    } else {
+      const confPath = await findMpdConf();
+      if (!confPath) throw new Error('mpd.conf not found');
+      const full = await fs.readFile(confPath, 'utf-8');
+      const block = extractMpdOutputBlock(full, getFifoPath(pipe.name));
+      return { content: block, filePath: confPath };
+    }
+  }
+
+  async setConfigContent(id: string, content: string): Promise<void> {
+    const pipe = this.getById(id);
+    if (!pipe) throw new Error(`Pipe source ${id} not found`);
+
+    if (pipe.type === 'radio') {
+      const tmp = `/tmp/snapcast_svc_edit_${pipe.id}.tmp`;
+      await fs.writeFile(tmp, content, 'utf-8');
+      await this.run(`${this.SUDO}mv ${tmp} ${getServiceFilePath(pipe.name)}`);
+      await this.run(`${this.SUDO}chmod 644 ${getServiceFilePath(pipe.name)}`);
+      await this.run(`${this.SUDO}systemctl daemon-reload`);
+      await this.run(`${this.SUDO}systemctl restart ${getSystemdServiceName(pipe.name)}`).catch(() => {});
+    } else {
+      const confPath = await findMpdConf();
+      if (!confPath) throw new Error('mpd.conf not found');
+      const full = await fs.readFile(confPath, 'utf-8');
+      const fifoPath = getFifoPath(pipe.name);
+      const cleaned = removeMpdOutputBlock(full, fifoPath);
+      const newContent = cleaned.trimEnd() + '\n\n' + content.trim() + '\n';
+      const tmp = `/tmp/mpd_conf_snapmgr_edit.tmp`;
+      await fs.writeFile(tmp, newContent, 'utf-8');
+      await this.run(`${this.SUDO}mv ${tmp} ${confPath}`);
+      await this.run(`${this.SUDO}systemctl restart mpd`).catch(() => {});
+    }
   }
 
   private async writeRadioServiceFile(pipe: PipeSource): Promise<void> {
