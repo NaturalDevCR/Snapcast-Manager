@@ -183,6 +183,39 @@ export class ConfigService {
     await fs.writeFile(SNAPSERVER_CONFIG_BASE, DEFAULT_SNAPSERVER_CONF, 'utf-8');
     await this.rebuildMasterConfig();
   }
+
+  async addStreamSource(uri: string): Promise<void> {
+    await this.ensureModularStructure();
+    const base = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
+    const parsed = SnapConfigParser.parse(base);
+    if (!parsed.stream) parsed.stream = {};
+    const existing = parsed.stream.source;
+    const sources: string[] = Array.isArray(existing)
+      ? (existing as string[])
+      : existing ? [String(existing)] : [];
+    if (!sources.includes(uri)) {
+      sources.push(uri);
+      parsed.stream.source = sources.length === 1 ? sources[0] : sources;
+      await fs.writeFile(SNAPSERVER_CONFIG_BASE, SnapConfigParser.stringify(parsed), 'utf-8');
+      await this.rebuildMasterConfig();
+    }
+  }
+
+  async removeStreamSourceByFifo(fifoPath: string): Promise<void> {
+    await this.ensureModularStructure();
+    const base = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
+    const parsed = SnapConfigParser.parse(base);
+    if (!parsed.stream?.source) return;
+    const existing = parsed.stream.source;
+    const sources: string[] = Array.isArray(existing)
+      ? (existing as string[])
+      : [String(existing)];
+    const filtered = sources.filter(s => !s.includes(fifoPath));
+    if (filtered.length === sources.length) return;
+    parsed.stream.source = filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? undefined as any : filtered);
+    await fs.writeFile(SNAPSERVER_CONFIG_BASE, SnapConfigParser.stringify(parsed), 'utf-8');
+    await this.rebuildMasterConfig();
+  }
 }
 
 export const configService = new ConfigService();

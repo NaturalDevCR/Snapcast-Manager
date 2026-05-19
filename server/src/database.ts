@@ -57,6 +57,19 @@ const init = () => {
       path TEXT NOT NULL UNIQUE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS radio_pipe_streams (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      url TEXT NOT NULL,
+      reconnect INTEGER DEFAULT 1,
+      reconnect_streamed INTEGER DEFAULT 1,
+      reconnect_at_eof INTEGER DEFAULT 1,
+      reconnect_delay_max INTEGER DEFAULT 30,
+      idle_threshold INTEGER DEFAULT 15000,
+      enabled INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Migration: add instance_num column for unique per-machine snapclient identification

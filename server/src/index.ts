@@ -10,6 +10,7 @@ import snapcastRouter from './routes/snapcast';
 import watchdogRouter from './routes/watchdog';
 import snapclientInstancesRouter from './routes/snapclientInstances';
 import toolsRouter from './routes/tools';
+import radioPipesRouter from './routes/radioPipes';
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use('/api/snapcast', snapcastRouter);
 app.use('/api/watchdog', watchdogRouter);
 app.use('/api/snapclient-instances', snapclientInstancesRouter);
 app.use('/api/tools', toolsRouter);
+app.use('/api/radio-pipes', radioPipesRouter);
 
 // Basic status route
 app.get('/api/status', (req, res) => {
