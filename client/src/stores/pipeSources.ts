@@ -92,6 +92,11 @@ export const usePipeSourcesStore = defineStore('pipeSources', () => {
     await fetchPipes();
   }
 
+  async function regenerateService(id: string): Promise<void> {
+    await fetchApi(`/pipe-sources/${id}/regenerate`, { method: 'POST' });
+    await fetchPipes();
+  }
+
   async function getLogs(id: string): Promise<string> {
     const { logs } = await fetchApi<{ logs: string }>(`/pipe-sources/${id}/logs`);
     return logs;
@@ -129,6 +134,6 @@ export const usePipeSourcesStore = defineStore('pipeSources', () => {
   return {
     pipes, loading, zombieCount,
     fetchPipes, createPipe, updatePipe, deletePipe, controlPipe, getLogs,
-    fetchZombieCount, discoverPipes, adoptPipe, getConfig, setConfig,
+    fetchZombieCount, discoverPipes, adoptPipe, getConfig, setConfig, regenerateService,
   };
 });

@@ -97,15 +97,15 @@ function buildRadioServiceContent(pipe: PipeSource): string {
 Description=Radio Stream: ${pipe.name}
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=10
 
 [Service]
 Type=simple
 Restart=always
 RestartSec=5
-StartLimitIntervalSec=60
-StartLimitBurst=10
 ExecStartPre=/bin/bash -c 'test -p ${fifo} || mkfifo -m 666 ${fifo}'
-ExecStart=/usr/bin/ffmpeg -hide_banner ${flags} -i "${pipe.url}" -f s16le -ar 48000 -ac 2 -y ${fifo}
+ExecStart=/bin/bash -o pipefail -c '/usr/bin/ffmpeg -hide_banner ${flags} -i "${pipe.url}" -f s16le -ar 48000 -ac 2 - | cat > ${fifo}'
 StandardOutput=null
 StandardError=journal
 
@@ -341,6 +341,26 @@ export class PipeSourceService {
       if (action === 'enable' || action === 'disable') return;
       await this.run(`${this.SUDO}systemctl ${action} mpd`);
     }
+  }
+
+  async regenerateService(id: string): Promise<void> {
+    const pipe = this.getById(id);
+    if (!pipe) throw new Error(`Pipe source ${id} not found`);
+
+    if (pipe.type === 'radio') {
+      await this.writeRadioServiceFile(pipe);
+      await this.run(`${this.SUDO}systemctl daemon-reload`);
+      if (pipe.enabled) {
+        await this.run(`${this.SUDO}systemctl enable ${getSystemdServiceName(pipe.name)}`).catch(() => {});
+        await this.run(`${this.SUDO}systemctl restart ${getSystemdServiceName(pipe.name)}`).catch(() => {});
+      } else {
+        await this.run(`${this.SUDO}systemctl disable ${getSystemdServiceName(pipe.name)}`).catch(() => {});
+      }
+      return;
+    }
+
+    await this.writeMpdOutput(pipe.name, getFifoPath(pipe.name));
+    await this.run(`${this.SUDO}systemctl restart mpd`).catch(() => {});
   }
 
   async getStatus(id: string): Promise<string> {

@@ -92,15 +92,15 @@ function buildServiceContent(pipe: RadioPipe): string {
 Description=Radio Stream: ${pipe.name}
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=10
 
 [Service]
 Type=simple
 Restart=always
 RestartSec=5
-StartLimitIntervalSec=60
-StartLimitBurst=10
 ExecStartPre=/bin/bash -c 'test -p ${fifo} || mkfifo -m 666 ${fifo}'
-ExecStart=/usr/bin/ffmpeg -hide_banner ${flags} -i "${pipe.url}" -f s16le -ar 48000 -ac 2 -y ${fifo}
+ExecStart=/bin/bash -o pipefail -c '/usr/bin/ffmpeg -hide_banner ${flags} -i "${pipe.url}" -f s16le -ar 48000 -ac 2 - | cat > ${fifo}'
 StandardOutput=null
 StandardError=journal
 
