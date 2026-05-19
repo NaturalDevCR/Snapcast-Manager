@@ -72,6 +72,13 @@ const init = () => {
     );
   `);
 
+  // Migration: add type column to pipe sources (radio | mpd)
+  try {
+    db.exec("ALTER TABLE radio_pipe_streams ADD COLUMN type TEXT NOT NULL DEFAULT 'radio'");
+  } catch (_) {
+    // Column already exists — no-op
+  }
+
   // Migration: add instance_num column for unique per-machine snapclient identification
   try {
     db.exec('ALTER TABLE snapclient_instances ADD COLUMN instance_num INTEGER DEFAULT 1');

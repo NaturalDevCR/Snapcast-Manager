@@ -55,7 +55,7 @@ const serverSystemNav: Array<{
   { name: 'Configuration', href: '/server', icon: 'settings', description: 'Snapserver settings' },
   { name: 'Tools', href: '/tools', icon: 'build_circle', description: 'Crontab, scripts & MPD' },
   { name: 'Security', href: '/security', icon: 'security', description: 'Admin access' },
-  { name: 'Radio Streams', href: '/radio-streams', icon: 'radio', description: 'Managed ffmpeg radio streams' },
+  { name: 'Pipe Sources', href: '/pipe-sources', icon: 'sensors', description: 'Radio & MPD pipe sources' },
   { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart', description: 'Service monitors' },
 ];
 
