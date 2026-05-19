@@ -5,12 +5,10 @@ import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import { useRadioPipesStore, type RadioPipe, type RadioPipeFormData, type DiscoveredPipe, type AdoptInput } from '../stores/radioPipes';
 import { useUIStore } from '../stores/ui';
-import { useSystemStore } from '../stores/system';
 import { fetchApi } from '../utils/api';
 
 const store = useRadioPipesStore();
 const uiStore = useUIStore();
-const systemStore = useSystemStore();
 
 // ---- polling ----
 let pollInterval: ReturnType<typeof setInterval> | null = null;
@@ -243,7 +241,13 @@ async function adoptPipe(d: DiscoveredPipe) {
   }
 }
 
-const pendingDiscovered = computed(() => discovered.value.filter(d => !importForms.value[d.fifoPath]?.adopted));
+const discoveredWithForms = computed(() =>
+  discovered.value
+    .map(d => ({ d, f: importForms.value[d.fifoPath] }))
+    .filter((x): x is { d: DiscoveredPipe; f: ImportForm } => x.f !== undefined)
+);
+
+const pendingDiscovered = computed(() => discoveredWithForms.value.filter(({ f }) => !f.adopted).map(({ d }) => d));
 
 // ---- helpers ----
 function statusColor(status: string) {
@@ -609,13 +613,13 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
             </div>
 
             <!-- Discovered items -->
-            <div v-for="d in discovered" :key="d.fifoPath" class="border border-zinc-800 rounded-lg overflow-hidden">
+            <div v-for="{ d, f } in discoveredWithForms" :key="d.fifoPath" class="border border-zinc-800 rounded-lg overflow-hidden">
               <!-- Item header -->
-              <div :class="['px-4 py-3 flex items-center justify-between', importForms[d.fifoPath]?.adopted ? 'bg-green-500/10' : 'bg-zinc-800/50']">
+              <div :class="['px-4 py-3 flex items-center justify-between', f.adopted ? 'bg-green-500/10' : 'bg-zinc-800/50']">
                 <div>
                   <div class="flex items-center gap-2">
                     <span class="font-semibold text-sm text-zinc-200">{{ d.name }}</span>
-                    <span v-if="importForms[d.fifoPath]?.adopted" class="text-xs text-green-400 font-medium">Imported</span>
+                    <span v-if="f.adopted" class="text-xs text-green-400 font-medium">Imported</span>
                   </div>
                   <span class="text-xs font-mono text-zinc-500">{{ d.fifoPath }}</span>
                 </div>
@@ -628,12 +632,12 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
               </div>
 
               <!-- Form (hidden if already imported) -->
-              <div v-if="!importForms[d.fifoPath]?.adopted" class="px-4 py-4 space-y-3">
+              <div v-if="!f.adopted" class="px-4 py-4 space-y-3">
                 <!-- URL -->
                 <div>
                   <label class="block text-xs text-zinc-400 mb-1">Stream URL <span class="text-red-400">*</span></label>
                   <input
-                    v-model="importForms[d.fifoPath].url"
+                    v-model="f.url"
                     type="url"
                     placeholder="https://…/radio.mp3"
                     class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 font-mono focus:border-purple-500 focus:outline-none"
@@ -644,21 +648,21 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                 <!-- Reconnect flags + delay -->
                 <div class="flex flex-wrap gap-x-4 gap-y-2 items-center">
                   <label class="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-300">
-                    <input type="checkbox" v-model="importForms[d.fifoPath].reconnect" class="rounded border-zinc-600 bg-zinc-800 text-purple-500" />
+                    <input type="checkbox" v-model="f.reconnect" class="rounded border-zinc-600 bg-zinc-800 text-purple-500" />
                     reconnect
                   </label>
                   <label class="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-300">
-                    <input type="checkbox" v-model="importForms[d.fifoPath].reconnectStreamed" class="rounded border-zinc-600 bg-zinc-800 text-purple-500" />
+                    <input type="checkbox" v-model="f.reconnectStreamed" class="rounded border-zinc-600 bg-zinc-800 text-purple-500" />
                     reconnect_streamed
                   </label>
                   <label class="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-300">
-                    <input type="checkbox" v-model="importForms[d.fifoPath].reconnectAtEof" class="rounded border-zinc-600 bg-zinc-800 text-purple-500" />
+                    <input type="checkbox" v-model="f.reconnectAtEof" class="rounded border-zinc-600 bg-zinc-800 text-purple-500" />
                     reconnect_at_eof
                   </label>
                   <div class="flex items-center gap-2 text-xs text-zinc-400">
                     delay_max
                     <input
-                      v-model.number="importForms[d.fifoPath].reconnectDelayMax"
+                      v-model.number="f.reconnectDelayMax"
                       type="number" min="1" max="300"
                       class="w-16 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-200 focus:border-purple-500 focus:outline-none"
                     />s
@@ -669,11 +673,11 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                 <div class="flex justify-end">
                   <button
                     @click="adoptPipe(d)"
-                    :disabled="importForms[d.fifoPath].adopting"
+                    :disabled="f.adopting"
                     class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded font-medium transition disabled:opacity-50 flex items-center gap-2"
                   >
-                    <span v-if="importForms[d.fifoPath].adopting" class="material-symbols-outlined animate-spin text-[1rem]">refresh</span>
-                    {{ importForms[d.fifoPath].adopting ? 'Importing…' : 'Import' }}
+                    <span v-if="f.adopting" class="material-symbols-outlined animate-spin text-[1rem]">refresh</span>
+                    {{ f.adopting ? 'Importing…' : 'Import' }}
                   </button>
                 </div>
               </div>
