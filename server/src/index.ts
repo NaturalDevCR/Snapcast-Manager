@@ -10,7 +10,7 @@ import snapcastRouter from './routes/snapcast';
 import watchdogRouter from './routes/watchdog';
 import snapclientInstancesRouter from './routes/snapclientInstances';
 import toolsRouter from './routes/tools';
-import radioPipesRouter from './routes/radioPipes';
+import pipeSourcesRouter from './routes/pipeSources';
 
 dotenv.config();
 
@@ -28,7 +28,8 @@ app.use('/api/snapcast', snapcastRouter);
 app.use('/api/watchdog', watchdogRouter);
 app.use('/api/snapclient-instances', snapclientInstancesRouter);
 app.use('/api/tools', toolsRouter);
-app.use('/api/radio-pipes', radioPipesRouter);
+app.use('/api/pipe-sources', pipeSourcesRouter);
+app.use('/api/radio-pipes', pipeSourcesRouter); // backwards compat alias
 
 // Basic status route
 app.get('/api/status', (req, res) => {
