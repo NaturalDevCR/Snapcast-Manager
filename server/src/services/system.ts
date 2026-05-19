@@ -49,8 +49,11 @@ export class SystemService {
     const cmd = `
       ${this.SUDO}apt-get update && \
       ${this.SUDO}apt-get install -y mpd && \
-      ${this.SUDO}systemctl enable mpd && \
-      ${this.SUDO}systemctl start mpd && \
+      ${this.SUDO}systemctl stop mpd.socket 2>/dev/null || true && \
+      ${this.SUDO}systemctl disable mpd.socket 2>/dev/null || true && \
+      ${this.SUDO}systemctl unmask mpd.service 2>/dev/null || true && \
+      ${this.SUDO}systemctl enable mpd.service && \
+      ${this.SUDO}systemctl restart mpd.service && \
       echo "MPD installed and started successfully."
     `;
     return this.runCommand(cmd);
@@ -103,8 +106,10 @@ export class SystemService {
     }
     if (pkg === 'mpd') {
       const cmd = `
-        ${this.SUDO}systemctl stop mpd 2>/dev/null || true && \
-        ${this.SUDO}systemctl disable mpd 2>/dev/null || true && \
+        ${this.SUDO}systemctl stop mpd.socket 2>/dev/null || true && \
+        ${this.SUDO}systemctl disable mpd.socket 2>/dev/null || true && \
+        ${this.SUDO}systemctl stop mpd.service 2>/dev/null || true && \
+        ${this.SUDO}systemctl disable mpd.service 2>/dev/null || true && \
         ${this.SUDO}apt-get remove --purge -y mpd && \
         echo "MPD removed successfully."
       `;

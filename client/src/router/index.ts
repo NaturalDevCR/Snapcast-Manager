@@ -9,6 +9,7 @@ import Logs from '../views/Logs.vue'
 import Watchdogs from '../views/Watchdogs.vue'
 import Routing from '../views/Routing.vue'
 import Tools from '../views/Tools.vue'
+import RadioStreams from '../views/RadioStreams.vue'
 
 import { fetchApi } from '../utils/api'
 
@@ -71,6 +72,12 @@ const router = createRouter({
       path: '/tools',
       name: 'tools',
       component: Tools,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/radio-streams',
+      name: 'radio-streams',
+      component: RadioStreams,
       meta: { requiresAuth: true }
     },
 
