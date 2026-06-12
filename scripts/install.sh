@@ -16,7 +16,7 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 LATEST_RELEASE=$(curl -sL "https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/latest" | grep '"tag_name"' | head -1 | cut -d '"' -f 4)
-VERSION="${LATEST_RELEASE:-v0.1.19}"
+VERSION="${LATEST_RELEASE:-v0.1.20}"
 APP_VERSION="$VERSION"
 
 # Colors for output
