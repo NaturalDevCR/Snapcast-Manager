@@ -127,25 +127,59 @@ export class ConfigService {
   }
 
   async setSnapserverDocRoot(docRootPath: string): Promise<void> {
-    // When using modular system, we should probably update the BASE or a specific segment.
-    // For now, let's update the BASE to keep it simple.
     try {
         await this.ensureModularStructure();
         const baseRaw = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
-        const config = SnapConfigParser.parse(baseRaw);
-        if (!config.http) config.http = {};
-        config.http.doc_root = docRootPath;
-        const newBase = SnapConfigParser.stringify(config);
-        await fs.writeFile(SNAPSERVER_CONFIG_BASE, newBase, 'utf-8');
+        const updated = this.surgicallySetIniKey(baseRaw, 'http', 'doc_root', docRootPath);
+        await fs.writeFile(SNAPSERVER_CONFIG_BASE, updated, 'utf-8');
         await this.rebuildMasterConfig();
     } catch (error) {
-        // Fallback to direct write if modular structure fails (unlikely)
-        const raw = await this.readServerConfig();
-        const config = SnapConfigParser.parse(raw);
-        if (!config.http) config.http = {};
-        config.http.doc_root = docRootPath;
-        await this.writeServerConfig(SnapConfigParser.stringify(config));
+        try {
+            const raw = await this.readServerConfig();
+            const updated = this.surgicallySetIniKey(raw, 'http', 'doc_root', docRootPath);
+            await this.writeServerConfig(updated);
+        } catch (fallbackError) {
+            console.error('Failed to update doc_root via both methods:', fallbackError);
+        }
     }
+  }
+
+  private surgicallySetIniKey(content: string, section: string, key: string, value: string): string {
+    const lines = content.split('\n');
+    const sectionHeader = `[${section}]`;
+    let inTargetSection = false;
+    let keyFound = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        if (inTargetSection && !keyFound) {
+          lines.splice(i, 0, `${key} = ${value}`);
+          keyFound = true;
+        }
+        inTargetSection = (trimmed === sectionHeader);
+        continue;
+      }
+
+      if (inTargetSection && lines[i].includes('=')) {
+        const eqIdx = lines[i].indexOf('=');
+        const existingKey = lines[i].substring(0, eqIdx).trim();
+        if (existingKey === key) {
+          const indent = lines[i].match(/^(\s*)/)?.[1] ?? '';
+          lines[i] = `${indent}${key} = ${value}`;
+          keyFound = true;
+        }
+      }
+    }
+
+    if (!keyFound) {
+      lines.push('');
+      lines.push(sectionHeader);
+      lines.push(`${key} = ${value}`);
+    }
+
+    return lines.join('\n');
   }
 
   async getTcpSources(): Promise<{ name: string; port: number }[]> {

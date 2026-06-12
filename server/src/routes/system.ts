@@ -152,13 +152,6 @@ router.post('/install-snap-ctrl', async (req: Request, res: Response) => {
     try {
         console.log('Starting snap-ctrl installation...');
         const output = await systemService.installSnapCtrl();
-        
-        console.log('Configuring snapserver to use snap-ctrl...');
-        await configService.setSnapserverDocRoot('/usr/share/snapserver/snap-ctrl');
-        
-        console.log('Restarting snapserver...');
-        await systemService.restartService('snapserver');
-        
         res.json({ message: 'snap-ctrl installed and configured successfully', output });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
