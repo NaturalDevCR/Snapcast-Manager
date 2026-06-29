@@ -2,10 +2,19 @@ import { exec } from 'child_process';
 import util from 'util';
 import { configService } from './config';
 import { snapclientInstanceService } from './snapclientInstances';
+import { backupService, BackupComponent } from './backup';
 
 const execAsync = util.promisify(exec);
 
 export type PackageName = 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node' | 'mpd';
+
+function normalizeVersion(raw: string | undefined | null): string {
+  if (!raw) return 'unknown';
+  const trimmed = raw.trim().replace(/^["']|["']$/g, '');
+  const m = trimmed.match(/v?(\d+\.\d+\.\d+(?:[-+][\w.]+)?)/i);
+  if (!m) return 'unknown';
+  return `v${m[1]}`;
+}
 
 export class SystemService {
   private distroCodename: string | null = null;
@@ -29,7 +38,23 @@ export class SystemService {
     }
   }
 
+  private async safeBackup(component: BackupComponent): Promise<string> {
+    try {
+      const result = await backupService.createPreUpdateBackup(component);
+      if (result.path) {
+        console.log(`[system] Pre-${component} backup: ${result.path}`);
+        return result.path;
+      }
+      console.log(`[system] No files to back up for ${component}`);
+      return '';
+    } catch (err: any) {
+      console.error(`[system] Backup before ${component} failed:`, err.message || err);
+      return '';
+    }
+  }
+
   async installPackage(pkg: string): Promise<string> {
+    await this.safeBackup(this.mapToComponent(pkg));
     if (pkg === 'shairport-sync') {
       return this.installShairportSync();
     }
@@ -43,6 +68,12 @@ export class SystemService {
       return this.installMpd();
     }
     return this.runCommand(`${this.SUDO}apt-get update && ${this.SUDO}apt-get install -y ${pkg}`);
+  }
+
+  private mapToComponent(pkg: string): BackupComponent {
+    if (pkg === 'snapserver' || pkg === 'snapclient' || pkg === 'snap-ctrl') return pkg;
+    if (pkg === 'shairport-sync' || pkg === 'mpd' || pkg === 'ffmpeg' || pkg === 'node') return pkg;
+    return 'general';
   }
 
   private async installMpd(): Promise<string> {
@@ -60,6 +91,9 @@ export class SystemService {
   }
 
   async updatePackage(pkg: PackageName, clean: boolean = false): Promise<string> {
+    if (pkg !== 'snap-ctrl') {
+      await this.safeBackup(this.mapToComponent(pkg));
+    }
     if (pkg === 'snap-ctrl') {
       return this.installSnapCtrl();
     }
@@ -80,6 +114,7 @@ export class SystemService {
   }
 
   async uninstallPackage(pkg: string): Promise<string> {
+    await this.safeBackup(this.mapToComponent(pkg));
     if (pkg === 'snapclient') {
       const cmd = `
         ${this.SUDO}systemctl stop snapclient 2>/dev/null || true && \
@@ -238,11 +273,13 @@ export class SystemService {
       ${this.SUDO}systemctl daemon-reload && \
       ${this.SUDO}systemctl restart snapserver`;
 
+    const dpkgFlags = '--force-confdef --force-confold';
+
     return this.runCommand(`
       ${cleanCmd}
       ${this.SUDO}apt-get update && \
       wget -qO ${debFile} "${downloadUrl}" && \
-      ${this.SUDO}dpkg -i ${debFile} || ${this.SUDO}apt-get install -f -y && \
+      (${this.SUDO}dpkg -i ${dpkgFlags} ${debFile} 2>&1 || ${this.SUDO}DEBIAN_FRONTEND=noninteractive apt-get install -f -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold") && \
       rm -f ${debFile} && \
       ${postInstallCmd}
     `);
@@ -329,12 +366,12 @@ export class SystemService {
           cmd = 'if [ -f /usr/local/bin/shairport-sync ]; then /usr/local/bin/shairport-sync -V 2>&1 | head -n 1; else shairport-sync -V 2>&1 | head -n 1; fi';
           break;
         case 'snap-ctrl':
-          // Attempt to find version in package.json if it exists
           try {
-              const { stdout } = await execAsync('cat /usr/share/snapserver/snap-ctrl/package.json 2>/dev/null | grep version | head -n 1');
-              return stdout.match(/"version":\s*"([^"]+)"/)?.[1] || 'v1.1.0';
+              const { stdout } = await execAsync('cat /usr/share/snapserver/snap-ctrl/package.json 2>/dev/null | grep -m1 \'"version"\' || true');
+              const match = stdout.match(/"version"\s*:\s*"([^"]+)"/);
+              return normalizeVersion(match?.[1]);
           } catch (e) {
-              return 'v1.1.0';
+              return 'unknown';
           }
         case 'node':
           cmd = 'node -v';
@@ -357,7 +394,7 @@ export class SystemService {
     try {
       if (pkg === 'snap-ctrl') {
         const release = await this.getLatestGitHubRelease('NaturalDevCR', 'snap-ctrl');
-        return release.tag_name;
+        return normalizeVersion(release.tag_name);
       }
 
       if (pkg === 'snapserver' || pkg === 'snapclient') {
@@ -507,6 +544,7 @@ export class SystemService {
   }
 
   async installSnapCtrl(): Promise<string> {
+      await this.safeBackup('snap-ctrl');
       const repo = 'NaturalDevCR/snap-ctrl';
       const apiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
       const installPath = '/usr/share/snapserver/snap-ctrl';
@@ -514,36 +552,40 @@ export class SystemService {
 
       console.log(`Installing snap-ctrl from ${apiUrl}...`);
 
-      // Improved robust command using -L for redirects and better grep
       const cmd = `
-        mkdir -p /tmp/snap-ctrl-download && \
+        set -e
+        EXTRACT_DIR=/tmp/snap-ctrl-extract
+        rm -rf /tmp/snap-ctrl-download $EXTRACT_DIR && \
+        mkdir -p /tmp/snap-ctrl-download $EXTRACT_DIR && \
         cd /tmp/snap-ctrl-download && \
-        DOWNLOAD_URL=$(curl -sL ${apiUrl} | grep "browser_download_url" | grep "dist.zip" | head -n 1 | cut -d '"' -f 4) && \
+        API_JSON=$(curl -sL -H 'Accept: application/vnd.github+json' ${apiUrl}) && \
+        DOWNLOAD_URL=$(printf '%s' "$API_JSON" | python3 -c "import json,sys;d=json.load(sys.stdin);a=[x['browser_download_url'] for x in d.get('assets',[]) if x.get('name','').lower().endswith('.zip')]; print(a[0] if a else '')") && \
         if [ -z "$DOWNLOAD_URL" ]; then
-            echo "Searching for any zip release...";
-            DOWNLOAD_URL=$(curl -sL ${apiUrl} | grep "browser_download_url" | grep ".zip" | head -n 1 | cut -d '"' -f 4);
-        fi && \
-        if [ -z "$DOWNLOAD_URL" ]; then
-            echo "Fallback to zipball_url";
-            DOWNLOAD_URL=$(curl -sL ${apiUrl} | grep "zipball_url" | head -n 1 | cut -d '"' -f 4);
+            echo "No release .zip asset found, falling back to zipball_url";
+            DOWNLOAD_URL=$(printf '%s' "$API_JSON" | python3 -c "import json,sys;d=json.load(sys.stdin); print(d.get('zipball_url',''))");
         fi && \
         if [ -z "$DOWNLOAD_URL" ]; then echo "Error: Could not find download URL" && exit 1; fi && \
         echo "Downloading: $DOWNLOAD_URL" && \
         wget --no-check-certificate -qO snap-ctrl.zip "$DOWNLOAD_URL" && \
-        ${this.SUDO}mkdir -p ${installPath} && \
-        ${this.SUDO}rm -rf ${installPath}/* && \
-        ${this.SUDO}unzip -qo snap-ctrl.zip -d ${installPath} && \
-        if [ -d "${installPath}/NaturalDevCR-snap-ctrl-"* ]; then
-            echo "Flattening zipball directory..."
-            ${this.SUDO}mv ${installPath}/NaturalDevCR-snap-ctrl-*/. ${installPath}/
-            ${this.SUDO}rm -rf ${installPath}/NaturalDevCR-snap-ctrl-*
+        ${this.SUDO}unzip -qo snap-ctrl.zip -d $EXTRACT_DIR && \
+        if [ ! -f "$EXTRACT_DIR/package.json" ]; then
+            NESTED=$(find $EXTRACT_DIR -mindepth 2 -maxdepth 2 -name package.json -print -quit | xargs -I{} dirname {});
+            if [ -n "$NESTED" ]; then
+                echo "Flattening nested directory: $NESTED";
+                ${this.SUDO}cp -rT "$NESTED" $EXTRACT_DIR/;
+            fi;
         fi && \
-        rm -rf /tmp/snap-ctrl-download
+        if [ ! -f "$EXTRACT_DIR/package.json" ]; then
+            echo "Error: package.json not found in archive" && exit 1;
+        fi && \
+        ${this.SUDO}mkdir -p ${installPath} && \
+        ${this.SUDO}rm -rf ${installPath}/* ${installPath}/.[!.]* 2>/dev/null || true && \
+        ${this.SUDO}cp -rT $EXTRACT_DIR ${installPath} && \
+        rm -rf /tmp/snap-ctrl-download $EXTRACT_DIR
       `;
 
       const result = await this.runCommand(cmd);
 
-      // Update snapserver config to use this doc_root
       try {
           await configService.setSnapserverDocRoot(docRootPath);
           await this.restartService('snapserver');

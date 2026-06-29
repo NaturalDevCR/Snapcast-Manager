@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { systemService } from '../services/system';
 import { configService } from '../services/config';
+import { backupService } from '../services/backup';
 import { authenticateToken } from '../auth';
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -156,6 +157,53 @@ router.post('/install-snap-ctrl', async (req: Request, res: Response) => {
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
+});
+
+router.get('/backups', async (_req: Request, res: Response) => {
+    try {
+        const backups = await backupService.listBackups();
+        res.json({ backups });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/backups/restore', async (req: Request, res: Response) => {
+    const { name } = req.body;
+    if (!name || typeof name !== 'string') {
+        return res.status(400).json({ error: 'Missing backup name' });
+    }
+    try {
+        const output = await backupService.restoreBackup(name);
+        res.json({ message: output });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.delete('/backups/:name', async (req: Request, res: Response) => {
+    try {
+        await backupService.deleteBackup(req.params.name);
+        res.json({ message: `Backup ${req.params.name} deleted` });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.get('/backups/download/:name', (req: Request, res: Response) => {
+    const name = req.params.name;
+    if (!/^pre-[a-z\-]+-\d{8}-\d{6}\.tar\.gz$/.test(name)) {
+        return res.status(400).json({ error: 'Invalid backup name' });
+    }
+    const fullPath = `/var/backups/snapmanager/${name}`;
+    if (!fs.existsSync(fullPath)) {
+        return res.status(404).json({ error: 'Backup not found' });
+    }
+    const stat = fs.statSync(fullPath);
+    res.setHeader('Content-disposition', `attachment; filename="${name}"`);
+    res.setHeader('Content-type', 'application/gzip');
+    res.setHeader('Content-length', String(stat.size));
+    fs.createReadStream(fullPath).pipe(res);
 });
 
 router.get('/version/:pkg', async (req: Request, res: Response) => {
