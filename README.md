@@ -94,6 +94,13 @@ To contribute or test new features locally:
    - **Backend**: `cd server && npm run dev` (Port 3000)
    - **Frontend**: `cd client && npm run dev` (Port 5173, proxies to 3000)
 
+> ⚠️ **Never commit the runtime database.** The backend creates a SQLite
+> database (`server/data/snapmanager.db` and its `-wal`/`-shm` companions) that
+> stores your admin user and its **bcrypt password hash**. These files are
+> git-ignored on purpose — committing them leaks credential hashes into the
+> repository history. If you ever see a `*.db` file staged, unstage it. The same
+> applies to `.env` (which holds `JWT_SECRET`).
+
 ---
 
 ## 📦 Automated Releases
