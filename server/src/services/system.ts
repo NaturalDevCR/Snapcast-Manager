@@ -3,8 +3,12 @@ import util from 'util';
 import { configService } from './config';
 import { snapclientInstanceService } from './snapclientInstances';
 import { backupService, BackupComponent } from './backup';
+import { jobService } from './jobs';
 
 const execAsync = util.promisify(exec);
+
+// Builds (e.g. shairport-sync) produce far more than the 1 MB default maxBuffer
+const EXEC_OPTS = { maxBuffer: 50 * 1024 * 1024 };
 
 export type PackageName = 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node' | 'mpd';
 
@@ -21,6 +25,15 @@ export class SystemService {
   private releaseCache: Record<string, { timestamp: number, data: any }> = {};
   private readonly CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
+  // Installed packages and versions only change through install/update actions,
+  // so cache them and let the dashboard poll cheaply (statuses stay live).
+  private pkgCache: { timestamp: number; installed: any; versions: any; available: any } | null = null;
+  private readonly PKG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  invalidatePackageCache(): void {
+    this.pkgCache = null;
+  }
+
   /** Returns 'sudo ' when not root, or '' when already root (e.g. on bare Debian). */
   private get SUDO(): string {
     return (process as any).getuid?.() === 0 ? '' : 'sudo ';
@@ -29,11 +42,15 @@ export class SystemService {
   private async runCommand(command: string): Promise<string> {
     try {
       console.log(`Executing: ${command}`);
-      const { stdout, stderr } = await execAsync(command);
+      jobService.log(`$ ${command.trim().split('\n')[0]}`);
+      const { stdout, stderr } = await execAsync(command, EXEC_OPTS);
       if (stderr) console.warn(`StdErr: ${stderr}`);
+      const tail = stdout.trim().split('\n').slice(-10);
+      for (const line of tail) jobService.log(line);
       return stdout;
     } catch (error) {
       console.error(`Error executing ${command}:`, error);
+      jobService.log(`ERROR: ${(error as any)?.message || error}`);
       throw error;
     }
   }
@@ -54,6 +71,7 @@ export class SystemService {
   }
 
   async installPackage(pkg: string): Promise<string> {
+    this.invalidatePackageCache();
     await this.safeBackup(this.mapToComponent(pkg));
     if (pkg === 'shairport-sync') {
       return this.installShairportSync();
@@ -91,6 +109,7 @@ export class SystemService {
   }
 
   async updatePackage(pkg: PackageName, clean: boolean = false): Promise<string> {
+    this.invalidatePackageCache();
     if (pkg !== 'snap-ctrl') {
       await this.safeBackup(this.mapToComponent(pkg));
     }
@@ -114,6 +133,7 @@ export class SystemService {
   }
 
   async uninstallPackage(pkg: string): Promise<string> {
+    this.invalidatePackageCache();
     await this.safeBackup(this.mapToComponent(pkg));
     if (pkg === 'snapclient') {
       const cmd = `
@@ -285,7 +305,11 @@ export class SystemService {
     `);
   }
 
-  async updateNodeJs(version: string = '20'): Promise<string> {
+  async updateNodeJs(version: string = '22'): Promise<string> {
+    if (!/^\d{1,2}$/.test(version)) {
+      throw new Error('Invalid Node.js major version');
+    }
+    this.invalidatePackageCache();
     console.log(`Updating Node.js to version ${version}...`);
     const pipeCmd = this.SUDO ? 'sudo -E bash -' : 'bash -';
     return this.runCommand(`
@@ -408,8 +432,8 @@ export class SystemService {
       }
 
       if (pkg === 'node') {
-        // Simple way to get latest LTS version or just assume we follow nodesource 20.x
-        return 'v20.x (Latest)';
+        // We follow the nodesource LTS line used by the installer
+        return 'v22.x (Latest)';
       }
 
 
@@ -446,22 +470,35 @@ export class SystemService {
     const packages: PackageName[] = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node', 'mpd'];
     const services = ['snapserver', 'snapclient', 'shairport-sync', 'mpd'] as const;
 
-    const installedPromises = packages.map(pkg => this.isInstalled(pkg).then(res => ({ pkg, val: res })));
-    const versionPromises = packages.map(pkg => this.getPackageVersion(pkg).then(res => ({ pkg, val: res })));
-    const availablePromises = packages.map(pkg => this.getLatestAvailableVersion(pkg).then(res => ({ pkg, val: res })));
-    const statusPromises = services.map(svc => this.getServiceStatus(svc).then(res => ({ svc, val: res })));
+    const statusPromise = Promise.all(
+      services.map(svc => this.getServiceStatus(svc).then(res => ({ svc, val: res })))
+    );
 
-    const [installedResults, versionResults, availableResults, statusResults] = await Promise.all([
-      Promise.all(installedPromises),
-      Promise.all(versionPromises),
-      Promise.all(availablePromises),
-      Promise.all(statusPromises)
-    ]);
+    let pkgData = this.pkgCache && Date.now() - this.pkgCache.timestamp < this.PKG_CACHE_TTL
+      ? this.pkgCache
+      : null;
+
+    if (!pkgData) {
+      const [installedResults, versionResults, availableResults] = await Promise.all([
+        Promise.all(packages.map(pkg => this.isInstalled(pkg).then(res => ({ pkg, val: res })))),
+        Promise.all(packages.map(pkg => this.getPackageVersion(pkg).then(res => ({ pkg, val: res })))),
+        Promise.all(packages.map(pkg => this.getLatestAvailableVersion(pkg).then(res => ({ pkg, val: res })))),
+      ]);
+      pkgData = {
+        timestamp: Date.now(),
+        installed: Object.fromEntries(installedResults.map(r => [r.pkg, r.val])),
+        versions: Object.fromEntries(versionResults.map(r => [r.pkg, r.val])),
+        available: Object.fromEntries(availableResults.map(r => [r.pkg, r.val])),
+      };
+      this.pkgCache = pkgData;
+    }
+
+    const statusResults = await statusPromise;
 
     return {
-      installed: Object.fromEntries(installedResults.map(r => [r.pkg, r.val])),
-      versions: Object.fromEntries(versionResults.map(r => [r.pkg, r.val])),
-      available: Object.fromEntries(availableResults.map(r => [r.pkg, r.val])),
+      installed: pkgData.installed,
+      versions: pkgData.versions,
+      available: pkgData.available,
       statuses: Object.fromEntries(statusResults.map(r => [r.svc, r.val]))
     };
   }
@@ -544,6 +581,7 @@ export class SystemService {
   }
 
   async installSnapCtrl(): Promise<string> {
+      this.invalidatePackageCache();
       await this.safeBackup('snap-ctrl');
       const repo = 'NaturalDevCR/snap-ctrl';
       const apiUrl = `https://api.github.com/repos/${repo}/releases/latest`;

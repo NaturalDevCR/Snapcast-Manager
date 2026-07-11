@@ -8,7 +8,7 @@ import Layout from '../components/Layout.vue';
 const uiStore = useUIStore();
 const systemStore = useSystemStore();
 
-type Tab = 'crontab' | 'scripts' | 'mpd-config';
+type Tab = 'crontab' | 'scripts' | 'mpd-config' | 'backups';
 const activeTab = ref<Tab>('crontab');
 
 // ─── Crontab ──────────────────────────────────────────────────────────────────
@@ -151,11 +151,83 @@ async function saveScript() {
   }
 }
 
+// ─── Backups ──────────────────────────────────────────────────────────────────
+interface BackupEntry { name: string; size: number; mtime: string; components: string[]; }
+
+const backups = ref<BackupEntry[]>([]);
+const backupsLoading = ref(false);
+
+async function loadBackups() {
+  backupsLoading.value = true;
+  try {
+    const data = await fetchApi('/system/backups');
+    backups.value = data.backups;
+  } catch (e: any) {
+    uiStore.showToast('Failed to load backups: ' + e.message, 'error');
+  } finally {
+    backupsLoading.value = false;
+  }
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString();
+}
+
+async function restoreBackup(backup: BackupEntry) {
+  if (!confirm(`Restore "${backup.name}"?\n\nThis will overwrite the current configuration files with the ones in the backup.`)) return;
+  backupsLoading.value = true;
+  try {
+    await fetchApi('/system/backups/restore', { method: 'POST', body: JSON.stringify({ name: backup.name }) });
+    uiStore.showToast('Backup restored. Restart the affected services to apply.', 'success', 8000);
+  } catch (e: any) {
+    uiStore.showToast('Failed to restore backup: ' + e.message, 'error');
+  } finally {
+    backupsLoading.value = false;
+  }
+}
+
+async function deleteBackup(backup: BackupEntry) {
+  if (!confirm(`Delete backup "${backup.name}"? This cannot be undone.`)) return;
+  try {
+    await fetchApi(`/system/backups/${encodeURIComponent(backup.name)}`, { method: 'DELETE' });
+    backups.value = backups.value.filter(b => b.name !== backup.name);
+    uiStore.showToast('Backup deleted', 'success');
+  } catch (e: any) {
+    uiStore.showToast('Failed to delete backup: ' + e.message, 'error');
+  }
+}
+
+async function downloadBackup(backup: BackupEntry) {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`/api/system/backups/download/${encodeURIComponent(backup.name)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error(`Download failed (${response.status})`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = backup.name;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e: any) {
+    uiStore.showToast('Failed to download backup: ' + e.message, 'error');
+  }
+}
+
 function switchTab(tab: Tab) {
   activeTab.value = tab;
   if (tab === 'crontab') loadCrontab();
   if (tab === 'mpd-config') loadMpdConfig();
   if (tab === 'scripts') loadScriptPaths();
+  if (tab === 'backups') loadBackups();
 }
 
 onMounted(() => {
@@ -201,6 +273,14 @@ onMounted(() => {
               : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">queue_music</span>
           <span>MPD Config</span>
+        </button>
+        <button @click="switchTab('backups')"
+          :class="['flex items-center space-x-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
+            activeTab === 'backups'
+              ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]'
+              : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+          <span class="material-symbols-outlined text-[1.1rem]">settings_backup_restore</span>
+          <span>Backups</span>
         </button>
       </div>
 
@@ -366,6 +446,60 @@ onMounted(() => {
               class="w-full bg-black/60 border border-white/5 rounded-xl text-sm font-mono text-gray-200 p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
               placeholder="# /etc/mpd.conf&#10;# MPD configuration file"
             ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Backups ─────────────────────────────────────────────────── -->
+      <div v-if="activeTab === 'backups'" class="space-y-4">
+        <div class="bg-black/40 border border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
+          <div class="px-6 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">settings_backup_restore</span>
+              <span class="text-sm font-black text-white uppercase tracking-widest">Configuration Backups</span>
+            </div>
+            <button @click="loadBackups" :disabled="backupsLoading"
+              class="inline-flex items-center px-3 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+              <span class="material-symbols-outlined text-[1rem] mr-1" :class="{'animate-spin': backupsLoading}">sync</span>
+              Reload
+            </button>
+          </div>
+          <div class="p-4">
+            <p class="text-[10px] font-mono text-gray-500 mb-3 leading-relaxed">
+              Automatic backups of snapserver/snapclient configuration, created before each install or update. The 15 most recent are kept.
+            </p>
+            <div v-if="backups.length === 0 && !backupsLoading" class="px-5 py-10 text-center text-gray-600 text-xs font-bold uppercase tracking-widest">
+              No backups yet — they are created automatically before installs and updates
+            </div>
+            <div v-else class="divide-y divide-white/5">
+              <div v-for="backup in backups" :key="backup.name"
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 hover:bg-white/5 transition-all rounded-xl">
+                <div class="min-w-0">
+                  <p class="text-xs font-black text-white truncate font-mono">{{ backup.name }}</p>
+                  <p class="text-[10px] font-mono text-gray-500 mt-0.5">
+                    {{ formatDate(backup.mtime) }} · {{ formatSize(backup.size) }}
+                    <span v-if="backup.components.length"> · {{ backup.components.join(', ') }}</span>
+                  </p>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <button @click="downloadBackup(backup)"
+                    class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-brand-primary hover:bg-brand-primary/10 border border-brand-primary/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
+                    <span class="material-symbols-outlined text-[0.9rem] mr-1">download</span>
+                    Download
+                  </button>
+                  <button @click="restoreBackup(backup)" :disabled="backupsLoading"
+                    class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-[#ffcc00] hover:bg-[#ffcc00]/10 border border-[#ffcc00]/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+                    <span class="material-symbols-outlined text-[0.9rem] mr-1">restore</span>
+                    Restore
+                  </button>
+                  <button @click="deleteBackup(backup)"
+                    class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-[#ff3b30] hover:bg-[#ff3b30]/10 border border-[#ff3b30]/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
+                    <span class="material-symbols-outlined text-[0.9rem] mr-1">delete</span>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

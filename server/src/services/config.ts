@@ -113,16 +113,27 @@ export class ConfigService {
     return segments;
   }
 
+  /** Segment names come from HTTP params — never let them escape the config dir. */
+  private sanitizeSegmentName(name: string): string {
+    const base = path.basename(name);
+    if (base !== name || base.startsWith('.') || !/^[\w.-]+$/.test(base)) {
+      throw new Error(`Invalid segment name: ${name}`);
+    }
+    return base;
+  }
+
   async saveSegment(name: string, content: string): Promise<void> {
     await this.ensureModularStructure();
-    if (!name.endsWith('.conf')) name += '.conf';
-    await fs.writeFile(path.join(SNAPSERVER_CONFIG_DIR, name), content, 'utf-8');
+    let safeName = this.sanitizeSegmentName(name);
+    if (!safeName.endsWith('.conf')) safeName += '.conf';
+    await fs.writeFile(path.join(SNAPSERVER_CONFIG_DIR, safeName), content, 'utf-8');
     await this.rebuildMasterConfig();
   }
 
   async deleteSegment(name: string): Promise<void> {
     await this.ensureModularStructure();
-    await fs.unlink(path.join(SNAPSERVER_CONFIG_DIR, name));
+    const safeName = this.sanitizeSegmentName(name);
+    await fs.unlink(path.join(SNAPSERVER_CONFIG_DIR, safeName));
     await this.rebuildMasterConfig();
   }
 

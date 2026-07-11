@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { systemService } from '../services/system';
 import { configService } from '../services/config';
 import { backupService } from '../services/backup';
+import { jobService } from '../services/jobs';
 import { authenticateToken } from '../auth';
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -9,6 +10,16 @@ import fs from 'fs';
 const router = express.Router();
 
 router.use(authenticateToken);
+
+/** Start a long-running task as a background job and return its id immediately. */
+function startJob(res: Response, label: string, task: () => Promise<string>) {
+    try {
+        const job = jobService.start(label, task);
+        res.status(202).json({ jobId: job.id, label: job.label });
+    } catch (error: any) {
+        res.status(409).json({ error: error.message });
+    }
+}
 
 router.get('/dashboard', async (req: Request, res: Response) => {
     try {
@@ -99,64 +110,44 @@ router.get('/installed/:pkg', async (req: Request, res: Response) => {
     }
 });
 
-router.post('/install/:pkg', async (req: Request, res: Response) => {
+router.post('/install/:pkg', (req: Request, res: Response) => {
     const { pkg } = req.params;
     if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'mpd') {
         return res.status(400).json({ error: 'Invalid package name' });
     }
-    try {
-        const output = await systemService.installPackage(pkg);
-        res.json({ message: `${pkg} installed`, output });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
+    startJob(res, `Install ${pkg}`, () => systemService.installPackage(pkg));
 });
 
-router.post('/update/:pkg', async (req: Request, res: Response) => {
+router.post('/update/:pkg', (req: Request, res: Response) => {
     const { pkg } = req.params;
     if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'snap-ctrl' && pkg !== 'mpd') {
          return res.status(400).json({ error: 'Invalid package name' });
     }
-    try {
-        const { clean } = req.body;
-        const output = await systemService.updatePackage(pkg as any, clean);
-        res.json({ message: `${pkg} updated`, output });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
+    const { clean } = req.body;
+    startJob(res, `Update ${pkg}`, () => systemService.updatePackage(pkg as any, clean));
 });
 
-router.post('/update-node', async (req: Request, res: Response) => {
-    try {
-        const { version } = req.body;
-        const output = await systemService.updateNodeJs(version);
-        res.json({ message: `Node.js update to ${version || 'LTS'} initiated`, output });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
+router.post('/update-node', (req: Request, res: Response) => {
+    const { version } = req.body;
+    startJob(res, `Update Node.js to ${version || '22'}`, () => systemService.updateNodeJs(version));
 });
 
-router.post('/uninstall/:pkg', async (req: Request, res: Response) => {
+router.post('/uninstall/:pkg', (req: Request, res: Response) => {
     const { pkg } = req.params;
     if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'mpd') {
          return res.status(400).json({ error: 'Invalid package name' });
     }
-    try {
-        const output = await systemService.uninstallPackage(pkg);
-        res.json({ message: `${pkg} uninstalled`, output });
-    } catch (error: any) {
-         res.status(500).json({ error: error.message });
-    }
+    startJob(res, `Uninstall ${pkg}`, () => systemService.uninstallPackage(pkg));
 });
 
-router.post('/install-snap-ctrl', async (req: Request, res: Response) => {
-    try {
-        console.log('Starting snap-ctrl installation...');
-        const output = await systemService.installSnapCtrl();
-        res.json({ message: 'snap-ctrl installed and configured successfully', output });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
+router.post('/install-snap-ctrl', (req: Request, res: Response) => {
+    startJob(res, 'Install snap-ctrl', () => systemService.installSnapCtrl());
+});
+
+router.get('/jobs/:id', (req: Request, res: Response) => {
+    const job = jobService.get(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    res.json(job);
 });
 
 router.get('/backups', async (_req: Request, res: Response) => {
@@ -206,8 +197,13 @@ router.get('/backups/download/:name', (req: Request, res: Response) => {
     fs.createReadStream(fullPath).pipe(res);
 });
 
+const VALID_PACKAGES = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node', 'mpd'];
+
 router.get('/version/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
+    if (!VALID_PACKAGES.includes(pkg)) {
+        return res.status(400).json({ error: 'Invalid package name' });
+    }
     try {
         const version = await systemService.getPackageVersion(pkg as any);
         res.json({ pkg, version });
@@ -218,6 +214,9 @@ router.get('/version/:pkg', async (req: Request, res: Response) => {
 
 router.get('/check-updates/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
+    if (!VALID_PACKAGES.includes(pkg)) {
+        return res.status(400).json({ error: 'Invalid package name' });
+    }
     try {
         const version = await systemService.getLatestAvailableVersion(pkg as any);
         res.json({ pkg, version });
@@ -257,7 +256,7 @@ router.get('/export', authenticateToken, (req: Request, res: Response) => {
 
     tarProcess.on('error', (err) => {
         console.error('Tar error:', err);
-        if (!res.headersSent) res.status(500).json({ error: 'Failed to create backup archve' });
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to create backup archive' });
     });
 });
 

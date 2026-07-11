@@ -157,6 +157,7 @@ export class WatchdogService {
     const ports = Array.isArray(watchdog.ports) ? watchdog.ports : [(watchdog as any).port || 0].filter(Boolean);
 
     for (const port of ports) {
+      if (!Number.isInteger(port) || port < 1 || port > 65535) continue;
       try {
         const { stdout } = await execAsync(`ss -t -i -n -a '( sport = :${port} or dport = :${port} )'`);
         portStats.push(...this.parseSocketStats(stdout));
@@ -276,6 +277,11 @@ export class WatchdogService {
   }
 
   async killConnection(id: string, peerIp: string, peerPort: number): Promise<boolean> {
+     // These values are interpolated into a shell command — validate strictly
+     // even though the route already does (defense in depth).
+     if (!/^[0-9a-fA-F.:\[\]]+$/.test(peerIp)) throw new Error('Invalid peer IP');
+     if (!Number.isInteger(peerPort) || peerPort < 1 || peerPort > 65535) throw new Error('Invalid peer port');
+
      const watchdogs = await this.load();
      const watchdog = watchdogs.find(w => w.id === id);
      if (!watchdog) throw new Error('Watchdog not found');

@@ -1,10 +1,44 @@
 import express, { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { randomBytes } from 'crypto';
 import db from './database';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme_secret_key';
+
+// Use JWT_SECRET from the environment if provided; otherwise generate one once
+// and persist it in the settings table so tokens survive restarts. Never fall
+// back to a hardcoded secret (it would let anyone forge admin tokens).
+function resolveJwtSecret(): string {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'jwt_secret'").get() as { value: string } | undefined;
+  if (row?.value) return row.value;
+  const secret = randomBytes(32).toString('hex');
+  db.prepare("INSERT INTO settings (key, value) VALUES ('jwt_secret', ?)").run(secret);
+  return secret;
+}
+const JWT_SECRET = resolveJwtSecret();
+
+// Simple in-memory rate limiter for login attempts (per IP)
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 10;
+const loginAttempts = new Map<string, { count: number; windowStart: number }>();
+
+function loginRateLimiter(req: Request, res: Response, next: NextFunction) {
+  const ip = req.ip || 'unknown';
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now - entry.windowStart > LOGIN_WINDOW_MS) {
+    loginAttempts.set(ip, { count: 1, windowStart: now });
+    return next();
+  }
+  entry.count++;
+  if (entry.count > LOGIN_MAX_ATTEMPTS) {
+    const retryMin = Math.ceil((entry.windowStart + LOGIN_WINDOW_MS - now) / 60000);
+    return res.status(429).json({ error: `Too many login attempts. Try again in ${retryMin} min.` });
+  }
+  next();
+}
 
 router.get('/setup-status', (req: Request, res: Response) => {
   try {
@@ -45,7 +79,7 @@ router.post('/setup', (req: Request, res: Response) => {
   }
 });
 
-router.post('/login', (req: Request, res: Response) => {
+router.post('/login', loginRateLimiter, (req: Request, res: Response) => {
   const { username, password } = req.body;
   
   if (!username || !password) {
@@ -65,6 +99,7 @@ router.post('/login', (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    loginAttempts.delete(req.ip || 'unknown');
     const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
     res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
   } catch (err: any) {

@@ -85,6 +85,11 @@ function buildSourceUri(pipe: PipeSource): string {
 
 // ---- radio: systemd service file ----
 function buildRadioServiceContent(pipe: PipeSource): string {
+  // The URL is embedded in a shell ExecStart line run as root by systemd.
+  // Routes validate it, but never trust stored data blindly (defense in depth).
+  if (/["'`$\\;\n\r\s]/.test(pipe.url)) {
+    throw new Error(`Stream URL for "${pipe.name}" contains unsafe characters`);
+  }
   const fifo = getFifoPath(pipe.name);
   const flags = [
     pipe.reconnect ? '-reconnect 1' : '',
@@ -200,7 +205,7 @@ export class PipeSourceService {
 
   private async run(cmd: string): Promise<string> {
     try {
-      const { stdout, stderr } = await execAsync(cmd);
+      const { stdout, stderr } = await execAsync(cmd, { maxBuffer: 50 * 1024 * 1024 });
       if (stderr) console.warn(`[pipeSources] ${stderr.trim()}`);
       return stdout;
     } catch (err: any) {

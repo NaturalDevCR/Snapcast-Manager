@@ -81,6 +81,38 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
+  /**
+   * Starts a background job on the server (install/update tasks) and polls it
+   * until completion, surfacing progress lines in the loading overlay. Long
+   * tasks like compiling shairport-sync no longer hold an HTTP request open.
+   */
+  async function runJob(endpoint: string, body: Record<string, unknown> | null, message: string): Promise<void> {
+    loadingMessage.value = message;
+    loading.value = true;
+    try {
+      const start = await fetchApi(endpoint, {
+        method: 'POST',
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      if (!start.jobId) return; // server handled it synchronously
+
+      while (true) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const job = await fetchApi(`/system/jobs/${start.jobId}`);
+        const lastLine = job.log?.length ? job.log[job.log.length - 1] : '';
+        loadingMessage.value = lastLine ? `${message} — ${lastLine}` : message;
+        if (job.status === 'done') return;
+        if (job.status === 'error') throw new Error(job.error || 'Task failed');
+      }
+    } catch (err: any) {
+      error.value = err.message;
+      throw err;
+    } finally {
+      loading.value = false;
+      loadingMessage.value = '';
+    }
+  }
+
   async function controlService(action: 'start' | 'stop' | 'restart' | 'enable' | 'disable', service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'mpd') {
     const serviceLabel = service === 'snapserver' ? 'Snapserver' : service === 'snapclient' ? 'Snapclient' : service === 'shairport-sync' ? 'AirPlay' : 'MPD';
     loadingMessage.value = `${action === 'start' ? 'Starting' : action === 'stop' ? 'Stopping' : action === 'restart' ? 'Restarting' : action === 'enable' ? 'Enabling' : 'Disabling'} ${serviceLabel}...`;
@@ -98,88 +130,37 @@ export const useSystemStore = defineStore('system', () => {
   }
 
   async function installPackage(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'mpd') {
-    loadingMessage.value = `Installing ${pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg === 'mpd' ? 'MPD (Music Player Daemon)' : pkg}...`;
-    loading.value = true;
-    try {
-      await fetchApi(`/system/install/${pkg}`, { method: 'POST' });
-      await checkInstalled(pkg);
-    } catch (err: any) {
-      error.value = err.message;
-      throw err;
-    } finally {
-      loading.value = false;
-      loadingMessage.value = '';
-    }
+    const label = pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg === 'mpd' ? 'MPD (Music Player Daemon)' : pkg;
+    await runJob(`/system/install/${pkg}`, null, `Installing ${label}...`);
+    await checkInstalled(pkg);
   }
 
   async function updatePackage(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'mpd', clean: boolean = false) {
-    loadingMessage.value = `Updating ${pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay 2)' : pkg === 'mpd' ? 'MPD' : pkg}... ${pkg === 'shairport-sync' ? '(This takes a few minutes)' : ''}`;
-    loading.value = true;
-    try {
-      await fetchApi(`/system/update/${pkg}`, { 
-        method: 'POST',
-        body: JSON.stringify({ clean })
-      });
-      await Promise.all([
-          checkInstalled(pkg as any),
-          checkVersion(pkg as any),
-          checkAvailableVersion(pkg as any)
-      ]);
-    } catch (err: any) {
-      error.value = err.message;
-      throw err;
-    } finally {
-      loading.value = false;
-      loadingMessage.value = '';
-    }
+    const label = pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay 2)' : pkg === 'mpd' ? 'MPD' : pkg;
+    await runJob(`/system/update/${pkg}`, { clean }, `Updating ${label}...`);
+    await Promise.all([
+        checkInstalled(pkg as any),
+        checkVersion(pkg as any),
+        checkAvailableVersion(pkg as any)
+    ]);
   }
 
-  async function updateNodeJs(version: string = '20') {
-    loading.value = true;
-    try {
-      await fetchApi(`/system/update-node`, { 
-        method: 'POST',
-        body: JSON.stringify({ version })
-      });
-      await checkVersion('node');
-    } catch (err: any) {
-      error.value = err.message;
-      throw err;
-    } finally {
-      loading.value = false;
-      loadingMessage.value = '';
-    }
+  async function updateNodeJs(version: string = '22') {
+    await runJob(`/system/update-node`, { version }, `Updating Node.js to v${version}...`);
+    await checkVersion('node');
   }
 
   async function uninstallPackage(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'mpd') {
-    loadingMessage.value = `Uninstalling ${pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg === 'mpd' ? 'MPD' : pkg}...`;
-    loading.value = true;
-    try {
-      await fetchApi(`/system/uninstall/${pkg}`, { method: 'POST' });
-      await checkInstalled(pkg);
-    } catch (err: any) {
-      error.value = err.message;
-      throw err;
-    } finally {
-      loading.value = false;
-      loadingMessage.value = '';
-    }
+    const label = pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg === 'mpd' ? 'MPD' : pkg;
+    await runJob(`/system/uninstall/${pkg}`, null, `Uninstalling ${label}...`);
+    await checkInstalled(pkg);
   }
 
   async function installSnapCtrl() {
-    loading.value = true;
-    try {
-      await fetchApi(`/system/install-snap-ctrl`, { method: 'POST' });
-      await checkInstalled('snap-ctrl');
-      await checkStatus('snapserver');
-      await checkVersion('snap-ctrl');
-    } catch (err: any) {
-      error.value = err.message;
-      throw err;
-    } finally {
-      loading.value = false;
-      loadingMessage.value = '';
-    }
+    await runJob(`/system/install-snap-ctrl`, null, 'Installing snap-ctrl...');
+    await checkInstalled('snap-ctrl');
+    await checkStatus('snapserver');
+    await checkVersion('snap-ctrl');
   }
 
   async function getLogs(service: string) {

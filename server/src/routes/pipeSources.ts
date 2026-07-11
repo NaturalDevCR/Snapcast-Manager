@@ -1,7 +1,22 @@
 import { Router } from 'express';
 import { pipeSourceService, getFifoPath, getSystemdServiceName } from '../services/pipeSources';
+import { authenticateToken } from '../auth';
 
 const router = Router();
+
+router.use(authenticateToken);
+
+// The URL ends up inside the ExecStart line of a systemd unit (shell context),
+// so reject anything that could break out of the quoted string.
+function validateStreamUrl(url: string): string | null {
+  if (!/^https?:\/\/\S+$/i.test(url)) {
+    return 'URL must start with http:// or https:// and contain no spaces';
+  }
+  if (/["'`$\\;\n\r]/.test(url)) {
+    return 'URL contains invalid characters (quotes, backticks, $, \\, or ;)';
+  }
+  return null;
+}
 
 // GET /api/pipe-sources
 router.get('/', async (req, res) => {
@@ -26,6 +41,10 @@ router.post('/', async (req, res) => {
     const { name, type = 'radio', url, reconnect, reconnectStreamed, reconnectAtEof, reconnectDelayMax, idleThreshold, enabled } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
     if (type === 'radio' && !url) return res.status(400).json({ error: 'url is required for radio sources' });
+    if (url) {
+      const urlError = validateStreamUrl(String(url).trim());
+      if (urlError) return res.status(400).json({ error: urlError });
+    }
     const pipe = await pipeSourceService.create({
       name: String(name).trim(),
       type: type === 'mpd' ? 'mpd' : 'radio',
@@ -46,6 +65,10 @@ router.post('/', async (req, res) => {
 // PUT /api/pipe-sources/:id
 router.put('/:id', async (req, res) => {
   try {
+    if (req.body.url !== undefined && req.body.url !== '') {
+      const urlError = validateStreamUrl(String(req.body.url).trim());
+      if (urlError) return res.status(400).json({ error: urlError });
+    }
     const pipe = await pipeSourceService.update(req.params.id, req.body);
     res.json(pipe);
   } catch (err: any) {
@@ -143,6 +166,10 @@ router.post('/adopt', async (req, res) => {
   try {
     const { name, type = 'radio', url, reconnect, reconnectStreamed, reconnectAtEof, reconnectDelayMax, idleThreshold, enabled, existingServiceName } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
+    if (url) {
+      const urlError = validateStreamUrl(String(url).trim());
+      if (urlError) return res.status(400).json({ error: urlError });
+    }
     const pipe = await pipeSourceService.adopt({
       name: String(name).trim(),
       type: type === 'mpd' ? 'mpd' : 'radio',

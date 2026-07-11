@@ -88,11 +88,15 @@ const router = createRouter({
   ]
 })
 
+// Once the system reports initialized it stays that way — cache the answer so
+// we don't hit /auth/setup-status on every single navigation.
+let setupInitialized = false;
+
 router.beforeEach(async (to, _from, next) => {
   const token = localStorage.getItem('token');
-  
+
   // Skip setup check for the setup route itself to avoid infinite loops
-  if (to.path !== '/setup') {
+  if (to.path !== '/setup' && !setupInitialized) {
     try {
       const { isInitialized } = await fetchApi('/auth/setup-status');
       if (!isInitialized) {
@@ -101,6 +105,7 @@ router.beforeEach(async (to, _from, next) => {
         }
         return next('/setup');
       }
+      setupInitialized = true;
     } catch (err) {
       console.error('Failed to check setup status:', err);
     }

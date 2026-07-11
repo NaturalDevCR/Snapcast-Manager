@@ -64,7 +64,7 @@ router.post('/mpd-config', async (req: Request, res: Response) => {
     }
     const tmpFile = `/tmp/snapmanager-mpd-${Date.now()}.tmp`;
     fs.writeFileSync(tmpFile, content);
-    await execAsync(`${SUDO()}cp ${tmpFile} ${MPD_CONF} && rm -f ${tmpFile}`);
+    await execAsync(`${SUDO()}cp '${tmpFile}' '${MPD_CONF}' && rm -f '${tmpFile}'`);
     res.json({ message: 'MPD config saved successfully' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -87,6 +87,9 @@ router.post('/scripts', (req: Request, res: Response) => {
     const { label, path } = req.body;
     if (!label || !path) {
       return res.status(400).json({ error: 'label and path are required' });
+    }
+    if (typeof path !== 'string' || !path.startsWith('/') || /['\n\r]/.test(path)) {
+      return res.status(400).json({ error: 'path must be an absolute path without quotes' });
     }
     const id = randomUUID();
     db.prepare('INSERT INTO script_paths (id, label, path) VALUES (?, ?, ?)').run(id, label, path);
@@ -143,9 +146,12 @@ router.post('/script', async (req: Request, res: Response) => {
     if (!row) {
       return res.status(403).json({ error: 'Path not registered' });
     }
+    if (/['\n\r]/.test(filePath)) {
+      return res.status(400).json({ error: 'Invalid characters in path' });
+    }
     const tmpFile = `/tmp/snapmanager-script-${Date.now()}.tmp`;
     fs.writeFileSync(tmpFile, content);
-    await execAsync(`${SUDO()}cp ${tmpFile} ${filePath} && chmod +x ${filePath} && rm -f ${tmpFile}`);
+    await execAsync(`${SUDO()}cp '${tmpFile}' '${filePath}' && ${SUDO()}chmod +x '${filePath}' && rm -f '${tmpFile}'`);
     res.json({ message: 'Script saved successfully' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

@@ -9,3 +9,11 @@ coverage/
 .stitch_screens/
 server/data/
 .claude/
+
+# SQLite databases (runtime data, never commit)
+*.db
+*.db-shm
+*.db-wal
+
+# Backup files
+*.bak

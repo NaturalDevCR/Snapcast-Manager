@@ -1,6 +1,7 @@
+// Load env vars before any other module reads process.env (e.g. JWT_SECRET in auth.ts)
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
 import authRouter from './auth';
 import systemRouter from './routes/system';
@@ -12,12 +13,14 @@ import snapclientInstancesRouter from './routes/snapclientInstances';
 import toolsRouter from './routes/tools';
 import pipeSourcesRouter from './routes/pipeSources';
 
-dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// The frontend is served from this same origin in production; CORS is only
+// needed when the Vite dev server (5173) talks to the API without the proxy.
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors());
+}
 app.use(express.json());
 
 app.use('/api/auth', authRouter);
@@ -38,6 +41,11 @@ app.get('/api/status', (req, res) => {
     service: 'Snapcast Manager',
     mode: (process.env.SNAPCAST_MODE as 'client' | 'server' | 'both') || 'both',
   });
+});
+
+// Unknown API routes must return JSON 404, not the SPA shell
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `Unknown API route: ${req.method} ${req.originalUrl}` });
 });
 
 // Serve frontend static files
