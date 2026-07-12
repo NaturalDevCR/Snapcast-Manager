@@ -19,6 +19,7 @@ Snapcast Manager turns your raw Debian/Ubuntu server or Raspberry Pi into a prem
 - 🕸️ **Interactive Audio Matrix**: A stunning drag-and-drop interface to route Virtual Sources to Output Zones with real-time visual "cable" animations.
 - 🔊 **Full Snapclient Management**: Install and run multiple `snapclient` instances on the same machine, each tied to a specific ALSA audio output.
 - 📦 **UI-Driven Package Manager**: Install, update, or uninstall `snapserver` and `snapclient` directly from the web interface. No terminal required!
+- 🎵 **MPD & myMPD Music Player**: Install and manage MPD and the lightweight [myMPD](https://github.com/jcorporation/myMPD) web client from the UI. Open myMPD in one click to control playback, browse playlists, and manage your library. *(myMPD serves its own UI on port 8080 and is **not** behind the manager's login — enable myMPD's PIN/ACL on untrusted networks.)*
 - 🎛️ **Visual Config Editor**: Never edit `snapserver.conf` manually again. Toggle all standard Snapcast properties with visual switches. Defaults are pre-populated!
 - 🔌 **Audio Source Management**: Easily add, edit, or remove pipes, tcp streams, alsa inputs, meta streams, and airplay sources.
 - 🛡️ **Secure Admin Access**: Setup Wizard and JWT-based authentication to keep your configuration completely safe.
