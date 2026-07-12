@@ -138,20 +138,46 @@ export class ConfigService {
   }
 
   async setSnapserverDocRoot(docRootPath: string): Promise<void> {
-    try {
-        await this.ensureModularStructure();
+    // Installing/updating snap-ctrl must NOT reset the user's configuration —
+    // it should only change [http] doc_root. We therefore edit the LIVE master
+    // (/etc/snapserver.conf, the file snapserver reads and the one the config
+    // editor writes to) surgically and in place.
+    //
+    // We deliberately avoid the old base -> rebuildMasterConfig() path here: the
+    // base file is only created once and never re-synced, so if the user had
+    // edited their config through the UI after snap-ctrl was first installed,
+    // rebuilding the master from the stale base wiped those edits. Editing the
+    // live master directly guarantees only doc_root changes.
+    const raw = await this.readServerConfig();
+
+    if (raw && raw.trim().length > 20) {
+      // Preserve the live config; change only doc_root.
+      const updated = this.surgicallySetIniKey(raw, 'http', 'doc_root', docRootPath);
+      await this.writeServerConfig(updated);
+
+      // Keep the modular base in sync (if it exists) so a later pipe-source
+      // rebuild carries the correct doc_root too — but never rebuild here.
+      try {
+        await fs.access(SNAPSERVER_CONFIG_BASE);
         const baseRaw = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
-        const updated = this.surgicallySetIniKey(baseRaw, 'http', 'doc_root', docRootPath);
-        await fs.writeFile(SNAPSERVER_CONFIG_BASE, updated, 'utf-8');
-        await this.rebuildMasterConfig();
+        const baseUpdated = this.surgicallySetIniKey(baseRaw, 'http', 'doc_root', docRootPath);
+        await fs.writeFile(SNAPSERVER_CONFIG_BASE, baseUpdated, 'utf-8');
+      } catch {
+        // No base file — nothing to keep in sync.
+      }
+      return;
+    }
+
+    // No live config to preserve (missing/empty): fall back to the modular seed.
+    try {
+      await this.ensureModularStructure();
+      const baseRaw = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
+      const updated = this.surgicallySetIniKey(baseRaw, 'http', 'doc_root', docRootPath);
+      await fs.writeFile(SNAPSERVER_CONFIG_BASE, updated, 'utf-8');
+      await this.rebuildMasterConfig();
     } catch (error) {
-        try {
-            const raw = await this.readServerConfig();
-            const updated = this.surgicallySetIniKey(raw, 'http', 'doc_root', docRootPath);
-            await this.writeServerConfig(updated);
-        } catch (fallbackError) {
-            console.error('Failed to update doc_root via both methods:', fallbackError);
-        }
+      console.error('Failed to update doc_root:', error);
+      throw error;
     }
   }
 
