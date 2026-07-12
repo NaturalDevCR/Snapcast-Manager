@@ -391,6 +391,11 @@ export class SystemService {
           break;
         case 'snap-ctrl':
           try {
+              // Preferred: the release tag we record at install time (current
+              // releases are pre-built dist zips with no package.json).
+              const { stdout: marker } = await execAsync('cat /usr/share/snapserver/snap-ctrl/.snap-ctrl-version 2>/dev/null || true');
+              if (marker.trim()) return normalizeVersion(marker);
+              // Fallback for older installs that shipped a package.json.
               const { stdout } = await execAsync('cat /usr/share/snapserver/snap-ctrl/package.json 2>/dev/null | grep -m1 \'"version"\' || true');
               const match = stdout.match(/"version"\s*:\s*"([^"]+)"/);
               return normalizeVersion(match?.[1]);
@@ -590,6 +595,11 @@ export class SystemService {
 
       console.log(`Installing snap-ctrl from ${apiUrl}...`);
 
+      // snap-ctrl releases ship pre-built frontend zips (dist.zip / dist-ha.zip),
+      // each containing a top-level dist/ folder and NO package.json. We pick the
+      // standalone dist.zip, locate the built dist/index.html, install it to
+      // installPath/dist (which is the doc_root), and record the release tag in a
+      // marker file so the version can be reported afterwards.
       const cmd = `
         set -e
         EXTRACT_DIR=/tmp/snap-ctrl-extract
@@ -597,28 +607,26 @@ export class SystemService {
         mkdir -p /tmp/snap-ctrl-download $EXTRACT_DIR && \
         cd /tmp/snap-ctrl-download && \
         API_JSON=$(curl -sL -H 'Accept: application/vnd.github+json' ${apiUrl}) && \
-        DOWNLOAD_URL=$(printf '%s' "$API_JSON" | python3 -c "import json,sys;d=json.load(sys.stdin);a=[x['browser_download_url'] for x in d.get('assets',[]) if x.get('name','').lower().endswith('.zip')]; print(a[0] if a else '')") && \
+        DOWNLOAD_URL=$(printf '%s' "$API_JSON" | python3 -c "import json,sys;d=json.load(sys.stdin);z=[a for a in d.get('assets',[]) if a.get('name','').lower().endswith('.zip')];exact=[a['browser_download_url'] for a in z if a.get('name','').lower()=='dist.zip'];noha=[a['browser_download_url'] for a in z if 'ha' not in a.get('name','').lower()];print(exact[0] if exact else (noha[0] if noha else (z[0]['browser_download_url'] if z else '')))") && \
+        TAG=$(printf '%s' "$API_JSON" | python3 -c "import json,sys;print(json.load(sys.stdin).get('tag_name',''))") && \
         if [ -z "$DOWNLOAD_URL" ]; then
             echo "No release .zip asset found, falling back to zipball_url";
             DOWNLOAD_URL=$(printf '%s' "$API_JSON" | python3 -c "import json,sys;d=json.load(sys.stdin); print(d.get('zipball_url',''))");
         fi && \
         if [ -z "$DOWNLOAD_URL" ]; then echo "Error: Could not find download URL" && exit 1; fi && \
-        echo "Downloading: $DOWNLOAD_URL" && \
+        echo "Downloading snap-ctrl $TAG: $DOWNLOAD_URL" && \
         wget --no-check-certificate -qO snap-ctrl.zip "$DOWNLOAD_URL" && \
-        ${this.SUDO}unzip -qo snap-ctrl.zip -d $EXTRACT_DIR && \
-        if [ ! -f "$EXTRACT_DIR/package.json" ]; then
-            NESTED=$(find $EXTRACT_DIR -mindepth 2 -maxdepth 2 -name package.json -print -quit | xargs -I{} dirname {});
-            if [ -n "$NESTED" ]; then
-                echo "Flattening nested directory: $NESTED";
-                ${this.SUDO}cp -rT "$NESTED" $EXTRACT_DIR/;
-            fi;
-        fi && \
-        if [ ! -f "$EXTRACT_DIR/package.json" ]; then
-            echo "Error: package.json not found in archive" && exit 1;
-        fi && \
+        unzip -qo snap-ctrl.zip -d $EXTRACT_DIR && \
+        INDEX=$(find $EXTRACT_DIR -type f -name index.html -path '*/dist/*' -print -quit) && \
+        if [ -z "$INDEX" ]; then INDEX=$(find $EXTRACT_DIR -type f -name index.html -print -quit); fi && \
+        if [ -z "$INDEX" ]; then echo "Error: no built index.html found in snap-ctrl archive" && exit 1; fi && \
+        DIST_DIR=$(dirname "$INDEX") && \
+        echo "Found built interface at: $DIST_DIR" && \
         ${this.SUDO}mkdir -p ${installPath} && \
         ${this.SUDO}rm -rf ${installPath}/* ${installPath}/.[!.]* 2>/dev/null || true && \
-        ${this.SUDO}cp -rT $EXTRACT_DIR ${installPath} && \
+        ${this.SUDO}mkdir -p ${docRootPath} && \
+        ${this.SUDO}cp -rT "$DIST_DIR" ${docRootPath} && \
+        printf '%s' "$TAG" | ${this.SUDO}tee ${installPath}/.snap-ctrl-version >/dev/null && \
         rm -rf /tmp/snap-ctrl-download $EXTRACT_DIR
       `;
 
