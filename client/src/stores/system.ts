@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { fetchApi } from '../utils/api';
 
 export const useSystemStore = defineStore('system', () => {
@@ -10,6 +10,9 @@ export const useSystemStore = defineStore('system', () => {
   const snapclientStatus = ref('unknown');
   const shairportSyncStatus = ref('unknown');
   const mpdStatus = ref('unknown');
+  const mympdStatus = ref('unknown');
+  const mympdPort = ref(8080);
+  const mympdRunning = ref(false);
   const snapcastMode = ref<'client' | 'server' | 'both'>('both');
 
   const installedPackages = ref({
@@ -20,6 +23,7 @@ export const useSystemStore = defineStore('system', () => {
     'shairport-sync': false,
     'node': true,
     'mpd': false,
+    'mympd': false,
   });
 
   const packageVersions = ref<Record<string, string>>({
@@ -30,6 +34,7 @@ export const useSystemStore = defineStore('system', () => {
     'shairport-sync': '',
     'node': '',
     'mpd': '',
+    'mympd': '',
   });
 
   const availableVersions = ref<Record<string, string>>({
@@ -40,21 +45,23 @@ export const useSystemStore = defineStore('system', () => {
     'shairport-sync': '',
     'node': '',
     'mpd': '',
+    'mympd': '',
   });
 
-  async function checkStatus(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'mpd') {
+  async function checkStatus(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'mpd' | 'mympd') {
      try {
        const data = await fetchApi(`/system/status/${service}`);
        if (service === 'snapserver') snapserverStatus.value = data.status;
        if (service === 'snapclient') snapclientStatus.value = data.status;
        if (service === 'shairport-sync') shairportSyncStatus.value = data.status;
        if (service === 'mpd') mpdStatus.value = data.status;
+       if (service === 'mympd') mympdStatus.value = data.status;
      } catch (err) {
        console.error(err);
      }
   }
 
-  async function checkInstalled(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'snap-ctrl' | 'shairport-sync' | 'mpd') {
+  async function checkInstalled(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'snap-ctrl' | 'shairport-sync' | 'mpd' | 'mympd') {
     try {
       const data = await fetchApi(`/system/installed/${pkg}`);
       installedPackages.value[pkg] = data.installed;
@@ -113,8 +120,8 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  async function controlService(action: 'start' | 'stop' | 'restart' | 'enable' | 'disable', service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'mpd') {
-    const serviceLabel = service === 'snapserver' ? 'Snapserver' : service === 'snapclient' ? 'Snapclient' : service === 'shairport-sync' ? 'AirPlay' : 'MPD';
+  async function controlService(action: 'start' | 'stop' | 'restart' | 'enable' | 'disable', service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'mpd' | 'mympd') {
+    const serviceLabel = service === 'snapserver' ? 'Snapserver' : service === 'snapclient' ? 'Snapclient' : service === 'shairport-sync' ? 'AirPlay' : service === 'mympd' ? 'myMPD' : 'MPD';
     loadingMessage.value = `${action === 'start' ? 'Starting' : action === 'stop' ? 'Stopping' : action === 'restart' ? 'Restarting' : action === 'enable' ? 'Enabling' : 'Disabling'} ${serviceLabel}...`;
     loading.value = true;
     try {
@@ -129,14 +136,14 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  async function installPackage(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'mpd') {
-    const label = pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg === 'mpd' ? 'MPD (Music Player Daemon)' : pkg;
+  async function installPackage(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'mpd' | 'mympd') {
+    const label = pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg === 'mpd' ? 'MPD (Music Player Daemon)' : pkg === 'mympd' ? 'myMPD' : pkg;
     await runJob(`/system/install/${pkg}`, null, `Installing ${label}...`);
     await checkInstalled(pkg);
   }
 
-  async function updatePackage(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'mpd', clean: boolean = false) {
-    const label = pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay 2)' : pkg === 'mpd' ? 'MPD' : pkg;
+  async function updatePackage(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'mpd' | 'mympd', clean: boolean = false) {
+    const label = pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay 2)' : pkg === 'mpd' ? 'MPD' : pkg === 'mympd' ? 'myMPD' : pkg;
     await runJob(`/system/update/${pkg}`, { clean }, `Updating ${label}...`);
     await Promise.all([
         checkInstalled(pkg as any),
@@ -150,8 +157,8 @@ export const useSystemStore = defineStore('system', () => {
     await checkVersion('node');
   }
 
-  async function uninstallPackage(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'mpd') {
-    const label = pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg === 'mpd' ? 'MPD' : pkg;
+  async function uninstallPackage(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'mpd' | 'mympd') {
+    const label = pkg === 'shairport-sync' ? 'Shairport Sync (AirPlay)' : pkg === 'mpd' ? 'MPD' : pkg === 'mympd' ? 'myMPD' : pkg;
     await runJob(`/system/uninstall/${pkg}`, null, `Uninstalling ${label}...`);
     await checkInstalled(pkg);
   }
@@ -208,6 +215,19 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
+  async function fetchMympdInfo() {
+    try {
+      const data = await fetchApi('/system/mympd-info');
+      if (typeof data.port === 'number') mympdPort.value = data.port;
+      mympdRunning.value = !!data.running;
+      installedPackages.value['mympd'] = !!data.installed;
+    } catch (err) {
+      console.error('Failed to fetch myMPD info:', err);
+    }
+  }
+
+  const mympdUrl = computed(() => `http://${window.location.hostname}:${mympdPort.value}`);
+
   async function refreshAll() {
     loading.value = true;
     try {
@@ -217,6 +237,7 @@ export const useSystemStore = defineStore('system', () => {
       if (data.statuses.snapclient) snapclientStatus.value = data.statuses.snapclient;
       if (data.statuses['shairport-sync']) shairportSyncStatus.value = data.statuses['shairport-sync'];
       if (data.statuses['mpd']) mpdStatus.value = data.statuses['mpd'];
+      if (data.statuses['mympd']) mympdStatus.value = data.statuses['mympd'];
       
       for (const [pkg, isInstalled] of Object.entries(data.installed)) {
          if (pkg in installedPackages.value) {
@@ -247,6 +268,10 @@ export const useSystemStore = defineStore('system', () => {
     snapclientStatus,
     shairportSyncStatus,
     mpdStatus,
+    mympdStatus,
+    mympdPort,
+    mympdRunning,
+    mympdUrl,
     snapcastMode,
     installedPackages,
     packageVersions,
@@ -261,6 +286,7 @@ export const useSystemStore = defineStore('system', () => {
     fetchServerConfig,
     saveServerConfig,
     fetchMode,
+    fetchMympdInfo,
     refreshAll
   };
 });
