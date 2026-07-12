@@ -45,6 +45,7 @@ const mpdConfigLoading = ref(false);
 
 async function loadMpdConfig() {
   mpdConfigLoading.value = true;
+  systemStore.fetchMympdInfo();
   try {
     const data = await fetchApi('/tools/mpd-config');
     mpdConfigContent.value = data.content;
@@ -65,6 +66,10 @@ async function saveMpdConfig() {
   } finally {
     mpdConfigLoading.value = false;
   }
+}
+
+function openMympd() {
+  window.open(systemStore.mympdUrl, '_blank', 'noopener');
 }
 
 // ─── Scripts ──────────────────────────────────────────────────────────────────
@@ -416,6 +421,11 @@ onMounted(() => {
               <span class="text-[10px] font-mono text-gray-500">/etc/mpd.conf</span>
             </div>
             <div class="flex items-center gap-3">
+              <button v-if="systemStore.installedPackages['mympd'] && systemStore.mympdRunning" @click="openMympd"
+                class="inline-flex items-center px-3 py-1.5 text-xs font-black text-emerald-400 hover:bg-emerald-400/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
+                <span class="material-symbols-outlined text-[1rem] mr-1">open_in_new</span>
+                Open myMPD
+              </button>
               <button @click="loadMpdConfig" :disabled="mpdConfigLoading"
                 class="inline-flex items-center px-3 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
                 <span class="material-symbols-outlined text-[1rem] mr-1" :class="{'animate-spin': mpdConfigLoading}">sync</span>
