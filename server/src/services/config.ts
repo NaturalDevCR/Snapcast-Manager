@@ -2,6 +2,11 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { SnapConfigParser, SnapServerConfig } from '../utils/snapConfigParser';
+import {
+  surgicallySetIniKey,
+  surgicallyAddStreamSource,
+  surgicallyRemoveStreamSourcesByFifo,
+} from '../utils/snapConfigEdit';
 import { DEFAULT_SNAPSERVER_CONF } from '../constants/defaultConfig';
 
 // Default location on Debian
@@ -152,7 +157,7 @@ export class ConfigService {
 
     if (raw && raw.trim().length > 20) {
       // Preserve the live config; change only doc_root.
-      const updated = this.surgicallySetIniKey(raw, 'http', 'doc_root', docRootPath);
+      const updated = surgicallySetIniKey(raw, 'http', 'doc_root', docRootPath);
       await this.writeServerConfig(updated);
 
       // Keep the modular base in sync (if it exists) so a later pipe-source
@@ -160,7 +165,7 @@ export class ConfigService {
       try {
         await fs.access(SNAPSERVER_CONFIG_BASE);
         const baseRaw = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
-        const baseUpdated = this.surgicallySetIniKey(baseRaw, 'http', 'doc_root', docRootPath);
+        const baseUpdated = surgicallySetIniKey(baseRaw, 'http', 'doc_root', docRootPath);
         await fs.writeFile(SNAPSERVER_CONFIG_BASE, baseUpdated, 'utf-8');
       } catch {
         // No base file — nothing to keep in sync.
@@ -172,51 +177,13 @@ export class ConfigService {
     try {
       await this.ensureModularStructure();
       const baseRaw = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
-      const updated = this.surgicallySetIniKey(baseRaw, 'http', 'doc_root', docRootPath);
+      const updated = surgicallySetIniKey(baseRaw, 'http', 'doc_root', docRootPath);
       await fs.writeFile(SNAPSERVER_CONFIG_BASE, updated, 'utf-8');
       await this.rebuildMasterConfig();
     } catch (error) {
       console.error('Failed to update doc_root:', error);
       throw error;
     }
-  }
-
-  private surgicallySetIniKey(content: string, section: string, key: string, value: string): string {
-    const lines = content.split('\n');
-    const sectionHeader = `[${section}]`;
-    let inTargetSection = false;
-    let keyFound = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const trimmed = lines[i].trim();
-
-      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-        if (inTargetSection && !keyFound) {
-          lines.splice(i, 0, `${key} = ${value}`);
-          keyFound = true;
-        }
-        inTargetSection = (trimmed === sectionHeader);
-        continue;
-      }
-
-      if (inTargetSection && lines[i].includes('=')) {
-        const eqIdx = lines[i].indexOf('=');
-        const existingKey = lines[i].substring(0, eqIdx).trim();
-        if (existingKey === key) {
-          const indent = lines[i].match(/^(\s*)/)?.[1] ?? '';
-          lines[i] = `${indent}${key} = ${value}`;
-          keyFound = true;
-        }
-      }
-    }
-
-    if (!keyFound) {
-      lines.push('');
-      lines.push(sectionHeader);
-      lines.push(`${key} = ${value}`);
-    }
-
-    return lines.join('\n');
   }
 
   async getTcpSources(): Promise<{ name: string; port: number }[]> {
@@ -255,37 +222,53 @@ export class ConfigService {
     await this.rebuildMasterConfig();
   }
 
+  /** Apply an in-place transform to the modular base file if it exists (no rebuild). */
+  private async syncBaseInPlace(transform: (content: string) => string): Promise<void> {
+    try {
+      await fs.access(SNAPSERVER_CONFIG_BASE);
+      const baseRaw = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
+      const updated = transform(baseRaw);
+      if (updated !== baseRaw) await fs.writeFile(SNAPSERVER_CONFIG_BASE, updated, 'utf-8');
+    } catch {
+      // No base file — nothing to keep in sync.
+    }
+  }
+
   async addStreamSource(uri: string): Promise<void> {
+    // Edit the live master in place so we never revert the user's config, then
+    // keep the modular base in sync (see setSnapserverDocRoot for the rationale).
+    const raw = await this.readServerConfig();
+    if (raw && raw.trim().length > 20) {
+      const updated = surgicallyAddStreamSource(raw, uri);
+      if (updated !== raw) await this.writeServerConfig(updated);
+      await this.syncBaseInPlace(base => surgicallyAddStreamSource(base, uri));
+      return;
+    }
+    // No live config to preserve — fall back to the modular seed + rebuild.
     await this.ensureModularStructure();
     const base = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
-    const parsed = SnapConfigParser.parse(base);
-    if (!parsed.stream) parsed.stream = {};
-    const existing = parsed.stream.source;
-    const sources: string[] = Array.isArray(existing)
-      ? (existing as string[])
-      : existing ? [String(existing)] : [];
-    if (!sources.includes(uri)) {
-      sources.push(uri);
-      parsed.stream.source = sources.length === 1 ? sources[0] : sources;
-      await fs.writeFile(SNAPSERVER_CONFIG_BASE, SnapConfigParser.stringify(parsed), 'utf-8');
+    const updated = surgicallyAddStreamSource(base, uri);
+    if (updated !== base) {
+      await fs.writeFile(SNAPSERVER_CONFIG_BASE, updated, 'utf-8');
       await this.rebuildMasterConfig();
     }
   }
 
   async removeStreamSourceByFifo(fifoPath: string): Promise<void> {
+    const raw = await this.readServerConfig();
+    if (raw && raw.trim().length > 20) {
+      const updated = surgicallyRemoveStreamSourcesByFifo(raw, fifoPath);
+      if (updated !== raw) await this.writeServerConfig(updated);
+      await this.syncBaseInPlace(base => surgicallyRemoveStreamSourcesByFifo(base, fifoPath));
+      return;
+    }
     await this.ensureModularStructure();
     const base = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
-    const parsed = SnapConfigParser.parse(base);
-    if (!parsed.stream?.source) return;
-    const existing = parsed.stream.source;
-    const sources: string[] = Array.isArray(existing)
-      ? (existing as string[])
-      : [String(existing)];
-    const filtered = sources.filter(s => !s.includes(fifoPath));
-    if (filtered.length === sources.length) return;
-    parsed.stream.source = filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? undefined as any : filtered);
-    await fs.writeFile(SNAPSERVER_CONFIG_BASE, SnapConfigParser.stringify(parsed), 'utf-8');
-    await this.rebuildMasterConfig();
+    const updated = surgicallyRemoveStreamSourcesByFifo(base, fifoPath);
+    if (updated !== base) {
+      await fs.writeFile(SNAPSERVER_CONFIG_BASE, updated, 'utf-8');
+      await this.rebuildMasterConfig();
+    }
   }
 }
 
