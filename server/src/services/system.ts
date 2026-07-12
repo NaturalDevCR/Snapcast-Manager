@@ -20,6 +20,24 @@ function normalizeVersion(raw: string | undefined | null): string {
   return `v${m[1]}`;
 }
 
+/**
+ * Maps an /etc/os-release (ID, VERSION_ID) to the myMPD openSUSE Build Service
+ * (OBS) repository directory. Returns null for distros myMPD doesn't publish for.
+ * Debian/Raspbian use the major version; Ubuntu uses the full VERSION_ID.
+ * Raspberry Pi OS reports ID=debian, which maps to Debian_<major> (armhf/arm64
+ * builds live there).
+ */
+export function mympdObsRepoDir(id: string, versionId: string): string | null {
+  const norm = (id || '').trim().toLowerCase();
+  const version = (versionId || '').trim();
+  const major = version.split('.')[0];
+  if (!major) return null;
+  if (norm === 'debian') return `Debian_${major}`;
+  if (norm === 'raspbian') return `Raspbian_${major}`;
+  if (norm === 'ubuntu') return `xUbuntu_${version}`;
+  return null;
+}
+
 export class SystemService {
   private distroCodename: string | null = null;
   private releaseCache: Record<string, { timestamp: number, data: any }> = {};
