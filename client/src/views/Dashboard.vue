@@ -16,7 +16,8 @@ let pollingInterval: number | undefined;
 
 onMounted(async () => {
   await systemStore.refreshAll();
-  
+  systemStore.fetchMympdInfo();
+
   // Auto-select current installed Node.js version
   if (systemStore.packageVersions.node) {
     const match = systemStore.packageVersions.node.match(/v?(\d+)/);
@@ -38,7 +39,7 @@ onUnmounted(() => {
   }
 });
 
-const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'mpd', clean: boolean = false) => {
+const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'mpd' | 'mympd', clean: boolean = false) => {
   if (clean && !confirm(`WARNING: This will UNINSTALL ${pkg} and DELETE ALL its configuration and data files before a fresh installation. Continue?`)) {
       return;
   }
@@ -51,7 +52,7 @@ const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 's
   }
 };
 
-const handleUninstall = async (pkg: 'shairport-sync' | 'mpd') => {
+const handleUninstall = async (pkg: 'shairport-sync' | 'mpd' | 'mympd') => {
   if (!confirm(`Are you sure you want to UNINSTALL ${pkg}? This will remove its binaries and service files.`)) return;
   try {
     await systemStore.uninstallPackage(pkg);
@@ -70,6 +71,10 @@ const handleUpdateNodeJs = async () => {
     } catch (err: any) {
         uiStore.showToast('Failed to update Node.js: ' + err.message, 'error');
     }
+};
+
+const openMympd = () => {
+    window.open(systemStore.mympdUrl, '_blank', 'noopener');
 };
 
 </script>
@@ -521,6 +526,52 @@ const handleUpdateNodeJs = async () => {
             <div class="pt-4 border-t border-white/5" v-else>
                  <button @click="systemStore.installPackage('mpd')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Install MPD
+                 </button>
+            </div>
+        </div>
+      </Card>
+
+      <!-- myMPD Card -->
+      <Card title="myMPD">
+        <template #icon>
+            <span class="material-symbols-outlined">library_music</span>
+        </template>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-400">Web music client</span>
+                <span :class="systemStore.installedPackages['mympd'] ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-sm font-black">
+                    {{ systemStore.installedPackages['mympd'] ? 'INSTALLED' : 'NOT INSTALLED' }}
+                </span>
+            </div>
+            <div class="flex items-center justify-between" v-if="systemStore.installedPackages['mympd']">
+                 <span class="text-sm font-semibold text-gray-400">Status</span>
+                 <span :class="systemStore.mympdStatus === 'active' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
+                     {{ systemStore.mympdStatus }}
+                 </span>
+            </div>
+            <div class="flex items-center justify-between" v-if="systemStore.packageVersions['mympd']">
+                  <span class="text-sm font-semibold text-gray-400">Version</span>
+                  <span class="text-sm font-bold text-gray-200">{{ systemStore.packageVersions['mympd'] }}</span>
+            </div>
+            <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages['mympd']">
+                <button v-if="systemStore.mympdRunning" @click="openMympd" class="w-full px-4 py-3 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95">
+                    <span class="material-symbols-outlined text-[1rem] mr-1 align-middle">open_in_new</span>Open myMPD
+                </button>
+                <div class="grid grid-cols-2 gap-3">
+                    <button @click="systemStore.controlService('restart', 'mympd')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
+                    <button v-if="systemStore.mympdStatus === 'active'" @click="systemStore.controlService('stop', 'mympd')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
+                    <button v-else @click="systemStore.controlService('start', 'mympd')" class="px-3 py-2.5 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
+                </div>
+                <button @click="handleUpdate('mympd')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                    Update myMPD
+                </button>
+                <button @click="handleUninstall('mympd')" class="w-full px-4 py-3 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                    Uninstall myMPD
+                </button>
+            </div>
+            <div class="pt-4 border-t border-white/5" v-else>
+                 <button @click="systemStore.installPackage('mympd')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                    Install myMPD
                  </button>
             </div>
         </div>

@@ -30,9 +30,18 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     }
 });
 
+router.get('/mympd-info', async (_req: Request, res: Response) => {
+    try {
+        const info = await systemService.getMympdInfo();
+        res.json(info);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 router.get('/status/:service', async (req: Request, res: Response) => {
     const { service } = req.params;
-    if (service !== 'snapserver' && service !== 'snapclient' && service !== 'shairport-sync' && service !== 'snapmanager' && service !== 'librespot' && service !== 'mpd') {
+    if (service !== 'snapserver' && service !== 'snapclient' && service !== 'shairport-sync' && service !== 'snapmanager' && service !== 'librespot' && service !== 'mpd' && service !== 'mympd') {
         return res.status(400).json({ error: 'Invalid service name' });
     }
     try {
@@ -48,7 +57,7 @@ router.get('/status/:service', async (req: Request, res: Response) => {
 
 router.get('/logs/:service', async (req: Request, res: Response) => {
     const { service } = req.params;
-    if (service !== 'snapserver' && service !== 'snapclient' && service !== 'shairport-sync' && service !== 'snapmanager' && service !== 'librespot' && service !== 'mpd') {
+    if (service !== 'snapserver' && service !== 'snapclient' && service !== 'shairport-sync' && service !== 'snapmanager' && service !== 'librespot' && service !== 'mpd' && service !== 'mympd') {
         return res.status(400).json({ error: 'Invalid service name' });
     }
     try {
@@ -61,7 +70,7 @@ router.get('/logs/:service', async (req: Request, res: Response) => {
 
 router.post('/service/:action/:service', async (req: Request, res: Response) => {
     const { action, service } = req.params;
-    if (service !== 'snapserver' && service !== 'snapclient' && service !== 'shairport-sync' && service !== 'librespot' && service !== 'mpd') {
+    if (service !== 'snapserver' && service !== 'snapclient' && service !== 'shairport-sync' && service !== 'librespot' && service !== 'mpd' && service !== 'mympd') {
         return res.status(400).json({ error: 'Invalid service name' });
     }
     
@@ -99,7 +108,7 @@ router.post('/service/:action/:service', async (req: Request, res: Response) => 
 
 router.get('/installed/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'snap-ctrl' && pkg !== 'shairport-sync' && pkg !== 'mpd') {
+    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'snap-ctrl' && pkg !== 'shairport-sync' && pkg !== 'mpd' && pkg !== 'mympd') {
         return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
@@ -112,7 +121,7 @@ router.get('/installed/:pkg', async (req: Request, res: Response) => {
 
 router.post('/install/:pkg', (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'mpd') {
+    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'mpd' && pkg !== 'mympd') {
         return res.status(400).json({ error: 'Invalid package name' });
     }
     startJob(res, `Install ${pkg}`, () => systemService.installPackage(pkg));
@@ -120,7 +129,7 @@ router.post('/install/:pkg', (req: Request, res: Response) => {
 
 router.post('/update/:pkg', (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'snap-ctrl' && pkg !== 'mpd') {
+    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'snap-ctrl' && pkg !== 'mpd' && pkg !== 'mympd') {
          return res.status(400).json({ error: 'Invalid package name' });
     }
     const { clean } = req.body;
@@ -134,7 +143,7 @@ router.post('/update-node', (req: Request, res: Response) => {
 
 router.post('/uninstall/:pkg', (req: Request, res: Response) => {
     const { pkg } = req.params;
-    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'mpd') {
+    if (pkg !== 'snapserver' && pkg !== 'snapclient' && pkg !== 'ffmpeg' && pkg !== 'shairport-sync' && pkg !== 'mpd' && pkg !== 'mympd') {
          return res.status(400).json({ error: 'Invalid package name' });
     }
     startJob(res, `Uninstall ${pkg}`, () => systemService.uninstallPackage(pkg));
@@ -197,7 +206,7 @@ router.get('/backups/download/:name', (req: Request, res: Response) => {
     fs.createReadStream(fullPath).pipe(res);
 });
 
-const VALID_PACKAGES = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node', 'mpd'];
+const VALID_PACKAGES = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node', 'mpd', 'mympd'];
 
 router.get('/version/:pkg', async (req: Request, res: Response) => {
     const { pkg } = req.params;
