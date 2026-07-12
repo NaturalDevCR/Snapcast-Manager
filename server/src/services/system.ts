@@ -10,7 +10,7 @@ const execAsync = util.promisify(exec);
 // Builds (e.g. shairport-sync) produce far more than the 1 MB default maxBuffer
 const EXEC_OPTS = { maxBuffer: 50 * 1024 * 1024 };
 
-export type PackageName = 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node' | 'mpd';
+export type PackageName = 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node' | 'mpd' | 'mympd';
 
 function normalizeVersion(raw: string | undefined | null): string {
   if (!raw) return 'unknown';
@@ -103,6 +103,9 @@ export class SystemService {
     if (pkg === 'mpd') {
       return this.installMpd();
     }
+    if (pkg === 'mympd') {
+      return this.installMympd();
+    }
     return this.runCommand(`${this.SUDO}apt-get update && ${this.SUDO}apt-get install -y ${pkg}`);
   }
 
@@ -122,6 +125,30 @@ export class SystemService {
       ${this.SUDO}systemctl enable mpd.service && \
       ${this.SUDO}systemctl restart mpd.service && \
       echo "MPD installed and started successfully."
+    `;
+    return this.runCommand(cmd);
+  }
+
+  private async installMympd(): Promise<string> {
+    const { stdout: osRelease } = await execAsync('cat /etc/os-release');
+    const id = (osRelease.match(/^ID=(.*)$/m)?.[1] || '').replace(/"/g, '').trim();
+    const versionId = (osRelease.match(/^VERSION_ID=(.*)$/m)?.[1] || '').replace(/"/g, '').trim();
+    const repoDir = mympdObsRepoDir(id, versionId);
+    if (!repoDir) {
+      throw new Error(`Unsupported distro for automatic myMPD install (ID=${id}, VERSION_ID=${versionId}). See https://jcorporation.github.io/myMPD/#/010-installation`);
+    }
+    const baseUrl = `https://download.opensuse.org/repositories/home:/jcorporation/${repoDir}`;
+    const cmd = `
+      ${this.SUDO}apt-get update && \
+      ${this.SUDO}apt-get install -y curl gpg && \
+      ${this.SUDO}mkdir -p /etc/apt/keyrings && \
+      curl -fsSL ${baseUrl}/Release.key | gpg --dearmor | ${this.SUDO}tee /etc/apt/keyrings/mympd.gpg >/dev/null && \
+      echo "deb [signed-by=/etc/apt/keyrings/mympd.gpg] ${baseUrl}/ /" | ${this.SUDO}tee /etc/apt/sources.list.d/mympd.list >/dev/null && \
+      ${this.SUDO}apt-get update && \
+      ${this.SUDO}apt-get install -y mympd && \
+      ${this.SUDO}systemctl enable mympd && \
+      ${this.SUDO}systemctl restart mympd && \
+      echo "myMPD installed and started successfully."
     `;
     return this.runCommand(cmd);
   }
@@ -185,6 +212,16 @@ export class SystemService {
         ${this.SUDO}systemctl disable mpd.service 2>/dev/null || true && \
         ${this.SUDO}apt-get remove --purge -y mpd && \
         echo "MPD removed successfully."
+      `;
+      return this.runCommand(cmd);
+    }
+    if (pkg === 'mympd') {
+      const cmd = `
+        ${this.SUDO}systemctl stop mympd 2>/dev/null || true && \
+        ${this.SUDO}systemctl disable mympd 2>/dev/null || true && \
+        ${this.SUDO}apt-get remove --purge -y mympd && \
+        ${this.SUDO}rm -f /etc/apt/sources.list.d/mympd.list /etc/apt/keyrings/mympd.gpg && \
+        echo "myMPD removed successfully."
       `;
       return this.runCommand(cmd);
     }
@@ -363,7 +400,7 @@ export class SystemService {
     }
   }
 
-  async getServiceStatus(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'mpd'): Promise<string> {
+  async getServiceStatus(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'mpd' | 'mympd'): Promise<string> {
     try {
       const { stdout } = await execAsync(`systemctl is-active ${service}`);
       return stdout.trim();
@@ -374,7 +411,19 @@ export class SystemService {
     }
   }
 
-  async getServiceLogs(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'snapmanager' | 'librespot' | 'mpd'): Promise<string> {
+  async getMympdInfo(): Promise<{ installed: boolean; running: boolean; port: number }> {
+    const installed = await this.isInstalled('mympd');
+    const running = installed ? (await this.getServiceStatus('mympd')) === 'active' : false;
+    let port = 8080;
+    try {
+      const { stdout } = await execAsync('cat /var/lib/mympd/config/http_port 2>/dev/null');
+      const parsed = parseInt(stdout.trim(), 10);
+      if (Number.isFinite(parsed) && parsed > 0) port = parsed;
+    } catch (e) { /* keep default 8080 */ }
+    return { installed, running, port };
+  }
+
+  async getServiceLogs(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'snapmanager' | 'librespot' | 'mpd' | 'mympd'): Promise<string> {
     try {
         const cmd = `${this.SUDO}journalctl -u ${service} -n 100 --no-pager`;
         const output = await this.runCommand(cmd);
@@ -426,6 +475,9 @@ export class SystemService {
         case 'mpd':
           cmd = 'mpd --version 2>&1 | head -n 1';
           break;
+        case 'mympd':
+          cmd = 'mympd --version 2>&1 | head -n 1';
+          break;
       }
       const { stdout } = await execAsync(cmd);
       // Clean up version string (e.g. "snapserver v0.26.0" -> "v0.26.0")
@@ -452,6 +504,11 @@ export class SystemService {
       if (pkg === 'shairport-sync') {
         const release = await this.getLatestGitHubRelease('mikebrady', 'shairport-sync');
         return release.tag_name;
+      }
+
+      if (pkg === 'mympd') {
+        const release = await this.getLatestGitHubRelease('jcorporation', 'myMPD');
+        return normalizeVersion(release.tag_name);
       }
 
       if (pkg === 'node') {
@@ -490,8 +547,8 @@ export class SystemService {
   }
 
   async getDashboardMetrics(): Promise<any> {
-    const packages: PackageName[] = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node', 'mpd'];
-    const services = ['snapserver', 'snapclient', 'shairport-sync', 'mpd'] as const;
+    const packages: PackageName[] = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node', 'mpd', 'mympd'];
+    const services = ['snapserver', 'snapclient', 'shairport-sync', 'mpd', 'mympd'] as const;
 
     const statusPromise = Promise.all(
       services.map(svc => this.getServiceStatus(svc).then(res => ({ svc, val: res })))
@@ -526,23 +583,23 @@ export class SystemService {
     };
   }
 
-  async restartService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd'): Promise<string> {
+  async restartService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd' | 'mympd'): Promise<string> {
       return this.runCommand(`${this.SUDO}systemctl restart ${service}`);
   }
 
-  async startService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd'): Promise<string> {
+  async startService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd' | 'mympd'): Promise<string> {
       return this.runCommand(`${this.SUDO}systemctl start ${service}`);
   }
 
-  async stopService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd'): Promise<string> {
+  async stopService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd' | 'mympd'): Promise<string> {
       return this.runCommand(`${this.SUDO}systemctl stop ${service}`);
   }
 
-  async enableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd'): Promise<string> {
+  async enableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd' | 'mympd'): Promise<string> {
       return this.runCommand(`${this.SUDO}systemctl enable ${service}`);
   }
 
-  async disableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd'): Promise<string> {
+  async disableService(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'librespot' | 'mpd' | 'mympd'): Promise<string> {
       return this.runCommand(`${this.SUDO}systemctl disable ${service}`);
   }
 
