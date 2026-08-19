@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
+import { isPathInsideManagedDir } from './services/tools';
 
 const isDev = process.env.NODE_ENV !== 'production';
 const dbDir = isDev 
@@ -87,6 +88,33 @@ const init = () => {
     rows.forEach((row, i) => {
       db.prepare('UPDATE snapclient_instances SET instance_num = ? WHERE id = ?').run(i + 1, row.id);
     });
+  } catch (_) {
+    // Column already exists — no-op
+  }
+
+  // Migration (Task 9): add `managed` column to script_paths -- closes the
+  // arbitrary-file-write-as-root vulnerability (design-spec finding #3) by
+  // restricting POST /api/tools/scripts to MANAGED_SCRIPTS_DIR going
+  // forward. Existing rows registered before this fix may point anywhere
+  // on the filesystem; they are NOT deleted (that could silently break
+  // something an operator relies on seeing) but are classified here so
+  // routes/tools.ts's write endpoint can reject writes to anything outside
+  // MANAGED_SCRIPTS_DIR while still allowing reads. `ADD COLUMN ... DEFAULT
+  // 1` backfills every pre-existing row with `managed = 1` at add-time;
+  // the loop below then reclassifies each one for real using the same
+  // boundary/symlink check the registration route itself uses
+  // (`isPathInsideManagedDir`, from services/tools.ts), so a legacy row
+  // pointing e.g. at /etc/sudoers.d/pwn ends up `managed = 0`. New rows
+  // inserted via the fixed POST /scripts are always managed = 1 -- enforced
+  // by that route's own validation, which rejects the insert entirely
+  // otherwise, not by anything here.
+  try {
+    db.exec('ALTER TABLE script_paths ADD COLUMN managed INTEGER NOT NULL DEFAULT 1');
+    const rows = db.prepare('SELECT id, path FROM script_paths').all() as { id: string; path: string }[];
+    const reclassify = db.prepare('UPDATE script_paths SET managed = ? WHERE id = ?');
+    for (const row of rows) {
+      reclassify.run(isPathInsideManagedDir(row.path) ? 1 : 0, row.id);
+    }
   } catch (_) {
     // Column already exists — no-op
   }
