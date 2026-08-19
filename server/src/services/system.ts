@@ -146,7 +146,9 @@ export class SystemService {
     if (pkg === 'mympd') {
       return this.installMympd();
     }
+    jobService.log('Updating package lists...');
     await apt.update();
+    jobService.log(`Installing ${pkg} package...`);
     await apt.install([pkg]);
     const msg = `${pkg} installed successfully.`;
     jobService.log(msg);
@@ -160,15 +162,22 @@ export class SystemService {
   }
 
   private async installMpd(): Promise<string> {
+    jobService.log('Updating package lists...');
     await apt.update();
+    jobService.log('Installing mpd package...');
     await apt.install(['mpd']);
     // Original chain: `2>/dev/null || true` for each of these three steps
     // (mpd.socket may not exist/be masked on a fresh install -- that's fine,
     // not a real failure) -- mirrored here with `.catch(() => {})`.
+    jobService.log('Stopping mpd.socket...');
     await systemdControl('mpd.socket', 'stop').catch(() => {});
+    jobService.log('Disabling mpd.socket...');
     await systemdControl('mpd.socket', 'disable').catch(() => {});
+    jobService.log('Unmasking mpd.service...');
     await systemdControl('mpd.service', 'unmask').catch(() => {});
+    jobService.log('Enabling mpd.service...');
     await systemdControl('mpd.service', 'enable');
+    jobService.log('Restarting mpd.service...');
     await systemdControl('mpd.service', 'restart');
     const msg = 'MPD installed and started successfully.';
     jobService.log(msg);
@@ -216,12 +225,16 @@ export class SystemService {
     }
     const baseUrl = `https://download.opensuse.org/repositories/home:/jcorporation/${repoDir}`;
 
+    jobService.log('Updating package lists...');
     await apt.update();
     // Only `gpg` is installed here -- `curl` is no longer needed now that
     // the repo GPG key is fetched via native fetch() below (Task 11).
+    jobService.log('Installing gpg...');
     await apt.install(['gpg']);
+    jobService.log('Creating /etc/apt/keyrings...');
     await this.runPrivileged(['mkdir', '-p', '/etc/apt/keyrings']);
 
+    jobService.log(`Downloading myMPD repository key from ${baseUrl}...`);
     const keyUrl = `${baseUrl}/Release.key`;
     const keyResponse = await fetch(keyUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!keyResponse.ok) {
@@ -229,14 +242,20 @@ export class SystemService {
     }
     const armoredKey = await keyResponse.text();
     const dearmoredKey = await this.dearmorGpgKey(armoredKey);
+    jobService.log('Installing myMPD APT keyring...');
     await installPrivilegedFile('/etc/apt/keyrings/mympd.gpg', dearmoredKey, { mode: 0o644 });
 
     const repoLine = `deb [signed-by=/etc/apt/keyrings/mympd.gpg] ${baseUrl}/ /\n`;
+    jobService.log('Adding myMPD APT repository...');
     await installPrivilegedFile('/etc/apt/sources.list.d/mympd.list', repoLine, { mode: 0o644 });
 
+    jobService.log('Updating package lists...');
     await apt.update();
+    jobService.log('Installing mympd package...');
     await apt.install(['mympd']);
+    jobService.log('Enabling mympd.service...');
     await systemdControl('mympd.service', 'enable');
+    jobService.log('Restarting mympd.service...');
     await systemdControl('mympd.service', 'restart');
 
     const msg = 'myMPD installed and started successfully.';
@@ -265,7 +284,9 @@ export class SystemService {
       return this.updateSnapclientFromGitHub(clean);
     }
 
+    jobService.log('Updating package lists...');
     await apt.update();
+    jobService.log(`Upgrading ${pkg}...`);
     await apt.upgrade([pkg]);
     const msg = `${pkg} updated successfully.`;
     jobService.log(msg);
@@ -276,8 +297,11 @@ export class SystemService {
     this.invalidatePackageCache();
     await this.safeBackup(this.mapToComponent(pkg));
     if (pkg === 'snapclient') {
+      jobService.log('Stopping snapclient.service...');
       await systemdControl('snapclient.service', 'stop').catch(() => {});
+      jobService.log('Disabling snapclient.service...');
       await systemdControl('snapclient.service', 'disable').catch(() => {});
+      jobService.log('Purging snapclient package...');
       await this.runPrivileged(['dpkg', '--purge', 'snapclient']);
       const msg = 'snapclient removed successfully.';
       jobService.log(msg);
@@ -298,24 +322,34 @@ export class SystemService {
       return msg;
     }
     if (pkg === 'mpd') {
+      jobService.log('Stopping mpd.socket...');
       await systemdControl('mpd.socket', 'stop').catch(() => {});
+      jobService.log('Disabling mpd.socket...');
       await systemdControl('mpd.socket', 'disable').catch(() => {});
+      jobService.log('Stopping mpd.service...');
       await systemdControl('mpd.service', 'stop').catch(() => {});
+      jobService.log('Disabling mpd.service...');
       await systemdControl('mpd.service', 'disable').catch(() => {});
+      jobService.log('Removing mpd package...');
       await apt.remove(['mpd']);
       const msg = 'MPD removed successfully.';
       jobService.log(msg);
       return msg;
     }
     if (pkg === 'mympd') {
+      jobService.log('Stopping mympd.service...');
       await systemdControl('mympd.service', 'stop').catch(() => {});
+      jobService.log('Disabling mympd.service...');
       await systemdControl('mympd.service', 'disable').catch(() => {});
+      jobService.log('Removing mympd package...');
       await apt.remove(['mympd']);
+      jobService.log('Removing myMPD APT repository files...');
       await this.runPrivileged(['rm', '-f', '/etc/apt/sources.list.d/mympd.list', '/etc/apt/keyrings/mympd.gpg']);
       const msg = 'myMPD removed successfully.';
       jobService.log(msg);
       return msg;
     }
+    jobService.log(`Removing ${pkg} package...`);
     await apt.remove([pkg]);
     const msg = `${pkg} removed successfully.`;
     jobService.log(msg);

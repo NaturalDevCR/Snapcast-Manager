@@ -45,6 +45,7 @@ import * as execModule from '../platform/exec';
 import * as aptModule from '../platform/apt';
 import * as backupModule from './backup';
 import * as snapclientInstancesModule from './snapclientInstances';
+import * as jobsModule from './jobs';
 import { SystemService } from './system';
 
 type RunFn = typeof execModule.run;
@@ -81,6 +82,23 @@ function stubNoBackup(): () => void {
   return stubModuleFn(backupModule.backupService, 'createPreUpdateBackup', async () => ({
     path: '', fileName: '', size: 0, timestamp: '', components: [], files: [],
   }));
+}
+
+/**
+ * Records every jobService.log() call made during a test. jobService.log()
+ * is normally a no-op unless a job is currently running (see jobs.ts's
+ * `if (!this.currentJobId) return;`) -- these tests call SystemService
+ * methods directly, bypassing jobService.start(), so without this stub every
+ * jobService.log() call in system.ts would silently no-op and there would be
+ * nothing to assert on. Mirrors this file's other stubModuleFn()-based
+ * stubs (stubRun/stubNeedsSudo/etc).
+ */
+function stubJobLog(): { calls: string[]; restore: () => void } {
+  const calls: string[] = [];
+  const restore = stubModuleFn(jobsModule.jobService, 'log', (line: string) => {
+    calls.push(line);
+  });
+  return { calls, restore };
 }
 
 function stubFetch(impl: typeof fetch): () => void {
@@ -995,6 +1013,177 @@ test('uninstallPackage() generic branch (ffmpeg) runs apt remove --purge via pla
     restoreRun();
     restoreSudo();
     restoreBackup();
+  }
+});
+
+// ============================================================
+// jobService.log() progress visibility -- regression tests for the Important
+// review finding on commit 346e73f: before this fix, installPackage()'s
+// generic branch, installMpd(), installMympd(), updatePackage()'s generic
+// branch, and most of uninstallPackage()'s branches called jobService.log()
+// exactly ONCE (a fixed final string) instead of at each meaningful step,
+// leaving the frontend's loading overlay (client/src/stores/system.ts's
+// runJob(), which polls the job log every 2s) frozen on a single static
+// label for the whole multi-minute apt-get operation. These tests assert
+// jobService.log() is called MULTIPLE times, proving real progress is
+// surfaced again.
+// ============================================================
+
+test('installMpd() (via installPackage) logs progress at every step, not just once at the end', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubNoBackup();
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.installPackage('mpd');
+    assert.ok(logCalls.length > 3, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'MPD installed and started successfully.');
+    // At least the five real systemd steps described in the review finding
+    // (stop-socket, disable-socket, unmask-service, enable-service,
+    // restart-service) must each produce a distinguishable log line.
+    for (const fragment of ['Stopping mpd.socket', 'Disabling mpd.socket', 'Unmasking mpd.service', 'Enabling mpd.service', 'Restarting mpd.service']) {
+      assert.ok(logCalls.some(l => l.includes(fragment)), `expected a log line mentioning "${fragment}", got: ${JSON.stringify(logCalls)}`);
+    }
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreJobLog();
+  }
+});
+
+test('installMympd() (via installPackage) logs progress at every step, not just once at the end', async () => {
+  const restoreFs = stubReadFileForPaths({ '/etc/os-release': OS_RELEASE_DEBIAN });
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreFetch = stubFetch(async () => textResponse(200, '-----BEGIN PGP PUBLIC KEY BLOCK-----\nfake\n-----END PGP PUBLIC KEY BLOCK-----\n'));
+  const calls: Call[] = [];
+  const restoreRun = stubGpgDearmor(Buffer.from([0x99, 0x01, 0x02]))(calls);
+  const restoreBackup = stubNoBackup();
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.installPackage('mympd');
+    assert.ok(logCalls.length > 3, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'myMPD installed and started successfully.');
+    for (const fragment of ['Installing gpg', 'Downloading myMPD repository key', 'Installing myMPD APT keyring', 'Enabling mympd.service', 'Restarting mympd.service']) {
+      assert.ok(logCalls.some(l => l.includes(fragment)), `expected a log line mentioning "${fragment}", got: ${JSON.stringify(logCalls)}`);
+    }
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreFs();
+    restoreFetch();
+    restoreBackup();
+    restoreJobLog();
+  }
+});
+
+test('uninstallPackage("mpd") logs progress at every step, not just once at the end', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubNoBackup();
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.uninstallPackage('mpd');
+    assert.ok(logCalls.length > 3, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'MPD removed successfully.');
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreJobLog();
+  }
+});
+
+test('uninstallPackage("mympd") logs progress at every step, not just once at the end', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubNoBackup();
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.uninstallPackage('mympd');
+    assert.ok(logCalls.length > 3, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'myMPD removed successfully.');
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreJobLog();
+  }
+});
+
+test('uninstallPackage("snapclient") logs progress at every step, not just once at the end', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubNoBackup();
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.uninstallPackage('snapclient');
+    assert.ok(logCalls.length > 1, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'snapclient removed successfully.');
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreJobLog();
+  }
+});
+
+test('installPackage() generic branch (ffmpeg) logs progress before and after apt install, not just once at the end', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubNoBackup();
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.installPackage('ffmpeg');
+    assert.ok(logCalls.length > 1, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'ffmpeg installed successfully.');
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreJobLog();
+  }
+});
+
+test('updatePackage() generic branch (ffmpeg) logs progress before and after apt upgrade, not just once at the end', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubNoBackup();
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.updatePackage('ffmpeg' as any, false);
+    assert.ok(logCalls.length > 1, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'ffmpeg updated successfully.');
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreJobLog();
+  }
+});
+
+test('uninstallPackage() generic branch (ffmpeg) logs progress before and after apt remove, not just once at the end', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubNoBackup();
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.uninstallPackage('ffmpeg');
+    assert.ok(logCalls.length > 1, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'ffmpeg removed successfully.');
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreJobLog();
   }
 });
 
