@@ -12,7 +12,7 @@ import {
   logs as systemdLogs,
   assertValidUnitName,
 } from '../platform/systemd';
-import { installPrivilegedFile } from '../platform/files';
+import { installPrivilegedFile, readTextFile } from '../platform/files';
 
 export type PipeSourceType = 'radio' | 'mpd';
 
@@ -69,8 +69,32 @@ function hyphenSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+// ---- runtime directory (Task 7) ----
+// A tmpfs directory this app controls -- unlike /tmp, only root and members
+// of the `audio` group can read/write inside it (mode 0770, group audio).
+// /run is wiped on every reboot, so this directory (and the FIFOs inside
+// it) must be recreated after every boot: the radio unit's ExecStartPre
+// below does that for the radio path, and writeMpdOutput()'s
+// ensureRuntimeDir() call does it for the mpd path (see that function's
+// docstring, and the Task 7 report, for the full reasoning).
+const RUNTIME_DIR = '/run/snapcast-manager';
+
 // ---- path helpers (exported for route use) ----
 export function getFifoPath(name: string): string {
+  return `${RUNTIME_DIR}/snapfifo_${underscoreSlug(name)}`;
+}
+
+/**
+ * The FIFO path formula THIS APP USED PRIOR TO TASK 7 -- `/tmp/snapfifo_
+ * <slug>`, world-writable directory, `mkfifo -m 666`. Deliberately
+ * reimplemented here (not derived from the now-changed `getFifoPath()`)
+ * so the migration logic in `migrateFifoPaths()` below has a stable,
+ * independent way to compute "where would this pipe's FIFO have lived
+ * before this upgrade" regardless of any future change to
+ * `getFifoPath()` itself. Only ever used for OLD-path detection during
+ * migration -- never for creating new FIFOs.
+ */
+function getOldFifoPath(name: string): string {
   return `/tmp/snapfifo_${underscoreSlug(name)}`;
 }
 
@@ -134,6 +158,16 @@ function buildSourceUri(pipe: PipeSource): string {
 }
 
 // ---- radio: systemd service file ----
+/**
+ * The generated unit has no `User=` directive, so systemd runs it (and
+ * every `ExecStartPre=`/`ExecStart=` line in it) as root regardless of
+ * what user the Node/Express manager process itself runs as. That's what
+ * makes it safe for `ExecStartPre` below to `mkdir`/`chgrp` under `/run` --
+ * a directory a non-root manager process typically cannot write to
+ * directly -- and to `chgrp audio` the FIFO: both run with root's
+ * privileges every time this unit starts, independent of Task 12's
+ * (not-yet-built) manager privilege model.
+ */
 function buildRadioServiceContent(pipe: PipeSource): string {
   // The URL is embedded in a shell ExecStart line run as root by systemd.
   // Routes validate it, but never trust stored data blindly (defense in depth).
@@ -159,7 +193,7 @@ StartLimitBurst=10
 Type=simple
 Restart=always
 RestartSec=5
-ExecStartPre=/bin/bash -c 'test -p ${fifo} || mkfifo -m 666 ${fifo}'
+ExecStartPre=/bin/bash -c 'mkdir -p -m 0770 ${RUNTIME_DIR} && chgrp audio ${RUNTIME_DIR} 2>/dev/null || true; test -p ${fifo} || mkfifo -m 660 ${fifo}; chgrp audio ${fifo} 2>/dev/null || true'
 ExecStart=/bin/bash -o pipefail -c '/usr/bin/ffmpeg -hide_banner ${flags} -i "${pipe.url}" -f s16le -ar 48000 -ac 2 - | cat > ${fifo}'
 StandardOutput=null
 StandardError=journal
@@ -204,6 +238,61 @@ async function findMpdConf(): Promise<string | null> {
     try { await fs.access(p); return p; } catch {}
   }
   return null;
+}
+
+/**
+ * Task 7, MPD-directory Option (b): best-effort creation of `RUNTIME_DIR`
+ * (mode 0770, group `audio`), called from `writeMpdOutput()` below --
+ * always BEFORE that function's `mpd.conf` write and every caller's
+ * subsequent `systemctl restart mpd` -- so the directory exists by the
+ * time MPD (re)starts and creates its own FIFO inside it. MPD's `fifo`
+ * audio-output type creates the FIFO itself internally (there is no
+ * `ExecStartPre` hook for it, unlike the radio path above); it can only do
+ * that if the *directory* already exists and is writable by the `mpd`
+ * user/group (typically `mpd:audio` on Debian) by the time it tries.
+ *
+ * This runs in the Node process rather than depending on Snapcast
+ * Manager's OWN systemd unit gaining a `RuntimeDirectory=` directive
+ * (Option (a)) -- see the Task 7 report for the full comparison. Short
+ * version: Option (a) only helps if the manager is (1) run via systemd at
+ * all and (2) reliably started before mpd on every single boot, neither
+ * of which this codebase's current (pre-Task-12) privilege/deployment
+ * model guarantees; this function runs every time an mpd-type pipe source
+ * is written, regardless of how or whether the manager itself is
+ * supervised.
+ *
+ * `mkdir`/`chgrp` go through `platform/exec.ts`'s `run()`, sudo-prefixed
+ * exactly like every other privileged write in this file (see
+ * `installPrivilegedFile()`) -- this works whether or not the Node process
+ * itself happens to run as root. Both commands are best-effort and never
+ * throw: a real `mkdir` permission failure here just means MPD's own
+ * internal `mkfifo` will also fail later (an MPD-side problem this
+ * function has no way to fix either way), and `chgrp audio` failing (no
+ * `audio` group on this system, or insufficient privilege) is tolerated
+ * the same way the radio unit's `ExecStartPre` tolerates it
+ * (`2>/dev/null || true`).
+ */
+async function ensureRuntimeDir(): Promise<void> {
+  const sudo = needsSudo();
+  try {
+    if (sudo) {
+      await run('sudo', ['mkdir', '-p', '-m', '0770', RUNTIME_DIR]);
+    } else {
+      await run('mkdir', ['-p', '-m', '0770', RUNTIME_DIR]);
+    }
+  } catch (err) {
+    console.warn(`[pipeSources] Could not create ${RUNTIME_DIR}:`, err);
+  }
+  try {
+    if (sudo) {
+      await run('sudo', ['chgrp', 'audio', RUNTIME_DIR]);
+    } else {
+      await run('chgrp', ['audio', RUNTIME_DIR]);
+    }
+  } catch {
+    // 'audio' group may not exist on this system, or we lack privilege to
+    // change it -- tolerate, same as the radio unit's ExecStartPre does.
+  }
 }
 
 function buildMpdAudioOutputBlock(name: string, fifoPath: string): string {
@@ -415,6 +504,102 @@ export class PipeSourceService {
 
     await this.writeMpdOutput(pipe.name, getFifoPath(pipe.name));
     await systemdControl(MPD_UNIT, 'restart').catch(() => {});
+  }
+
+  /**
+   * Task 7: automatic, idempotent migration off the old `/tmp/snapfifo_
+   * <slug>` FIFO path onto the new `/run/snapcast-manager/snapfifo_<slug>`
+   * one, for every existing pipe source in the DB. Called once from
+   * index.ts at server startup, but safe to run on every single boot --
+   * see `migrateOnePipeFifoPath()`'s detection logic below for why.
+   *
+   * Design: this function itself NEVER throws. Each pipe's migration is
+   * independently wrapped in try/catch; a failure migrating one pipe
+   * (a malformed unit file, a permissions error, `mpd.conf` missing, a
+   * transient systemctl failure, ...) is logged loudly and then the loop
+   * moves on to the next pipe -- it never stops the others and never
+   * propagates out of this function. index.ts's call site additionally
+   * wraps the whole call in its own try/catch as defense in depth (in case
+   * of a bug here that isn't a per-pipe error), but that outer catch is
+   * not this function's primary safety mechanism -- the per-pipe try/catch
+   * below is.
+   */
+  async migrateFifoPaths(): Promise<void> {
+    const pipes = this.list();
+    for (const pipe of pipes) {
+      try {
+        await this.migrateOnePipeFifoPath(pipe);
+      } catch (err) {
+        console.error(
+          `[pipeSources] FIFO migration FAILED for pipe "${pipe.name}" (${pipe.type}, id=${pipe.id}) -- ` +
+          'leaving it on its current path; will retry on next server startup. Error:',
+          err,
+        );
+      }
+    }
+  }
+
+  /**
+   * Detection: does this pipe's ACTUAL on-disk config (the radio unit
+   * file, or `mpd.conf`) still reference the OLD `/tmp/snapfifo_<slug>`
+   * path? If not -- a fresh install that only ever knew the new path, or a
+   * pipe already migrated on a previous boot -- this returns immediately
+   * without touching anything, which is what makes `migrateFifoPaths()`
+   * idempotent and safe to run on every server startup. A missing file
+   * (ENOENT from `readTextFile()`, or no `mpd.conf` found at all) is
+   * treated the same as "old path not found" -- there is nothing to
+   * migrate if the config this app manages doesn't exist yet.
+   */
+  private async migrateOnePipeFifoPath(pipe: PipeSource): Promise<void> {
+    const oldFifo = getOldFifoPath(pipe.name);
+    const newFifo = getFifoPath(pipe.name);
+
+    let stillOnOldPath: boolean;
+    if (pipe.type === 'radio') {
+      try {
+        const content = await readTextFile(getServiceFilePath(pipe.name));
+        stillOnOldPath = content.includes(oldFifo);
+      } catch {
+        stillOnOldPath = false;
+      }
+    } else {
+      const confPath = await findMpdConf();
+      if (!confPath) {
+        stillOnOldPath = false;
+      } else {
+        try {
+          const content = await readTextFile(confPath);
+          stillOnOldPath = content.includes(oldFifo);
+        } catch {
+          stillOnOldPath = false;
+        }
+      }
+    }
+
+    if (!stillOnOldPath) return;
+
+    console.log(
+      `[pipeSources] Migrating pipe "${pipe.name}" (${pipe.type}) FIFO from the old path ${oldFifo} ` +
+      `to the new path ${newFifo}...`,
+    );
+
+    if (pipe.type === 'radio') {
+      // configService.addStreamSource() below builds the URI via
+      // buildSourceUri(pipe), which calls getFifoPath() internally --
+      // already the NEW path -- so it does not need oldFifo/newFifo passed
+      // explicitly.
+      await configService.removeStreamSourceByFifo(oldFifo);
+      await configService.addStreamSource(buildSourceUri(pipe));
+      // regenerateService() rewrites the unit file using the current
+      // (new) getFifoPath() and restarts/enables per pipe.enabled.
+      await this.regenerateService(pipe.id);
+    } else {
+      await this.removeMpdOutput(oldFifo);
+      await this.writeMpdOutput(pipe.name, newFifo);
+      await systemdControl(MPD_UNIT, 'restart').catch(() => {});
+    }
+
+    console.log(`[pipeSources] Migration complete for pipe "${pipe.name}": now using ${newFifo}`);
   }
 
   async getStatus(id: string): Promise<string> {
@@ -687,6 +872,7 @@ export class PipeSourceService {
   }
 
   private async writeMpdOutput(name: string, fifoPath: string): Promise<void> {
+    await ensureRuntimeDir();
     const confPath = await findMpdConf();
     if (!confPath) throw new Error('mpd.conf not found — is MPD installed?');
     const content = await fs.readFile(confPath, 'utf-8');

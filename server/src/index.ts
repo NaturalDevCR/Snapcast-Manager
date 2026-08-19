@@ -12,6 +12,7 @@ import watchdogRouter from './routes/watchdog';
 import snapclientInstancesRouter from './routes/snapclientInstances';
 import toolsRouter from './routes/tools';
 import pipeSourcesRouter from './routes/pipeSources';
+import { pipeSourceService } from './services/pipeSources';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -56,6 +57,26 @@ app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+// Task 7: migrate any pipe source still on the pre-0.4 /tmp FIFO path onto
+// the new /run/snapcast-manager one before accepting traffic. The database
+// module above is already fully initialized by the time this file's
+// imports finish running (its `init()` call is a top-level side effect of
+// importing '../database', transitively pulled in by every router above),
+// so this satisfies "after the database is initialized". migrateFifoPaths()
+// itself already never throws (each pipe's migration is independently
+// caught -- see its docstring in services/pipeSources.ts), but this
+// try/catch is kept as defense in depth so a startup-crashing bug there
+// can never take server startup down with it.
+async function start(): Promise<void> {
+  try {
+    await pipeSourceService.migrateFifoPaths();
+  } catch (err) {
+    console.error('[startup] Pipe-source FIFO migration failed unexpectedly:', err);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+start();

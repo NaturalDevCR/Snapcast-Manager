@@ -124,6 +124,38 @@ function stubDiscover(result: any[]): () => void {
   return stubModuleFn(proto, 'discover', async () => result);
 }
 
+/** Stubs any (public OR private -- private is TS-only, still a plain
+ * prototype property at runtime) PipeSourceService method, same pattern as
+ * stubDiscover() above. Used by the Task 7 migration tests to mock
+ * regenerateService()/writeMpdOutput()/removeMpdOutput() per the brief. */
+function stubProtoFn(name: string, impl: (...args: any[]) => any): () => void {
+  const proto = Object.getPrototypeOf(pipeSourceService);
+  return stubModuleFn(proto, name, impl);
+}
+
+/** Stubs platform/files.ts's readTextFile() to return fixed content for a
+ * fixed set of paths, and throw ENOENT (as the real fs-backed
+ * implementation would for a missing file) for anything else -- so tests
+ * only need to describe the paths they care about, and every OTHER pipe
+ * row left over from earlier tests in this same shared-DB file is safely
+ * treated as "no old path found" (nothing to migrate). */
+function stubReadTextFile(contents: Record<string, string>): () => void {
+  return stubModuleFn(filesModule, 'readTextFile', async (p: string) => {
+    if (Object.prototype.hasOwnProperty.call(contents, p)) return contents[p];
+    const err: any = new Error(`ENOENT: no such file or directory, open '${p}'`);
+    err.code = 'ENOENT';
+    throw err;
+  });
+}
+
+/** Old-scheme FIFO path for `name`, derived from the NEW getFifoPath()'s
+ * own slug computation (both the old and new formula use the identical
+ * underscoreSlug() -- only the directory prefix changed) rather than
+ * reimplementing the slug regex a second time in this test file. */
+function oldFifoPathFor(name: string): string {
+  return getFifoPath(name).replace('/run/snapcast-manager', '/tmp');
+}
+
 let nameCounter = 0;
 function uniqueName(prefix: string): string {
   nameCounter += 1;
@@ -619,5 +651,345 @@ test('getZombieCount() returns 0 (not a throw) when run() fails', async () => {
     assert.equal(count, 0);
   } finally {
     restoreRun();
+  }
+});
+
+// ============================================================================
+// Task 7: FIFO path scheme /tmp -> /run/snapcast-manager, and the automatic
+// migration for existing installations still on the old path.
+// ============================================================================
+
+test('getFifoPath() returns the new /run/snapcast-manager path, not the old /tmp path', () => {
+  const fifo = getFifoPath('My Radio Station!');
+  assert.equal(fifo, '/run/snapcast-manager/snapfifo_my_radio_station');
+  assert.ok(fifo.startsWith('/run/snapcast-manager/'));
+  assert.ok(!fifo.startsWith('/tmp/'));
+});
+
+test(
+  "buildRadioServiceContent()'s ExecStartPre creates /run/snapcast-manager (mode 0770), chgrps it to " +
+  'audio, and mkfifos the FIFO itself at mode 660 (never 666)',
+  async () => {
+    const calls: Call[] = [];
+    const restorePlatform = stubAllPlatformCalls(calls);
+    try {
+      const name = uniqueName('execstartpre-pipe');
+      const fifo = getFifoPath(name);
+      await pipeSourceService.create({
+        name,
+        type: 'radio',
+        url: 'https://example.com/execstartpre-stream.mp3',
+        reconnect: true,
+        reconnectStreamed: true,
+        reconnectAtEof: true,
+        reconnectDelayMax: 30,
+        idleThreshold: 15000,
+        enabled: false,
+      });
+
+      const installCalls = calls.filter(c => c.kind === 'files.installPrivilegedFile');
+      assert.equal(installCalls.length, 1);
+      const content = installCalls[0].args[1] as string;
+
+      assert.ok(
+        content.includes('mkdir -p -m 0770 /run/snapcast-manager'),
+        `expected mkdir -p -m 0770 /run/snapcast-manager in:\n${content}`,
+      );
+      assert.ok(
+        content.includes('chgrp audio /run/snapcast-manager'),
+        `expected chgrp audio /run/snapcast-manager in:\n${content}`,
+      );
+      assert.ok(
+        content.includes(`mkfifo -m 660 ${fifo}`),
+        `expected mkfifo -m 660 ${fifo} in:\n${content}`,
+      );
+      assert.ok(!content.includes('mkfifo -m 666'), 'must not use the old world-writable mode 666');
+      assert.ok(!content.includes('-m 777'), 'must not use mode 777 anywhere');
+      assert.ok(content.includes(`chgrp audio ${fifo}`), `expected chgrp audio ${fifo} in:\n${content}`);
+    } finally {
+      restorePlatform();
+    }
+  },
+);
+
+test('migrateFifoPaths() skips a radio pipe whose unit file no longer references the old /tmp path (idempotent)', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const name = uniqueName('migrate-radio-skip');
+    const pipe = await pipeSourceService.create({
+      name,
+      type: 'radio',
+      url: 'https://example.com/migrate-skip-stream.mp3',
+      reconnect: true,
+      reconnectStreamed: true,
+      reconnectAtEof: true,
+      reconnectDelayMax: 30,
+      idleThreshold: 15000,
+      enabled: false,
+    });
+    calls.length = 0;
+
+    const unitFilePath = `/etc/systemd/system/${getSystemdServiceName(name)}.service`;
+    const restoreReadText = stubReadTextFile({
+      [unitFilePath]: `ExecStartPre=/bin/bash -c 'mkfifo -m 660 ${getFifoPath(name)}'\n`,
+    });
+    let regenerateCalls = 0;
+    const restoreRegenerate = stubProtoFn('regenerateService', async () => {
+      regenerateCalls += 1;
+    });
+
+    try {
+      await pipeSourceService.migrateFifoPaths();
+
+      assert.equal(regenerateCalls, 0, 'regenerateService must NOT be called when already on the new path');
+      const configCalls = calls.filter(
+        c => c.kind === 'config.removeStreamSourceByFifo' || c.kind === 'config.addStreamSource',
+      );
+      assert.equal(configCalls.length, 0, `expected zero config calls, got: ${JSON.stringify(configCalls)}`);
+    } finally {
+      restoreReadText();
+      restoreRegenerate();
+    }
+    void pipe;
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('migrateFifoPaths() migrates a radio pipe still on the old /tmp path: updates snapserver.conf and calls regenerateService()', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const name = uniqueName('migrate-radio-proceed');
+    const pipe = await pipeSourceService.create({
+      name,
+      type: 'radio',
+      url: 'https://example.com/migrate-proceed-stream.mp3',
+      reconnect: true,
+      reconnectStreamed: true,
+      reconnectAtEof: true,
+      reconnectDelayMax: 30,
+      idleThreshold: 15000,
+      enabled: false,
+    });
+    calls.length = 0;
+
+    const unitFilePath = `/etc/systemd/system/${getSystemdServiceName(name)}.service`;
+    const oldFifo = oldFifoPathFor(name);
+    const newFifo = getFifoPath(name);
+    const restoreReadText = stubReadTextFile({
+      [unitFilePath]: `ExecStartPre=/bin/bash -c 'test -p ${oldFifo} || mkfifo -m 666 ${oldFifo}'\n`,
+    });
+    const regenerateArgs: any[] = [];
+    const restoreRegenerate = stubProtoFn('regenerateService', async (id: string) => {
+      regenerateArgs.push(id);
+    });
+
+    try {
+      await pipeSourceService.migrateFifoPaths();
+
+      assert.deepEqual(regenerateArgs, [pipe.id]);
+
+      const removeCalls = calls.filter(c => c.kind === 'config.removeStreamSourceByFifo');
+      assert.equal(removeCalls.length, 1);
+      assert.deepEqual(removeCalls[0].args, [oldFifo]);
+
+      const addCalls = calls.filter(c => c.kind === 'config.addStreamSource');
+      assert.equal(addCalls.length, 1);
+      assert.ok((addCalls[0].args[0] as string).includes(newFifo), `expected new URI to include ${newFifo}`);
+      assert.ok(!(addCalls[0].args[0] as string).includes(oldFifo), 'new URI must not reference the old path');
+    } finally {
+      restoreReadText();
+      restoreRegenerate();
+    }
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('migrateFifoPaths() skips an mpd pipe whose mpd.conf no longer references the old /tmp path (idempotent)', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  const restoreFs = stubFsPromises({
+    access: async (p: string) => {
+      if (p !== '/etc/mpd.conf') {
+        const err: any = new Error('ENOENT');
+        err.code = 'ENOENT';
+        throw err;
+      }
+    },
+    readFile: async () => 'existing mpd.conf content\n',
+  });
+  try {
+    const name = uniqueName('migrate-mpd-skip');
+    await pipeSourceService.create({
+      name,
+      type: 'mpd',
+      url: '',
+      reconnect: true,
+      reconnectStreamed: true,
+      reconnectAtEof: true,
+      reconnectDelayMax: 30,
+      idleThreshold: 15000,
+      enabled: true,
+    });
+    calls.length = 0;
+
+    const restoreReadText = stubReadTextFile({
+      '/etc/mpd.conf': `audio_output {\n\ttype\t\t"fifo"\n\tpath\t\t"${getFifoPath(name)}"\n}\n`,
+    });
+    let writeMpdCalls = 0;
+    let removeMpdCalls = 0;
+    const restoreWriteMpd = stubProtoFn('writeMpdOutput', async () => {
+      writeMpdCalls += 1;
+    });
+    const restoreRemoveMpd = stubProtoFn('removeMpdOutput', async () => {
+      removeMpdCalls += 1;
+    });
+
+    try {
+      await pipeSourceService.migrateFifoPaths();
+      assert.equal(writeMpdCalls, 0);
+      assert.equal(removeMpdCalls, 0);
+    } finally {
+      restoreReadText();
+      restoreWriteMpd();
+      restoreRemoveMpd();
+    }
+  } finally {
+    restorePlatform();
+    restoreFs();
+  }
+});
+
+test('migrateFifoPaths() migrates an mpd pipe still on the old /tmp path: calls removeMpdOutput(old) then writeMpdOutput(name, new) and restarts mpd', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  const restoreFs = stubFsPromises({
+    access: async (p: string) => {
+      if (p !== '/etc/mpd.conf') {
+        const err: any = new Error('ENOENT');
+        err.code = 'ENOENT';
+        throw err;
+      }
+    },
+    readFile: async () => 'existing mpd.conf content\n',
+  });
+  try {
+    const name = uniqueName('migrate-mpd-proceed');
+    await pipeSourceService.create({
+      name,
+      type: 'mpd',
+      url: '',
+      reconnect: true,
+      reconnectStreamed: true,
+      reconnectAtEof: true,
+      reconnectDelayMax: 30,
+      idleThreshold: 15000,
+      enabled: true,
+    });
+    calls.length = 0;
+
+    const oldFifo = oldFifoPathFor(name);
+    const newFifo = getFifoPath(name);
+    const restoreReadText = stubReadTextFile({
+      '/etc/mpd.conf': `audio_output {\n\ttype\t\t"fifo"\n\tpath\t\t"${oldFifo}"\n}\n`,
+    });
+    const removeArgs: any[] = [];
+    const writeArgs: any[] = [];
+    const restoreRemoveMpd = stubProtoFn('removeMpdOutput', async (fifo: string) => {
+      removeArgs.push(fifo);
+    });
+    const restoreWriteMpd = stubProtoFn('writeMpdOutput', async (n: string, fifo: string) => {
+      writeArgs.push([n, fifo]);
+    });
+
+    try {
+      await pipeSourceService.migrateFifoPaths();
+
+      assert.deepEqual(removeArgs, [oldFifo]);
+      assert.deepEqual(writeArgs, [[name, newFifo]]);
+
+      const mpdRestarts = calls.filter(c => c.kind === 'systemd.control' && c.args[0] === 'mpd.service' && c.args[1] === 'restart');
+      assert.equal(mpdRestarts.length, 1);
+    } finally {
+      restoreReadText();
+      restoreRemoveMpd();
+      restoreWriteMpd();
+    }
+  } finally {
+    restorePlatform();
+    restoreFs();
+  }
+});
+
+test('migrateFifoPaths() continues past one pipe throwing during migration and still migrates the rest, without itself throwing', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const failName = uniqueName('migrate-fail-pipe');
+    const okName = uniqueName('migrate-ok-pipe');
+    const failPipe = await pipeSourceService.create({
+      name: failName,
+      type: 'radio',
+      url: 'https://example.com/fail-stream.mp3',
+      reconnect: true,
+      reconnectStreamed: true,
+      reconnectAtEof: true,
+      reconnectDelayMax: 30,
+      idleThreshold: 15000,
+      enabled: false,
+    });
+    const okPipe = await pipeSourceService.create({
+      name: okName,
+      type: 'radio',
+      url: 'https://example.com/ok-stream.mp3',
+      reconnect: true,
+      reconnectStreamed: true,
+      reconnectAtEof: true,
+      reconnectDelayMax: 30,
+      idleThreshold: 15000,
+      enabled: false,
+    });
+    calls.length = 0;
+
+    const failUnitPath = `/etc/systemd/system/${getSystemdServiceName(failName)}.service`;
+    const okUnitPath = `/etc/systemd/system/${getSystemdServiceName(okName)}.service`;
+    const restoreReadText = stubReadTextFile({
+      [failUnitPath]: `ExecStartPre=/bin/bash -c 'mkfifo -m 666 ${oldFifoPathFor(failName)}'\n`,
+      [okUnitPath]: `ExecStartPre=/bin/bash -c 'mkfifo -m 666 ${oldFifoPathFor(okName)}'\n`,
+    });
+    const regenerateArgs: any[] = [];
+    const restoreRegenerate = stubProtoFn('regenerateService', async (id: string) => {
+      regenerateArgs.push(id);
+    });
+    const restoreRemoveSource = stubModuleFn(
+      configModule.configService,
+      'removeStreamSourceByFifo',
+      async (fifo: string) => {
+        calls.push({ kind: 'config.removeStreamSourceByFifo', args: [fifo] });
+        if (fifo === oldFifoPathFor(failName)) {
+          throw new Error('simulated snapserver.conf write failure for the failing pipe');
+        }
+      },
+    );
+
+    try {
+      // The whole migration run must resolve (not reject) even though one
+      // pipe's migration throws partway through.
+      await pipeSourceService.migrateFifoPaths();
+
+      // The failing pipe never got as far as regenerateService()...
+      assert.ok(!regenerateArgs.includes(failPipe.id), 'the failing pipe must not have reached regenerateService()');
+      // ...but the OK pipe, processed after it in the same loop, still did.
+      assert.ok(regenerateArgs.includes(okPipe.id), 'the healthy pipe after the failing one must still be migrated');
+    } finally {
+      restoreReadText();
+      restoreRegenerate();
+      restoreRemoveSource();
+    }
+  } finally {
+    restorePlatform();
   }
 });
