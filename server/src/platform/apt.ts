@@ -87,14 +87,31 @@ export async function remove(packages: string[]): Promise<void> {
 }
 
 /**
- * `dpkg -s <pkg>`, true on a zero exit (installed), false on a non-zero
- * exit (not installed / unknown package -- the ordinary, expected
- * `ExecError` `run()` rejects with in that case). This is a read, so unlike
- * the four mutating functions above it is NEVER sudo-prefixed, regardless
- * of `needsSudo()` -- mirrors the `activeState()`/`control()` split in
- * `platform/systemd.ts`. Also mirrors `activeState()` in only swallowing
- * `ExecError` (the expected "dpkg ran and said no") and rethrowing anything
- * else (e.g. `dpkg` itself missing) as a genuine failure.
+ * `dpkg -s <pkg>`, true on a zero exit (installed), false when `dpkg`
+ * actually ran and exited non-zero (not installed / unknown package). This
+ * is a read, so unlike the four mutating functions above it is NEVER
+ * sudo-prefixed, regardless of `needsSudo()` -- mirrors the
+ * `activeState()`/`control()` split in `platform/systemd.ts`.
+ *
+ * Distinguishing "not installed" from "couldn't even run dpkg": `run()`
+ * (see `platform/exec.ts`) wraps EVERY `execFile` callback error into an
+ * `ExecError`, including a spawn failure (e.g. `dpkg` missing from PATH,
+ * `ENOENT`) -- so `err instanceof ExecError` alone does NOT distinguish "not
+ * installed" from "dpkg itself couldn't be launched". `ExecError.exitCode`
+ * does: `exec.ts` only sets a numeric `exitCode` when Node's callback
+ * `error.code` is itself a number, which happens when the child process
+ * actually ran and exited with that code. A spawn failure surfaces a
+ * string `error.code` (`'ENOENT'`, `'EACCES'`, ...), which `exec.ts` maps to
+ * `exitCode: null`. So:
+ *   - `ExecError` with `exitCode !== null` -- dpkg ran and said no. Expected
+ *     "not installed" outcome -- return `false`.
+ *   - `ExecError` with `exitCode === null` -- dpkg never actually ran
+ *     (spawn failure, timeout, or maxBuffer kill). Genuine execution
+ *     failure -- rethrow, don't silently report "not installed".
+ *   - Anything not an `ExecError` at all -- can only happen from a
+ *     synchronous throw inside `run()`'s own `Promise` executor (e.g. a
+ *     caller passing malformed argument types to `execFile`), never from a
+ *     real dpkg invocation. Also rethrown, for the same reason.
  */
 export async function isInstalled(pkg: string): Promise<boolean> {
   assertValidPackageName(pkg);
@@ -102,7 +119,7 @@ export async function isInstalled(pkg: string): Promise<boolean> {
     await run('dpkg', ['-s', pkg]);
     return true;
   } catch (err) {
-    if (err instanceof ExecError) {
+    if (err instanceof ExecError && err.exitCode !== null) {
       return false;
     }
     throw err;

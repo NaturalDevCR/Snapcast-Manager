@@ -412,13 +412,36 @@ test('isInstalled() returns false when dpkg -s exits non-zero (package not insta
   }
 });
 
-test('isInstalled() rethrows non-ExecError failures (real execution errors, e.g. dpkg missing)', async () => {
+test('isInstalled() rethrows on a spawn failure (dpkg itself could not run, exitCode null)', async () => {
+  // Real `run()` semantics (see exec.ts): EVERY execFile callback error --
+  // including a spawn failure like `dpkg` missing from PATH (ENOENT) --
+  // rejects with an `ExecError`, not a raw `Error`. What actually
+  // distinguishes "dpkg ran and said not-installed" from "dpkg never ran
+  // at all" is `ExecError.exitCode`: null means the child process never
+  // produced a numeric exit code (exec.ts only special-cases that here).
   const restoreRun = stubRun(async () => {
-    throw new Error('ENOENT: dpkg not found');
+    throw new ExecError('dpkg', ['-s', 'ffmpeg'], null, '', '');
   });
   const restoreSudo = stubNeedsSudo(() => false);
   try {
-    await assert.rejects(() => isInstalled('ffmpeg'), /ENOENT/);
+    await assert.rejects(() => isInstalled('ffmpeg'), (err: unknown) => {
+      assert.ok(err instanceof ExecError);
+      assert.equal(err.exitCode, null);
+      return true;
+    });
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('isInstalled() rethrows non-ExecError failures (e.g. a synchronous throw inside run())', async () => {
+  const restoreRun = stubRun(async () => {
+    throw new Error('boom: malformed argv passed to execFile');
+  });
+  const restoreSudo = stubNeedsSudo(() => false);
+  try {
+    await assert.rejects(() => isInstalled('ffmpeg'), /boom/);
   } finally {
     restoreRun();
     restoreSudo();
