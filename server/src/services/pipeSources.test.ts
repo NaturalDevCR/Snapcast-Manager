@@ -863,7 +863,15 @@ test('migrateFifoPaths() skips an mpd pipe whose mpd.conf no longer references t
   }
 });
 
-test('migrateFifoPaths() migrates an mpd pipe still on the old /tmp path: calls removeMpdOutput(old) then writeMpdOutput(name, new) and restarts mpd', async () => {
+test('migrateFifoPaths() migrates an mpd pipe still on the old /tmp path: calls writeMpdOutput(name, new) BEFORE removeMpdOutput(old), then restarts mpd', async () => {
+  // Order matters here (see the Critical-finding fix in
+  // migrateOnePipeFifoPath()'s mpd branch, services/pipeSources.ts): the
+  // NEW block must be written before the OLD one is removed, so that a
+  // failure partway through never leaves mpd.conf referencing neither
+  // path. This test asserts both that the two calls happen (as the older
+  // version of this test already did) AND that they happen in that exact
+  // order, via one shared, order-preserving array rather than two
+  // independent ones.
   const calls: Call[] = [];
   const restorePlatform = stubAllPlatformCalls(calls);
   const restoreFs = stubFsPromises({
@@ -896,20 +904,25 @@ test('migrateFifoPaths() migrates an mpd pipe still on the old /tmp path: calls 
     const restoreReadText = stubReadTextFile({
       '/etc/mpd.conf': `audio_output {\n\ttype\t\t"fifo"\n\tpath\t\t"${oldFifo}"\n}\n`,
     });
-    const removeArgs: any[] = [];
-    const writeArgs: any[] = [];
+    const orderedCalls: Array<{ kind: 'write' | 'remove'; args: any[] }> = [];
     const restoreRemoveMpd = stubProtoFn('removeMpdOutput', async (fifo: string) => {
-      removeArgs.push(fifo);
+      orderedCalls.push({ kind: 'remove', args: [fifo] });
     });
     const restoreWriteMpd = stubProtoFn('writeMpdOutput', async (n: string, fifo: string) => {
-      writeArgs.push([n, fifo]);
+      orderedCalls.push({ kind: 'write', args: [n, fifo] });
     });
 
     try {
       await pipeSourceService.migrateFifoPaths();
 
-      assert.deepEqual(removeArgs, [oldFifo]);
-      assert.deepEqual(writeArgs, [[name, newFifo]]);
+      assert.deepEqual(
+        orderedCalls,
+        [
+          { kind: 'write', args: [name, newFifo] },
+          { kind: 'remove', args: [oldFifo] },
+        ],
+        'writeMpdOutput(new) must run BEFORE removeMpdOutput(old), not after',
+      );
 
       const mpdRestarts = calls.filter(c => c.kind === 'systemd.control' && c.args[0] === 'mpd.service' && c.args[1] === 'restart');
       assert.equal(mpdRestarts.length, 1);
@@ -923,6 +936,226 @@ test('migrateFifoPaths() migrates an mpd pipe still on the old /tmp path: calls 
     restoreFs();
   }
 });
+
+// ============================================================================
+// Critical review finding fix (Task 7 follow-up): migrateOnePipeFifoPath()'s
+// mpd branch used to call removeMpdOutput(oldFifo) BEFORE
+// writeMpdOutput(name, newFifo). If the write then failed, mpd.conf ended up
+// with NEITHER block, and detection (`content.includes(oldFifo)`) would
+// wrongly conclude "already migrated" forever, permanently and silently
+// losing the MPD audio output. The fix reorders to write-then-remove. These
+// two tests exercise the REAL writeMpdOutput()/removeMpdOutput()
+// implementations (not stubbed) against a single stateful fake mpd.conf, so
+// they prove actual file-content convergence, not just call order.
+// ============================================================================
+
+test(
+  'migrateOnePipeFifoPath() (mpd): removeMpdOutput failing AFTER writeMpdOutput succeeded leaves BOTH blocks ' +
+  'present (old still detected, safe retry converges to just the new block)',
+  async () => {
+    const calls: Call[] = [];
+    const restorePlatform = stubAllPlatformCalls(calls);
+    const restoreFs = stubFsPromises({
+      access: async (p: string) => {
+        if (p !== '/etc/mpd.conf') {
+          const err: any = new Error('ENOENT');
+          err.code = 'ENOENT';
+          throw err;
+        }
+      },
+      readFile: async () => 'existing mpd.conf content\n',
+    });
+    try {
+      const name = uniqueName('migrate-mpd-partial-fail');
+      await pipeSourceService.create({
+        name,
+        type: 'mpd',
+        url: '',
+        reconnect: true,
+        reconnectStreamed: true,
+        reconnectAtEof: true,
+        reconnectDelayMax: 30,
+        idleThreshold: 15000,
+        enabled: true,
+      });
+      calls.length = 0;
+
+      const oldFifo = oldFifoPathFor(name);
+      const newFifo = getFifoPath(name);
+
+      // A single mutable "disk" that both migrateOnePipeFifoPath()'s own
+      // detection (readTextFile) and the real writeMpdOutput()/
+      // removeMpdOutput() (via fs.readFile + installPrivilegedFile) read
+      // from and write to -- starts on the OLD path only, as a real
+      // pre-Task-7 installation's mpd.conf would.
+      let mpdConfContent = `audio_output {\n\ttype\t\t"fifo"\n\tname\t\t"${name}"\n\tpath\t\t"${oldFifo}"\n}\n`;
+
+      const restoreReadText = stubModuleFn(filesModule, 'readTextFile', async (p: string) => {
+        if (p === '/etc/mpd.conf') return mpdConfContent;
+        const err: any = new Error(`ENOENT: no such file or directory, open '${p}'`);
+        err.code = 'ENOENT';
+        throw err;
+      });
+      const restoreFsRead = stubModuleFn(fsPromises, 'readFile', async (p: string) => {
+        if (p === '/etc/mpd.conf') return mpdConfContent;
+        const err: any = new Error('ENOENT');
+        err.code = 'ENOENT';
+        throw err;
+      });
+
+      let installCallCount = 0;
+      // One-shot: only the 2nd installPrivilegedFile call EVER (removeMpdOutput's
+      // write, since writeMpdOutput's is 1st per the fix) fails. Using a
+      // separate flag (rather than re-testing installCallCount, which gets
+      // reset to count run 2's calls too) means run 2 genuinely succeeds
+      // end-to-end instead of hitting the same simulated failure again.
+      let failNextRemoveWrite = true;
+      const restoreInstall = stubModuleFn(filesModule, 'installPrivilegedFile', async (destPath: string, content: string) => {
+        installCallCount += 1;
+        if (installCallCount === 2 && failNextRemoveWrite) {
+          failNextRemoveWrite = false;
+          // The 2nd installPrivilegedFile call in a migration run is
+          // removeMpdOutput's write (writeMpdOutput's is 1st, per the fix).
+          // Simulate it failing AFTER the 1st (write) already succeeded.
+          throw new Error('simulated failure removing the old mpd.conf block');
+        }
+        mpdConfContent = content;
+      });
+
+      try {
+        // Run 1: writeMpdOutput (install #1) succeeds and adds the NEW
+        // block; removeMpdOutput (install #2) throws before removing the
+        // OLD block. migrateFifoPaths()'s per-pipe try/catch swallows it
+        // and does not throw.
+        await pipeSourceService.migrateFifoPaths();
+
+        assert.equal(installCallCount, 2, 'expected both the write and the (failing) remove to have been attempted');
+        assert.ok(mpdConfContent.includes(oldFifo), 'old block must still be present after the failed remove');
+        assert.ok(mpdConfContent.includes(newFifo), 'new block must have been written before the failure');
+
+        // Detection must still see the old path present -- this is exactly
+        // what the reorder fix guarantees: the OLD order could leave
+        // NEITHER block present, and detection would wrongly conclude
+        // "already migrated", permanently losing this pipe's MPD output.
+        const contentAfterPartialFailure = await filesModule.readTextFile('/etc/mpd.conf');
+        assert.ok(contentAfterPartialFailure.includes(oldFifo), 'detection must still see the old path after a partial failure');
+
+        // Run 2: installPrivilegedFile now succeeds normally. Migration
+        // must proceed again (old path still detected) and fully converge
+        // this time to just the new block.
+        installCallCount = 0;
+        await pipeSourceService.migrateFifoPaths();
+
+        assert.equal(installCallCount, 2, 'expected the successful retry to write the new block and remove the old one');
+        assert.ok(!mpdConfContent.includes(oldFifo), 'old block must be gone after the successful retry converges');
+        assert.ok(mpdConfContent.includes(newFifo), 'new block must still be present after the successful retry');
+      } finally {
+        restoreReadText();
+        restoreFsRead();
+        restoreInstall();
+      }
+    } finally {
+      restorePlatform();
+      restoreFs();
+    }
+  },
+);
+
+test(
+  'migrateOnePipeFifoPath() (mpd): writeMpdOutput failing on the FIRST step leaves mpd.conf untouched and the ' +
+  'old path still correctly detected as needing migration',
+  async () => {
+    const calls: Call[] = [];
+    const restorePlatform = stubAllPlatformCalls(calls);
+    const restoreFs = stubFsPromises({
+      access: async (p: string) => {
+        if (p !== '/etc/mpd.conf') {
+          const err: any = new Error('ENOENT');
+          err.code = 'ENOENT';
+          throw err;
+        }
+      },
+      readFile: async () => 'existing mpd.conf content\n',
+    });
+    try {
+      const name = uniqueName('migrate-mpd-write-fail');
+      await pipeSourceService.create({
+        name,
+        type: 'mpd',
+        url: '',
+        reconnect: true,
+        reconnectStreamed: true,
+        reconnectAtEof: true,
+        reconnectDelayMax: 30,
+        idleThreshold: 15000,
+        enabled: true,
+      });
+      calls.length = 0;
+
+      const oldFifo = oldFifoPathFor(name);
+      const newFifo = getFifoPath(name);
+      const originalContent = `audio_output {\n\ttype\t\t"fifo"\n\tname\t\t"${name}"\n\tpath\t\t"${oldFifo}"\n}\n`;
+      let mpdConfContent = originalContent;
+
+      const restoreReadText = stubModuleFn(filesModule, 'readTextFile', async (p: string) => {
+        if (p === '/etc/mpd.conf') return mpdConfContent;
+        const err: any = new Error(`ENOENT: no such file or directory, open '${p}'`);
+        err.code = 'ENOENT';
+        throw err;
+      });
+      const restoreFsRead = stubModuleFn(fsPromises, 'readFile', async (p: string) => {
+        if (p === '/etc/mpd.conf') return mpdConfContent;
+        const err: any = new Error('ENOENT');
+        err.code = 'ENOENT';
+        throw err;
+      });
+
+      let installCallCount = 0;
+      // One-shot: only the 1st installPrivilegedFile call EVER (writeMpdOutput's
+      // write, per the fix) fails. See the sibling test above for why a
+      // separate flag (not just re-testing installCallCount, which resets
+      // per run) is needed for run 2 to genuinely succeed.
+      let failNextWrite = true;
+      const restoreInstall = stubModuleFn(filesModule, 'installPrivilegedFile', async (destPath: string, content: string) => {
+        installCallCount += 1;
+        if (installCallCount === 1 && failNextWrite) {
+          failNextWrite = false;
+          // The very first install call in a migration run is now
+          // writeMpdOutput's (per the fix) -- simulate IT failing, the
+          // case that used to be silently fine under the old order too,
+          // confirmed still fine here.
+          throw new Error('simulated mpd.conf write failure on the first step');
+        }
+        mpdConfContent = content;
+      });
+
+      try {
+        await pipeSourceService.migrateFifoPaths();
+
+        assert.equal(installCallCount, 1, 'removeMpdOutput must never be reached when writeMpdOutput itself fails first');
+        assert.equal(mpdConfContent, originalContent, 'mpd.conf must be completely untouched when the first step fails');
+        assert.ok(!mpdConfContent.includes(newFifo), 'the new block must never have been written');
+
+        const contentAfterFailure = await filesModule.readTextFile('/etc/mpd.conf');
+        assert.ok(contentAfterFailure.includes(oldFifo), 'detection must still see the old path needing migration');
+
+        // A subsequent successful run still converges normally.
+        installCallCount = 0;
+        await pipeSourceService.migrateFifoPaths();
+        assert.equal(installCallCount, 2, 'expected the successful retry to write the new block and remove the old one');
+        assert.ok(!mpdConfContent.includes(oldFifo));
+        assert.ok(mpdConfContent.includes(newFifo));
+      } finally {
+        restoreReadText();
+        restoreFsRead();
+        restoreInstall();
+      }
+    } finally {
+      restorePlatform();
+      restoreFs();
+    }
+  },
+);
 
 test('migrateFifoPaths() continues past one pipe throwing during migration and still migrates the rest, without itself throwing', async () => {
   const calls: Call[] = [];

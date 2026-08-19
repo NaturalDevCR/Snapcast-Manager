@@ -594,8 +594,35 @@ export class PipeSourceService {
       // (new) getFifoPath() and restarts/enables per pipe.enabled.
       await this.regenerateService(pipe.id);
     } else {
-      await this.removeMpdOutput(oldFifo);
+      // Order matters for idempotent convergence under a mid-migration
+      // failure (Task 7 critical review finding): write the NEW
+      // audio_output block first, remove the OLD one second.
+      //
+      // writeMpdOutput(pipe.name, newFifo) internally calls
+      // removeMpdOutputBlock(content, newFifo) before inserting -- i.e. it
+      // only strips a pre-existing block matching newFifo (there isn't one
+      // yet), never one matching oldFifo. So this call is safe to run
+      // while oldFifo's block is still present: it leaves that block
+      // completely untouched and appends the new one alongside it.
+      //
+      // If writeMpdOutput() throws (mpd.conf missing, permission error,
+      // disk full, ...), nothing has changed yet -- oldFifo's block is
+      // still there, so this function's own detection
+      // (`content.includes(oldFifo)`) correctly reports "still needs
+      // migration" on the next boot and the per-pipe try/catch in
+      // migrateFifoPaths() lets other pipes continue.
+      //
+      // If writeMpdOutput() succeeds but the subsequent removeMpdOutput()
+      // throws, mpd.conf is left with BOTH blocks present -- redundant
+      // (MPD may briefly have two fifo outputs for this pipe) but not
+      // silently broken: detection still sees oldFifo referenced and will
+      // retry the removal on the next boot, eventually converging to just
+      // the new block. This is the opposite of the old order, which could
+      // leave mpd.conf with NEITHER block (the old one removed, the new
+      // one never written) and have detection wrongly conclude "already
+      // migrated" forever.
       await this.writeMpdOutput(pipe.name, newFifo);
+      await this.removeMpdOutput(oldFifo);
       await systemdControl(MPD_UNIT, 'restart').catch(() => {});
     }
 
