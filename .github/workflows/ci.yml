@@ -46,6 +46,10 @@ jobs:
           npm ci
           npm run build
 
+      - name: Test client
+        working-directory: ./client
+        run: npm test
+
   lint:
     # Not matrixed across Node versions like the server/client jobs: ESLint's
     # findings don't vary by Node runtime, so running it twice would only add
