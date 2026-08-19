@@ -52,7 +52,8 @@ router.put('/bulk', async (req, res) => {
 // POST /api/watchdog - Add a watchdog
 router.post('/', async (req, res) => {
   try {
-    let { name, ports, port, description, enabled, autoKillDuplicates } = req.body;
+    const { name, port, description, enabled, autoKillDuplicates } = req.body;
+    let { ports } = req.body;
     if (!ports && port) ports = [port];
     const validPorts = sanitizePorts(ports);
     if (!name || !validPorts) {

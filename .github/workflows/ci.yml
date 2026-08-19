@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install, build & test server
+        working-directory: ./server
+        run: |
+          npm ci
+          npm run build
+          npm test
+
+  client:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install & build client
+        working-directory: ./client
+        run: |
+          npm ci
+          npm run build
+
+  lint:
+    # Not matrixed across Node versions like the server/client jobs: ESLint's
+    # findings don't vary by Node runtime, so running it twice would only add
+    # CI time without adding coverage. Uses Node 24 (this repo's primary
+    # target, per the release workflow) to install and run it once.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install root devDependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+  no-shell-injection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Warning-only for now: this repo currently builds shell commands via
+      # template-literal string interpolation throughout server/src (see
+      # docs/superpowers/plans/2026-08-18-professional-hardening.md Stage 1),
+      # so the check is expected to find matches today. Stage 1 migrates
+      # those call sites into server/src/platform/ (using spawn() with an
+      # argv array instead of a shell string) and, once that's done, this
+      # step should be changed to fail the build instead of only warning.
+      - name: Check for shell-injection-prone patterns (warning only)
+        run: |
+          ./scripts/check-no-shell-injection.sh || echo "::warning::Shell injection pattern found — see docs/superpowers/plans/2026-08-18-professional-hardening.md Stage 1"

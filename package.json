@@ -5,6 +5,16 @@
   "scripts": {
     "bump:patch": "bash scripts/bump.sh patch",
     "bump:minor": "bash scripts/bump.sh minor",
-    "bump:major": "bash scripts/bump.sh major"
+    "bump:major": "bash scripts/bump.sh major",
+    "lint": "eslint server/src client/src",
+    "format": "prettier --write \"server/src/**/*.ts\" \"client/src/**/*.{ts,vue}\"",
+    "format:check": "prettier --check \"server/src/**/*.ts\" \"client/src/**/*.{ts,vue}\""
+  },
+  "devDependencies": {
+    "eslint": "^10.8.1",
+    "eslint-plugin-vue": "^10.10.0",
+    "prettier": "^3.9.6",
+    "typescript-eslint": "^8.67.0",
+    "vue-eslint-parser": "^10.4.1"
   }
 }

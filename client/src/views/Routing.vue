@@ -138,8 +138,8 @@ const generateBezierPath = (startX: number, startY: number, endX: number, endY: 
 
 const activeConnections = computed(() => {
     // Dependency on connectionsVersion to force redraw
-    connectionsVersion.value;
-    
+    void connectionsVersion.value;
+
     if (!snapcastStore.status || !containerRef.value) return [];
     
     const connections: any[] = [];

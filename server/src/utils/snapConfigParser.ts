@@ -1,5 +1,3 @@
-import ini from 'ini';
-
 export interface SnapServerConfig {
   [section: string]: {
     [key: string]: string | string[] | boolean | number;
