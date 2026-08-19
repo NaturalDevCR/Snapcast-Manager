@@ -1,9 +1,37 @@
-import { exec } from 'child_process';
-import util from 'util';
-import fs from 'fs/promises';
-import db from '../database';
+// Shell-free snapclient-instance management, built on top of
+// `platform/exec.ts` / `platform/systemd.ts` / `platform/files.ts` (Tasks
+// 4-5, already merged) -- see those files' headers for the shell-free
+// contract this module relies on.
+//
+// SECURITY: `:id` (arrives straight from the URL path via
+// routes/snapclientInstances.ts) MUST NEVER be trusted on its own. It used
+// to be interpolated directly into `systemctl .../journalctl .../rm ...`
+// shell command strings run as root, which was a real, currently-
+// exploitable root command injection (`DELETE /api/snapclient-instances/%3B%20rm%20-rf%20%2F%20%23`
+// ran `; rm -rf / #` as root -- see the Task 8 brief / design-spec finding
+// #2). Every function below that does something privileged with an `id`
+// (deleteInstance, controlInstance, getInstanceStatus, getInstanceLogs,
+// updateInstance) now calls `getRow(id)` FIRST and bails out (see that
+// method's docstring for the chosen not-found convention) BEFORE building
+// any unit name or calling any platform function. An attacker-supplied id
+// that isn't a real row's id can never reach a systemctl/rm/journalctl
+// call -- this is a complete check because these are the app's OWN
+// instances, created through its OWN API (unlike Task 6's
+// `existingServiceName`, there is no external discovery scan needed here).
+// `assertValidUnitName()` is still applied to every derived unit name as
+// defense in depth, matching the pattern established in Tasks 6-7.
 
-const execAsync = util.promisify(exec);
+import { randomUUID } from 'crypto';
+import db from '../database';
+import { run, needsSudo } from '../platform/exec';
+import {
+  control as systemdControl,
+  activeState,
+  daemonReload,
+  logs as systemdLogs,
+  assertValidUnitName,
+} from '../platform/systemd';
+import { installPrivilegedFile } from '../platform/files';
 
 export interface SnapclientInstance {
   id: string;
@@ -42,6 +70,11 @@ function envFileName(id: string): string {
   return `${ENV_DIR}/${id}.env`;
 }
 
+/** Bare-plus-suffix systemd unit name for a given instance id. */
+function unitName(id: string): string {
+  return `snapclient-manager-${id}.service`;
+}
+
 function buildServiceContent(instance: Omit<SnapclientInstance, 'status'>): string {
   return `[Unit]
 Description=Snapcast client - ${instance.name}
@@ -70,41 +103,72 @@ function buildEnvContent(instance: Omit<SnapclientInstance, 'status'>): string {
 }
 
 export class SnapclientInstanceService {
-  /** Returns 'sudo ' when not root, or '' when already root (e.g. on bare Debian). */
-  private get SUDO(): string {
-    return (process as any).getuid?.() === 0 ? '' : 'sudo ';
+  /**
+   * Resolves `id` against the database FIRST, before any privileged
+   * operation builds a unit name from it. Returns the raw DB row, or
+   * `null` if no such instance exists.
+   *
+   * Not-found convention (chosen for this file, applied consistently
+   * across all five id-taking functions): return `null` / `false`, never
+   * throw. `updateInstance()` already established this convention before
+   * this task (`if (!row) return null`); `deleteInstance()` and
+   * `controlInstance()` (both previously `Promise<void>`) now return
+   * `Promise<boolean>` (`false` = not found) instead, and
+   * `getInstanceStatus()`/`getInstanceLogs()` now return `string | null`
+   * (`null` = not found). This mirrors the existing, lower-risk contract
+   * already in place for `updateInstance()` rather than introducing a new
+   * throw-based convention for the other four -- see the Task 8 report for
+   * the full rationale and the corresponding route-layer changes (every
+   * one of these five now maps its "not found" signal to HTTP 404).
+   */
+  private getRow(id: string): any | null {
+    const row = db.prepare('SELECT * FROM snapclient_instances WHERE id = ?').get(id);
+    return row ?? null;
   }
 
-  private async run(cmd: string): Promise<string> {
+  /** Best-effort `mkdir -p ENV_DIR`, sudo-prefixed via argv when needed. */
+  private async ensureEnvDir(): Promise<void> {
     try {
-      const { stdout, stderr } = await execAsync(cmd);
-      if (stderr) console.warn(`[snapclientInstances] stderr: ${stderr}`);
-      return stdout;
-    } catch (err: any) {
-      console.error(`[snapclientInstances] Error: ${cmd}`, err.message);
-      throw err;
+      if (needsSudo()) {
+        await run('sudo', ['mkdir', '-p', ENV_DIR]);
+      } else {
+        await run('mkdir', ['-p', ENV_DIR]);
+      }
+    } catch (err) {
+      console.warn(`[snapclientInstances] Could not create ${ENV_DIR}:`, err);
     }
   }
 
   private async writeFiles(instance: Omit<SnapclientInstance, 'status'>): Promise<void> {
-    const tmpEnv = `/tmp/snapclient-${instance.id}.env`;
-    const tmpSvc = `/tmp/snapclient-manager-${instance.id}.service`;
-
-    await fs.writeFile(tmpEnv, buildEnvContent(instance), 'utf-8');
-    await fs.writeFile(tmpSvc, buildServiceContent(instance), 'utf-8');
-
-    await this.run(`${this.SUDO}mkdir -p ${ENV_DIR}`);
-    await this.run(`${this.SUDO}mv ${tmpEnv} ${envFileName(instance.id)}`);
-    await this.run(`${this.SUDO}chmod 644 ${envFileName(instance.id)}`);
-    await this.run(`${this.SUDO}mv ${tmpSvc} ${serviceFileName(instance.id)}`);
-    await this.run(`${this.SUDO}chmod 644 ${serviceFileName(instance.id)}`);
-    await this.run(`${this.SUDO}systemctl daemon-reload`);
+    await this.ensureEnvDir();
+    await installPrivilegedFile(envFileName(instance.id), buildEnvContent(instance), { mode: 0o644 });
+    await installPrivilegedFile(serviceFileName(instance.id), buildServiceContent(instance), { mode: 0o644 });
+    await daemonReload();
   }
 
   private async removeFiles(id: string): Promise<void> {
-    await this.run(`${this.SUDO}rm -f ${envFileName(id)}`).catch(() => {});
-    await this.run(`${this.SUDO}rm -f ${serviceFileName(id)}`).catch(() => {});
-    await this.run(`${this.SUDO}systemctl daemon-reload`).catch(() => {});
+    const sudo = needsSudo();
+    const envPath = envFileName(id);
+    const svcPath = serviceFileName(id);
+    try {
+      if (sudo) {
+        await run('sudo', ['rm', '-f', envPath]);
+      } else {
+        await run('rm', ['-f', envPath]);
+      }
+    } catch {
+      // best-effort, matches pre-migration .catch(() => {}) behavior
+    }
+    try {
+      if (sudo) {
+        await run('sudo', ['rm', '-f', svcPath]);
+      } else {
+        await run('rm', ['-f', svcPath]);
+      }
+    } catch {
+      // best-effort, matches pre-migration .catch(() => {}) behavior
+    }
+    await daemonReload().catch(() => {});
   }
 
   /** Returns the next available sequential instance number. */
@@ -124,12 +188,18 @@ export class SnapclientInstanceService {
       hostId: r.host_id,
       instanceNum: r.instance_num ?? 1,
       enabled: r.enabled === 1,
-      status: await this.getInstanceStatus(r.id),
+      status: (await this.getInstanceStatus(r.id)) ?? 'unknown',
     })));
   }
 
   async createInstance(data: { name: string; host: string; port: number; soundcard: string; hostId?: string }): Promise<SnapclientInstance> {
-    const id = `inst-${Date.now()}`;
+    // randomUUID() (Task 8): the previous `inst-${Date.now()}` scheme could
+    // collide when two instances were created within the same millisecond,
+    // or across a clock change. No migration of existing rows is needed --
+    // this only changes what NEW rows get; existing `inst-<timestamp>` ids
+    // keep working unchanged (their unit/env files are already named after
+    // those ids and nothing here renames existing files).
+    const id = randomUUID();
     const instanceNum = this.getNextInstanceNum();
     db.prepare(
       'INSERT INTO snapclient_instances (id, name, host, port, soundcard, host_id, instance_num) VALUES (?, ?, ?, ?, ?, ?, ?)'
@@ -147,16 +217,18 @@ export class SnapclientInstanceService {
     };
 
     await this.writeFiles(instance);
-    await this.run(`${this.SUDO}systemctl enable snapclient-manager-${id}`).catch(() => {});
-    await this.run(`${this.SUDO}systemctl start snapclient-manager-${id}`).catch(err => {
+    const unit = unitName(id);
+    assertValidUnitName(unit);
+    await systemdControl(unit, 'enable').catch(() => {});
+    await systemdControl(unit, 'start').catch(err => {
       console.warn(`Instance ${id} start warning: ${err.message}`);
     });
 
-    return { ...instance, status: await this.getInstanceStatus(id) };
+    return { ...instance, status: (await this.getInstanceStatus(id)) ?? 'unknown' };
   }
 
   async updateInstance(id: string, data: Partial<{ name: string; host: string; port: number; soundcard: string; hostId: string }>): Promise<SnapclientInstance | null> {
-    const row = db.prepare('SELECT * FROM snapclient_instances WHERE id = ?').get(id) as any;
+    const row = this.getRow(id);
     if (!row) return null;
 
     const updated: Omit<SnapclientInstance, 'status'> = {
@@ -175,43 +247,64 @@ export class SnapclientInstanceService {
     ).run(updated.name, updated.host, updated.port, updated.soundcard, updated.hostId, id);
 
     await this.writeFiles(updated);
-    await this.run(`${this.SUDO}systemctl restart snapclient-manager-${id}`).catch(() => {});
+    const unit = unitName(id);
+    assertValidUnitName(unit);
+    await systemdControl(unit, 'restart').catch(() => {});
 
-    return { ...updated, status: await this.getInstanceStatus(id) };
+    return { ...updated, status: (await this.getInstanceStatus(id)) ?? 'unknown' };
   }
 
-  async deleteInstance(id: string): Promise<void> {
-    await this.run(`${this.SUDO}systemctl stop snapclient-manager-${id}`).catch(() => {});
-    await this.run(`${this.SUDO}systemctl disable snapclient-manager-${id}`).catch(() => {});
+  /** Returns `false` if `id` does not match a real instance (see `getRow()`), `true` on success. */
+  async deleteInstance(id: string): Promise<boolean> {
+    const row = this.getRow(id);
+    if (!row) return false;
+
+    const unit = unitName(id);
+    assertValidUnitName(unit);
+    await systemdControl(unit, 'stop').catch(() => {});
+    await systemdControl(unit, 'disable').catch(() => {});
     await this.removeFiles(id);
     db.prepare('DELETE FROM snapclient_instances WHERE id = ?').run(id);
+    return true;
   }
 
-  async controlInstance(id: string, action: 'start' | 'stop' | 'restart' | 'enable' | 'disable'): Promise<void> {
-    await this.run(`${this.SUDO}systemctl ${action} snapclient-manager-${id}`);
+  /** Returns `false` if `id` does not match a real instance (see `getRow()`), `true` on success. */
+  async controlInstance(id: string, action: 'start' | 'stop' | 'restart' | 'enable' | 'disable'): Promise<boolean> {
+    const row = this.getRow(id);
+    if (!row) return false;
+
+    const unit = unitName(id);
+    assertValidUnitName(unit);
+    await systemdControl(unit, action);
+    return true;
   }
 
-  async getInstanceStatus(id: string): Promise<string> {
-    try {
-      const { stdout } = await execAsync(`systemctl is-active snapclient-manager-${id}`);
-      return stdout.trim();
-    } catch (err: any) {
-      if (err.stdout) return err.stdout.trim();
-      return 'inactive';
-    }
+  /** Returns `null` if `id` does not match a real instance (see `getRow()`). */
+  async getInstanceStatus(id: string): Promise<string | null> {
+    const row = this.getRow(id);
+    if (!row) return null;
+
+    const unit = unitName(id);
+    assertValidUnitName(unit);
+    return activeState(unit);
   }
 
-  async getInstanceLogs(id: string): Promise<string> {
-    try {
-      const cmd = `${this.SUDO}journalctl -u snapclient-manager-${id} -n 100 --no-pager`;
-      return await this.run(cmd);
-    } catch (err: any) {
-      try {
-        return await this.run(`journalctl -u snapclient-manager-${id} -n 100 --no-pager`);
-      } catch {
-        return `Failed to retrieve logs: ${err.message}`;
-      }
-    }
+  /**
+   * Returns `null` if `id` does not match a real instance (see `getRow()`).
+   *
+   * `platform/systemd.ts`'s `logs()` already applies `needsSudo()`
+   * internally to its `journalctl` call (see that file's `journalctl()`
+   * helper) -- the old sudo-then-fallback-without-sudo retry that used to
+   * live in this function is therefore unnecessary and has been dropped,
+   * not reimplemented on top.
+   */
+  async getInstanceLogs(id: string): Promise<string | null> {
+    const row = this.getRow(id);
+    if (!row) return null;
+
+    const unit = unitName(id);
+    assertValidUnitName(unit);
+    return systemdLogs(unit, 100);
   }
 
   /** Returns true if the device is an audio output (not HDMI/SPDIF/DisplayPort). */
@@ -243,8 +336,8 @@ export class SnapclientInstanceService {
 
   private async getDevicesViaAplay(): Promise<AudioDevice[]> {
     try {
-      const output = await this.run('aplay -l 2>/dev/null');
-      return this.parseAplayOutput(output);
+      const { stdout } = await run('aplay', ['-l']);
+      return this.parseAplayOutput(stdout);
     } catch {
       return [];
     }
@@ -252,11 +345,11 @@ export class SnapclientInstanceService {
 
   private async getDevicesViaProc(): Promise<AudioDevice[]> {
     try {
-      const [pcmOutput, cardsOutput] = await Promise.all([
-        this.run('cat /proc/asound/pcm 2>/dev/null').catch(() => ''),
-        this.run('cat /proc/asound/cards 2>/dev/null').catch(() => ''),
+      const [pcmResult, cardsResult] = await Promise.all([
+        run('cat', ['/proc/asound/pcm']).catch(() => ({ stdout: '', stderr: '' })),
+        run('cat', ['/proc/asound/cards']).catch(() => ({ stdout: '', stderr: '' })),
       ]);
-      return this.parseProcAsound(pcmOutput, cardsOutput);
+      return this.parseProcAsound(pcmResult.stdout, cardsResult.stdout);
     } catch {
       return [];
     }
@@ -318,7 +411,13 @@ export class SnapclientInstanceService {
     return hwId.replace(/^hw:CARD=/, '').split(',')[0];
   }
 
-  /** Validate a card ID / control name to prevent command injection. */
+  /**
+   * Validate a card ID / control name to prevent command injection. Kept
+   * unchanged by Task 8 (not being replaced) -- it's reasonable input
+   * validation on its own, and now also acts purely as an input-shape gate
+   * since these values are passed to `platform/exec.ts`'s `run()` as argv
+   * elements (no shell in the middle to reinterpret them either way).
+   */
   private isValidAlsaId(value: string): boolean {
     return /^[\w\-. ]+$/.test(value);
   }
@@ -330,7 +429,7 @@ export class SnapclientInstanceService {
   async listAlsaControls(cardId: string): Promise<AlsaControl[]> {
     if (!this.isValidAlsaId(cardId)) return [];
     try {
-      const raw = await this.run(`amixer -D hw:CARD=${cardId} scontrols 2>/dev/null`).catch(() => '');
+      const { stdout: raw } = await run('amixer', ['-D', `hw:CARD=${cardId}`, 'scontrols']).catch(() => ({ stdout: '', stderr: '' }));
       const nameRegex = /Simple mixer control '([^']+)'/g;
       const controls: AlsaControl[] = [];
       let m: RegExpExecArray | null;
@@ -348,7 +447,7 @@ export class SnapclientInstanceService {
   private async getAlsaPercent(cardId: string, controlName: string): Promise<number | null> {
     if (!this.isValidAlsaId(controlName)) return null;
     try {
-      const out = await this.run(`amixer -D hw:CARD=${cardId} sget '${controlName}' 2>/dev/null`);
+      const { stdout: out } = await run('amixer', ['-D', `hw:CARD=${cardId}`, 'sget', controlName]);
       // Only include controls that have playback volume (pvolume capability or Playback N [X%])
       if (!out.match(/Playback \d+ \[\d+%\]/) && !out.includes('pvolume')) return null;
       const match = out.match(/\[(\d+)%\]/);
@@ -366,16 +465,25 @@ export class SnapclientInstanceService {
       throw new Error('Invalid cardId or controlName');
     }
     const pct = Math.min(100, Math.max(0, Math.round(percent)));
-    await this.run(`amixer -D hw:CARD=${cardId} sset '${controlName}' ${pct}% 2>/dev/null`);
+    await run('amixer', ['-D', `hw:CARD=${cardId}`, 'sset', controlName, `${pct}%`]);
     // Persist so settings survive reboots
-    await this.run(`${this.SUDO}alsactl store 2>/dev/null`).catch(() => {});
+    const sudo = needsSudo();
+    try {
+      if (sudo) {
+        await run('sudo', ['alsactl', 'store']);
+      } else {
+        await run('alsactl', ['store']);
+      }
+    } catch {
+      // best-effort, matches pre-migration .catch(() => {}) behavior
+    }
   }
 
   // Called after snapclient package install to disable the default service
   async postInstallSetup(): Promise<void> {
-    await this.run(`${this.SUDO}systemctl stop snapclient 2>/dev/null || true`).catch(() => {});
-    await this.run(`${this.SUDO}systemctl disable snapclient 2>/dev/null || true`).catch(() => {});
-    await this.run(`${this.SUDO}mkdir -p ${ENV_DIR}`).catch(() => {});
+    await systemdControl('snapclient.service', 'stop').catch(() => {});
+    await systemdControl('snapclient.service', 'disable').catch(() => {});
+    await this.ensureEnvDir();
   }
 }
 

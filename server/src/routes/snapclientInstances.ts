@@ -59,7 +59,8 @@ router.put('/:id', async (req: Request, res: Response) => {
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    await snapclientInstanceService.deleteInstance(req.params.id);
+    const deleted = await snapclientInstanceService.deleteInstance(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Instance not found' });
     res.json({ message: 'Instance deleted' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -99,7 +100,8 @@ router.post('/:id/:action', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Invalid action' });
   }
   try {
-    await snapclientInstanceService.controlInstance(req.params.id, action as any);
+    const ok = await snapclientInstanceService.controlInstance(req.params.id, action as any);
+    if (!ok) return res.status(404).json({ error: 'Instance not found' });
     const status = await snapclientInstanceService.getInstanceStatus(req.params.id);
     res.json({ message: `Instance ${action}ed`, status });
   } catch (err: any) {
@@ -110,6 +112,7 @@ router.post('/:id/:action', async (req: Request, res: Response) => {
 router.get('/:id/logs', async (req: Request, res: Response) => {
   try {
     const logs = await snapclientInstanceService.getInstanceLogs(req.params.id);
+    if (logs === null) return res.status(404).json({ error: 'Instance not found' });
     res.json({ logs });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
