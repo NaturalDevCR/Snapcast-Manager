@@ -138,6 +138,20 @@ test('control() validates the unit name before calling run()', async () => {
   await assert.rejects(() => control('not a valid unit; rm -rf /', 'start'));
 });
 
+test('control() rejects an invalid unit name without calling run()', async () => {
+  let called = false;
+  const restoreRun = stubRun(async (_bin: string, _args: string[]) => {
+    called = true;
+    return { stdout: '', stderr: '' };
+  });
+  try {
+    await assert.rejects(() => control('not a valid unit; rm -rf /', 'start'));
+    assert.equal(called, false);
+  } finally {
+    restoreRun();
+  }
+});
+
 test('control() calls systemctl via an argv array (never a shell string)', async () => {
   const calls: Call[] = [];
   const restoreRun = stubRunRecording(calls);
@@ -176,6 +190,21 @@ test('daemonReload() calls systemctl daemon-reload', async () => {
     await daemonReload();
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0], { bin: 'systemctl', args: ['daemon-reload'] });
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('daemonReload() prefixes with sudo via argv when needsSudo() is true', async () => {
+  const calls: Call[] = [];
+  const restoreRun = stubRunRecording(calls);
+  const restoreSudo = stubNeedsSudo(() => true);
+  try {
+    await daemonReload();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].bin, 'sudo');
+    assert.deepEqual(calls[0].args, ['systemctl', 'daemon-reload']);
   } finally {
     restoreRun();
     restoreSudo();
@@ -253,8 +282,56 @@ test('activeState() rethrows non-ExecError failures (real execution errors)', as
   }
 });
 
-test('activeState() validates the unit name before calling run()', async () => {
-  await assert.rejects(() => activeState('bad; rm -rf /'));
+test('activeState() rejects an invalid unit name without calling run()', async () => {
+  let called = false;
+  const restoreRun = stubRun(async (_bin: string, _args: string[]) => {
+    called = true;
+    return { stdout: '', stderr: '' };
+  });
+  try {
+    await assert.rejects(() => activeState('bad; rm -rf /'));
+    assert.equal(called, false);
+  } finally {
+    restoreRun();
+  }
+});
+
+// Regression test: activeState()/isActive() must call `systemctl is-active`
+// WITHOUT a sudo prefix even when needsSudo() is true -- unlike
+// control()/daemonReload()/logs(), which DO get sudo-prefixed. This is the
+// pre-existing codebase pattern (see server/src/services/pipeSources.ts,
+// where `is-active` calls never get a SUDO prefix but mutating calls do); a
+// deployment with passwordless sudo scoped only to mutating subcommands
+// would start failing/hanging on status checks that used to work unprefixed
+// if this regressed.
+test('activeState() never applies sudo, even when needsSudo() is true', async () => {
+  const calls: Call[] = [];
+  const restoreRun = stubRunRecording(calls);
+  const restoreSudo = stubNeedsSudo(() => true);
+  try {
+    await activeState('snapserver.service');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].bin, 'systemctl');
+    assert.deepEqual(calls[0].args, ['is-active', 'snapserver.service']);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('isActive() never applies sudo, even when needsSudo() is true', async () => {
+  const calls: Call[] = [];
+  const restoreRun = stubRunRecording(calls);
+  const restoreSudo = stubNeedsSudo(() => true);
+  try {
+    await isActive('snapserver.service');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].bin, 'systemctl');
+    assert.deepEqual(calls[0].args, ['is-active', 'snapserver.service']);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
 });
 
 test('isActive() returns true only when activeState() is "active"', async () => {

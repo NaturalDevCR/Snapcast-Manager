@@ -49,8 +49,22 @@ export function assertValidUnitName(unit: string): void {
   }
 }
 
-function systemctl(args: string[]) {
-  return needsSudo() ? run('sudo', ['systemctl', ...args]) : run('systemctl', args);
+// ---- sudo split ----
+// Mirrors the pre-existing pattern elsewhere in this codebase (e.g.
+// server/src/services/pipeSources.ts): mutating `systemctl` subcommands
+// (start/stop/restart/enable/disable, daemon-reload) get a `sudo` prefix
+// when `needsSudo()` is true, but `systemctl is-active` never does. This
+// lets a deployment grant passwordless sudo scoped only to the mutating
+// subcommands while leaving status checks unprefixed -- a real, sensible
+// hardening pattern. `journalctl` (used by `logs()`) is a read-only command
+// too, but reading privileged units' logs typically does require sudo, so
+// it follows `needsSudo()` like the mutating systemctl calls do.
+//
+// `systemctl()` below takes an explicit `sudo` boolean rather than calling
+// `needsSudo()` itself, precisely so each caller states its own sudo
+// requirement instead of silently inheriting one shared default.
+function systemctl(args: string[], sudo: boolean) {
+  return sudo ? run('sudo', ['systemctl', ...args]) : run('systemctl', args);
 }
 
 function journalctl(args: string[]) {
@@ -59,7 +73,7 @@ function journalctl(args: string[]) {
 
 export async function control(unit: string, action: SystemdAction): Promise<void> {
   assertValidUnitName(unit);
-  await systemctl([action, unit]);
+  await systemctl([action, unit], needsSudo());
 }
 
 /**
@@ -72,11 +86,19 @@ export async function control(unit: string, action: SystemdAction): Promise<void
  * state string on stdout, returns that string instead of propagating the
  * throw. Only a *real* failure (run() rejecting with something other than
  * an ExecError -- e.g. systemctl not being installed) still throws.
+ *
+ * Sudo: unlike `control()`/`daemonReload()`, this NEVER applies a `sudo`
+ * prefix, regardless of `needsSudo()` -- `systemctl is-active` is a
+ * read-only status query, and this mirrors the pre-existing codebase
+ * pattern where `is-active` calls are never sudo-prefixed while mutating
+ * calls are (see server/src/services/pipeSources.ts). A deployment can
+ * grant passwordless sudo scoped only to the mutating subcommands; keeping
+ * status checks unprefixed means they keep working under that setup.
  */
 export async function activeState(unit: string): Promise<string> {
   assertValidUnitName(unit);
   try {
-    const { stdout } = await systemctl(['is-active', unit]);
+    const { stdout } = await systemctl(['is-active', unit], false);
     return stdout.trim();
   } catch (err) {
     if (err instanceof ExecError) {
@@ -87,12 +109,13 @@ export async function activeState(unit: string): Promise<string> {
   }
 }
 
+/** See `activeState()` -- never sudo-prefixed, same as the call it wraps. */
 export async function isActive(unit: string): Promise<boolean> {
   return (await activeState(unit)) === 'active';
 }
 
 export async function daemonReload(): Promise<void> {
-  await systemctl(['daemon-reload']);
+  await systemctl(['daemon-reload'], needsSudo());
 }
 
 /** `journalctl -u <unit> -n <lines> --no-pager`. `lines` defaults to 100. */
