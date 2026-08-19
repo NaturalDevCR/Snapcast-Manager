@@ -20,7 +20,7 @@ import db from '../database';
 import { randomUUID } from 'crypto';
 import { run } from '../platform/exec';
 import { installPrivilegedFile } from '../platform/files';
-import { MANAGED_SCRIPTS_DIR, validateManagedScriptPath, readCrontab } from '../services/tools';
+import { MANAGED_SCRIPTS_DIR, validateManagedScriptPath, readCrontab, ensureManagedScriptsDir } from '../services/tools';
 
 const router = express.Router();
 
@@ -104,7 +104,7 @@ router.get('/scripts', (_req: Request, res: Response) => {
   }
 });
 
-router.post('/scripts', (req: Request, res: Response) => {
+router.post('/scripts', async (req: Request, res: Response) => {
   try {
     const { label, path: rawPath } = req.body;
     if (!label || !rawPath) {
@@ -123,6 +123,14 @@ router.post('/scripts', (req: Request, res: Response) => {
         error: `Invalid script path (${validation.reason}). Scripts must be registered inside ${MANAGED_SCRIPTS_DIR}.`,
       });
     }
+    // Task-9-follow-up fix: MANAGED_SCRIPTS_DIR is never created anywhere
+    // else (not by this codebase, not by the installer). Guarantee it
+    // exists here, at the point a NEW managed-path registration is about
+    // to be inserted, so that a later POST /script write into it (via
+    // installPrivilegedFile) doesn't fail with "No such file or directory"
+    // on a fresh/real install. See services/tools.ts's
+    // ensureManagedScriptsDir() docstring for the full reasoning.
+    await ensureManagedScriptsDir();
     const id = randomUUID();
     db.prepare('INSERT INTO script_paths (id, label, path, managed) VALUES (?, ?, ?, 1)')
       .run(id, label, validation.resolvedPath);

@@ -29,11 +29,13 @@ import * as path from 'path';
 import * as os from 'os';
 import * as execModule from '../platform/exec';
 import { ExecError } from '../platform/exec';
+import { installPrivilegedFile } from '../platform/files';
 import {
   MANAGED_SCRIPTS_DIR,
   validateManagedScriptPath,
   isPathInsideManagedDir,
   readCrontab,
+  ensureManagedScriptsDir,
 } from './tools';
 
 function stubModuleFn(mod: any, key: string, impl: (...args: any[]) => any): () => void {
@@ -67,6 +69,68 @@ function mkTmpManagedRoot(): string {
 
 test('MANAGED_SCRIPTS_DIR is the app-owned managed directory', () => {
   assert.equal(MANAGED_SCRIPTS_DIR, '/var/lib/snapcast-manager/scripts');
+});
+
+// ---- ensureManagedScriptsDir(): closes the "MANAGED_SCRIPTS_DIR is never
+// actually created anywhere" gap found in review of Task 9. Nothing in this
+// codebase or the installer created this directory, so a fresh/real install
+// could register a brand-new script successfully (registration tolerates a
+// not-yet-existing path) and then always fail to write its content (`cp`
+// fails with ENOENT on the missing parent directory). Mirrors
+// services/pipeSources.ts's ensureRuntimeDir() test style: mock
+// platform/exec.ts's run()/needsSudo(), assert the exact argv used. ----
+
+test('ensureManagedScriptsDir() runs mkdir -p -m 0750 on MANAGED_SCRIPTS_DIR when not running as root', async () => {
+  const calls: { bin: string; args: string[] }[] = [];
+  const restoreRun = stubModuleFn(execModule, 'run', async (bin: string, args: string[]) => {
+    calls.push({ bin, args });
+    return { stdout: '', stderr: '' };
+  });
+  const restoreSudo = stubModuleFn(execModule, 'needsSudo', () => false);
+  try {
+    await ensureManagedScriptsDir();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].bin, 'mkdir');
+    assert.deepEqual(calls[0].args, ['-p', '-m', '0750', MANAGED_SCRIPTS_DIR]);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('ensureManagedScriptsDir() sudo-gates the mkdir call via argv when needsSudo() is true', async () => {
+  const calls: { bin: string; args: string[] }[] = [];
+  const restoreRun = stubModuleFn(execModule, 'run', async (bin: string, args: string[]) => {
+    calls.push({ bin, args });
+    return { stdout: '', stderr: '' };
+  });
+  const restoreSudo = stubModuleFn(execModule, 'needsSudo', () => true);
+  try {
+    await ensureManagedScriptsDir();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].bin, 'sudo');
+    assert.deepEqual(calls[0].args, ['mkdir', '-p', '-m', '0750', MANAGED_SCRIPTS_DIR]);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('ensureManagedScriptsDir() is best-effort: a failing mkdir is logged and swallowed, not thrown', async () => {
+  const restoreRun = stubModuleFn(execModule, 'run', async () => {
+    throw new ExecError('mkdir', ['-p', '-m', '0750', MANAGED_SCRIPTS_DIR], 1, '', 'mkdir: permission denied');
+  });
+  const restoreSudo = stubModuleFn(execModule, 'needsSudo', () => false);
+  try {
+    // Must not reject -- mirrors ensureRuntimeDir()'s best-effort behavior,
+    // so a directory-creation hiccup never blocks script registration.
+    // (If mkdir genuinely fails, the subsequent installPrivilegedFile()
+    // write will surface its own clear error instead.)
+    await ensureManagedScriptsDir();
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
 });
 
 // ---- validateManagedScriptPath / isPathInsideManagedDir: the critical
@@ -268,5 +332,89 @@ test('readCrontab() rethrows non-ExecError failures (e.g. crontab binary missing
     await assert.rejects(() => readCrontab(), /ENOENT/);
   } finally {
     restore();
+  }
+});
+
+// ---- End-to-end regression test: "register a new script, then write to
+// it" on a FRESH environment where MANAGED_SCRIPTS_DIR does not exist yet.
+// This is the exact gap review found: registration (validateManagedScript
+// Path) tolerates a not-yet-existing target by design, but nothing ever
+// created MANAGED_SCRIPTS_DIR itself, so the subsequent write (through
+// installPrivilegedFile's `cp`) always failed with ENOENT on a fresh
+// install. `run()` is mocked here to model a bare filesystem: `cp` only
+// succeeds once `mkdir` has been called for that exact destination
+// directory first -- exactly what real `cp` does when a parent directory
+// is missing. `installPrivilegedFile` itself is the REAL function (only
+// its `run()` dependency is mocked), consistent with
+// platform/files.test.ts's own mocking style for this function -- real
+// mkdtemp/write/cleanup, mocked cp/chmod. ----
+
+/**
+ * Models a bare filesystem's `mkdir`/`cp` semantics using an in-memory set
+ * of "directories that exist". `cp` fails exactly like the real command
+ * does when its destination's parent directory is missing.
+ */
+function stubFreshFilesystem(): { restore: () => void; existingDirs: Set<string> } {
+  const existingDirs = new Set<string>();
+  const restore = stubModuleFn(execModule, 'run', async (bin: string, args: string[]) => {
+    const [cmd, ...rest] = bin === 'sudo' ? args : [bin, ...args];
+    if (cmd === 'mkdir') {
+      // ['-p', '-m', '0750', dir] -- the directory is always the last arg.
+      existingDirs.add(rest[rest.length - 1]);
+      return { stdout: '', stderr: '' };
+    }
+    if (cmd === 'cp') {
+      const dest = rest[rest.length - 1];
+      if (!existingDirs.has(path.dirname(dest))) {
+        throw new ExecError('cp', rest, 1, '', `cp: cannot create regular file '${dest}': No such file or directory`);
+      }
+      return { stdout: '', stderr: '' };
+    }
+    // chmod and anything else: succeed unconditionally.
+    return { stdout: '', stderr: '' };
+  });
+  return { restore, existingDirs };
+}
+
+test('REGRESSION: writing to a brand-new managed script fails on a fresh install without ensureManagedScriptsDir() (reproduces the reported gap)', async () => {
+  const { restore } = stubFreshFilesystem();
+  const restoreSudo = stubModuleFn(execModule, 'needsSudo', () => false);
+  try {
+    const candidate = path.join(MANAGED_SCRIPTS_DIR, 'brand-new-script.sh');
+    // Registration succeeds (mirrors POST /api/tools/scripts pre-fix: no
+    // directory-creation step at all).
+    const validation = validateManagedScriptPath(candidate);
+    assert.equal(validation.ok, true);
+    // But the write (mirrors POST /api/tools/script) fails, because
+    // MANAGED_SCRIPTS_DIR was never created on this fresh install.
+    await assert.rejects(
+      () => installPrivilegedFile(validation.resolvedPath, '#!/bin/sh\necho hi\n', { mode: 0o755 }),
+      ExecError,
+    );
+  } finally {
+    restore();
+    restoreSudo();
+  }
+});
+
+test('REGRESSION FIX: registering a new script then writing to it succeeds end-to-end on a fresh install once ensureManagedScriptsDir() runs first', async () => {
+  const { restore } = stubFreshFilesystem();
+  const restoreSudo = stubModuleFn(execModule, 'needsSudo', () => false);
+  try {
+    const candidate = path.join(MANAGED_SCRIPTS_DIR, 'brand-new-script.sh');
+    // 1. Registration: path validation succeeds for the not-yet-existing
+    //    filename (unchanged from Task 9)...
+    const validation = validateManagedScriptPath(candidate);
+    assert.equal(validation.ok, true);
+    // 2. ...and now, as wired into POST /api/tools/scripts, the managed
+    //    directory is guaranteed to exist before the registration is
+    //    inserted.
+    await ensureManagedScriptsDir();
+    // 3. A later POST /api/tools/script write to that exact path now
+    //    succeeds, because the directory exists.
+    await installPrivilegedFile(validation.resolvedPath, '#!/bin/sh\necho hi\n', { mode: 0o755 });
+  } finally {
+    restore();
+    restoreSudo();
   }
 });

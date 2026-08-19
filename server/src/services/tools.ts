@@ -16,7 +16,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { run, ExecError } from '../platform/exec';
+import { run, needsSudo, ExecError } from '../platform/exec';
 
 /**
  * The only directory this application will register scripts inside of, or
@@ -24,6 +24,54 @@ import { run, ExecError } from '../platform/exec';
  * user-arbitrary path) -- see docs/superpowers/sdd/task-9-brief.md.
  */
 export const MANAGED_SCRIPTS_DIR = '/var/lib/snapcast-manager/scripts';
+
+/**
+ * Idempotently ensures `MANAGED_SCRIPTS_DIR` exists on disk, mode `0750`
+ * (owner rwx, group rx, others none -- reasonable for a directory that
+ * holds executable scripts an admin edits and that presumably get run;
+ * unlike `services/pipeSources.ts`'s runtime FIFO directory, there is no
+ * established group requirement -- e.g. `audio` -- for this directory, so
+ * no `chgrp` step is needed here).
+ *
+ * TASK-9-FOLLOW-UP GAP THIS CLOSES: nothing in this codebase or the
+ * installer ever creates `MANAGED_SCRIPTS_DIR`. `POST /api/tools/scripts`
+ * (registration) succeeds for a not-yet-existing filename inside it by
+ * design (`validateManagedScriptPath()` tolerates `ENOENT` while walking up
+ * to the managed-dir boundary -- see its docstring), but the subsequent
+ * `POST /api/tools/script` write, via `installPrivilegedFile()`, has no
+ * directory-creation step of its own and `cp` fails with "No such file or
+ * directory" if the destination's parent directory doesn't exist. On a
+ * fresh/real install where an operator hasn't manually pre-created
+ * `MANAGED_SCRIPTS_DIR`, registering a brand-new script would succeed and
+ * then writing its content would always fail -- not a security regression
+ * (fails safe, not open), but it breaks the "register and write a
+ * brand-new script" use case the brief requires to work. Calling this
+ * helper from `POST /api/tools/scripts` (registration), right before the
+ * new row is inserted, guarantees the directory exists by the time a
+ * client that just registered a script tries to write content to it.
+ *
+ * Mirrors `services/pipeSources.ts`'s `ensureRuntimeDir()`: `run()` with an
+ * argv array (never a shell string), sudo-gated via `needsSudo()`, and
+ * best-effort -- a failure here is logged but does not throw, so it can
+ * never block registration on a filesystem convenience step. (Unlike
+ * `ensureRuntimeDir()`, there is no `chgrp` call to tolerate failing, since
+ * this directory has no group requirement.) If directory creation
+ * genuinely fails (e.g. permission denied even under sudo), the subsequent
+ * `installPrivilegedFile()` write will surface its own clear `cp` error
+ * instead.
+ */
+export async function ensureManagedScriptsDir(): Promise<void> {
+  const sudo = needsSudo();
+  try {
+    if (sudo) {
+      await run('sudo', ['mkdir', '-p', '-m', '0750', MANAGED_SCRIPTS_DIR]);
+    } else {
+      await run('mkdir', ['-p', '-m', '0750', MANAGED_SCRIPTS_DIR]);
+    }
+  } catch (err) {
+    console.warn(`[tools] Could not create ${MANAGED_SCRIPTS_DIR}:`, err);
+  }
+}
 
 export interface PathValidationResult {
   ok: boolean;
