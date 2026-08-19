@@ -17,3 +17,6 @@ server/data/
 
 # Backup files
 *.bak
+
+# Subagent-driven-development scratch (ledger, briefs, reports)
+.superpowers/
