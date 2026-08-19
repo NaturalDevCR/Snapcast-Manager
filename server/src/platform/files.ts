@@ -83,10 +83,19 @@ export async function writeFileAtomic(
  * (`fs.rm(tmpDir, { recursive: true, force: true })`) in a `finally`,
  * whether the install succeeded or failed, so a failed privileged copy
  * never leaves file contents lingering in a temp directory.
+ *
+ * `content` also accepts a raw `Buffer` (added Task 11, for
+ * `services/system.ts`'s `installMympd()`, which needs to install a
+ * dearmored -- i.e. binary -- GPG keyring). `fs.promises.writeFile`/
+ * `FileHandle#writeFile` documents that its `encoding` option is IGNORED
+ * when `data` is a `Buffer` -- it writes the raw bytes as-is -- so passing
+ * `content` straight through to `handle.writeFile(content, 'utf-8')` below
+ * is already byte-safe for both cases without a branch: a `string` is
+ * UTF-8-encoded as before, a `Buffer` is written verbatim.
  */
 export async function installPrivilegedFile(
   destPath: string,
-  content: string,
+  content: string | Buffer,
   opts: WriteOptions = {},
 ): Promise<void> {
   const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'snapmanager-'));

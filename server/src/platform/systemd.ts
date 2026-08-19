@@ -15,7 +15,14 @@
 
 import { run, needsSudo, ExecError } from './exec';
 
-export type SystemdAction = 'start' | 'stop' | 'restart' | 'enable' | 'disable';
+// 'unmask' added in Task 11 for installMpd()'s `systemctl unmask mpd.service`
+// step (undoing an admin- or distro-applied mask so the unit can actually be
+// enabled/started). It is a mutating systemctl subcommand exactly like
+// start/stop/restart/enable/disable -- same sudo-gating via control() below,
+// no special-casing needed -- so extending this union is the clean, small
+// change the Task 11 brief asked for, rather than bypassing this module with
+// a direct platform/exec.ts run() call for just this one verb.
+export type SystemdAction = 'start' | 'stop' | 'restart' | 'enable' | 'disable' | 'unmask';
 
 // Verified against systemd.unit(5) (checked via the man7.org mirror,
 // 2026-08-19, https://www.man7.org/linux/man-pages/man5/systemd.unit.5.html

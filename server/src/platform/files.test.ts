@@ -184,6 +184,44 @@ test('installPrivilegedFile prefixes cp/chmod with sudo via argv when needsSudo(
   }
 });
 
+// ---- installPrivilegedFile() with Buffer content (Task 11 -- gpg --dearmor
+// binary keyring bytes for installMympd()) : content must land on disk
+// byte-for-byte, never passed through a UTF-8 string re-encoding that would
+// corrupt non-UTF-8-safe binary bytes. ----
+
+test('installPrivilegedFile writes Buffer content to the real temp file byte-for-byte (no UTF-8 corruption)', async () => {
+  // Bytes that are NOT valid UTF-8 on their own (a lone continuation byte,
+  // then a byte sequence that looks like a truncated multi-byte sequence) --
+  // representative of real binary data (e.g. a dearmored GPG keyring) that
+  // would come back altered (replacement characters) if ever round-tripped
+  // through a UTF-8 string.
+  const binaryContent = Buffer.from([0x00, 0x01, 0xff, 0xfe, 0x80, 0x81, 0x47, 0x50, 0x47]);
+  const calls: Call[] = [];
+  let capturedTmpFileContent: Buffer | undefined;
+  const restoreRun = stubRun(async (bin: string, args: string[]) => {
+    calls.push({ bin, args });
+    if (bin === 'cp') {
+      capturedTmpFileContent = fs.readFileSync(args[0]);
+    }
+    return { stdout: '', stderr: '' };
+  });
+  const restoreSudo = stubNeedsSudo(() => false);
+  const dir = makeTmpDir();
+  const dest = path.join(dir, 'dest.gpg');
+  try {
+    await installPrivilegedFile(dest, binaryContent, { mode: 0o644 });
+    assert.ok(capturedTmpFileContent, 'expected cp to have been called with the temp file path');
+    assert.ok(
+      (capturedTmpFileContent as Buffer).equals(binaryContent),
+      'temp file content must match the original Buffer byte-for-byte',
+    );
+  } finally {
+    restoreRun();
+    restoreSudo();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('installPrivilegedFile skips the chmod call entirely when opts.mode is not given', async () => {
   const calls: Call[] = [];
   const restoreRun = stubRunRecording(calls);

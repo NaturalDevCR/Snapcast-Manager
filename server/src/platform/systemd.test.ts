@@ -182,6 +182,39 @@ test('control() prefixes with sudo via argv (not string concatenation) when need
   }
 });
 
+// ---- 'unmask' action (Task 11 -- installMpd()'s `systemctl unmask
+// mpd.service` step) ----
+
+test('control() supports the "unmask" action via argv, unprefixed when needsSudo() is false', async () => {
+  const calls: Call[] = [];
+  const restoreRun = stubRunRecording(calls);
+  const restoreSudo = stubNeedsSudo(() => false);
+  try {
+    await control('mpd.service', 'unmask');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].bin, 'systemctl');
+    assert.deepEqual(calls[0].args, ['unmask', 'mpd.service']);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('control() "unmask" prefixes with sudo via argv when needsSudo() is true', async () => {
+  const calls: Call[] = [];
+  const restoreRun = stubRunRecording(calls);
+  const restoreSudo = stubNeedsSudo(() => true);
+  try {
+    await control('mpd.service', 'unmask');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].bin, 'sudo');
+    assert.deepEqual(calls[0].args, ['systemctl', 'unmask', 'mpd.service']);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
 test('daemonReload() calls systemctl daemon-reload', async () => {
   const calls: Call[] = [];
   const restoreRun = stubRunRecording(calls);
