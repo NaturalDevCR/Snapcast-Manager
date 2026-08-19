@@ -184,7 +184,13 @@ router.post('/adopt', async (req, res) => {
     });
     res.json(pipe);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    // "existingServiceName does not match any discovered..." means the
+    // caller supplied something invalid/unverifiable -- 400, not a server
+    // error. The authoritative check lives in pipeSourceService.adopt()
+    // itself (see its docstring), not here; this only maps its error to
+    // the right HTTP status.
+    const status = err.message.includes('existingServiceName') ? 400 : 500;
+    res.status(status).json({ error: err.message });
   }
 });
 
