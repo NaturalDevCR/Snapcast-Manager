@@ -1,11 +1,29 @@
-import { exec } from 'child_process';
-import fs from 'fs/promises';
-import util from 'util';
+// Shell-free wrapper around backup creation/restore/cleanup, built on top of
+// `platform/exec.ts`'s `run()` (argv arrays only, no shell -- see that
+// file's header). Task 10 migration -- see docs/superpowers/sdd/
+// task-10-report.md for the full writeup.
+//
+// This file's shell-command-injection risk was already lower than
+// services/pipeSources.ts's or services/tools.ts's before this migration:
+// the only two places outside input reaches this file (`restoreBackup()`
+// and `deleteBackup()`) are already guarded by the
+// `/^pre-[a-z\-]+-\d{8}-\d{6}\.tar\.gz$/` filename regex below, unchanged
+// by this task. Still, every command here used to be built via
+// `child_process.exec()` string interpolation -- this migrates every call
+// site onto `platform/exec.ts`'s argv-based `run()` for consistency and to
+// close `check-no-shell-injection.sh` across the codebase.
 
-const execAsync = util.promisify(exec);
+import fs from 'fs/promises';
+import { run, needsSudo } from '../platform/exec';
 
 const BACKUP_DIR = '/var/backups/snapmanager';
 const MAX_BACKUPS = 15;
+
+// The directory `resolveExistingSources()` scans for
+// `snapclient-manager-*.service` unit files -- see that function's
+// docstring for why this is now an `fs.readdir()` + regex scan instead of a
+// shell `ls` glob.
+const SYSTEMD_DIR = '/etc/systemd/system';
 
 export type BackupComponent =
   | 'snapserver'
@@ -34,24 +52,19 @@ export interface BackupEntry {
 }
 
 export class BackupService {
-  private get SUDO(): string {
-    return (process as any).getuid?.() === 0 ? '' : 'sudo ';
-  }
-
-  private async run(cmd: string, options: { allowFail?: boolean } = {}): Promise<string> {
-    try {
-      const { stdout, stderr } = await execAsync(cmd, { maxBuffer: 50 * 1024 * 1024 });
-      if (stderr && stderr.trim()) {
-        const lower = stderr.toLowerCase();
-        if (lower.includes('error') || lower.includes('failed')) {
-          console.warn(`[backup] stderr from ${cmd}:`, stderr);
-        }
-      }
-      return stdout;
-    } catch (err: any) {
-      if (options.allowFail) return '';
-      throw new Error(`Backup command failed: ${cmd}\n${err.stderr || err.message}`);
-    }
+  /**
+   * Runs `bin` with `args` via `platform/exec.ts`'s `run()`, sudo-prefixed
+   * following the idiom established in `platform/systemd.ts`'s internal
+   * `systemctl()` helper: `needsSudo() ? run('sudo', [bin, ...args]) :
+   * run(bin, args)`. Every mutating command this service issues (`mkdir`,
+   * `tar`, `chmod`, `rm`) needs root on a normal Debian install (`/var/
+   * backups/snapmanager` and `/etc/systemd/system` are root-owned), so
+   * unlike `platform/systemd.ts`'s read/write split (`activeState()` never
+   * sudo-prefixes; `control()` always does), every call site in this file
+   * sudo-gates via `needsSudo()` -- there is no unprivileged variant here.
+   */
+  private privileged(bin: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+    return needsSudo() ? run('sudo', [bin, ...args]) : run(bin, args);
   }
 
   private async pathExists(p: string): Promise<boolean> {
@@ -64,7 +77,7 @@ export class BackupService {
   }
 
   private async ensureBackupDir(): Promise<void> {
-    await this.run(`${this.SUDO}mkdir -p ${BACKUP_DIR}`);
+    await this.privileged('mkdir', ['-p', BACKUP_DIR]);
   }
 
   private formatTimestamp(): string {
@@ -105,21 +118,62 @@ export class BackupService {
     return { sources, components: Array.from(new Set(components)) };
   }
 
+  /**
+   * Resolves which of `sources` (fixed, hardcoded paths from
+   * `collectSources()`) actually exist on disk, PLUS any dynamically-named
+   * `snapclient-manager-*.service` unit files under `/etc/systemd/system`.
+   *
+   * The latter used to be a shell glob:
+   *   `${SUDO}ls -1 /etc/systemd/system/snapclient-manager-*.service 2>/dev/null || true`
+   * Shell globbing (`*`) only expands inside an actual shell -- argv-based
+   * `execFile`/`run()` CANNOT replicate this (passing the literal string
+   * `'snapclient-manager-*.service'` as an argv element to `ls` would not
+   * expand it; `ls` would just fail to find a file with that literal
+   * name). Reintroducing a shell call to preserve the glob would undo the
+   * entire point of this migration, so instead this lists the directory
+   * with `fs.promises.readdir()` and filters the entries in-process with a
+   * regex equivalent to the glob pattern (`^snapclient-manager-.*\.service$`
+   * for `snapclient-manager-*.service`), then maps each match back to its
+   * full path under `SYSTEMD_DIR`. This is simpler, safer, and more
+   * idiomatic Node than shelling out to `ls` ever was.
+   *
+   * Equivalence with the original shell behavior:
+   *  - Match semantics: shell glob `*` matches any sequence of characters
+   *    (excluding `/`, irrelevant here since we're only matching bare
+   *    filenames within one directory) -- `.*` in the regex is the exact
+   *    same "any characters" semantics for a single path segment.
+   *  - Zero matches: the original appended `|| true` specifically so an
+   *    empty/no-match `ls` (which exits non-zero when its glob expands to
+   *    nothing, because the shell passes the literal unexpanded pattern to
+   *    `ls` and `ls` reports "no such file") was swallowed into empty
+   *    stdout rather than aborting the whole backup. Here, zero regex
+   *    matches naturally produces zero appended paths -- no special-casing
+   *    needed.
+   *  - Directory missing/unreadable: the original's `2>/dev/null || true`
+   *    swallows `ls`'s stderr and lets `|| true` force a zero exit
+   *    regardless of the underlying reason (directory missing, permission
+   *    denied, ...) -- the effect is "found nothing" either way. The
+   *    try/catch below reproduces that exact "found nothing" outcome for
+   *    ANY `fs.readdir()` failure (ENOENT, EACCES, or anything else),
+   *    without needing sudo -- `/etc/systemd/system` is world-readable on a
+   *    normal Debian install, and even a hardened install that restricted
+   *    it would need the same underlying permission via any listing method,
+   *    shell-based or not.
+   */
   private async resolveExistingSources(sources: string[]): Promise<string[]> {
     const existing: string[] = [];
     for (const src of sources) {
       if (await this.pathExists(src)) existing.push(src);
     }
     try {
-      const { stdout } = await execAsync(
-        `${this.SUDO}ls -1 /etc/systemd/system/snapclient-manager-*.service 2>/dev/null || true`
-      );
-      for (const line of stdout.split('\n')) {
-        const f = line.trim();
-        if (f) existing.push(f);
+      const entries = await fs.readdir(SYSTEMD_DIR);
+      const pattern = /^snapclient-manager-.*\.service$/;
+      for (const entry of entries) {
+        if (pattern.test(entry)) existing.push(`${SYSTEMD_DIR}/${entry}`);
       }
     } catch {
-      // ignore
+      // Directory missing/unreadable -- treat as "found nothing", exactly
+      // like the original shell command's `2>/dev/null || true`.
     }
     return existing;
   }
@@ -145,15 +199,14 @@ export class BackupService {
     const fileName = `pre-${component}-${this.formatTimestamp()}.tar.gz`;
     const fullPath = `${BACKUP_DIR}/${fileName}`;
 
-    const archiveArgs: string[] = ['czf', fullPath, '--absolute-names'];
-    for (const src of existing) {
-      archiveArgs.push(src);
-    }
+    // Argv-based `run()` needs no manual quoting at all: each element of
+    // this array is passed to execFile as a literal argument, spaces and
+    // all -- unlike the old shell-string approach, there is no quoting
+    // logic here to get wrong.
+    const archiveArgs: string[] = ['czf', fullPath, '--absolute-names', ...existing];
+    await this.privileged('tar', archiveArgs);
 
-    const tarCmd = `${this.SUDO}tar ${archiveArgs.map(a => (a.includes(' ') ? `'${a}'` : a)).join(' ')}`;
-    await this.run(tarCmd);
-
-    await this.run(`${this.SUDO}chmod 600 ${fullPath}`);
+    await this.privileged('chmod', ['600', fullPath]);
 
     const stat = await fs.stat(fullPath).catch(() => null);
     if (!stat) throw new Error(`Backup file ${fullPath} could not be stat'd`);
@@ -181,7 +234,7 @@ export class BackupService {
       if (backups.length > MAX_BACKUPS) {
         const toDelete = backups.slice(0, backups.length - MAX_BACKUPS);
         for (const f of toDelete) {
-          await this.run(`${this.SUDO}rm -f ${BACKUP_DIR}/${f}`).catch(() => {});
+          await this.privileged('rm', ['-f', `${BACKUP_DIR}/${f}`]).catch(() => {});
         }
       }
     } catch (err) {
@@ -222,8 +275,7 @@ export class BackupService {
       throw new Error(`Backup ${backupName} not found`);
     }
 
-    const extractCmd = `${this.SUDO}tar -xPzf ${fullPath}`;
-    await this.run(extractCmd);
+    await this.privileged('tar', ['-xPzf', fullPath]);
     return `Restored from ${fullPath}`;
   }
 
@@ -232,7 +284,7 @@ export class BackupService {
       throw new Error('Invalid backup name format');
     }
     const fullPath = `${BACKUP_DIR}/${backupName}`;
-    await this.run(`${this.SUDO}rm -f ${fullPath}`);
+    await this.privileged('rm', ['-f', fullPath]);
   }
 }
 
