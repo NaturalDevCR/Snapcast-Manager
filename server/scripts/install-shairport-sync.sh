@@ -7,33 +7,44 @@
 # `run('bash', [<path to this script>], ...)` (server/src/platform/exec.ts's
 # argv-based run()) -- a plain argv invocation, never a shell string built
 # from runtime-interpolated data. This script takes no arguments and reads no
-# external input; it is a static, versioned, shellcheck-able artifact, not
-# something assembled at runtime from untrusted data, so the real shell
-# features used below (command substitution, conditionals, `2>/dev/null ||
-# true` tolerance) are fine here -- see
-# docs/superpowers/sdd/task-12-brief.md for the full rationale on why this
-# extraction does NOT reintroduce the shell-injection class Stage 1 of the
-# hardening plan otherwise eliminates.
+# external input beyond the SNAPMGR_SUDO environment variable described
+# below; it is a static, versioned, shellcheck-able artifact, not something
+# assembled at runtime from untrusted data, so the real shell features used
+# below (command substitution, conditionals, `2>/dev/null || true`
+# tolerance) are fine here -- see docs/superpowers/sdd/task-12-brief.md for
+# the full rationale on why this extraction does NOT reintroduce the
+# shell-injection class Stage 1 of the hardening plan otherwise eliminates.
 #
-# Privilege handling: unlike the original TypeScript template-literal
-# version (which prefixed only individual privileged sub-commands with a
-# per-line `${this.SUDO}`, leaving the build steps -- git clone, autoreconf,
-# configure, make -- running as the invoking user), this script assumes it
-# is invoked ALREADY elevated as a single whole: services/system.ts's
-# installShairportSync() runs it via `runPrivileged(['bash', scriptPath],
-# ...)`, the same `needsSudo() ? run('sudo', [...]) : run(...)` idiom this
-# file already sudo-gates every other privileged multi-step operation with
-# (installMpd(), installMympd(), executeDebUpdate(), etc.) -- so no command
-# in this script needs its own `sudo` prefix. This is a deliberate
-# simplification over the original's finer-grained per-line escalation: the
-# build steps (git clone / autoreconf / configure / make, not just `make
-# install`) now also run with whatever privilege the whole script was
-# invoked with. Since this whole pipeline already downloads and compiles
-# third-party source that is then installed with root privileges regardless
-# (`make install`, systemd unit management), this does not introduce a new
-# trust boundary -- but it is a real narrowing of the previous
-# build-vs-install privilege separation, called out explicitly in
-# task-12-report.md as a concern rather than silently changed.
+# Privilege handling (fixed post-Task-12, see task-12-report.md's "Fix
+# report" section): this script is invoked WITHOUT its own sudo/root
+# wrapper -- `services/system.ts`'s installShairportSync() runs it as
+# `run('bash', [scriptPath], { env: { SNAPMGR_SUDO: ... }, ... })`, i.e. as
+# whatever user the Node process itself runs as. Only the specific
+# PRIVILEGED lines below (apt-get, the cleanup-of-old-installs systemctl/rm
+# lines, `make install` for both nqptp and shairport-sync,
+# useradd/groupadd, and the systemd daemon-reload/enable/restart calls) are
+# prefixed with `$SUDO`, exactly mirroring how the ORIGINAL (pre-Task-12)
+# TypeScript implementation individually prefixed only those same lines
+# with `${this.SUDO}`. The BUILD/COMPILE phase -- `git clone`,
+# `autoreconf -fvi`, `./configure`, `make -j"$(nproc)"`, for both nqptp and
+# shairport-sync -- deliberately runs WITHOUT escalation, as the script's
+# own invoking (non-root) user, same as the original. This matters because
+# compiling freshly-cloned, unpinned third-party source is the highest-risk
+# phase to run as root: `autoreconf`/`./configure`/`make` can and do
+# execute arbitrary shell via Makefile rules, `config.guess`/`config.sub`
+# scripts, and autotools macros -- containing that risk to the invoking,
+# unprivileged user (escalating only for the narrow, well-understood
+# install-time operations) is the whole point of this privilege
+# separation, not a style preference.
+#
+# `SNAPMGR_SUDO` ("1" or "0", default "0" if unset): computed in Node by
+# `services/system.ts` via `platform/exec.ts`'s `needsSudo()` (true when
+# the Node process itself is NOT running as root) and passed in as an
+# environment variable so this script can replicate that same decision for
+# its own privileged lines, without re-implementing `needsSudo()`'s uid
+# check in shell. When `SNAPMGR_SUDO=1`, `$SUDO` expands to `sudo`;
+# otherwise it expands to nothing (the invoking user is assumed to already
+# have the needed privileges, e.g. Node itself already running as root).
 #
 # `set -euo pipefail`: the original code ran this whole chain as a single
 # `&&`-joined shell command string via one exec() call, so ANY step failing
@@ -46,23 +57,28 @@
 
 set -euo pipefail
 
+SUDO=""
+if [ "${SNAPMGR_SUDO:-0}" = "1" ]; then
+  SUDO="sudo"
+fi
+
 echo "Installing build dependencies..."
-apt-get update
-apt-get install -y --no-install-recommends systemd-dev 2>/dev/null || true
-apt-get install -y --no-install-recommends build-essential git autoconf automake libtool \
+$SUDO apt-get update
+$SUDO apt-get install -y --no-install-recommends systemd-dev 2>/dev/null || true
+$SUDO apt-get install -y --no-install-recommends build-essential git autoconf automake libtool \
   libpopt-dev libconfig-dev libasound2-dev avahi-daemon libavahi-client-dev \
   libssl-dev libsoxr-dev libplist-dev libsodium-dev uuid-dev libgcrypt-dev xxd \
   libplist-utils libavutil-dev libavcodec-dev libavformat-dev
 
 echo "Cleaning up any legacy installations..."
-apt-get remove --purge -y shairport-sync 2>/dev/null || true
-systemctl stop shairport-sync 2>/dev/null || true
-systemctl disable shairport-sync 2>/dev/null || true
-systemctl stop nqptp 2>/dev/null || true
-systemctl disable nqptp 2>/dev/null || true
-rm -f /usr/local/bin/shairport-sync /usr/bin/shairport-sync /usr/local/bin/nqptp /usr/bin/nqptp
-rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service
-rm -f /lib/systemd/system/shairport-sync.service /lib/systemd/system/nqptp.service
+$SUDO apt-get remove --purge -y shairport-sync 2>/dev/null || true
+$SUDO systemctl stop shairport-sync 2>/dev/null || true
+$SUDO systemctl disable shairport-sync 2>/dev/null || true
+$SUDO systemctl stop nqptp 2>/dev/null || true
+$SUDO systemctl disable nqptp 2>/dev/null || true
+$SUDO rm -f /usr/local/bin/shairport-sync /usr/bin/shairport-sync /usr/local/bin/nqptp /usr/bin/nqptp
+$SUDO rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service
+$SUDO rm -f /lib/systemd/system/shairport-sync.service /lib/systemd/system/nqptp.service
 
 echo "Building and installing nqptp..."
 rm -rf /tmp/nqptp-build
@@ -71,10 +87,10 @@ cd /tmp/nqptp-build
 autoreconf -fvi
 ./configure --with-systemd-startup
 make -j"$(nproc)"
-make install
-systemctl daemon-reload
-systemctl enable nqptp
-systemctl restart nqptp
+$SUDO make install
+$SUDO systemctl daemon-reload
+$SUDO systemctl enable nqptp
+$SUDO systemctl restart nqptp
 
 echo "Building and installing shairport-sync..."
 rm -rf /tmp/shairport-sync-build
@@ -83,17 +99,17 @@ cd /tmp/shairport-sync-build
 autoreconf -fvi
 ./configure --sysconfdir=/etc --with-alsa --with-soxr --with-avahi --with-ssl=openssl --with-systemd-startup --with-airplay-2 --with-metadata
 make -j"$(nproc)"
-make install
+$SUDO make install
 
 echo "Setting up systemd service and user access..."
 if ! getent group "shairport-sync" >/dev/null 2>&1; then
-  groupadd -r shairport-sync || true
+  $SUDO groupadd -r shairport-sync || true
 fi
 if ! id "shairport-sync" >/dev/null 2>&1; then
-  useradd -r -M -g shairport-sync -s /usr/sbin/nologin -G audio shairport-sync || true
+  $SUDO useradd -r -M -g shairport-sync -s /usr/sbin/nologin -G audio shairport-sync || true
 fi
 
-systemctl daemon-reload
-systemctl enable shairport-sync
-systemctl restart shairport-sync
+$SUDO systemctl daemon-reload
+$SUDO systemctl enable shairport-sync
+$SUDO systemctl restart shairport-sync
 echo "Shairport-sync and nqptp installed successfully."

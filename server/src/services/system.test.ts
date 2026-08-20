@@ -1702,7 +1702,7 @@ test('executeDebUpdate() logs progress at multiple distinguishable steps, not ju
 // toolchain (DONE_WITH_CONCERNS, see task-12-report.md).
 // ============================================================
 
-test('installShairportSync() runs the extracted script via `run(\'bash\', [scriptPath], ...)`, unprefixed when needsSudo() is false', async () => {
+test('installShairportSync() runs the extracted script directly (NOT via runPrivileged/sudo-wrapped) and passes SNAPMGR_SUDO="0" when needsSudo() is false', async () => {
   const calls: Call[] = [];
   const restoreSudo = stubNeedsSudo(false);
   const restoreRun = stubRunRecording(calls);
@@ -1714,13 +1714,15 @@ test('installShairportSync() runs the extracted script via `run(\'bash\', [scrip
     assert.equal(calls[0].bin, 'bash');
     assert.equal(calls[0].args.length, 1);
     assert.ok(calls[0].args[0].endsWith(path.join('scripts', 'install-shairport-sync.sh')), `expected the script path, got ${calls[0].args[0]}`);
+    const opts = calls[0].opts as any;
+    assert.equal(opts?.env?.SNAPMGR_SUDO, '0');
   } finally {
     restoreRun();
     restoreSudo();
   }
 });
 
-test('installShairportSync() sudo-gates the script invocation via argv (not string concatenation) when needsSudo() is true', async () => {
+test('installShairportSync() does NOT sudo-wrap the whole script invocation when needsSudo() is true -- instead passes SNAPMGR_SUDO="1" so the script escalates only its own privileged lines internally', async () => {
   const calls: Call[] = [];
   const restoreSudo = stubNeedsSudo(true);
   const restoreRun = stubRunRecording(calls);
@@ -1728,9 +1730,15 @@ test('installShairportSync() sudo-gates the script invocation via argv (not stri
     const service = freshService();
     await service.installShairportSync();
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].bin, 'sudo');
-    assert.equal(calls[0].args[0], 'bash');
-    assert.ok(calls[0].args[1].endsWith(path.join('scripts', 'install-shairport-sync.sh')));
+    // The outer `bash <script>` invocation itself must NOT be prefixed with
+    // `sudo` -- that's exactly the widened-privileged-execution-surface bug
+    // this fix closes (see task-12-report.md's "Fix report" section): the
+    // build/compile phase inside the script must run unescalated even when
+    // the invoking Node process needs sudo for its own privileged steps.
+    assert.equal(calls[0].bin, 'bash');
+    assert.ok(calls[0].args[0].endsWith(path.join('scripts', 'install-shairport-sync.sh')));
+    const opts = calls[0].opts as any;
+    assert.equal(opts?.env?.SNAPMGR_SUDO, '1');
   } finally {
     restoreRun();
     restoreSudo();

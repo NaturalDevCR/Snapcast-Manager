@@ -898,12 +898,27 @@ export class SystemService {
    * `server/scripts/install-shairport-sync.sh` -- this function is a thin
    * wrapper that just runs it via `run('bash', [scriptPath], ...)` (a plain
    * argv invocation, never a runtime-built shell string) and logs progress
-   * around it. See that script's own header comment for why real shell
-   * features (`$(nproc)`, `&&`, `if`) are fine INSIDE that static file, and
-   * for why it no longer needs its own per-line `sudo` -- this wrapper
-   * invokes the whole script already elevated, via the same
-   * `runPrivileged()` sudo-split every other multi-step privileged
-   * operation in this file uses.
+   * around it.
+   *
+   * Privilege handling (fixed post-Task-12 review, see task-12-report.md's
+   * "Fix report" section): unlike this file's other multi-step privileged
+   * operations, this call does NOT go through `runPrivileged()` -- the
+   * script itself is invoked as whatever user the Node process runs as,
+   * NOT wrapped in `sudo` as a whole. That's deliberate: the script
+   * compiles freshly-cloned, unpinned third-party source
+   * (`autoreconf`/`./configure`/`make`), which can execute arbitrary shell
+   * via Makefile rules, `config.guess`/`config.sub`, or autotools macros --
+   * running that phase as root would be the highest-risk phase to
+   * escalate. Instead, `needsSudo()` is computed here in Node (exactly as
+   * `runPrivileged()` does internally) and passed into the script as the
+   * `SNAPMGR_SUDO` environment variable ("1" or "0"); the script uses it to
+   * prefix only its own individual privileged lines (apt-get, systemctl,
+   * `make install`, useradd/groupadd, the legacy-install cleanup) with its
+   * own `$SUDO`, leaving the build/compile phase unescalated -- restoring
+   * the ORIGINAL (pre-Task-12) TypeScript implementation's per-line
+   * privilege separation (`${this.SUDO}apt-get ...` etc.), which Task 12
+   * had collapsed into escalating the whole script at once. See the
+   * script's own header comment for the full mirror of this reasoning.
    *
    * `BUILD_RUN_OPTS`: a 50 MiB maxBuffer (this compiles two C projects with
    * verbose `autoreconf`/`make` output) and a 20-minute timeout (a full
@@ -921,7 +936,10 @@ export class SystemService {
       console.log('Installing shairport-sync and nqptp from source... (AirPlay 2)');
       const scriptPath = path.join(__dirname, '../../scripts/install-shairport-sync.sh');
       jobService.log('Installing build dependencies and compiling shairport-sync + nqptp from source (this can take several minutes on a Raspberry Pi)...');
-      await this.runPrivileged(['bash', scriptPath], BUILD_RUN_OPTS);
+      await run('bash', [scriptPath], {
+        ...BUILD_RUN_OPTS,
+        env: { SNAPMGR_SUDO: needsSudo() ? '1' : '0' },
+      });
       const msg = 'Shairport-sync and nqptp installed successfully.';
       jobService.log(msg);
       return msg;
