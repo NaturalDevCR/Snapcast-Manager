@@ -23,9 +23,10 @@ import { installPrivilegedFile, readTextFile } from '../platform/files';
 // passed straight to child_process.exec() as EXEC_OPTS for the same reason).
 const BUILD_RUN_OPTS: RunOptions = { maxBuffer: 50 * 1024 * 1024, timeoutMs: 20 * 60 * 1000 };
 
-// Timeout for outbound network calls (GitHub API, NodeSource setup script,
+// Timeout for outbound network calls (GitHub API, NodeSource's repo GPG key,
 // myMPD's OBS repo GPG key) made via native fetch() -- see getLatestGitHubRelease(),
-// updateNodeJs(), and installMympd() below (Task 11, migrating off `curl`).
+// updateNodeJs(), and installMympd() below (Task 11, migrating off `curl`;
+// updateNodeJs()'s fetch target updated by Task 17).
 const FETCH_TIMEOUT_MS = 10_000;
 
 export type PackageName = 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node' | 'mpd' | 'mympd';
@@ -574,6 +575,32 @@ export class SystemService {
     return msg;
   }
 
+  /**
+   * Replaces the old `fetch(setup_<major>.x script) | sudo -E bash -`
+   * pattern (Task 17 -- see task-17-brief.md and SECURITY.md's validation
+   * checklist item 14) with NodeSource's own APT-repo method, mirroring
+   * `installMympd()`'s already-shipped architecture exactly: native
+   * `fetch()` for the GPG key, `dearmorGpgKey()` (reused directly, not
+   * duplicated), `installPrivilegedFile()` for the keyring + APT
+   * source-list files, `apt.update()` + `apt.install()`. The old pattern
+   * piped a remotely-fetched script into a general-purpose `bash`
+   * invocation, which Task 16's `sudoers.d/snapcast-manager` deliberately
+   * does not grant (a general-purpose shell wildcard would defeat the
+   * whole point of that file) -- this closes that gap with ZERO new
+   * sudoers surface: every primitive used below (`gpg`, `mkdir`,
+   * `installPrivilegedFile`'s `cp`/`chmod`, `apt-get`) is already granted.
+   *
+   * NodeSource's current documented method (replicated here without the
+   * shell script): a GPG keyring dearmored from
+   * `https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key` into
+   * `/etc/apt/keyrings/nodesource.gpg`, plus a single distro-agnostic
+   * `nodistro` APT source per major version pointing at
+   * `https://deb.nodesource.com/node_<major>.x`. Unlike `installMympd()`
+   * (which needs two `apt.update()` calls -- one to install `gpg` before
+   * this repo exists, one after adding it), only ONE `apt.update()` is
+   * needed here, right before installing `nodejs`, since there is nothing
+   * else this function needs from `apt-get` before the new repo is added.
+   */
   async updateNodeJs(version: string = '22'): Promise<string> {
     if (!/^\d{1,2}$/.test(version)) {
       throw new Error('Invalid Node.js major version');
@@ -581,24 +608,34 @@ export class SystemService {
     this.invalidatePackageCache();
     console.log(`Updating Node.js to version ${version}...`);
 
-    const setupUrl = `https://deb.nodesource.com/setup_${version}.x`;
-    const setupResponse = await fetch(setupUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!setupResponse.ok) {
-      throw new Error(`Failed to download NodeSource setup script: HTTP ${setupResponse.status} for ${setupUrl}`);
-    }
-    const script = await setupResponse.text();
+    // Only `gpg` is installed here -- `updateNodeJs()` can be triggered
+    // independently of installMympd() (in either order), so it cannot
+    // assume `gpg` is already present on the host.
+    jobService.log('Installing gpg...');
+    await apt.install(['gpg']);
 
-    jobService.log(`$ fetch ${setupUrl} | bash -`);
-    // `bash -` reads its script from stdin -- no shell pipe involved: the
-    // fetched script text is handed to run() as its `input` (stdin) option
-    // directly, in-process. `-E` (preserve environment) is kept only on the
-    // sudo-prefixed path, matching the original `sudo -E bash -`.
-    if (needsSudo()) {
-      await run('sudo', ['-E', 'bash', '-'], { input: script });
-    } else {
-      await run('bash', ['-'], { input: script });
+    const keyUrl = 'https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key';
+    jobService.log(`Downloading NodeSource repository key from ${keyUrl}...`);
+    const keyResponse = await fetch(keyUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    if (!keyResponse.ok) {
+      throw new Error(`Failed to download NodeSource repo GPG key: HTTP ${keyResponse.status} for ${keyUrl}`);
     }
+    const armoredKey = await keyResponse.text();
+    const dearmoredKey = await this.dearmorGpgKey(armoredKey);
 
+    jobService.log('Creating /etc/apt/keyrings...');
+    await this.runPrivileged(['mkdir', '-p', '/etc/apt/keyrings']);
+
+    jobService.log('Installing NodeSource APT keyring...');
+    await installPrivilegedFile('/etc/apt/keyrings/nodesource.gpg', dearmoredKey, { mode: 0o644 });
+
+    const repoLine = `deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${version}.x nodistro main\n`;
+    jobService.log('Adding NodeSource APT repository...');
+    await installPrivilegedFile('/etc/apt/sources.list.d/nodesource.list', repoLine, { mode: 0o644 });
+
+    jobService.log('Updating package lists...');
+    await apt.update();
+    jobService.log('Installing nodejs package...');
     await apt.install(['nodejs']);
 
     const msg = `Node.js updated to version ${version}.x`;

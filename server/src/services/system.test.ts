@@ -301,92 +301,238 @@ test('getLatestAvailableVersion() never shells through `grep`/`awk` -- run() is 
 });
 
 // ============================================================
-// updateNodeJs() -- curl | sudo bash - pipe eliminated via fetch + stdin
+// updateNodeJs() (Task 17) -- replaces the `curl | sudo bash -` pattern
+// (which needed a general-purpose bash/shell sudoers grant Task 16's
+// sudoers.d/snapcast-manager deliberately does NOT provide, so this feature
+// failed outright on a migrated non-root install) with the SAME
+// architecture already shipped for installMympd() above: native fetch()
+// for the GPG key, dearmorGpgKey() (reused directly, not duplicated),
+// installPrivilegedFile() for the keyring + APT source-list files, and
+// apt.update()/apt.install() -- zero new sudoers surface, every primitive
+// (gpg, mkdir, installPrivilegedFile's cp/chmod, apt-get) is already
+// granted.
 // ============================================================
 
-test('updateNodeJs() fetches the NodeSource setup script for the given major version', async () => {
-  const fetchCalls: { url: string }[] = [];
-  const restoreFetch = stubFetch(async (url: any) => {
-    fetchCalls.push({ url: String(url) });
-    return textResponse(200, '#!/bin/bash\necho setup\n');
-  });
-  const restoreSudo = stubNeedsSudo(false);
-  const restoreRun = stubRun(async () => ({ stdout: '', stderr: '' }));
-  const restoreAptInstall = stubModuleFn(aptModule, 'install', async () => {});
-  try {
-    const service = freshService();
-    await service.updateNodeJs('20');
-    assert.equal(fetchCalls.length, 1);
-    assert.equal(fetchCalls[0].url, 'https://deb.nodesource.com/setup_20.x');
-  } finally {
-    restoreFetch();
-    restoreRun();
-    restoreSudo();
-    restoreAptInstall();
-  }
-});
+const NODESOURCE_KEY_URL = 'https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key';
+const FAKE_ARMORED_KEY = '-----BEGIN PGP PUBLIC KEY BLOCK-----\nfake\n-----END PGP PUBLIC KEY BLOCK-----\n';
 
-test('updateNodeJs() runs the fetched script via `bash -` on stdin -- no shell pipe -- unprefixed when needsSudo() is false', async () => {
-  const scriptText = '#!/bin/bash\necho hello-nodesource\n';
-  const calls: Call[] = [];
-  const restoreFetch = stubFetch(async () => textResponse(200, scriptText));
-  const restoreSudo = stubNeedsSudo(false);
-  const restoreRun = stubRunRecording(calls);
-  const restoreAptInstall = stubModuleFn(aptModule, 'install', async () => {});
-  try {
-    const service = freshService();
-    await service.updateNodeJs('20');
-    const bashCall = calls.find(c => c.bin === 'bash');
-    assert.ok(bashCall, 'expected a bash call');
-    assert.deepEqual(bashCall!.args, ['-']);
-    assert.equal((bashCall!.opts as any)?.input, scriptText);
-  } finally {
-    restoreFetch();
-    restoreRun();
-    restoreSudo();
-    restoreAptInstall();
-  }
-});
-
-test('updateNodeJs() prefixes with `sudo -E` via argv (not string concatenation) when needsSudo() is true', async () => {
-  const scriptText = '#!/bin/bash\necho hello\n';
-  const calls: Call[] = [];
-  const restoreFetch = stubFetch(async () => textResponse(200, scriptText));
-  const restoreSudo = stubNeedsSudo(true);
-  const restoreRun = stubRunRecording(calls);
-  const restoreAptInstall = stubModuleFn(aptModule, 'install', async () => {});
-  try {
-    const service = freshService();
-    await service.updateNodeJs('20');
-    const bashCall = calls.find(c => c.bin === 'sudo');
-    assert.ok(bashCall, 'expected a sudo-prefixed call');
-    assert.deepEqual(bashCall!.args, ['-E', 'bash', '-']);
-    assert.equal((bashCall!.opts as any)?.input, scriptText);
-  } finally {
-    restoreFetch();
-    restoreRun();
-    restoreSudo();
-    restoreAptInstall();
-  }
-});
-
-test('updateNodeJs() installs nodejs via platform/apt.ts install() after running the setup script', async () => {
-  const installCalls: string[][] = [];
-  const restoreFetch = stubFetch(async () => textResponse(200, '#!/bin/bash\n'));
-  const restoreSudo = stubNeedsSudo(false);
-  const restoreRun = stubRun(async () => ({ stdout: '', stderr: '' }));
+/** Stubs platform/apt.ts's install()/update() and platform/files.ts's
+ * installPrivilegedFile() directly (per task-17-brief.md's testing
+ * guidance), recording every call into a single shared `order` array so
+ * ordering across the three can be asserted precisely. `run()`/`needsSudo()`
+ * are stubbed separately (via stubGpgDearmor below) since dearmorGpgKey()
+ * and the `mkdir -p /etc/apt/keyrings` step are real code driving real
+ * (stubbed) run() calls. */
+function stubUpdateNodeJsDeps(): {
+  order: string[];
+  installFileCalls: { destPath: string; content: any; opts: any }[];
+  aptInstallCalls: string[][];
+  aptUpdateCalls: number;
+  restore: () => void;
+} {
+  const order: string[] = [];
+  const installFileCalls: { destPath: string; content: any; opts: any }[] = [];
+  const aptInstallCalls: string[][] = [];
+  const state = { aptUpdateCalls: 0 };
   const restoreAptInstall = stubModuleFn(aptModule, 'install', async (pkgs: string[]) => {
-    installCalls.push(pkgs);
+    order.push(`apt-install:${pkgs.join(',')}`);
+    aptInstallCalls.push(pkgs);
   });
+  const restoreAptUpdate = stubModuleFn(aptModule, 'update', async () => {
+    order.push('apt-update');
+    state.aptUpdateCalls++;
+  });
+  const restoreInstallFile = stubModuleFn(filesModule, 'installPrivilegedFile', async (destPath: string, content: any, opts?: any) => {
+    order.push(`install-file:${destPath}`);
+    installFileCalls.push({ destPath, content, opts });
+  });
+  return {
+    order,
+    installFileCalls,
+    aptInstallCalls,
+    get aptUpdateCalls() { return state.aptUpdateCalls; },
+    restore: () => { restoreAptInstall(); restoreAptUpdate(); restoreInstallFile(); },
+  } as any;
+}
+
+test('updateNodeJs() fetches the NodeSource GPG key from the documented, dedicated key URL (not the old setup_N.x script URL)', async () => {
+  const fetchCalls: string[] = [];
+  const restoreFetch = stubFetch(async (url: any) => {
+    fetchCalls.push(String(url));
+    return textResponse(200, FAKE_ARMORED_KEY);
+  });
+  const restoreSudo = stubNeedsSudo(false);
+  const calls: Call[] = [];
+  const restoreRun = stubGpgDearmor(Buffer.from([0x99, 0x01, 0x02]))(calls);
+  const deps = stubUpdateNodeJsDeps();
   try {
     const service = freshService();
     await service.updateNodeJs('20');
-    assert.deepEqual(installCalls, [['nodejs']]);
+    assert.deepEqual(fetchCalls, [NODESOURCE_KEY_URL]);
   } finally {
     restoreFetch();
     restoreRun();
     restoreSudo();
-    restoreAptInstall();
+    deps.restore();
+  }
+});
+
+test('updateNodeJs() performs the exact NodeSource APT-repo sequence in order: install gpg -> keyring install -> source-list install -> single apt update -> nodejs install', async () => {
+  const restoreFetch = stubFetch(async () => textResponse(200, FAKE_ARMORED_KEY));
+  const restoreSudo = stubNeedsSudo(false);
+  const calls: Call[] = [];
+  const restoreRun = stubGpgDearmor(Buffer.from([0x99, 0x01, 0x02]))(calls);
+  const deps = stubUpdateNodeJsDeps();
+  try {
+    const service = freshService();
+    await service.updateNodeJs('20');
+    assert.deepEqual(deps.order, [
+      'apt-install:gpg',
+      'install-file:/etc/apt/keyrings/nodesource.gpg',
+      'install-file:/etc/apt/sources.list.d/nodesource.list',
+      'apt-update',
+      'apt-install:nodejs',
+    ]);
+    // Only ONE apt.update() -- unlike installMympd()'s two-update
+    // structure, this feature only needs a single update, right before the
+    // nodejs install, after the new repo has been added.
+    assert.equal(deps.aptUpdateCalls, 1);
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreSudo();
+    deps.restore();
+  }
+});
+
+test('updateNodeJs() creates /etc/apt/keyrings (sudo-prefixed via argv when needsSudo() is true) before installing the keyring, mirroring installMympd()', async () => {
+  const restoreFetch = stubFetch(async () => textResponse(200, FAKE_ARMORED_KEY));
+  const restoreSudo = stubNeedsSudo(true);
+  const calls: Call[] = [];
+  const restoreRun = stubGpgDearmor(Buffer.from([1, 2, 3]))(calls);
+  const deps = stubUpdateNodeJsDeps();
+  try {
+    const service = freshService();
+    await service.updateNodeJs('20');
+    const mkdirCall = calls.find(c => c.bin === 'sudo' && c.args[0] === 'mkdir');
+    assert.ok(mkdirCall, 'expected a sudo-prefixed mkdir -p /etc/apt/keyrings');
+    assert.deepEqual(mkdirCall!.args, ['mkdir', '-p', '/etc/apt/keyrings']);
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreSudo();
+    deps.restore();
+  }
+});
+
+test('updateNodeJs() installs the dearmored key at /etc/apt/keyrings/nodesource.gpg with mode 0o644, bytes matching gpg --dearmor\'s real output', async () => {
+  const restoreFetch = stubFetch(async () => textResponse(200, FAKE_ARMORED_KEY));
+  const restoreSudo = stubNeedsSudo(false);
+  const dearmoredBytes = Buffer.from([0x99, 0x01, 0xff, 0x00, 0x47, 0x50, 0x47]);
+  const calls: Call[] = [];
+  const restoreRun = stubGpgDearmor(dearmoredBytes)(calls);
+  const deps = stubUpdateNodeJsDeps();
+  try {
+    const service = freshService();
+    await service.updateNodeJs('20');
+    const keyringInstall = deps.installFileCalls.find(f => f.destPath === '/etc/apt/keyrings/nodesource.gpg');
+    assert.ok(keyringInstall, 'expected the dearmored keyring to be installed to /etc/apt/keyrings/nodesource.gpg');
+    assert.ok((keyringInstall!.content as Buffer).equals(dearmoredBytes), 'installed keyring bytes must exactly match gpg --dearmor\'s output');
+    assert.equal(keyringInstall!.opts?.mode, 0o644);
+
+    const gpgCall = calls.find(c => c.bin === 'gpg');
+    assert.ok(gpgCall, 'expected gpg --dearmor to be invoked (reusing dearmorGpgKey(), not duplicated)');
+    assert.equal(gpgCall!.args[0], '--dearmor');
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreSudo();
+    deps.restore();
+  }
+});
+
+test('updateNodeJs() writes the source-list entry with EXACTLY the right content for the given major version (node_20.x, not node_20 or 20.x alone)', async () => {
+  const restoreFetch = stubFetch(async () => textResponse(200, FAKE_ARMORED_KEY));
+  const restoreSudo = stubNeedsSudo(false);
+  const calls: Call[] = [];
+  const restoreRun = stubGpgDearmor(Buffer.from([1, 2, 3]))(calls);
+  const deps = stubUpdateNodeJsDeps();
+  try {
+    const service = freshService();
+    await service.updateNodeJs('20');
+    const sourcesInstall = deps.installFileCalls.find(f => f.destPath === '/etc/apt/sources.list.d/nodesource.list');
+    assert.ok(sourcesInstall, 'expected a sources.list.d entry to be installed');
+    assert.equal(
+      sourcesInstall!.content,
+      'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main\n',
+    );
+    assert.equal(sourcesInstall!.opts?.mode, 0o644);
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreSudo();
+    deps.restore();
+  }
+});
+
+test('updateNodeJs() interpolates the requested major version into the repo URL, not a hardcoded one (version 18 case)', async () => {
+  const restoreFetch = stubFetch(async () => textResponse(200, FAKE_ARMORED_KEY));
+  const restoreSudo = stubNeedsSudo(false);
+  const calls: Call[] = [];
+  const restoreRun = stubGpgDearmor(Buffer.from([1, 2, 3]))(calls);
+  const deps = stubUpdateNodeJsDeps();
+  try {
+    const service = freshService();
+    await service.updateNodeJs('18');
+    const sourcesInstall = deps.installFileCalls.find(f => f.destPath === '/etc/apt/sources.list.d/nodesource.list');
+    assert.equal(
+      sourcesInstall!.content,
+      'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main\n',
+    );
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreSudo();
+    deps.restore();
+  }
+});
+
+test('updateNodeJs() installs nodejs via platform/apt.ts install() as the final step', async () => {
+  const restoreFetch = stubFetch(async () => textResponse(200, FAKE_ARMORED_KEY));
+  const restoreSudo = stubNeedsSudo(false);
+  const calls: Call[] = [];
+  const restoreRun = stubGpgDearmor(Buffer.from([1, 2, 3]))(calls);
+  const deps = stubUpdateNodeJsDeps();
+  try {
+    const service = freshService();
+    await service.updateNodeJs('20');
+    assert.deepEqual(deps.aptInstallCalls[deps.aptInstallCalls.length - 1], ['nodejs']);
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreSudo();
+    deps.restore();
+  }
+});
+
+test('updateNodeJs() never invokes bash or any general-purpose shell (regression guard: the whole point of this fix)', async () => {
+  const restoreFetch = stubFetch(async () => textResponse(200, FAKE_ARMORED_KEY));
+  const restoreSudo = stubNeedsSudo(true);
+  const calls: Call[] = [];
+  const restoreRun = stubGpgDearmor(Buffer.from([1, 2, 3]))(calls);
+  const deps = stubUpdateNodeJsDeps();
+  try {
+    const service = freshService();
+    await service.updateNodeJs('20');
+    for (const call of calls) {
+      assert.notEqual(call.bin, 'bash');
+      assert.ok(!call.args.includes('bash'), `unexpected bash invocation via argv: ${JSON.stringify(call)}`);
+    }
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreSudo();
+    deps.restore();
   }
 });
 
@@ -405,13 +551,43 @@ test('updateNodeJs() rejects an invalid version without ever calling fetch()', a
   }
 });
 
-test('updateNodeJs() throws when the NodeSource setup script fetch is not ok', async () => {
-  const restoreFetch = stubFetch(async () => textResponse(500, ''));
+test('updateNodeJs() throws a clear error when the NodeSource GPG key fetch is not ok', async () => {
+  const restoreFetch = stubFetch(async () => textResponse(404, ''));
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRun(async () => ({ stdout: '', stderr: '' }));
+  const deps = stubUpdateNodeJsDeps();
   try {
     const service = freshService();
-    await assert.rejects(() => service.updateNodeJs('20'), /500/);
+    await assert.rejects(() => service.updateNodeJs('20'), /404/);
+    assert.equal(deps.installFileCalls.length, 0, 'must not install any files after a failed key fetch');
   } finally {
     restoreFetch();
+    restoreRun();
+    restoreSudo();
+    deps.restore();
+  }
+});
+
+test('updateNodeJs() logs progress at every real step, not just once at the end', async () => {
+  const restoreFetch = stubFetch(async () => textResponse(200, FAKE_ARMORED_KEY));
+  const restoreSudo = stubNeedsSudo(false);
+  const calls: Call[] = [];
+  const restoreRun = stubGpgDearmor(Buffer.from([1, 2, 3]))(calls);
+  const deps = stubUpdateNodeJsDeps();
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.updateNodeJs('20');
+    assert.ok(logCalls.length > 3, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    for (const fragment of ['gpg', 'keyring', 'repository', 'package lists', 'nodejs']) {
+      assert.ok(logCalls.some(l => l.toLowerCase().includes(fragment)), `expected a log line mentioning "${fragment}", got: ${JSON.stringify(logCalls)}`);
+    }
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreSudo();
+    deps.restore();
+    restoreJobLog();
   }
 });
 

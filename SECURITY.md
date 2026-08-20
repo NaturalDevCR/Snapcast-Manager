@@ -269,15 +269,18 @@ OS hardware before this is considered production-ready:
     `Defaults:snapmanager !requiretty` line added for it (this daemon never
     has a controlling TTY).
 14. Confirm no feature silently broke that this task's grep pass may have
-    missed. In particular: **"Update Node.js" (`updateNodeJs()` in
-    `server/src/services/system.ts`) is a KNOWN, un-fixed regression** --
-    it pipes a remotely-fetched NodeSource setup script into
-    `sudo -E bash -` via stdin, which this task's sudoers file
-    deliberately does NOT grant (doing so would be exactly the
-    general-purpose-shell-wildcard hole this design explicitly forbids).
-    On a migrated (non-root) install this feature will fail loudly with a
-    sudo permission error rather than silently succeeding insecurely --
-    confirm that failure is clean (no partial state) and plan a follow-up
-    task to replace the fetch-and-pipe-to-bash pattern (e.g. a pinned,
-    literal setup-script path following the `install-shairport-sync.sh`
-    model, or switching to NodeSource's own apt-repo-based install).
+    missed. In particular: install/update Node.js via the UI and confirm
+    it succeeds end-to-end on a migrated (non-root `snapmanager`) install.
+    `updateNodeJs()` (`server/src/services/system.ts`) formerly piped a
+    remotely-fetched NodeSource setup script into `sudo -E bash -` via
+    stdin -- a general-purpose-shell-wildcard hole this design explicitly
+    forbids, which this task's sudoers file deliberately did not grant, so
+    the feature failed outright on a migrated install. Task 17 replaced
+    that with NodeSource's own APT-repo method (native `fetch()` for the
+    GPG key, `dearmorGpgKey()`, `installPrivilegedFile()` for the keyring +
+    source-list files, `apt.update()`/`apt.install()`), mirroring
+    `installMympd()`'s already-shipped pattern -- zero new sudoers surface
+    was needed. Confirm the installed keyring (`/etc/apt/keyrings/nodesource.gpg`)
+    and source-list entry (`/etc/apt/sources.list.d/nodesource.list`) are
+    present and correct, and that `apt-get install -y nodejs` actually
+    installs the requested major version.
