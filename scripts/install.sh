@@ -719,6 +719,33 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     # (fresh install) there is nothing to roll back to, so a failure here
     # fails loudly and exits non-zero instead, per the task brief's second
     # sanctioned failure-handling option. ---
+    #
+    # Fix-pass additions to ReadWritePaths= below (Criticals #4/#5/#6, found
+    # during post-Task-16 review -- `sudo` does NOT create a new mount
+    # namespace, so every sudo-elevated child of this ProtectSystem=strict
+    # unit stays inside the SAME read-only view unless its own required
+    # writable state is listed explicitly here):
+    #   /var/lib/dpkg /var/cache/apt /var/lib/apt/lists -- every apt-get/dpkg
+    #     call (platform/apt.ts, executeDebUpdate(), uninstallPackage()) is
+    #     sudo-elevated and needs to write its OWN package-manager state.
+    #   /usr/local/bin /usr/bin -- install-shairport-sync.sh's `make install`
+    #     (autotools default prefix /usr/local) installs nqptp/shairport-sync
+    #     binaries to /usr/local/bin; uninstallPackage('shairport-sync')
+    #     (server/src/services/system.ts) does
+    #     `runPrivileged(['rm', '-f', '/usr/local/bin/shairport-sync',
+    #     '/usr/local/bin/nqptp'])`; the script's own legacy-cleanup line
+    #     also removes stale copies under /usr/bin and runs under `set -e`
+    #     with no `|| true`, so a failure there would otherwise abort the
+    #     whole script.
+    #   /etc/passwd /etc/group /etc/shadow /etc/gshadow -- useradd/groupadd/
+    #     usermod (install-shairport-sync.sh's `groupadd -r shairport-sync`/
+    #     `useradd -r -M -g shairport-sync ...`, and executeDebUpdate()'s
+    #     `usermod -d /var/lib/snapserver snapserver`) write the account
+    #     database directly. This is the SAME "broad by necessity because the
+    #     sudoers-granted tool itself already carries root-equivalent trust"
+    #     reasoning already applied to apt-get/dpkg/make above, not a new,
+    #     separate risk category -- see SECURITY.md's "Privilege model"
+    #     section for the full writeup.
     NEW_UNIT_CONTENT=$(cat <<EOF
 [Unit]
 Description=Snapcast Manager Service
@@ -735,7 +762,7 @@ NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=$INSTALL_BASE_DIR/data $INSTALL_BASE_DIR/server/snapshots /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /etc/snapcast-manager /run/snapcast-manager /var/lib/snapcast-manager/scripts /var/backups/snapmanager /etc/mpd.conf /var/lib/mpd /etc/systemd/system /etc/default/snapclient /etc/snapclient-manager /var/lib/snapserver /etc/apt/keyrings /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl
+ReadWritePaths=$INSTALL_BASE_DIR/data $INSTALL_BASE_DIR/server/snapshots /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /etc/snapcast-manager /run/snapcast-manager /var/lib/snapcast-manager/scripts /var/backups/snapmanager /etc/mpd.conf /var/lib/mpd /etc/systemd/system /etc/default/snapclient /etc/snapclient-manager /var/lib/snapserver /etc/apt/keyrings /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl /var/lib/dpkg /var/cache/apt /var/lib/apt/lists /usr/local/bin /usr/bin /etc/passwd /etc/group /etc/shadow /etc/gshadow
 
 [Install]
 WantedBy=multi-user.target

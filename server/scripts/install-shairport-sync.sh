@@ -81,25 +81,38 @@ $SUDO rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp
 $SUDO rm -f /lib/systemd/system/shairport-sync.service /lib/systemd/system/nqptp.service
 
 echo "Building and installing nqptp..."
-rm -rf /tmp/nqptp-build
-git clone https://github.com/mikebrady/nqptp.git /tmp/nqptp-build
-cd /tmp/nqptp-build
+NQPTP_BUILD_DIR=/tmp/nqptp-build
+rm -rf "$NQPTP_BUILD_DIR"
+git clone https://github.com/mikebrady/nqptp.git "$NQPTP_BUILD_DIR"
+cd "$NQPTP_BUILD_DIR"
 autoreconf -fvi
 ./configure --with-systemd-startup
-make -j"$(nproc)"
-$SUDO make install
+# Fix-pass note (Critical #2, post-Task-16 review): `-C "$NQPTP_BUILD_DIR"`
+# is passed explicitly on both `make` invocations below rather than relying
+# solely on the preceding `cd` -- `sudo make` is a GTFOBins-class
+# arbitrary-code-execution primitive when combined with a controllable
+# Makefile/CWD, and sudoers cannot restrict *which* CWD a granted `make`
+# runs against. Pinning `-C` here removes this script's own dependency on
+# ambient CWD state at the moment `sudo make install` runs; it does NOT
+# fully close the risk, since sudoers still cannot pin the `-C` argument's
+# value itself (see scripts/sudoers.d/snapcast-manager and SECURITY.md for
+# the full, honest disclosure of this residual gap).
+make -C "$NQPTP_BUILD_DIR" -j"$(nproc)"
+$SUDO make -C "$NQPTP_BUILD_DIR" install
 $SUDO systemctl daemon-reload
 $SUDO systemctl enable nqptp
 $SUDO systemctl restart nqptp
 
 echo "Building and installing shairport-sync..."
-rm -rf /tmp/shairport-sync-build
-git clone https://github.com/mikebrady/shairport-sync.git /tmp/shairport-sync-build
-cd /tmp/shairport-sync-build
+SPS_BUILD_DIR=/tmp/shairport-sync-build
+rm -rf "$SPS_BUILD_DIR"
+git clone https://github.com/mikebrady/shairport-sync.git "$SPS_BUILD_DIR"
+cd "$SPS_BUILD_DIR"
 autoreconf -fvi
 ./configure --sysconfdir=/etc --with-alsa --with-soxr --with-avahi --with-ssl=openssl --with-systemd-startup --with-airplay-2 --with-metadata
-make -j"$(nproc)"
-$SUDO make install
+# Same `-C` hardening as nqptp above -- see the note there.
+make -C "$SPS_BUILD_DIR" -j"$(nproc)"
+$SUDO make -C "$SPS_BUILD_DIR" install
 
 echo "Setting up systemd service and user access..."
 if ! getent group "shairport-sync" >/dev/null 2>&1; then
