@@ -1,0 +1,79 @@
+/*
+ * Self-hosted fonts (Task 20).
+ *
+ * These replace the fonts.googleapis.com/fonts.gstatic.com <link> tags that
+ * used to live in index.html. This app is designed to run on a LAN, often
+ * on hardware (Raspberry Pi) with no outbound internet access - a hard CDN
+ * dependency meant Inter silently fell back to a system font and Material
+ * Symbols rendered as literal text (e.g. "settings_input_antenna") instead
+ * of icon glyphs. Self-hosting removes that dependency entirely.
+ *
+ * Files live in client/public/fonts/ (served from /fonts/... at runtime)
+ * and were fetched from Google Fonts' real, current css2 API response
+ * (content-hashed gstatic.com URLs - not hardcoded/guessed) - see
+ * .superpowers/sdd/task-20-report.md for exact provenance and sizes.
+ */
+
+/* ---- Inter (Latin subset, only the weights actually used by Tailwind's
+   font-normal/medium/semibold/bold/black utilities in this app) ---- */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter-500.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter-600.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter-700.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url('/fonts/inter-900.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ---- Material Symbols Outlined ----
+ * Subset (via fonttools varLib.instancer + pyftsubset) to a static instance
+ * at the exact axis coordinates this app renders at (wght 400, FILL 0,
+ * GRAD 0, opsz 24 - see the .material-symbols-outlined font-variation-settings
+ * rule below) and to only the ~79 icon glyph names actually referenced
+ * across client/src (literal spans + traced dynamic {{ }} bindings). See
+ * the task report for the full glyph list and size breakdown.
+ */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/material-symbols-outlined.woff2') format('woff2');
+}

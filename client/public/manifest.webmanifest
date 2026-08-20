@@ -1,0 +1,23 @@
+{
+  "name": "Snapcast Manager",
+  "short_name": "Snapcast",
+  "description": "Manage a Snapcast audio server and clients on your LAN.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1c1022",
+  "theme_color": "#a60df2",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

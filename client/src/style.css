@@ -1,4 +1,35 @@
 @import "tailwindcss";
+@import "./fonts.css";
+
+/*
+ * prefers-reduced-motion: reduce - global override (Task 20).
+ *
+ * A blanket, well-established pattern rather than a full per-component
+ * animation audit (out of scope): collapse animation/transition durations
+ * to near-zero for anyone who has asked the OS for reduced motion.
+ *
+ * Exception: .animate-spin (Tailwind's spin keyframe, used throughout this
+ * app on sync/loading icons - e.g. Dashboard.vue's refresh icon,
+ * PipeSources.vue/Tools.vue/Security.vue/ServerConfig.vue's inline "sync"
+ * icons) is explicitly re-enabled. Loading spinners communicating "still
+ * working" are a standard, accepted exception to reduced-motion overrides -
+ * freezing them would make the UI look hung instead of busy.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
 
 /*
  * Tailwind v4 is CSS-first: utility classes are only generated for names
@@ -94,8 +125,31 @@
     border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
-  /* Material Symbols Defaults */
+  /*
+   * Material Symbols Defaults.
+   *
+   * font-family/weight/style/etc. here used to be supplied by the
+   * fonts.googleapis.com stylesheet (removed in Task 20 - see
+   * client/src/fonts.css for the self-hosted @font-face). That CDN CSS
+   * response bundled both the @font-face AND this class rule, so
+   * self-hosting only the @font-face isn't enough - the class rule has to
+   * be reproduced here or every .material-symbols-outlined element falls
+   * back to the inherited body font (Inter) and renders literal glyph
+   * names as text instead of icons.
+   */
   .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
     font-variation-settings:
       'FILL' 0,
       'wght' 400,
@@ -107,6 +161,6 @@
 body {
   background-color: var(--brand-bg);
   color: var(--text-main);
-  transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1), color 0.5s ease;
+  transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s ease;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
