@@ -19,25 +19,83 @@ function resolveJwtSecret(): string {
 }
 const JWT_SECRET = resolveJwtSecret();
 
-// Simple in-memory rate limiter for login attempts (per IP)
+// Task 15: minimum password length policy -- applied on BOTH POST /setup
+// (initial admin creation) and POST /change-password (the newPassword
+// field), before any hashing/storing happens. Deliberately length-only
+// (no uppercase/digit/symbol complexity rules): length is the single most
+// impactful, least user-hostile policy -- see task-15-brief.md requirement 1.
+const MIN_PASSWORD_LENGTH = 12;
+
+function isPasswordTooShort(password: unknown): boolean {
+  return typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH;
+}
+
+// Task 15: persisted rate limiter for login/setup/change-password attempts
+// (per IP), backed by the `login_attempts` SQLite table (see database.ts)
+// instead of an in-memory Map -- a restart is no longer a free rate-limit
+// reset for an attacker, which matters here since this app's own
+// install/update features restart the server itself.
+//
+// The SAME limiter (one row per IP, shared across all three endpoints) is
+// applied to all of POST /auth/login, POST /auth/setup, and POST
+// /auth/change-password:
+//   - /login has always needed this (credential stuffing / brute force).
+//   - /setup had NONE before this task -- an attacker could hammer the
+//     initial-setup race condition or spam admin-creation attempts before
+//     a real admin ever sets up the system.
+//   - /change-password had NONE before this task -- an authenticated
+//     attacker (or anyone holding a stolen valid token) could otherwise
+//     brute-force the current-password check with unlimited attempts.
+// The window/max-attempts constants are reused unchanged across all three
+// (no differentiation): all three guard the same class of risk (a
+// password-guessing loop against this single-admin app), and there's no
+// specific reason found to size one endpoint's budget differently from
+// another's.
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 10;
-const loginAttempts = new Map<string, { count: number; windowStart: number }>();
+// Lazy cleanup: on every rate-limit check, sweep rows whose window expired
+// more than this many window-lengths ago (for ANY ip, not just the current
+// request's), so `login_attempts` doesn't grow unbounded from one-off
+// visitors. A simple sweep-on-check is sufficient at this app's scale; a
+// dedicated cron/cleanup job would be over-engineering.
+const STALE_ROW_WINDOW_MULTIPLE = 4;
+
+interface LoginAttemptRow {
+  count: number;
+  window_start: number;
+}
 
 function loginRateLimiter(req: Request, res: Response, next: NextFunction) {
   const ip = req.ip || 'unknown';
   const now = Date.now();
-  const entry = loginAttempts.get(ip);
-  if (!entry || now - entry.windowStart > LOGIN_WINDOW_MS) {
-    loginAttempts.set(ip, { count: 1, windowStart: now });
+
+  db.prepare('DELETE FROM login_attempts WHERE window_start < ?').run(now - LOGIN_WINDOW_MS * STALE_ROW_WINDOW_MULTIPLE);
+
+  const row = db.prepare('SELECT count, window_start FROM login_attempts WHERE ip = ?').get(ip) as LoginAttemptRow | undefined;
+
+  if (!row || now - row.window_start > LOGIN_WINDOW_MS) {
+    db.prepare(
+      `INSERT INTO login_attempts (ip, count, window_start) VALUES (?, 1, ?)
+       ON CONFLICT(ip) DO UPDATE SET count = 1, window_start = excluded.window_start`
+    ).run(ip, now);
     return next();
   }
-  entry.count++;
-  if (entry.count > LOGIN_MAX_ATTEMPTS) {
-    const retryMin = Math.ceil((entry.windowStart + LOGIN_WINDOW_MS - now) / 60000);
-    return res.status(429).json({ error: `Too many login attempts. Try again in ${retryMin} min.` });
+
+  const newCount = row.count + 1;
+  db.prepare('UPDATE login_attempts SET count = ? WHERE ip = ?').run(newCount, ip);
+
+  if (newCount > LOGIN_MAX_ATTEMPTS) {
+    const retryMin = Math.ceil((row.window_start + LOGIN_WINDOW_MS - now) / 60000);
+    return res.status(429).json({ error: `Too many attempts. Try again in ${retryMin} min.` });
   }
   next();
+}
+
+// Clears an IP's rate-limit counter after a successful attempt on a
+// rate-limited endpoint, matching the original in-memory limiter's
+// behavior of resetting on a successful login.
+function clearRateLimit(ip: string) {
+  db.prepare('DELETE FROM login_attempts WHERE ip = ?').run(ip);
 }
 
 router.get('/setup-status', (req: Request, res: Response) => {
@@ -50,7 +108,7 @@ router.get('/setup-status', (req: Request, res: Response) => {
   }
 });
 
-router.post('/setup', (req: Request, res: Response) => {
+router.post('/setup', loginRateLimiter, (req: Request, res: Response) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -63,13 +121,24 @@ router.post('/setup', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'System already initialized' });
     }
 
+    if (isPasswordTooShort(password)) {
+      return res.status(400).json({ error: 'Password must be at least 12 characters' });
+    }
+
     const hashedPassword = bcrypt.hashSync(password, 10);
     const insert = db.prepare('INSERT INTO users (username, password) VALUES (?, ?)');
     const result = insert.run(username, hashedPassword);
 
-    const token = jwt.sign({ id: result.lastInsertRowid, username, role: 'admin' }, JWT_SECRET, { expiresIn: '1d' });
+    // A brand-new user always starts at token_version 0 (the column's own
+    // default), so the claim mirrors that explicitly.
+    const token = jwt.sign(
+      { id: result.lastInsertRowid, username, role: 'admin', tokenVersion: 0 },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
 
-    res.status(201).json({ 
+    clearRateLimit(req.ip || 'unknown');
+    res.status(201).json({
       message: 'Admin user created successfully',
       token,
       user: { id: result.lastInsertRowid, username, role: 'admin' }
@@ -81,7 +150,7 @@ router.post('/setup', (req: Request, res: Response) => {
 
 router.post('/login', loginRateLimiter, (req: Request, res: Response) => {
   const { username, password } = req.body;
-  
+
   if (!username || !password) {
      return res.status(400).json({ error: 'Username and password are required' });
   }
@@ -99,31 +168,61 @@ router.post('/login', loginRateLimiter, (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    loginAttempts.delete(req.ip || 'unknown');
-    const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+    clearRateLimit(req.ip || 'unknown');
+    const tokenVersion = user.token_version ?? 0;
+    const token = jwt.sign({ id: user.id, username: user.username, role: user.role, tokenVersion }, JWT_SECRET, { expiresIn: '1d' });
     res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Task 15: verifies both the JWT signature AND that its `tokenVersion`
+// claim matches the CURRENT value stored for that user in the `users`
+// table -- this is what makes POST /change-password and POST /auth/logout
+// able to immediately invalidate every previously-issued token for a user
+// by bumping `token_version`, without maintaining a separate token
+// blacklist.
+//
+// Backward compatibility: a token issued before this feature existed has
+// no `tokenVersion` claim at all. `decoded.tokenVersion ?? 0` treats a
+// missing claim as version 0 -- matching the `users.token_version` column's
+// own `DEFAULT 0` -- so tokens issued just before this deploy keep working
+// instead of every existing session breaking at once. This is a genuine
+// comparison, not a bypass: as soon as that user's token_version moves
+// past 0 (e.g. any password change or logout), an old claim-less token
+// stops matching and is rejected exactly like any other stale token.
+//
+// This costs one extra synchronous DB read per authenticated request --
+// acceptable for this single-admin, low-traffic app on synchronous
+// better-sqlite3; no caching layer is added for it.
 export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+  jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
     if (err) return res.sendStatus(403);
-    (req as any).user = user;
+
+    const row = db.prepare('SELECT token_version FROM users WHERE id = ?').get(decoded.id) as { token_version: number } | undefined;
+    if (!row) return res.sendStatus(403);
+
+    const currentVersion = row.token_version ?? 0;
+    const tokenVersion = decoded.tokenVersion ?? 0;
+    if (tokenVersion !== currentVersion) {
+      return res.sendStatus(403);
+    }
+
+    (req as any).user = decoded;
     next();
   });
 };
 
-router.post('/change-password', authenticateToken, (req: Request, res: Response) => {
+router.post('/change-password', authenticateToken, loginRateLimiter, (req: Request, res: Response) => {
   const { currentPassword, newPassword } = req.body;
   const user = (req as any).user;
-  
+
   if (!currentPassword || !newPassword) {
      return res.status(400).json({ error: 'Current and new passwords are required' });
   }
@@ -141,11 +240,46 @@ router.post('/change-password', authenticateToken, (req: Request, res: Response)
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
+    if (isPasswordTooShort(newPassword)) {
+      return res.status(400).json({ error: 'Password must be at least 12 characters' });
+    }
+
     const hashedPassword = bcrypt.hashSync(newPassword, 10);
-    const update = db.prepare('UPDATE users SET password = ? WHERE id = ?');
+    // Bump token_version in the SAME update as the password change so this
+    // immediately invalidates every previously-issued token for this user
+    // -- including the very token used to make this request.
+    const update = db.prepare('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?');
     update.run(hashedPassword, user.id);
 
-    res.json({ message: 'Password updated successfully' });
+    const updated = db.prepare('SELECT token_version FROM users WHERE id = ?').get(user.id) as { token_version: number };
+
+    // Because this request's own token was just invalidated above, the
+    // response must include a FRESH token (with the new tokenVersion) so
+    // the client that just changed its own password isn't immediately
+    // logged out by its own action.
+    const freshToken = jwt.sign(
+      { id: dbUser.id, username: dbUser.username, role: dbUser.role, tokenVersion: updated.token_version },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    clearRateLimit(req.ip || 'unknown');
+    res.json({ message: 'Password updated successfully', token: freshToken });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Task 15: logging out invalidates the CURRENT token (and any other
+// outstanding token for this user) by bumping token_version -- there's no
+// separate blacklist to maintain. This is a single-admin app, so there's
+// no "log out this device but keep my other sessions alive" concern to
+// design around; bumping the one user's version is sufficient.
+router.post('/logout', authenticateToken, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  try {
+    db.prepare('UPDATE users SET token_version = token_version + 1 WHERE id = ?').run(user.id);
+    res.json({ message: 'Logged out successfully' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

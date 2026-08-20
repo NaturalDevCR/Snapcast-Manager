@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import authRouter from './auth';
 import systemRouter from './routes/system';
@@ -13,16 +14,47 @@ import snapclientInstancesRouter from './routes/snapclientInstances';
 import toolsRouter from './routes/tools';
 import pipeSourcesRouter from './routes/pipeSources';
 import { pipeSourceService } from './services/pipeSources';
+import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Task 15: HTTP security headers. The CSP is built on helmet's own strict
+// defaults (default-src 'self', object-src 'none', no 'unsafe-inline'
+// anywhere by default) -- confirmed against the REAL built
+// `client/dist/index.html` (via `cd client && npm run build`) that no
+// `'unsafe-inline'`/nonce carve-out is needed: Vite emits the app's script
+// and CSS as external files (`<script type="module" src="/assets/...">`,
+// `<link rel="stylesheet" href="/assets/...">`), not inline <script>/<style>
+// tags, so the default script-src/style-src 'self' already covers them.
+//
+// The one deliberate carve-out: `client/index.html` still loads Google
+// Fonts (Inter + Material Symbols) directly from fonts.googleapis.com /
+// fonts.gstatic.com (see that file's <link> tags). Stage 2 of the
+// hardening plan self-hosts those fonts instead; until that lands,
+// style-src/font-src must explicitly allow just those two hosts -- no
+// other external host is allowed beyond them. Tighten this back to
+// helmet's plain defaults once fonts are self-hosted.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        'style-src': ["'self'", 'https://fonts.googleapis.com'],
+        'font-src': ["'self'", 'https://fonts.gstatic.com'],
+      },
+    },
+  })
+);
 
 // The frontend is served from this same origin in production; CORS is only
 // needed when the Vite dev server (5173) talks to the API without the proxy.
 if (process.env.NODE_ENV !== 'production') {
   app.use(cors());
 }
-app.use(express.json());
+// Task 15: bound the JSON body size (was unbounded express.json()) so a
+// client can't force the process to buffer an arbitrarily large request body.
+app.use(express.json({ limit: '1mb' }));
 
 app.use('/api/auth', authRouter);
 app.use('/api/system', systemRouter);
@@ -57,6 +89,14 @@ app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
 });
 
+// Task 15: central error-handling middleware -- MUST be registered last,
+// after every router and the SPA fallback above, so Express treats it as
+// the catch-all for anything that reaches it without a route's own
+// try/catch handling it first (see middleware/errorHandler.ts for the
+// full scope-boundary explanation: this is a safety net, not a
+// replacement for each route's existing local error handling).
+app.use(errorHandler);
+
 // Task 7: migrate any pipe source still on the pre-0.4 /tmp FIFO path onto
 // the new /run/snapcast-manager one before accepting traffic. The database
 // module above is already fully initialized by the time this file's
@@ -74,9 +114,24 @@ async function start(): Promise<void> {
     console.error('[startup] Pipe-source FIFO migration failed unexpectedly:', err);
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
+
+  // Task 15: request timeout via Node's own http.Server#setTimeout, applied
+  // to the server instance app.listen() returns. This is a socket-idle
+  // timeout (resets on activity), not a hard cap on total request
+  // duration, which is what we want here: routes/system.ts's long-running
+  // install/update/uninstall work already runs as a background job
+  // (jobService.start(), returning 202 immediately -- see startJob() in
+  // routes/system.ts) that the client polls via quick, individual
+  // GET /system/jobs/:id requests rather than holding one connection open
+  // for the job's full duration, so those never approach this timeout.
+  // 2 minutes is generous for any single request/response on this app
+  // (including e.g. streaming a backup archive download in
+  // GET /system/backups/download/:name) while still bounding a
+  // slow-loris-style hung connection.
+  server.setTimeout(2 * 60 * 1000);
 }
 
 start();

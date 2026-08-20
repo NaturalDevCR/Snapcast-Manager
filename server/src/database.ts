@@ -85,6 +85,21 @@ const init = () => {
       content TEXT NOT NULL,
       saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- Task 15: persisted login-rate-limiter state, keyed by client IP. This
+    -- replaces auth.ts's old in-memory Map<ip, {count, windowStart}>, which
+    -- reset to empty on every server restart -- a free rate-limit reset for
+    -- an attacker, and this app's own install/update features cause the
+    -- server to restart itself, so that reset was reachable in practice.
+    -- One shared row per IP is deliberately reused across all three
+    -- rate-limited endpoints (/auth/login, /auth/setup,
+    -- /auth/change-password) -- see auth.ts's loginRateLimiter -- rather
+    -- than keying by (ip, route), matching the brief's schema.
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      ip TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0,
+      window_start INTEGER NOT NULL
+    );
   `);
 
   // Migration: add type column to pipe sources (radio | mpd)
@@ -129,6 +144,21 @@ const init = () => {
     for (const row of rows) {
       reclassify.run(isPathInsideManagedDir(row.path) ? 1 : 0, row.id);
     }
+  } catch (_) {
+    // Column already exists — no-op
+  }
+
+  // Migration (Task 15): add `token_version` to users -- incremented by
+  // POST /auth/change-password and POST /auth/logout to invalidate every
+  // previously-issued JWT for that user (see auth.ts's authenticateToken,
+  // which rejects a token whose `tokenVersion` claim doesn't match this
+  // column's current value). `DEFAULT 0` means: (a) every pre-existing row
+  // backfills to 0 here, and (b) a JWT issued before this migration ran has
+  // no `tokenVersion` claim at all -- authenticateToken treats a missing
+  // claim as 0 too, so those already-issued tokens keep working after this
+  // deploy instead of every session breaking at once.
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0');
   } catch (_) {
     // Column already exists — no-op
   }
