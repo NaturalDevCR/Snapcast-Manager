@@ -10,6 +10,7 @@ import Watchdogs from '../views/Watchdogs.vue'
 import Routing from '../views/Routing.vue'
 import Tools from '../views/Tools.vue'
 import PipeSources from '../views/PipeSources.vue'
+import UiKit from '../views/dev/UiKit.vue'
 
 import { fetchApi } from '../utils/api'
 
@@ -83,6 +84,15 @@ const router = createRouter({
     {
       path: '/radio-streams',
       redirect: '/pipe-sources',
+    },
+    {
+      // Dev-only visual showcase for client/src/components/ui/* primitives
+      // (Task 21). Deliberately unauthenticated and NOT linked from
+      // Layout.vue's navigation — reachable only by visiting this URL
+      // directly. See client/src/views/dev/UiKit.vue for details.
+      path: '/dev/ui-kit',
+      name: 'dev-ui-kit',
+      component: UiKit,
     },
 
   ]
