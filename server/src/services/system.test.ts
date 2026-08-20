@@ -17,10 +17,15 @@
 // TASK 11 -- migrates most of services/system.ts off child_process.exec()
 // string interpolation (and, in several places, off shelling out at all)
 // onto platform/exec.ts's argv-based run(), platform/systemd.ts,
-// platform/apt.ts, platform/files.ts, and native fetch(). Six functions are
-// explicitly OUT OF SCOPE (Task 12): updateSnapserverFromGitHub,
-// updateSnapclientFromGitHub, executeDebUpdate, installShairportSync,
-// installSnapCtrl, getDistroCodename -- untouched, not exercised here.
+// platform/apt.ts, platform/files.ts, and native fetch(). Six functions were
+// explicitly OUT OF SCOPE for Task 11 (deferred to Task 12):
+// updateSnapserverFromGitHub, updateSnapclientFromGitHub, executeDebUpdate,
+// installShairportSync, installSnapCtrl, getDistroCodename.
+//
+// TASK 12 -- migrates those six remaining functions, closing out this
+// file's shell-injection-prone-pattern matches entirely (see
+// scripts/check-no-shell-injection.sh). See the "TASK 12" test sections
+// below for the new coverage.
 //
 // Design: most tests stub only the LOWEST layer -- platform/exec.ts's
 // run()/needsSudo() and global fetch() -- and let the REAL platform/apt.ts,
@@ -43,10 +48,12 @@ import * as os from 'os';
 import fsPromisesDefault from 'fs/promises';
 import * as execModule from '../platform/exec';
 import * as aptModule from '../platform/apt';
+import * as filesModule from '../platform/files';
 import * as backupModule from './backup';
 import * as snapclientInstancesModule from './snapclientInstances';
 import * as jobsModule from './jobs';
-import { SystemService } from './system';
+import * as configModule from './config';
+import { SystemService, selectSnapCtrlDownloadUrl } from './system';
 
 type RunFn = typeof execModule.run;
 type NeedsSudoFn = typeof execModule.needsSudo;
@@ -1322,12 +1329,762 @@ test('getMympdInfo() falls back to port 8080 when the http_port file is missing'
 });
 
 // ============================================================
-// Out-of-scope guard: sanity-check that the six Task-12 functions still
-// exist with their original names/behavior shape (not exercised further --
-// they are explicitly untouched by this task).
+// TASK 12 -- getDistroCodename() -- `grep | cut` pipe eliminated
 // ============================================================
 
-test('sanity: Task-12 functions are still present (untouched by Task 11)', () => {
+test('getDistroCodename() uses `lsb_release -cs` via argv (no shell, no 2>/dev/null needed)', async () => {
+  const calls: Call[] = [];
+  const restoreRun = stubRun(async (bin: string, args: string[]) => {
+    calls.push({ bin, args });
+    return { stdout: 'bookworm\n', stderr: '' };
+  });
+  try {
+    const service = freshService();
+    const codename = await (service as any).getDistroCodename();
+    assert.equal(codename, 'bookworm');
+    assert.deepEqual(calls, [{ bin: 'lsb_release', args: ['-cs'] }]);
+  } finally {
+    restoreRun();
+  }
+});
+
+test('getDistroCodename() falls back to parsing /etc/os-release directly when lsb_release fails (no grep|cut pipe)', async () => {
+  const restoreRun = stubRun(async () => { throw new Error('lsb_release: command not found'); });
+  const osRelease = 'PRETTY_NAME="Debian GNU/Linux 12 (bookworm)"\nID=debian\nVERSION_ID="12"\nVERSION_CODENAME=bookworm\n';
+  const restoreFs = stubFsPromises({ readFile: async (p: string) => { assert.equal(p, '/etc/os-release'); return osRelease; } });
+  try {
+    const service = freshService();
+    const codename = await (service as any).getDistroCodename();
+    assert.equal(codename, 'bookworm');
+  } finally {
+    restoreRun();
+    restoreFs();
+  }
+});
+
+test('getDistroCodename() strips quotes from a quoted VERSION_CODENAME value in a realistic multi-line os-release file', async () => {
+  const restoreRun = stubRun(async () => { throw new Error('no lsb_release'); });
+  const osRelease = [
+    'PRETTY_NAME="Debian GNU/Linux 12 (bookworm)"',
+    'NAME="Debian GNU/Linux"',
+    'VERSION_ID="12"',
+    'VERSION="12 (bookworm)"',
+    'VERSION_CODENAME="bookworm"',
+    'ID=debian',
+    'HOME_URL="https://www.debian.org/"',
+    '',
+  ].join('\n');
+  const restoreFs = stubFsPromises({ readFile: async () => osRelease });
+  try {
+    const service = freshService();
+    assert.equal(await (service as any).getDistroCodename(), 'bookworm');
+  } finally {
+    restoreRun();
+    restoreFs();
+  }
+});
+
+test('getDistroCodename() falls back to "bookworm" when both lsb_release and /etc/os-release fail', async () => {
+  const restoreRun = stubRun(async () => { throw new Error('no lsb_release'); });
+  const restoreFs = stubFsPromises({ readFile: async () => { throw new Error('ENOENT'); } });
+  try {
+    const service = freshService();
+    assert.equal(await (service as any).getDistroCodename(), 'bookworm');
+  } finally {
+    restoreRun();
+    restoreFs();
+  }
+});
+
+test('getDistroCodename() caches the result across calls', async () => {
+  let callCount = 0;
+  const restoreRun = stubRun(async () => {
+    callCount++;
+    return { stdout: 'trixie\n', stderr: '' };
+  });
+  try {
+    const service = freshService();
+    assert.equal(await (service as any).getDistroCodename(), 'trixie');
+    assert.equal(await (service as any).getDistroCodename(), 'trixie');
+    assert.equal(callCount, 1);
+  } finally {
+    restoreRun();
+  }
+});
+
+// ============================================================
+// TASK 12 -- updateSnapserverFromGitHub() / updateSnapclientFromGitHub() --
+// `dpkg --print-architecture` via argv; asset-matching logic unchanged
+// ============================================================
+
+test('updateSnapserverFromGitHub() runs `dpkg --print-architecture` via argv and delegates to executeDebUpdate() with the matched asset', async () => {
+  const restoreFetch = stubFetch(async () => jsonResponse(200, {
+    tag_name: 'v0.29.0',
+    assets: [{ name: 'snapserver_0.29.0-1_amd64_bookworm.deb', browser_download_url: 'https://example.com/snapserver.deb' }],
+  }));
+  const calls: Call[] = [];
+  const restoreRun = stubRun(async (bin: string, args: string[]) => {
+    calls.push({ bin, args });
+    if (bin === 'dpkg' && args[0] === '--print-architecture') return { stdout: 'amd64\n', stderr: '' };
+    if (bin === 'lsb_release') return { stdout: 'bookworm\n', stderr: '' };
+    return { stdout: '', stderr: '' };
+  });
+  const executeDebUpdateCalls: any[] = [];
+  const service = freshService();
+  (service as any).executeDebUpdate = async (...args: any[]) => {
+    executeDebUpdateCalls.push(args);
+    return 'snapserver updated successfully.';
+  };
+  try {
+    const result = await (service as any).updateSnapserverFromGitHub(false);
+    assert.equal(result, 'snapserver updated successfully.');
+    assert.ok(calls.some(c => c.bin === 'dpkg' && c.args.join(' ') === '--print-architecture'));
+    assert.deepEqual(executeDebUpdateCalls, [['https://example.com/snapserver.deb', 'snapserver_0.29.0-1_amd64_bookworm.deb', false]]);
+  } finally {
+    restoreFetch();
+    restoreRun();
+  }
+});
+
+test('updateSnapclientFromGitHub() runs `dpkg --print-architecture` via argv, delegates to executeDebUpdate(), then postSnapclientInstall()', async () => {
+  const restoreFetch = stubFetch(async () => jsonResponse(200, {
+    tag_name: 'v0.29.0',
+    assets: [{ name: 'snapclient_0.29.0-1_amd64_bookworm.deb', browser_download_url: 'https://example.com/snapclient.deb' }],
+  }));
+  const restoreRun = stubRun(async (bin: string, args: string[]) => {
+    if (bin === 'dpkg' && args[0] === '--print-architecture') return { stdout: 'amd64\n', stderr: '' };
+    if (bin === 'lsb_release') return { stdout: 'bookworm\n', stderr: '' };
+    return { stdout: '', stderr: '' };
+  });
+  const service = freshService();
+  const executeDebUpdateCalls: any[] = [];
+  (service as any).executeDebUpdate = async (...args: any[]) => {
+    executeDebUpdateCalls.push(args);
+    return 'snapclient updated successfully.';
+  };
+  let postInstallCalled = false;
+  (service as any).postSnapclientInstall = async () => { postInstallCalled = true; };
+  try {
+    const result = await (service as any).updateSnapclientFromGitHub(true);
+    assert.equal(result, 'snapclient updated successfully.');
+    assert.deepEqual(executeDebUpdateCalls, [['https://example.com/snapclient.deb', 'snapclient_0.29.0-1_amd64_bookworm.deb', true, 'snapclient']]);
+    assert.equal(postInstallCalled, true);
+  } finally {
+    restoreFetch();
+    restoreRun();
+  }
+});
+
+// ============================================================
+// TASK 12 -- executeDebUpdate() -- the core .deb install pipeline, formerly
+// one giant &&-chained shell string
+// ============================================================
+
+test('executeDebUpdate() happy path (dpkg succeeds): apt update, download to a private mkdtemp dir (never a predictable /tmp/<file> path), dpkg -i, then snapserver post-install chain', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  let wgetDestDir = '';
+  const restoreRun = stubRun(async (bin: string, args: string[]) => {
+    calls.push({ bin, args });
+    if (bin === 'wget') {
+      wgetDestDir = path.dirname(args[1]);
+    }
+    return { stdout: '', stderr: '' };
+  });
+  try {
+    const service = freshService();
+    const result = await (service as any).executeDebUpdate('https://example.com/snapserver_0.29.0.deb', 'snapserver_0.29.0.deb', false, 'snapserver');
+    assert.match(result, /snapserver updated successfully/);
+
+    const bins = calls.map(c => `${c.bin} ${c.args.join(' ')}`);
+    assert.deepEqual(bins, [
+      'apt-get update',
+      'wget -qO ' + path.join(wgetDestDir, 'snapserver_0.29.0.deb') + ' https://example.com/snapserver_0.29.0.deb',
+      'dpkg -i --force-confdef --force-confold ' + path.join(wgetDestDir, 'snapserver_0.29.0.deb'),
+      'mkdir -p /var/lib/snapserver',
+      'chown -R snapserver:snapserver /var/lib/snapserver',
+      'usermod -d /var/lib/snapserver snapserver',
+      'systemctl daemon-reload',
+      'systemctl restart snapserver.service',
+    ]);
+
+    // Never a fixed, predictable /tmp/<filename> path (design-spec finding #5).
+    assert.notEqual(wgetDestDir, '/tmp');
+    assert.ok(wgetDestDir.includes('snapmanager-deb-'), `expected an unpredictable mkdtemp dir, got ${wgetDestDir}`);
+    // The temp directory must be cleaned up afterwards.
+    await assert.rejects(() => fsPromisesDefault.access(wgetDestDir));
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() snapclient happy path: post-install is just daemon-reload + restart snapclient', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording(calls);
+  try {
+    const service = freshService();
+    const result = await (service as any).executeDebUpdate('https://example.com/snapclient.deb', 'snapclient.deb', false, 'snapclient');
+    assert.match(result, /snapclient updated successfully/);
+    const bins = calls.map(c => `${c.bin} ${c.args.join(' ')}`);
+    assert.deepEqual(bins.slice(-2), ['systemctl daemon-reload', 'systemctl restart snapclient.service']);
+    assert.ok(!bins.some(b => b.includes('mkdir -p /var/lib/snapserver')), 'snapclient path must not run the snapserver-specific post-install steps');
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() sudo-gates every privileged call via argv (not string concatenation) when needsSudo() is true', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(true);
+  const restoreRun = stubRun(async (bin: string, args: string[]) => {
+    calls.push({ bin, args });
+    return { stdout: '', stderr: '' };
+  });
+  try {
+    const service = freshService();
+    await (service as any).executeDebUpdate('https://example.com/snapserver.deb', 'snapserver.deb', false, 'snapserver');
+    const dpkgCall = calls.find(c => c.bin === 'sudo' && c.args[0] === 'dpkg');
+    assert.ok(dpkgCall, 'expected a sudo-prefixed dpkg -i call');
+    assert.deepEqual(dpkgCall!.args.slice(0, 3), ['dpkg', '-i', '--force-confdef']);
+    // wget itself is never sudo-prefixed (writes into a process-owned temp dir).
+    assert.ok(!calls.some(c => c.bin === 'sudo' && c.args[0] === 'wget'));
+    assert.ok(calls.some(c => c.bin === 'wget'));
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() fallback path: dpkg -i failing triggers `apt-get install -f`, unprefixed with DEBIAN_FRONTEND via real env propagation when needsSudo() is false', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRun(async (bin: string, args: string[], opts?: unknown) => {
+    calls.push({ bin, args, opts });
+    if (bin === 'dpkg') throw new Error('dpkg: dependency problems prevent configuration');
+    return { stdout: '', stderr: '' };
+  });
+  try {
+    const service = freshService();
+    const result = await (service as any).executeDebUpdate('https://example.com/snapserver.deb', 'snapserver.deb', false, 'snapserver');
+    assert.match(result, /snapserver updated successfully/);
+    const fixCall = calls.find(c => c.bin === 'apt-get' && c.args[0] === 'install' && c.args.includes('-f'));
+    assert.ok(fixCall, 'expected an apt-get install -f fallback call');
+    assert.deepEqual(fixCall!.args, ['install', '-f', '-y', '-o', 'Dpkg::Options::=--force-confdef', '-o', 'Dpkg::Options::=--force-confold']);
+    assert.deepEqual((fixCall!.opts as any)?.env, { DEBIAN_FRONTEND: 'noninteractive' });
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() fallback path when needsSudo() is true: DEBIAN_FRONTEND=noninteractive is passed as a literal argv element to sudo (sudo parses VAR=value itself)', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(true);
+  const restoreRun = stubRun(async (bin: string, args: string[], opts?: unknown) => {
+    calls.push({ bin, args, opts });
+    if (bin === 'sudo' && args[0] === 'dpkg') throw new Error('dpkg: dependency problems');
+    return { stdout: '', stderr: '' };
+  });
+  try {
+    const service = freshService();
+    await (service as any).executeDebUpdate('https://example.com/snapserver.deb', 'snapserver.deb', false, 'snapserver');
+    const fixCall = calls.find(c => c.bin === 'sudo' && c.args[1] === 'apt-get');
+    assert.ok(fixCall, 'expected a sudo-prefixed apt-get install -f fallback call');
+    assert.deepEqual(fixCall!.args, ['DEBIAN_FRONTEND=noninteractive', 'apt-get', 'install', '-f', '-y', '-o', 'Dpkg::Options::=--force-confdef', '-o', 'Dpkg::Options::=--force-confold']);
+    // The `env` RunOptions field is NOT needed on this branch -- sudo itself
+    // parses the leading VAR=value argv element.
+    assert.equal((fixCall!.opts as any)?.env, undefined);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() rethrows when BOTH dpkg -i and the apt-get install -f fallback fail', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRun(async (bin: string) => {
+    if (bin === 'dpkg' || bin === 'apt-get') throw new Error('both failed');
+    return { stdout: '', stderr: '' };
+  });
+  try {
+    const service = freshService();
+    await assert.rejects(() => (service as any).executeDebUpdate('https://example.com/x.deb', 'x.deb', false, 'snapserver'));
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() clean=true (snapclient): stops the service and purges via dpkg --purge (tolerating failure), removes /etc/default/snapclient, before the apt update/download/install chain', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording(calls);
+  try {
+    const service = freshService();
+    await (service as any).executeDebUpdate('https://example.com/snapclient.deb', 'snapclient.deb', true, 'snapclient');
+    const bins = calls.map(c => `${c.bin} ${c.args.join(' ')}`);
+    assert.deepEqual(bins.slice(0, 4), [
+      'systemctl stop snapclient.service',
+      'dpkg --purge snapclient',
+      'rm -f /etc/default/snapclient',
+      'apt-get update',
+    ]);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() clean=true (snapclient) tolerates the stop/purge steps failing (mirrors the original `|| true`)', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRun(async (bin: string, args: string[]) => {
+    if ((bin === 'systemctl' && args[0] === 'stop') || (bin === 'dpkg' && args[0] === '--purge')) {
+      throw new Error('unit/package not found');
+    }
+    return { stdout: '', stderr: '' };
+  });
+  try {
+    const service = freshService();
+    const result = await (service as any).executeDebUpdate('https://example.com/snapclient.deb', 'snapclient.deb', true, 'snapclient');
+    assert.match(result, /snapclient updated successfully/);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() clean=true (snapserver): stops, purges (tolerating failure), then removes config/data paths in one rm -rf', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording(calls);
+  try {
+    const service = freshService();
+    await (service as any).executeDebUpdate('https://example.com/snapserver.deb', 'snapserver.deb', true, 'snapserver');
+    const bins = calls.map(c => `${c.bin} ${c.args.join(' ')}`);
+    assert.deepEqual(bins.slice(0, 4), [
+      'systemctl stop snapserver.service',
+      'dpkg --purge snapserver',
+      'rm -rf /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /var/lib/snapserver',
+      'apt-get update',
+    ]);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() logs progress at multiple distinguishable steps, not just once at the end', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await (service as any).executeDebUpdate('https://example.com/snapserver.deb', 'snapserver.deb', false, 'snapserver');
+    assert.ok(logCalls.length > 3, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'snapserver updated successfully.');
+    for (const fragment of ['Updating package lists', 'Downloading', 'Installing', 'post-install']) {
+      assert.ok(logCalls.some(l => l.includes(fragment)), `expected a log line mentioning "${fragment}", got: ${JSON.stringify(logCalls)}`);
+    }
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreJobLog();
+  }
+});
+
+// ============================================================
+// TASK 12 -- installShairportSync() -- thin wrapper around the extracted
+// server/scripts/install-shairport-sync.sh; the script's actual build
+// logic is genuinely untestable here without a real Debian build
+// toolchain (DONE_WITH_CONCERNS, see task-12-report.md).
+// ============================================================
+
+test('installShairportSync() runs the extracted script via `run(\'bash\', [scriptPath], ...)`, unprefixed when needsSudo() is false', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording(calls);
+  try {
+    const service = freshService();
+    const result = await service.installShairportSync();
+    assert.match(result, /Shairport-sync and nqptp installed successfully/);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].bin, 'bash');
+    assert.equal(calls[0].args.length, 1);
+    assert.ok(calls[0].args[0].endsWith(path.join('scripts', 'install-shairport-sync.sh')), `expected the script path, got ${calls[0].args[0]}`);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('installShairportSync() sudo-gates the script invocation via argv (not string concatenation) when needsSudo() is true', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(true);
+  const restoreRun = stubRunRecording(calls);
+  try {
+    const service = freshService();
+    await service.installShairportSync();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].bin, 'sudo');
+    assert.equal(calls[0].args[0], 'bash');
+    assert.ok(calls[0].args[1].endsWith(path.join('scripts', 'install-shairport-sync.sh')));
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('installShairportSync() gives the build a generous timeout and maxBuffer (verbose, multi-minute compile)', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording(calls);
+  try {
+    const service = freshService();
+    await service.installShairportSync();
+    const opts = calls[0].opts as any;
+    assert.ok(opts?.timeoutMs >= 10 * 60 * 1000, `expected a generous timeout, got ${opts?.timeoutMs}`);
+    assert.ok(opts?.maxBuffer >= 10 * 1024 * 1024, `expected a generous maxBuffer, got ${opts?.maxBuffer}`);
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('installShairportSync() logs progress before and after the build', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.installShairportSync();
+    assert.ok(logCalls.length >= 2, `expected at least a start and end log line, got ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'Shairport-sync and nqptp installed successfully.');
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreJobLog();
+  }
+});
+
+// ============================================================
+// TASK 12 -- selectSnapCtrlDownloadUrl() -- replicates the embedded
+// `python3 -c "..."` asset-selection one-liner exactly, in TypeScript
+// ============================================================
+
+test('selectSnapCtrlDownloadUrl() prefers an asset literally named dist.zip', () => {
+  const release = {
+    assets: [
+      { name: 'dist-ha.zip', browser_download_url: 'https://example.com/dist-ha.zip' },
+      { name: 'dist.zip', browser_download_url: 'https://example.com/dist.zip' },
+      { name: 'source.zip', browser_download_url: 'https://example.com/source.zip' },
+    ],
+  };
+  assert.equal(selectSnapCtrlDownloadUrl(release), 'https://example.com/dist.zip');
+});
+
+test('selectSnapCtrlDownloadUrl() is case-insensitive for the exact dist.zip match', () => {
+  const release = { assets: [{ name: 'DIST.ZIP', browser_download_url: 'https://example.com/DIST.ZIP' }] };
+  assert.equal(selectSnapCtrlDownloadUrl(release), 'https://example.com/DIST.ZIP');
+});
+
+test('selectSnapCtrlDownloadUrl() falls back to the first non-"ha" .zip asset when there is no exact dist.zip', () => {
+  const release = {
+    assets: [
+      { name: 'dist-ha.zip', browser_download_url: 'https://example.com/dist-ha.zip' },
+      { name: 'snap-ctrl-frontend.zip', browser_download_url: 'https://example.com/frontend.zip' },
+    ],
+  };
+  assert.equal(selectSnapCtrlDownloadUrl(release), 'https://example.com/frontend.zip');
+});
+
+test('selectSnapCtrlDownloadUrl() falls back to the first .zip asset at all when every zip name contains "ha"', () => {
+  const release = {
+    assets: [
+      { name: 'dist-ha.zip', browser_download_url: 'https://example.com/first-ha.zip' },
+      { name: 'other-ha.zip', browser_download_url: 'https://example.com/second-ha.zip' },
+    ],
+  };
+  assert.equal(selectSnapCtrlDownloadUrl(release), 'https://example.com/first-ha.zip');
+});
+
+test('selectSnapCtrlDownloadUrl() falls back to release.zipball_url when there are no .zip assets at all', () => {
+  const release = { assets: [{ name: 'readme.txt', browser_download_url: 'https://example.com/readme.txt' }], zipball_url: 'https://api.github.com/repos/x/y/zipball/v1.0.0' };
+  assert.equal(selectSnapCtrlDownloadUrl(release), 'https://api.github.com/repos/x/y/zipball/v1.0.0');
+});
+
+test('selectSnapCtrlDownloadUrl() returns "" when there is neither a .zip asset nor a zipball_url', () => {
+  assert.equal(selectSnapCtrlDownloadUrl({ assets: [] }), '');
+  assert.equal(selectSnapCtrlDownloadUrl({}), '');
+});
+
+// ============================================================
+// TASK 12 -- installSnapCtrl() -- python3 removed, TLS re-enabled,
+// predictable /tmp paths eliminated, minimal size check added
+// ============================================================
+
+function stubInstallSnapCtrlHappyPath(overrides: { zipBytes?: number; unzipOk?: boolean; findOutputs?: string[] } = {}) {
+  const calls: Call[] = [];
+  const zipBytes = overrides.zipBytes ?? 1024;
+  const findOutputs = overrides.findOutputs ?? ['/extract/pkg/dist/index.html\n', ''];
+  let findCallCount = 0;
+  const restoreRun = stubRun(async (bin: string, args: string[], opts?: unknown) => {
+    calls.push({ bin, args, opts });
+    if (bin === 'find') {
+      const out = findOutputs[findCallCount] ?? '';
+      findCallCount++;
+      return { stdout: out, stderr: '' };
+    }
+    return { stdout: '', stderr: '' };
+  });
+  const restoreFs = stubFsPromises({
+    stat: async () => ({ size: zipBytes } as any),
+  });
+  return { calls, restoreRun, restoreFs };
+}
+
+test('installSnapCtrl() fetches the release via getLatestGitHubRelease() (no separate curl+python3 pipeline) and downloads WITHOUT --no-check-certificate', async () => {
+  const restoreFetch = stubFetch(async (url: any) => {
+    assert.equal(String(url), 'https://api.github.com/repos/NaturalDevCR/snap-ctrl/releases/latest');
+    return jsonResponse(200, { tag_name: 'v3.1.0', assets: [{ name: 'dist.zip', browser_download_url: 'https://example.com/dist.zip' }] });
+  });
+  const { calls, restoreRun, restoreFs } = stubInstallSnapCtrlHappyPath();
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreInstallFile = stubModuleFn(filesModule, 'installPrivilegedFile', async () => {});
+  const restoreConfig = stubModuleFn(configModule.configService, 'setSnapserverDocRoot', async () => {});
+  const restoreBackup = stubNoBackup();
+  try {
+    const service = freshService();
+    await service.installSnapCtrl();
+    const wgetCall = calls.find(c => c.bin === 'wget');
+    assert.ok(wgetCall, 'expected a wget download call');
+    assert.deepEqual(wgetCall!.args.slice(0, 1), ['-qO']);
+    assert.equal(wgetCall!.args[2], 'https://example.com/dist.zip');
+    for (const arg of wgetCall!.args) {
+      assert.notEqual(arg, '--no-check-certificate', 'TLS certificate validation must not be disabled');
+    }
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreFs();
+    restoreSudo();
+    restoreInstallFile();
+    restoreConfig();
+    restoreBackup();
+  }
+});
+
+test('installSnapCtrl() throws when the downloaded archive is zero bytes (minimal size sanity check)', async () => {
+  const restoreFetch = stubFetch(async () => jsonResponse(200, { tag_name: 'v3.1.0', assets: [{ name: 'dist.zip', browser_download_url: 'https://example.com/dist.zip' }] }));
+  const { restoreRun, restoreFs } = stubInstallSnapCtrlHappyPath({ zipBytes: 0 });
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreBackup = stubNoBackup();
+  try {
+    const service = freshService();
+    await assert.rejects(() => service.installSnapCtrl(), /empty/i);
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreFs();
+    restoreSudo();
+    restoreBackup();
+  }
+});
+
+test('installSnapCtrl() locates index.html via `find` with argv-safe -path filtering, falling back to an unfiltered find when the dist-path search comes up empty', async () => {
+  const restoreFetch = stubFetch(async () => jsonResponse(200, { tag_name: 'v3.1.0', assets: [{ name: 'dist.zip', browser_download_url: 'https://example.com/dist.zip' }] }));
+  const { calls, restoreRun, restoreFs } = stubInstallSnapCtrlHappyPath({ findOutputs: ['', '/extract/index.html\n'] });
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreInstallFile = stubModuleFn(filesModule, 'installPrivilegedFile', async () => {});
+  const restoreConfig = stubModuleFn(configModule.configService, 'setSnapserverDocRoot', async () => {});
+  const restoreBackup = stubNoBackup();
+  try {
+    const service = freshService();
+    await service.installSnapCtrl();
+    const findCalls = calls.filter(c => c.bin === 'find');
+    assert.equal(findCalls.length, 2);
+    assert.ok(findCalls[0].args.includes('-path'), 'first find call should filter by -path */dist/*');
+    assert.ok(!findCalls[1].args.includes('-path'), 'fallback find call should NOT filter by -path');
+    for (const c of findCalls) {
+      assert.deepEqual(c.args.slice(0, 4), [c.args[0], '-type', 'f', '-name']);
+      assert.ok(c.args.includes('index.html'));
+      assert.ok(c.args.includes('-print'));
+      assert.ok(c.args.includes('-quit'));
+    }
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreFs();
+    restoreSudo();
+    restoreInstallFile();
+    restoreConfig();
+    restoreBackup();
+  }
+});
+
+test('installSnapCtrl() throws a clear error when no index.html is found at all', async () => {
+  const restoreFetch = stubFetch(async () => jsonResponse(200, { tag_name: 'v3.1.0', assets: [{ name: 'dist.zip', browser_download_url: 'https://example.com/dist.zip' }] }));
+  const { restoreRun, restoreFs } = stubInstallSnapCtrlHappyPath({ findOutputs: ['', ''] });
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreBackup = stubNoBackup();
+  try {
+    const service = freshService();
+    await assert.rejects(() => service.installSnapCtrl(), /no built index\.html/i);
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreFs();
+    restoreSudo();
+    restoreBackup();
+  }
+});
+
+test('installSnapCtrl() empties the install directory via rm -rf + mkdir -p (no shell glob), then cp -rT, sudo-gated when needsSudo() is true', async () => {
+  const restoreFetch = stubFetch(async () => jsonResponse(200, { tag_name: 'v3.1.0', assets: [{ name: 'dist.zip', browser_download_url: 'https://example.com/dist.zip' }] }));
+  const { calls, restoreRun, restoreFs } = stubInstallSnapCtrlHappyPath({ findOutputs: ['/extract/pkg/dist/index.html\n', ''] });
+  const restoreSudo = stubNeedsSudo(true);
+  const restoreInstallFile = stubModuleFn(filesModule, 'installPrivilegedFile', async () => {});
+  const restoreConfig = stubModuleFn(configModule.configService, 'setSnapserverDocRoot', async () => {});
+  const restoreBackup = stubNoBackup();
+  try {
+    const service = freshService();
+    await service.installSnapCtrl();
+    const bins = calls.filter(c => c.bin === 'sudo').map(c => c.args.join(' '));
+    const installPath = '/usr/share/snapserver/snap-ctrl';
+    const docRootPath = path.join(installPath, 'dist');
+    assert.ok(bins.includes(`rm -rf ${installPath}`), `expected rm -rf ${installPath}, got ${JSON.stringify(bins)}`);
+    assert.ok(bins.includes(`mkdir -p ${docRootPath}`), `expected mkdir -p ${docRootPath}, got ${JSON.stringify(bins)}`);
+    assert.ok(bins.some(b => b.startsWith(`cp -rT /extract/pkg/dist ${docRootPath}`)), `expected cp -rT ..., got ${JSON.stringify(bins)}`);
+    // No shell-glob remnants of the old `${installPath}/* ${installPath}/.[!.]*` trick anywhere in argv.
+    for (const c of calls) {
+      for (const arg of c.args) {
+        assert.ok(!arg.includes('.[!.]'), `unexpected shell glob in argv: ${JSON.stringify(arg)}`);
+      }
+    }
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreFs();
+    restoreSudo();
+    restoreInstallFile();
+    restoreConfig();
+    restoreBackup();
+  }
+});
+
+test('installSnapCtrl() records the release tag via platform/files.ts installPrivilegedFile() (no printf | tee pipe)', async () => {
+  const restoreFetch = stubFetch(async () => jsonResponse(200, { tag_name: 'v3.1.0', assets: [{ name: 'dist.zip', browser_download_url: 'https://example.com/dist.zip' }] }));
+  const { restoreRun, restoreFs } = stubInstallSnapCtrlHappyPath({ findOutputs: ['/extract/pkg/dist/index.html\n', ''] });
+  const restoreSudo = stubNeedsSudo(false);
+  const installFileCalls: { destPath: string; content: any }[] = [];
+  const restoreInstallFile = stubModuleFn(filesModule, 'installPrivilegedFile', async (destPath: string, content: any) => {
+    installFileCalls.push({ destPath, content });
+  });
+  const restoreConfig = stubModuleFn(configModule.configService, 'setSnapserverDocRoot', async () => {});
+  const restoreBackup = stubNoBackup();
+  try {
+    const service = freshService();
+    await service.installSnapCtrl();
+    assert.equal(installFileCalls.length, 1);
+    assert.equal(installFileCalls[0].destPath, '/usr/share/snapserver/snap-ctrl/.snap-ctrl-version');
+    assert.equal(installFileCalls[0].content, 'v3.1.0');
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreFs();
+    restoreSudo();
+    restoreInstallFile();
+    restoreConfig();
+    restoreBackup();
+  }
+});
+
+test('installSnapCtrl() downloads to and extracts into unpredictable fs.mkdtemp() directories, never the fixed /tmp/snap-ctrl-download or /tmp/snap-ctrl-extract paths', async () => {
+  const restoreFetch = stubFetch(async () => jsonResponse(200, { tag_name: 'v3.1.0', assets: [{ name: 'dist.zip', browser_download_url: 'https://example.com/dist.zip' }] }));
+  const calls: Call[] = [];
+  const findOutputs = ['/extract/pkg/dist/index.html\n', ''];
+  let findCallCount = 0;
+  const restoreRun = stubRun(async (bin: string, args: string[]) => {
+    calls.push({ bin, args });
+    if (bin === 'find') {
+      const out = findOutputs[findCallCount] ?? '';
+      findCallCount++;
+      return { stdout: out, stderr: '' };
+    }
+    return { stdout: '', stderr: '' };
+  });
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreInstallFile = stubModuleFn(filesModule, 'installPrivilegedFile', async () => {});
+  const restoreConfig = stubModuleFn(configModule.configService, 'setSnapserverDocRoot', async () => {});
+  const restoreBackup = stubNoBackup();
+  // fs.promises.stat is real here (not stubbed) -- the wget call is a no-op
+  // stub, so no real zip file is written; instead we stub stat only to
+  // report a non-zero size for whatever path is asked about, keeping the
+  // rest of fs/promises (mkdtemp/rm) real so we can assert on real
+  // directory paths/existence below.
+  const restoreStat = stubFsPromises({ stat: async () => ({ size: 1024 } as any) });
+  let capturedDownloadDir = '';
+  let capturedExtractDir = '';
+  try {
+    const service = freshService();
+    await service.installSnapCtrl();
+    const wgetCall = calls.find(c => c.bin === 'wget');
+    capturedDownloadDir = path.dirname(wgetCall!.args[1]);
+    const unzipCall = calls.find(c => c.bin === 'unzip');
+    capturedExtractDir = unzipCall!.args[unzipCall!.args.indexOf('-d') + 1];
+
+    assert.notEqual(capturedDownloadDir, '/tmp/snap-ctrl-download');
+    assert.notEqual(capturedExtractDir, '/tmp/snap-ctrl-extract');
+    assert.ok(capturedDownloadDir.includes('snapmanager-snapctrl-dl-'));
+    assert.ok(capturedExtractDir.includes('snapmanager-snapctrl-extract-'));
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreSudo();
+    restoreInstallFile();
+    restoreConfig();
+    restoreBackup();
+    restoreStat();
+    // Both temp dirs must be cleaned up afterwards.
+    await assert.rejects(() => fsPromisesDefault.access(capturedDownloadDir));
+    await assert.rejects(() => fsPromisesDefault.access(capturedExtractDir));
+  }
+});
+
+test('installSnapCtrl() logs progress at multiple distinguishable steps, not just once at the end', async () => {
+  const restoreFetch = stubFetch(async () => jsonResponse(200, { tag_name: 'v3.1.0', assets: [{ name: 'dist.zip', browser_download_url: 'https://example.com/dist.zip' }] }));
+  const { restoreRun, restoreFs } = stubInstallSnapCtrlHappyPath({ findOutputs: ['/extract/pkg/dist/index.html\n', ''] });
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreInstallFile = stubModuleFn(filesModule, 'installPrivilegedFile', async () => {});
+  const restoreConfig = stubModuleFn(configModule.configService, 'setSnapserverDocRoot', async () => {});
+  const restoreBackup = stubNoBackup();
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await service.installSnapCtrl();
+    assert.ok(logCalls.length > 3, `expected multiple progress log lines, got ${logCalls.length}: ${JSON.stringify(logCalls)}`);
+    assert.equal(logCalls[logCalls.length - 1], 'snap-ctrl installed successfully.');
+  } finally {
+    restoreFetch();
+    restoreRun();
+    restoreFs();
+    restoreSudo();
+    restoreInstallFile();
+    restoreConfig();
+    restoreBackup();
+    restoreJobLog();
+  }
+});
+
+// ============================================================
+// Out-of-scope guard: sanity-check that the six Task-12 functions still
+// exist (now migrated, exercised above -- this just guards against a
+// future rename/removal going unnoticed).
+// ============================================================
+
+test('sanity: Task-12 functions are still present', () => {
   const service = freshService();
   for (const name of [
     'updateSnapserverFromGitHub',

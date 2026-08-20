@@ -1,5 +1,3 @@
-import { exec } from 'child_process';
-import util from 'util';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -8,6 +6,7 @@ import { snapclientInstanceService } from './snapclientInstances';
 import { backupService, BackupComponent } from './backup';
 import { jobService } from './jobs';
 import { run, needsSudo } from '../platform/exec';
+import type { RunOptions } from '../platform/exec';
 import {
   control as systemdControl,
   activeState as systemdActiveState,
@@ -17,10 +16,12 @@ import {
 import * as apt from '../platform/apt';
 import { installPrivilegedFile, readTextFile } from '../platform/files';
 
-const execAsync = util.promisify(exec);
-
-// Builds (e.g. shairport-sync) produce far more than the 1 MB default maxBuffer
-const EXEC_OPTS = { maxBuffer: 50 * 1024 * 1024 };
+// Builds (e.g. shairport-sync's `run('bash', [scriptPath], ...)` below) can
+// produce far more output than run()'s 10 MiB default maxBuffer, and can
+// genuinely take several minutes to compile on a Raspberry Pi -- both
+// generous on purpose (Task 12; formerly this exact { maxBuffer } shape was
+// passed straight to child_process.exec() as EXEC_OPTS for the same reason).
+const BUILD_RUN_OPTS: RunOptions = { maxBuffer: 50 * 1024 * 1024, timeoutMs: 20 * 60 * 1000 };
 
 // Timeout for outbound network calls (GitHub API, NodeSource setup script,
 // myMPD's OBS repo GPG key) made via native fetch() -- see getLatestGitHubRelease(),
@@ -55,6 +56,35 @@ export function mympdObsRepoDir(id: string, versionId: string): string | null {
   return null;
 }
 
+/**
+ * Picks the snap-ctrl release asset to download, replicating -- exactly,
+ * asset-by-asset -- the embedded `python3 -c "import json,sys;..."`
+ * one-liner `installSnapCtrl()` used to pipe the GitHub API response
+ * through (Task 12). snap-ctrl releases ship pre-built frontend zips
+ * (`dist.zip` / `dist-ha.zip`), each containing a top-level `dist/` folder
+ * and no `package.json`. Preference order, matching the Python exactly:
+ *   1. an asset literally named `dist.zip` (case-insensitive)
+ *   2. else the first `.zip` asset whose name does NOT contain "ha"
+ *      (case-insensitive) -- excludes the Home-Assistant-flavored build
+ *   3. else the first `.zip` asset at all
+ *   4. else `release.zipball_url` (GitHub's auto-generated full-source
+ *      zip, when the release has no `.zip` asset at all)
+ * Returns '' only if even `zipball_url` is missing from the release JSON
+ * (installSnapCtrl() treats that as a hard error, same as the original).
+ * Pure JSON/array manipulation -- python3 buys nothing here that
+ * `.filter()`/`.find()` doesn't already do in-process.
+ */
+export function selectSnapCtrlDownloadUrl(release: any): string {
+  const assets: any[] = Array.isArray(release?.assets) ? release.assets : [];
+  const zipAssets = assets.filter(a => typeof a?.name === 'string' && a.name.toLowerCase().endsWith('.zip'));
+  const exact = zipAssets.find(a => a.name.toLowerCase() === 'dist.zip');
+  if (exact) return exact.browser_download_url;
+  const nonHa = zipAssets.find(a => !a.name.toLowerCase().includes('ha'));
+  if (nonHa) return nonHa.browser_download_url;
+  if (zipAssets.length > 0) return zipAssets[0].browser_download_url;
+  return release?.zipball_url || '';
+}
+
 export class SystemService {
   private distroCodename: string | null = null;
   private releaseCache: Record<string, { timestamp: number, data: any }> = {};
@@ -67,35 +97,6 @@ export class SystemService {
 
   invalidatePackageCache(): void {
     this.pkgCache = null;
-  }
-
-  /**
-   * Returns 'sudo ' when not root, or '' when already root (e.g. on bare
-   * Debian). Still used by the Task-12 GitHub-release download/build/install
-   * pipelines below (updateSnapserverFromGitHub, updateSnapclientFromGitHub,
-   * executeDebUpdate, installShairportSync, installSnapCtrl,
-   * getDistroCodename) and by runCommand()/execAsync -- all explicitly out
-   * of scope for Task 11 (see docs/superpowers/sdd/task-11-brief.md), left
-   * completely untouched here.
-   */
-  private get SUDO(): string {
-    return (process as any).getuid?.() === 0 ? '' : 'sudo ';
-  }
-
-  private async runCommand(command: string): Promise<string> {
-    try {
-      console.log(`Executing: ${command}`);
-      jobService.log(`$ ${command.trim().split('\n')[0]}`);
-      const { stdout, stderr } = await execAsync(command, EXEC_OPTS);
-      if (stderr) console.warn(`StdErr: ${stderr}`);
-      const tail = stdout.trim().split('\n').slice(-10);
-      for (const line of tail) jobService.log(line);
-      return stdout;
-    } catch (error) {
-      console.error(`Error executing ${command}:`, error);
-      jobService.log(`ERROR: ${(error as any)?.message || error}`);
-      throw error;
-    }
   }
 
   private async safeBackup(component: BackupComponent): Promise<string> {
@@ -114,18 +115,24 @@ export class SystemService {
   }
 
   /**
-   * `run('sudo', argv)` when `needsSudo()`, `run(argv[0], argv.slice(1))`
-   * otherwise -- the same per-call sudo-split idiom every other migrated
-   * service in this codebase uses (see e.g. `services/pipeSources.ts`'s
-   * `removeServiceFile()`/`ensureRuntimeDir()`), pulled into one shared
-   * helper here since Task 11 needed it at many call sites across
-   * install/uninstall/update. Never string-concatenates `sudo` into a
-   * binary name -- that was the exact "false sudo split" bug a previous
-   * task caught (see this file's test suite for the exact-argv assertions
-   * that guard against it recurring).
+   * `run('sudo', argv, opts)` when `needsSudo()`, `run(argv[0], argv.slice(1),
+   * opts)` otherwise -- the same per-call sudo-split idiom every other
+   * migrated service in this codebase uses (see e.g.
+   * `services/pipeSources.ts`'s `removeServiceFile()`/`ensureRuntimeDir()`),
+   * pulled into one shared helper here since Task 11 needed it at many call
+   * sites across install/uninstall/update. Never string-concatenates `sudo`
+   * into a binary name -- that was the exact "false sudo split" bug a
+   * previous task caught (see this file's test suite for the exact-argv
+   * assertions that guard against it recurring).
+   *
+   * The optional `opts` (added Task 12) forwards a `RunOptions` (e.g. a
+   * longer `timeoutMs`/bigger `maxBuffer` for a slow build, or `env` for a
+   * privileged call that needs an extra environment variable) straight
+   * through to `run()` -- every pre-Task-12 call site omits it and keeps
+   * run()'s defaults, unchanged.
    */
-  private async runPrivileged(argv: string[]) {
-    return needsSudo() ? run('sudo', argv) : run(argv[0], argv.slice(1));
+  private async runPrivileged(argv: string[], opts?: RunOptions) {
+    return needsSudo() ? run('sudo', argv, opts) : run(argv[0], argv.slice(1), opts);
   }
 
   async installPackage(pkg: string): Promise<string> {
@@ -356,21 +363,35 @@ export class SystemService {
     return msg;
   }
 
+  /**
+   * `lsb_release -cs` first (now a plain argv `run()` -- no shell, no
+   * `2>/dev/null`; `run()`'s stderr is simply never looked at here, which is
+   * the same effect), falling back to parsing `/etc/os-release` directly.
+   * The fallback used to be a `grep VERSION_CODENAME /etc/os-release | cut
+   * -d= -f2` shell pipe -- Task 11 already established the "read the file
+   * with fs.promises.readFile(), extract the field with a regex" pattern
+   * for this exact file (see installMympd()'s ID=/VERSION_ID= parsing
+   * above); this reuses that same pattern for VERSION_CODENAME= (Task 12).
+   */
   private async getDistroCodename(): Promise<string> {
     if (this.distroCodename) return this.distroCodename;
 
     try {
-      // Try lsb_release first
-      const output = await this.runCommand('lsb_release -cs 2>/dev/null');
-      this.distroCodename = output.trim();
-      if (this.distroCodename) return this.distroCodename;
+      const { stdout } = await run('lsb_release', ['-cs']);
+      const codename = stdout.trim();
+      if (codename) {
+        this.distroCodename = codename;
+        return codename;
+      }
     } catch (e) {}
 
     try {
-      // Fallback to /etc/os-release
-      const output = await this.runCommand('grep VERSION_CODENAME /etc/os-release | cut -d= -f2');
-      this.distroCodename = output.trim().replace(/"/g, '');
-      if (this.distroCodename) return this.distroCodename;
+      const osRelease = await fs.promises.readFile('/etc/os-release', 'utf-8');
+      const codename = (osRelease.match(/^VERSION_CODENAME=(.*)$/m)?.[1] || '').replace(/"/g, '').trim();
+      if (codename) {
+        this.distroCodename = codename;
+        return codename;
+      }
     } catch (e) {}
 
     // Ultimate fallback for many debian-based systems if detection fails
@@ -379,7 +400,7 @@ export class SystemService {
 
   private async updateSnapserverFromGitHub(clean: boolean = false): Promise<string> {
     const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
-    const arch = await this.runCommand('dpkg --print-architecture');
+    const { stdout: arch } = await run('dpkg', ['--print-architecture']);
     const archTrimmed = arch.trim();
     const codename = await this.getDistroCodename();
 
@@ -410,7 +431,7 @@ export class SystemService {
 
   private async updateSnapclientFromGitHub(clean: boolean = false): Promise<string> {
     const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
-    const arch = await this.runCommand('dpkg --print-architecture');
+    const { stdout: arch } = await run('dpkg', ['--print-architecture']);
     const archTrimmed = arch.trim();
     const codename = await this.getDistroCodename();
 
@@ -447,45 +468,110 @@ export class SystemService {
     await snapclientInstanceService.postInstallSetup();
   }
 
+  /**
+   * `apt-get install -f -y ...` (the `dpkg -i` fallback), with
+   * `DEBIAN_FRONTEND=noninteractive` set for the child process. Two
+   * different mechanisms depending on whether `sudo` is in the way,
+   * because they achieve the same original shell semantics differently:
+   *
+   * - `needsSudo()` true: the original shell command was literally `sudo
+   *   DEBIAN_FRONTEND=noninteractive apt-get ...` -- `sudo` (not the
+   *   shell) is what parses that leading `VAR=value` and applies it to the
+   *   command it execs (see sudo(8): "environment variables to be set for
+   *   the command may be passed on the command line"). Passing
+   *   `'DEBIAN_FRONTEND=noninteractive'` as a literal argv element to
+   *   `sudo` reproduces exactly that, argv-safe, no shell involved.
+   * - `needsSudo()` false (already root): the original was a bare
+   *   env-var-prefixed shell command (`DEBIAN_FRONTEND=noninteractive
+   *   apt-get ...`), which only the shell's own env-prefix parsing
+   *   handled. There is no shell here to do that, and `apt-get` itself
+   *   doesn't parse a `VAR=value` argv element the way `sudo` does -- this
+   *   is exactly the case that needs real child-process environment
+   *   injection, which is why `platform/exec.ts`'s `RunOptions.env` was
+   *   added in Task 12 (see that file for the full option and its own
+   *   direct tests). `env` is only used on this branch.
+   */
+  private async aptGetInstallFix(): Promise<void> {
+    const fixArgs = ['install', '-f', '-y', '-o', 'Dpkg::Options::=--force-confdef', '-o', 'Dpkg::Options::=--force-confold'];
+    if (needsSudo()) {
+      await run('sudo', ['DEBIAN_FRONTEND=noninteractive', 'apt-get', ...fixArgs]);
+    } else {
+      await run('apt-get', fixArgs, { env: { DEBIAN_FRONTEND: 'noninteractive' } });
+    }
+  }
+
+  /**
+   * The core `.deb` download+install pipeline shared by
+   * `updateSnapserverFromGitHub()`/`updateSnapclientFromGitHub()`. Formerly
+   * a single giant `&&`-chained shell command string executed via
+   * `runCommand()`/`exec()`; broken here into individual `platform`-layer
+   * calls in the exact same order, with the exact same failure-tolerance
+   * (`.catch(() => {})` where the original had `|| true`) -- see
+   * docs/superpowers/sdd/task-12-brief.md section 3 for the full mapping.
+   *
+   * The downloaded `.deb` now lives in a fresh, unpredictable
+   * `fs.mkdtemp()` directory instead of the original's fixed, predictable
+   * `/tmp/${fileName}` path -- closing the same symlink-race class of issue
+   * design-spec finding #5 already closed for privileged file writes
+   * (`platform/files.ts`'s `installPrivilegedFile()`).
+   */
   private async executeDebUpdate(downloadUrl: string, fileName: string, clean: boolean = false, pkg: 'snapserver' | 'snapclient' = 'snapserver'): Promise<string> {
-    const debFile = `/tmp/${fileName}`;
     console.log(`Downloading ${pkg} from ${downloadUrl}... (Clean: ${clean})`);
 
-    let cleanCmd = '';
     if (clean) {
+      jobService.log(`Cleaning up existing ${pkg} installation...`);
       if (pkg === 'snapclient') {
-        cleanCmd = `
-          ${this.SUDO}systemctl stop snapclient || true && \
-          ${this.SUDO}dpkg --purge snapclient || true && \
-          ${this.SUDO}rm -f /etc/default/snapclient && \
-        `;
+        await systemdControl('snapclient.service', 'stop').catch(() => {});
+        await this.runPrivileged(['dpkg', '--purge', 'snapclient']).catch(() => {});
+        await this.runPrivileged(['rm', '-f', '/etc/default/snapclient']);
       } else {
-        cleanCmd = `
-          ${this.SUDO}systemctl stop snapserver || true && \
-          ${this.SUDO}dpkg --purge snapserver || true && \
-          ${this.SUDO}rm -rf /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /var/lib/snapserver && \
-        `;
+        await systemdControl('snapserver.service', 'stop').catch(() => {});
+        await this.runPrivileged(['dpkg', '--purge', 'snapserver']).catch(() => {});
+        await this.runPrivileged(['rm', '-rf', '/etc/snapserver.conf', '/etc/snapserver.conf.base', '/etc/snapserver.conf.d', '/var/lib/snapserver']);
       }
     }
 
-    const postInstallCmd = pkg === 'snapclient'
-      ? `${this.SUDO}systemctl daemon-reload && ${this.SUDO}systemctl restart snapclient`
-      : `${this.SUDO}mkdir -p /var/lib/snapserver && \
-      ${this.SUDO}chown -R snapserver:snapserver /var/lib/snapserver && \
-      ${this.SUDO}usermod -d /var/lib/snapserver snapserver 2>/dev/null || true && \
-      ${this.SUDO}systemctl daemon-reload && \
-      ${this.SUDO}systemctl restart snapserver`;
+    jobService.log('Updating package lists...');
+    await apt.update();
 
-    const dpkgFlags = '--force-confdef --force-confold';
+    const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'snapmanager-deb-'));
+    try {
+      const debFile = path.join(tmpDir, fileName);
+      jobService.log(`Downloading ${fileName}...`);
+      await run('wget', ['-qO', debFile, downloadUrl], { timeoutMs: 5 * 60 * 1000 });
 
-    return this.runCommand(`
-      ${cleanCmd}
-      ${this.SUDO}apt-get update && \
-      wget -qO ${debFile} "${downloadUrl}" && \
-      (${this.SUDO}dpkg -i ${dpkgFlags} ${debFile} 2>&1 || ${this.SUDO}DEBIAN_FRONTEND=noninteractive apt-get install -f -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold") && \
-      rm -f ${debFile} && \
-      ${postInstallCmd}
-    `);
+      jobService.log(`Installing ${fileName}...`);
+      try {
+        await this.runPrivileged(['dpkg', '-i', '--force-confdef', '--force-confold', debFile], { timeoutMs: 5 * 60 * 1000 });
+      } catch (err) {
+        // Original shell `||` fallback: dpkg -i can exit non-zero purely
+        // because of missing dependencies, which `apt-get install -f`
+        // resolves. Translated to a real try/catch, exactly matching the
+        // original's "any real failure of THIS step, including the
+        // fallback itself, aborts the whole update" semantic (nothing
+        // here is swallowed).
+        jobService.log('dpkg reported missing dependencies, resolving via apt-get install -f...');
+        await this.aptGetInstallFix();
+      }
+    } finally {
+      await fs.promises.rm(tmpDir, { recursive: true, force: true });
+    }
+
+    jobService.log('Running post-install steps...');
+    if (pkg === 'snapclient') {
+      await systemdDaemonReload();
+      await systemdControl('snapclient.service', 'restart');
+    } else {
+      await this.runPrivileged(['mkdir', '-p', '/var/lib/snapserver']);
+      await this.runPrivileged(['chown', '-R', 'snapserver:snapserver', '/var/lib/snapserver']);
+      await this.runPrivileged(['usermod', '-d', '/var/lib/snapserver', 'snapserver']).catch(() => {});
+      await systemdDaemonReload();
+      await systemdControl('snapserver.service', 'restart');
+    }
+
+    const msg = `${pkg} updated successfully.`;
+    jobService.log(msg);
+    return msg;
   }
 
   async updateNodeJs(version: string = '22'): Promise<string> {
@@ -804,109 +890,153 @@ export class SystemService {
       return `${service} disabled`;
   }
 
+  /**
+   * The full build logic (apt build-deps, removing legacy installs, `git
+   * clone`+`autoreconf`+`configure`+`make -j$(nproc)`+`make install` for
+   * both `nqptp` and `shairport-sync`, `useradd`/`groupadd`, systemd
+   * enable/restart) now lives in the static, versioned, shellcheck-able
+   * `server/scripts/install-shairport-sync.sh` -- this function is a thin
+   * wrapper that just runs it via `run('bash', [scriptPath], ...)` (a plain
+   * argv invocation, never a runtime-built shell string) and logs progress
+   * around it. See that script's own header comment for why real shell
+   * features (`$(nproc)`, `&&`, `if`) are fine INSIDE that static file, and
+   * for why it no longer needs its own per-line `sudo` -- this wrapper
+   * invokes the whole script already elevated, via the same
+   * `runPrivileged()` sudo-split every other multi-step privileged
+   * operation in this file uses.
+   *
+   * `BUILD_RUN_OPTS`: a 50 MiB maxBuffer (this compiles two C projects with
+   * verbose `autoreconf`/`make` output) and a 20-minute timeout (a full
+   * from-source build of shairport-sync + nqptp, including their build
+   * dependencies, can genuinely take several minutes on a Raspberry Pi --
+   * `platform/apt.ts`'s own `INSTALL_TIMEOUT_MS` (10 minutes, for a plain
+   * `apt-get install`) was the closest existing precedent; this is longer
+   * because it also compiles from source, not just installs prebuilt
+   * packages).
+   *
+   * Genuinely untestable in this environment without a real Debian host
+   * with the full build toolchain installed -- see task-12-report.md.
+   */
   async installShairportSync(): Promise<string> {
       console.log('Installing shairport-sync and nqptp from source... (AirPlay 2)');
-      const cmd = `
-        echo "Installing build dependencies..." && \
-        ${this.SUDO}apt-get update && \
-        (${this.SUDO}apt-get install -y --no-install-recommends systemd-dev 2>/dev/null || true) && \
-        ${this.SUDO}apt-get install -y --no-install-recommends build-essential git autoconf automake libtool \
-          libpopt-dev libconfig-dev libasound2-dev avahi-daemon libavahi-client-dev \
-          libssl-dev libsoxr-dev libplist-dev libsodium-dev uuid-dev libgcrypt-dev xxd \
-          libplist-utils libavutil-dev libavcodec-dev libavformat-dev && \
-        echo "Cleaning up absolute legacy installations..." && \
-        ${this.SUDO}apt-get remove --purge -y shairport-sync 2>/dev/null || true && \
-        ${this.SUDO}systemctl stop shairport-sync 2>/dev/null || true && \
-        ${this.SUDO}systemctl disable shairport-sync 2>/dev/null || true && \
-        ${this.SUDO}systemctl stop nqptp 2>/dev/null || true && \
-        ${this.SUDO}systemctl disable nqptp 2>/dev/null || true && \
-        ${this.SUDO}rm -f /usr/local/bin/shairport-sync /usr/bin/shairport-sync /usr/local/bin/nqptp /usr/bin/nqptp && \
-        ${this.SUDO}rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service && \
-        ${this.SUDO}rm -f /lib/systemd/system/shairport-sync.service /lib/systemd/system/nqptp.service && \
-
-        echo "Building and installing nqptp..." && \
-        rm -rf /tmp/nqptp-build && \
-        git clone https://github.com/mikebrady/nqptp.git /tmp/nqptp-build && \
-        cd /tmp/nqptp-build && \
-        autoreconf -fvi && \
-        ./configure --with-systemd-startup && \
-        make -j$(nproc) && \
-        ${this.SUDO}make install && \
-        ${this.SUDO}systemctl daemon-reload && \
-        ${this.SUDO}systemctl enable nqptp && \
-        ${this.SUDO}systemctl restart nqptp && \
-
-        echo "Building and installing shairport-sync..." && \
-        rm -rf /tmp/shairport-sync-build && \
-        git clone https://github.com/mikebrady/shairport-sync.git /tmp/shairport-sync-build && \
-        cd /tmp/shairport-sync-build && \
-        autoreconf -fvi && \
-        ./configure --sysconfdir=/etc --with-alsa --with-soxr --with-avahi --with-ssl=openssl --with-systemd-startup --with-airplay-2 --with-metadata && \
-        make -j$(nproc) && \
-        ${this.SUDO}make install && \
-
-        echo "Setting up systemd service and user access..." && \
-        if ! getent group "shairport-sync" >/dev/null 2>&1; then \
-          ${this.SUDO}groupadd -r shairport-sync || true; \
-        fi && \
-        if ! id "shairport-sync" >/dev/null 2>&1; then \
-          ${this.SUDO}useradd -r -M -g shairport-sync -s /usr/sbin/nologin -G audio shairport-sync || true; \
-        fi && \
-
-        ${this.SUDO}systemctl daemon-reload && \
-        ${this.SUDO}systemctl enable shairport-sync && \
-        ${this.SUDO}systemctl restart shairport-sync && \
-        echo "Shairport-sync and nqptp installed successfully."
-      `;
-      return this.runCommand(cmd);
+      const scriptPath = path.join(__dirname, '../../scripts/install-shairport-sync.sh');
+      jobService.log('Installing build dependencies and compiling shairport-sync + nqptp from source (this can take several minutes on a Raspberry Pi)...');
+      await this.runPrivileged(['bash', scriptPath], BUILD_RUN_OPTS);
+      const msg = 'Shairport-sync and nqptp installed successfully.';
+      jobService.log(msg);
+      return msg;
   }
 
+  /**
+   * `find <dir> -type f -name index.html [-path <dist-glob>] -print -quit`
+   * (the dist-glob restricts matches to a path with a "dist" directory
+   * segment) -- argv-safe: `-path`'s glob pattern is `find`'s OWN flag syntax,
+   * interpreted by `find` itself, not shell-expanded (no shell is
+   * involved at all here, so there is nothing to expand it prematurely).
+   * `find` exits 0 with empty stdout when nothing matches -- never throws
+   * just because the search came up empty, mirroring the original
+   * `$(find ... -print -quit)` capturing an empty string in that case.
+   */
+  private async findSnapCtrlIndex(extractDir: string, requireDistPath: boolean): Promise<string | null> {
+    const args = requireDistPath
+      ? [extractDir, '-type', 'f', '-name', 'index.html', '-path', '*/dist/*', '-print', '-quit']
+      : [extractDir, '-type', 'f', '-name', 'index.html', '-print', '-quit'];
+    const { stdout } = await run('find', args);
+    const found = stdout.trim();
+    return found.length > 0 ? found : null;
+  }
+
+  /**
+   * Downloads and installs the latest snap-ctrl frontend release. Formerly
+   * a single shell script that curled the GitHub API, piped the JSON
+   * through embedded `python3 -c "..."` one-liners to extract the download
+   * URL and tag, downloaded with `wget --no-check-certificate` (TLS
+   * validation DISABLED -- design-spec finding #6), and used shell globbing
+   * (`${installPath}/* ${installPath}/.[!.]*`) to empty the install
+   * directory. Migrated here (Task 12) to:
+   *   - reuse `getLatestGitHubRelease()` (Task 11, already used by
+   *     `getLatestAvailableVersion('snap-ctrl')`) instead of a separate
+   *     curl+python3 pipeline, with `selectSnapCtrlDownloadUrl()` above
+   *     replicating the Python's exact asset-selection logic in TypeScript;
+   *   - drop `--no-check-certificate` entirely -- `wget` now validates TLS
+   *     certificates normally; there is no comment or history anywhere in
+   *     this codebase indicating a real-world need for it, so it is removed
+   *     outright rather than preserved "just in case" (flagged as a
+   *     resolved concern in task-12-report.md, not silently kept);
+   *   - add a minimal post-download size check (non-zero) -- NOT full
+   *     artifact signature/hash verification, which design-spec finding #6
+   *     will eventually want but is out of scope here (see the report);
+   *   - move both the download and extraction directories off the
+   *     predictable, fixed `/tmp/snap-ctrl-download` / `/tmp/snap-ctrl-extract`
+   *     paths onto fresh `fs.mkdtemp()` directories (same finding-#5
+   *     symlink-race class `executeDebUpdate()`'s `.deb` download closes
+   *     above);
+   *   - replace the `${installPath}/* ${installPath}/.[!.]*` shell-glob
+   *     empty-the-directory trick with a full `rm -rf` + `mkdir -p`
+   *     (semantically identical -- empties the directory entirely -- with
+   *     no shell glob involved), sudo-gated via `runPrivileged()` since
+   *     `/usr/share/snapserver/snap-ctrl` is root-owned and this process
+   *     cannot write there directly;
+   *   - replace the `printf '%s' "$TAG" | sudo tee ...` pipe (itself only
+   *     existing to get a sudo-privileged file write) with
+   *     `platform/files.ts`'s `installPrivilegedFile()` directly, which is
+   *     exactly what that function exists for.
+   */
   async installSnapCtrl(): Promise<string> {
       this.invalidatePackageCache();
       await this.safeBackup('snap-ctrl');
-      const repo = 'NaturalDevCR/snap-ctrl';
-      const apiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
       const installPath = '/usr/share/snapserver/snap-ctrl';
-      const docRootPath = '/usr/share/snapserver/snap-ctrl/dist';
+      const docRootPath = path.join(installPath, 'dist');
 
-      console.log(`Installing snap-ctrl from ${apiUrl}...`);
+      console.log('Installing snap-ctrl...');
 
-      // snap-ctrl releases ship pre-built frontend zips (dist.zip / dist-ha.zip),
-      // each containing a top-level dist/ folder and NO package.json. We pick the
-      // standalone dist.zip, locate the built dist/index.html, install it to
-      // installPath/dist (which is the doc_root), and record the release tag in a
-      // marker file so the version can be reported afterwards.
-      const cmd = `
-        set -e
-        EXTRACT_DIR=/tmp/snap-ctrl-extract
-        rm -rf /tmp/snap-ctrl-download $EXTRACT_DIR && \
-        mkdir -p /tmp/snap-ctrl-download $EXTRACT_DIR && \
-        cd /tmp/snap-ctrl-download && \
-        API_JSON=$(curl -sL -H 'Accept: application/vnd.github+json' ${apiUrl}) && \
-        DOWNLOAD_URL=$(printf '%s' "$API_JSON" | python3 -c "import json,sys;d=json.load(sys.stdin);z=[a for a in d.get('assets',[]) if a.get('name','').lower().endswith('.zip')];exact=[a['browser_download_url'] for a in z if a.get('name','').lower()=='dist.zip'];noha=[a['browser_download_url'] for a in z if 'ha' not in a.get('name','').lower()];print(exact[0] if exact else (noha[0] if noha else (z[0]['browser_download_url'] if z else '')))") && \
-        TAG=$(printf '%s' "$API_JSON" | python3 -c "import json,sys;print(json.load(sys.stdin).get('tag_name',''))") && \
-        if [ -z "$DOWNLOAD_URL" ]; then
-            echo "No release .zip asset found, falling back to zipball_url";
-            DOWNLOAD_URL=$(printf '%s' "$API_JSON" | python3 -c "import json,sys;d=json.load(sys.stdin); print(d.get('zipball_url',''))");
-        fi && \
-        if [ -z "$DOWNLOAD_URL" ]; then echo "Error: Could not find download URL" && exit 1; fi && \
-        echo "Downloading snap-ctrl $TAG: $DOWNLOAD_URL" && \
-        wget --no-check-certificate -qO snap-ctrl.zip "$DOWNLOAD_URL" && \
-        unzip -qo snap-ctrl.zip -d $EXTRACT_DIR && \
-        INDEX=$(find $EXTRACT_DIR -type f -name index.html -path '*/dist/*' -print -quit) && \
-        if [ -z "$INDEX" ]; then INDEX=$(find $EXTRACT_DIR -type f -name index.html -print -quit); fi && \
-        if [ -z "$INDEX" ]; then echo "Error: no built index.html found in snap-ctrl archive" && exit 1; fi && \
-        DIST_DIR=$(dirname "$INDEX") && \
-        echo "Found built interface at: $DIST_DIR" && \
-        ${this.SUDO}mkdir -p ${installPath} && \
-        ${this.SUDO}rm -rf ${installPath}/* ${installPath}/.[!.]* 2>/dev/null || true && \
-        ${this.SUDO}mkdir -p ${docRootPath} && \
-        ${this.SUDO}cp -rT "$DIST_DIR" ${docRootPath} && \
-        printf '%s' "$TAG" | ${this.SUDO}tee ${installPath}/.snap-ctrl-version >/dev/null && \
-        rm -rf /tmp/snap-ctrl-download $EXTRACT_DIR
-      `;
+      jobService.log('Fetching latest snap-ctrl release metadata...');
+      const release = await this.getLatestGitHubRelease('NaturalDevCR', 'snap-ctrl');
+      const tag = release.tag_name || '';
+      const downloadUrl = selectSnapCtrlDownloadUrl(release);
+      if (!downloadUrl) {
+        throw new Error('Could not find a download URL for the latest snap-ctrl release');
+      }
 
-      const result = await this.runCommand(cmd);
+      const downloadDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'snapmanager-snapctrl-dl-'));
+      const extractDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'snapmanager-snapctrl-extract-'));
+      try {
+        const zipPath = path.join(downloadDir, 'snap-ctrl.zip');
+        jobService.log(`Downloading snap-ctrl ${tag}...`);
+        await run('wget', ['-qO', zipPath, downloadUrl], { timeoutMs: 5 * 60 * 1000 });
+
+        // Minimal sanity check: did we actually get a real file, not a
+        // truncated/empty response? NOT full artifact verification -- see
+        // this method's doc comment and task-12-report.md.
+        const stat = await fs.promises.stat(zipPath);
+        if (stat.size === 0) {
+          throw new Error('Downloaded snap-ctrl archive is empty');
+        }
+
+        jobService.log('Extracting snap-ctrl archive...');
+        await run('unzip', ['-qo', zipPath, '-d', extractDir]);
+
+        jobService.log('Locating built interface...');
+        const index = (await this.findSnapCtrlIndex(extractDir, true)) ?? (await this.findSnapCtrlIndex(extractDir, false));
+        if (!index) {
+          throw new Error('No built index.html found in snap-ctrl archive');
+        }
+        const distDir = path.dirname(index);
+
+        jobService.log(`Installing snap-ctrl to ${installPath}...`);
+        await this.runPrivileged(['rm', '-rf', installPath]);
+        await this.runPrivileged(['mkdir', '-p', docRootPath]);
+        await this.runPrivileged(['cp', '-rT', distDir, docRootPath]);
+
+        jobService.log('Recording installed version...');
+        await installPrivilegedFile(path.join(installPath, '.snap-ctrl-version'), tag);
+      } finally {
+        await fs.promises.rm(downloadDir, { recursive: true, force: true });
+        await fs.promises.rm(extractDir, { recursive: true, force: true });
+      }
+
+      const result = 'snap-ctrl installed successfully.';
+      jobService.log(result);
 
       try {
           await configService.setSnapserverDocRoot(docRootPath);

@@ -91,6 +91,21 @@ test('run() enforces maxBuffer', async () => {
   );
 });
 
+test('run() propagates opts.env to the real child process (Task 12, merged on top of process.env)', async () => {
+  const { stdout } = await run(process.execPath, ['-e', 'process.stdout.write(process.env.FOO || "")'], {
+    env: { FOO: 'bar' },
+  });
+  assert.equal(stdout, 'bar');
+});
+
+test('run() with opts.env still inherits the rest of process.env (merge, not replace)', async () => {
+  const originalPath = process.env.PATH;
+  const { stdout } = await run(process.execPath, ['-e', 'process.stdout.write(process.env.PATH || "")'], {
+    env: { FOO: 'bar' },
+  });
+  assert.equal(stdout, originalPath || '');
+});
+
 test('needsSudo() returns true when getuid is unavailable', () => {
   const original = (process as any).getuid;
   delete (process as any).getuid;

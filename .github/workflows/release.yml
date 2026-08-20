@@ -41,23 +41,32 @@ jobs:
           cp -r server/dist release_package/server_dist
           cp server/package.json release_package/server_package.json
           cp server/package-lock.json release_package/server_package-lock.json
-          
+
           mkdir release_package/client
           cp -r client/dist release_package/client/dist
-          
+
           mkdir release_package/scripts
           cp scripts/install.sh release_package/scripts/install.sh
-          
+
           # Modify the install script to work with the prebuilt files
           cd release_package
-          
+
           # The release structure is slightly different to avoid exposing source
           # Re-create server/ structure
           mkdir server
           mv server_dist server/dist
           mv server_package.json server/package.json
           mv server_package-lock.json server/package-lock.json
-          
+
+          # server/src/services/system.ts's installShairportSync() resolves
+          # this script at runtime relative to its own compiled location
+          # (server/dist/services/system.js -> ../../scripts/... ->
+          # server/scripts/...), so it must be packaged at that exact path,
+          # not just under the top-level scripts/ dir above (Task 12).
+          mkdir -p server/scripts
+          cp ../server/scripts/install-shairport-sync.sh server/scripts/install-shairport-sync.sh
+          chmod +x server/scripts/install-shairport-sync.sh
+
           zip -r ../snapcast-manager-release.zip ./*
 
       - name: Create GitHub Release

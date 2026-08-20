@@ -27,6 +27,22 @@ export interface RunOptions {
   maxBuffer?: number;
   /** Optional data written to the child's stdin, then stdin is closed (EOF). */
   input?: string;
+  /**
+   * Extra environment variables for the child process, MERGED on top of the
+   * current process's own `process.env` (never a wholesale replacement --
+   * that would also strip PATH and everything else the child needs to run
+   * at all). Added in Task 12 for `services/system.ts`'s `executeDebUpdate()`,
+   * which needs `DEBIAN_FRONTEND=noninteractive` set for the `apt-get
+   * install -f` fallback path when the current process is already root (no
+   * `sudo` in the way). When `sudo` IS the direct child, prefer passing
+   * `VAR=value` as a literal argv element before the target command instead
+   * (sudo parses that itself and applies it to the command it execs,
+   * independent of sudo's own env_reset policy) -- this `env` option only
+   * reliably affects the directly-spawned child, not a grandchild sudo
+   * execs, since sudo does not inherit/forward its own environment to the
+   * command it invokes unless configured to (`-E` / `env_keep`).
+   */
+  env?: Record<string, string>;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -64,6 +80,11 @@ export function run(bin: string, args: string[], opts: RunOptions = {}): Promise
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBuffer = opts.maxBuffer ?? DEFAULT_MAX_BUFFER;
   const input = opts.input;
+  // `undefined` (not merging at all) when the caller didn't ask for extra
+  // env vars, so execFile falls back to its own default of inheriting
+  // `process.env` unchanged -- only build a merged object when there's
+  // actually something to merge.
+  const env = opts.env ? { ...process.env, ...opts.env } : undefined;
 
   return new Promise<RunResult>((resolve, reject) => {
     // NOTE: no `shell` option here, ever — see file header. execFile spawns
@@ -72,7 +93,7 @@ export function run(bin: string, args: string[], opts: RunOptions = {}): Promise
     const child = execFile(
       bin,
       args,
-      { timeout: timeoutMs, maxBuffer, encoding: 'utf8' },
+      { timeout: timeoutMs, maxBuffer, encoding: 'utf8', env },
       (error, stdout, stderr) => {
         const out = typeof stdout === 'string' ? stdout : '';
         const err = typeof stderr === 'string' ? stderr : '';
