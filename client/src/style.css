@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+/*
+ * Tailwind v4 is CSS-first: utility classes are only generated for names
+ * registered here via @theme. The old client/tailwind.config.js (v3-style
+ * theme.extend.colors/fontFamily) is NOT read by Tailwind v4's PostCSS
+ * plugin unless referenced via `@config`, which this project never does —
+ * it was silently dead. This @theme block is the real source of truth now.
+ *
+ * Each --color-* entry below points at the plain custom property (e.g.
+ * var(--brand-primary)) defined in the :root/.dark/.theme-client blocks
+ * below, rather than a literal color, so that toggling those classes at
+ * runtime still re-resolves the utility's rendered color — Tailwind v4
+ * utilities generated from a `var(--x)` value re-evaluate at paint time.
+ */
+@theme {
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-bg: var(--brand-bg);
+  --color-brand-surface: var(--brand-surface);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
 @layer base {
   :root {
     --brand-bg: #f8f9fa;
@@ -20,7 +42,6 @@
     --brand-surface: #140b1b;
     --text-main: #ffffff;
     --text-muted: #9ca3af;
-    --brand-accent: #00ff9d;
   }
 
   /* Client theme variant */
@@ -37,7 +58,6 @@
     --brand-primary: #0ea5e9; /* sky 500 */
     --brand-primary-rgb: 14 165 233;
     --brand-surface: #1e293b; /* slate 800 */
-    --brand-accent: #00ff9d;
   }
 }
 

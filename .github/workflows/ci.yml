@@ -40,11 +40,18 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Install & build client
+      - name: Install client dependencies
         working-directory: ./client
-        run: |
-          npm ci
-          npm run build
+        run: npm ci
+
+      # Builds the client once and asserts the compiled CSS still contains
+      # real rules for the Tailwind v4 @theme utility classes used across
+      # client/src/**/*.vue (bg-brand-primary, text-text-main, etc.) — see
+      # Task 18 (.superpowers/sdd/task-18-report.md). Runs the build so a
+      # separate `npm run build` step isn't needed here.
+      - name: Build client & check theme tokens
+        working-directory: ./client
+        run: ./scripts/check-theme-tokens.sh
 
       - name: Test client
         working-directory: ./client
