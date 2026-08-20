@@ -59,6 +59,8 @@ import * as systemdModule from '../platform/systemd';
 import * as filesModule from '../platform/files';
 import * as configModule from '../services/config';
 import fsPromises from 'fs/promises';
+import db from '../database';
+import pipeSourcesRouter from '../routes/pipeSources';
 
 // ---- generic module-function stubbing (same pattern as platform/*.test.ts:
 // plain property reassignment + try/finally restore) ----
@@ -1224,5 +1226,493 @@ test('migrateFifoPaths() continues past one pipe throwing during migration and s
     }
   } finally {
     restorePlatform();
+  }
+});
+
+// ============================================================================
+// Task 14: PUT /api/pipe-sources/:id/config hardening --
+//   1. systemd-analyze verify (radio only) before installing new content
+//   2. reject unexpected top-level unit-file sections (radio only)
+//   3. backup previous content + rollbackConfig()
+// ============================================================================
+
+/** Creates a radio-type pipe with the shared platform stub already active,
+ * then clears `calls` so each test only sees setConfigContent()'s own
+ * platform activity. */
+async function createRadioPipeForConfigTests(namePrefix: string, calls: Call[]) {
+  const name = uniqueName(namePrefix);
+  const pipe = await pipeSourceService.create({
+    name,
+    type: 'radio',
+    url: 'https://example.com/task14-stream.mp3',
+    reconnect: true,
+    reconnectStreamed: true,
+    reconnectAtEof: true,
+    reconnectDelayMax: 30,
+    idleThreshold: 15000,
+    enabled: false,
+  });
+  calls.length = 0;
+  return pipe;
+}
+
+const VALID_RADIO_UNIT = `[Unit]
+Description=hand-edited
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ffmpeg -i "https://example.com/x.mp3" -f s16le -
+
+[Install]
+WantedBy=multi-user.target
+`;
+
+function getBackupRow(pipeId: string): { pipe_id: string; content: string; saved_at: string } | undefined {
+  return db.prepare('SELECT * FROM pipe_source_config_backup WHERE pipe_id = ?').get(pipeId) as any;
+}
+
+// ---- 1a. systemd-analyze verify: valid content (exit 0) -> proceeds ----
+
+test('setConfigContent() (radio): valid content passes systemd-analyze verify (exit 0) and installs', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-verify-valid', calls);
+
+    await pipeSourceService.setConfigContent(pipe.id, VALID_RADIO_UNIT);
+
+    const verifyCalls = calls.filter(c => c.kind === 'exec.run' && c.args[0] === 'systemd-analyze');
+    assert.equal(verifyCalls.length, 1);
+    assert.equal(verifyCalls[0].args[1][0], 'verify');
+    // Argv-based -- the candidate content was written to an fs.mkdtemp-based
+    // temp file, never interpolated into a shell string.
+    assert.ok(typeof verifyCalls[0].args[1][1] === 'string' && verifyCalls[0].args[1][1].length > 0);
+
+    const installCalls = calls.filter(c => c.kind === 'files.installPrivilegedFile');
+    assert.equal(installCalls.length, 1);
+    assert.equal(installCalls[0].args[1], VALID_RADIO_UNIT);
+  } finally {
+    restorePlatform();
+  }
+});
+
+// ---- 1b. systemd-analyze verify: non-zero exit with real output -> INVALID, rejected ----
+
+test('setConfigContent() (radio): systemd-analyze verify non-zero exit REJECTS the call with the verifier output, and never installs/reloads/restarts', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  const restoreRun = stubModuleFn(execModule, 'run', async (bin: string, args: string[]) => {
+    calls.push({ kind: 'exec.run', args: [bin, args] });
+    if (bin === 'systemd-analyze') {
+      throw new ExecError(
+        'systemd-analyze',
+        args,
+        1,
+        '',
+        '/tmp/foo.service:5: Failed to parse service type, ignoring: bogus\n',
+      );
+    }
+    return { stdout: '', stderr: '' };
+  });
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-verify-invalid', calls);
+
+    await assert.rejects(
+      () => pipeSourceService.setConfigContent(pipe.id, VALID_RADIO_UNIT),
+      /Failed to parse service type/,
+    );
+
+    const installCalls = calls.filter(c => c.kind === 'files.installPrivilegedFile');
+    assert.equal(installCalls.length, 0, 'installPrivilegedFile must NEVER be called when verification fails');
+    const reloadCalls = calls.filter(c => c.kind === 'systemd.daemonReload');
+    assert.equal(reloadCalls.length, 0, 'daemonReload must NEVER be called when verification fails');
+    const controlCalls = calls.filter(c => c.kind === 'systemd.control');
+    assert.equal(controlCalls.length, 0, 'systemdControl must NEVER be called when verification fails');
+  } finally {
+    restorePlatform();
+    restoreRun();
+  }
+});
+
+// ---- 1c. systemd-analyze missing (ENOENT-style spawn failure, exitCode null) -> warn + proceed ----
+
+test('setConfigContent() (radio): systemd-analyze missing (ExecError exitCode: null) logs a warning and PROCEEDS to install anyway', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  const restoreRun = stubModuleFn(execModule, 'run', async (bin: string, args: string[]) => {
+    calls.push({ kind: 'exec.run', args: [bin, args] });
+    if (bin === 'systemd-analyze') {
+      throw new ExecError('systemd-analyze', args, null, '', '');
+    }
+    return { stdout: '', stderr: '' };
+  });
+  const warnCalls: any[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: any[]) => { warnCalls.push(args); };
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-verify-missing', calls);
+
+    // Must NOT throw -- graceful degradation, same pattern as watchdog.ts's
+    // macOS lsof fallback and apt.ts's isInstalled() exitCode===null rethrow
+    // (mirrored here as "proceed", since this is a missing-tool fallback,
+    // not a real execution failure of the file operation itself).
+    await pipeSourceService.setConfigContent(pipe.id, VALID_RADIO_UNIT);
+
+    assert.ok(warnCalls.length > 0, 'expected a warning to be logged when systemd-analyze is unavailable');
+
+    const installCalls = calls.filter(c => c.kind === 'files.installPrivilegedFile');
+    assert.equal(installCalls.length, 1, 'install must still proceed when the verifier tool itself is missing');
+  } finally {
+    console.warn = originalWarn;
+    restorePlatform();
+    restoreRun();
+  }
+});
+
+// ---- 2. section allowlist ----
+
+test('setConfigContent() (radio): content with an unexpected [Timer] section is rejected BEFORE systemd-analyze even runs, and never installs', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-section-timer', calls);
+    const badContent = `[Unit]
+Description=smuggled timer
+
+[Service]
+ExecStart=/usr/bin/ffmpeg -i "https://example.com/x.mp3" -f s16le -
+
+[Timer]
+OnCalendar=daily
+
+[Install]
+WantedBy=multi-user.target
+`;
+
+    await assert.rejects(
+      () => pipeSourceService.setConfigContent(pipe.id, badContent),
+      /Timer/,
+    );
+
+    const verifyCalls = calls.filter(c => c.kind === 'exec.run' && c.args[0] === 'systemd-analyze');
+    assert.equal(verifyCalls.length, 0, 'systemd-analyze must not even be invoked when the section check rejects first');
+    const installCalls = calls.filter(c => c.kind === 'files.installPrivilegedFile');
+    assert.equal(installCalls.length, 0);
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('setConfigContent() (radio): content with only [Unit]/[Service]/[Install], however unusual its directives, passes the section check', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-section-ok', calls);
+    const unusualButAllowed = `[Unit]
+Description=weird but legal
+
+[Service]
+Type=simple
+User=someone
+Restart=on-failure
+RestartSec=17
+ExecStart=/usr/bin/ffmpeg -i "https://example.com/x.mp3" -f s16le -
+
+[Install]
+WantedBy=multi-user.target
+`;
+
+    await pipeSourceService.setConfigContent(pipe.id, unusualButAllowed);
+
+    const installCalls = calls.filter(c => c.kind === 'files.installPrivilegedFile');
+    assert.equal(installCalls.length, 1, 'directive freedom within allowed sections must not be restricted');
+  } finally {
+    restorePlatform();
+  }
+});
+
+// ---- 3a. backup-then-install sequence ----
+
+test('setConfigContent() (radio): saves the PRE-edit on-disk content to pipe_source_config_backup before installing the new content', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-backup-existing', calls);
+    const oldContent = '[Unit]\nDescription=the OLD content\n';
+    const destPath = `/etc/systemd/system/${getSystemdServiceName(pipe.name)}.service`;
+    const restoreFs = stubFsPromises({
+      readFile: async (p: string) => {
+        if (p === destPath) return oldContent;
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      },
+    });
+    try {
+      await pipeSourceService.setConfigContent(pipe.id, VALID_RADIO_UNIT);
+
+      const row = getBackupRow(pipe.id);
+      assert.ok(row, 'expected a backup row to have been written');
+      assert.equal(row!.content, oldContent);
+
+      const installCalls = calls.filter(c => c.kind === 'files.installPrivilegedFile');
+      assert.equal(installCalls.length, 1);
+      assert.equal(installCalls[0].args[1], VALID_RADIO_UNIT, 'the NEW content, not the backed-up one, must be installed');
+    } finally {
+      restoreFs();
+    }
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('setConfigContent() (radio): a first-time edit (no prior on-disk file) skips the backup step cleanly, without erroring', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-backup-firsttime', calls);
+    // No fs stub -- the real fs.readFile() genuinely ENOENTs against this
+    // never-actually-written path, exercising the real "getConfigContent()
+    // throws" path setConfigContent() must tolerate.
+    await pipeSourceService.setConfigContent(pipe.id, VALID_RADIO_UNIT);
+
+    const row = getBackupRow(pipe.id);
+    assert.equal(row, undefined, 'no backup row should exist for a first-time edit with nothing to preserve');
+
+    const installCalls = calls.filter(c => c.kind === 'files.installPrivilegedFile');
+    assert.equal(installCalls.length, 1, 'the new content must still install even though backup was skipped');
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('setConfigContent() upserts the backup row (a SECOND edit overwrites the first backup, not a growing history)', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-backup-upsert', calls);
+    const destPath = `/etc/systemd/system/${getSystemdServiceName(pipe.name)}.service`;
+    let currentOnDisk = '[Unit]\nDescription=version A\n';
+    const restoreFs = stubFsPromises({
+      readFile: async (p: string) => {
+        if (p === destPath) return currentOnDisk;
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      },
+    });
+    try {
+      await pipeSourceService.setConfigContent(pipe.id, '[Unit]\nDescription=version B\n');
+      assert.equal(getBackupRow(pipe.id)!.content, '[Unit]\nDescription=version A\n');
+
+      currentOnDisk = '[Unit]\nDescription=version B\n';
+      await pipeSourceService.setConfigContent(pipe.id, '[Unit]\nDescription=version C\n');
+      assert.equal(getBackupRow(pipe.id)!.content, '[Unit]\nDescription=version B\n');
+
+      const allRows = db.prepare('SELECT * FROM pipe_source_config_backup WHERE pipe_id = ?').all(pipe.id);
+      assert.equal(allRows.length, 1, 'exactly one backup slot per pipe -- never a growing history');
+    } finally {
+      restoreFs();
+    }
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('setConfigContent() (mpd): the backup/rollback mechanism applies to the mpd branch too (no systemd-analyze/section-check involved)', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const name = uniqueName('task14-backup-mpd');
+    const restoreCreateFs = stubFsPromises({
+      access: async (p: string) => {
+        if (p !== '/etc/mpd.conf') throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      },
+      readFile: async () => 'existing mpd.conf content\n',
+    });
+    const pipe = await pipeSourceService.create({
+      name,
+      type: 'mpd',
+      url: '',
+      reconnect: true,
+      reconnectStreamed: true,
+      reconnectAtEof: true,
+      reconnectDelayMax: 30,
+      idleThreshold: 15000,
+      enabled: true,
+    });
+    restoreCreateFs();
+    calls.length = 0;
+
+    const fifoPath = getFifoPath(name);
+    const oldBlock = `audio_output {\n\ttype\t\t"fifo"\n\tname\t\t"${name}"\n\tpath\t\t"${fifoPath}"\n\tformat\t\t"48000:16:2"\n\tmixer_type\t"null"\n}`;
+    const mpdConfWithBlock = `some other config\n\n${oldBlock}\n`;
+    const restoreFs = stubFsPromises({
+      access: async (p: string) => {
+        if (p !== '/etc/mpd.conf') throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      },
+      readFile: async () => mpdConfWithBlock,
+    });
+    try {
+      await pipeSourceService.setConfigContent(pipe.id, 'new audio_output block content');
+
+      const row = getBackupRow(pipe.id);
+      assert.ok(row, 'expected a backup row for the mpd branch too');
+      assert.equal(row!.content, oldBlock, 'the backed-up content is the pre-edit audio_output block, extracted the same way getConfigContent() does');
+
+      const verifyCalls = calls.filter(c => c.kind === 'exec.run' && c.args[0] === 'systemd-analyze');
+      assert.equal(verifyCalls.length, 0, 'mpd content is not systemd unit syntax -- systemd-analyze must never run for it');
+    } finally {
+      restoreFs();
+    }
+  } finally {
+    restorePlatform();
+  }
+});
+
+// ---- 3b. rollbackConfig() ----
+
+test('rollbackConfig(): throws a clear error and attempts no writes when there is no backup for this pipe', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-rollback-none', calls);
+
+    await assert.rejects(
+      () => pipeSourceService.rollbackConfig(pipe.id),
+      /No previous version to roll back to/,
+    );
+
+    assert.equal(calls.filter(c => c.kind === 'files.installPrivilegedFile').length, 0);
+    assert.equal(calls.filter(c => c.kind === 'exec.run').length, 0);
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('rollbackConfig(): when a backup exists, routes through setConfigContent() with the backed-up content (full verify/section-check path reused)', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-rollback-exists', calls);
+    const backedUpContent = '[Unit]\nDescription=the version to restore\n';
+    db.prepare(`
+      INSERT INTO pipe_source_config_backup (pipe_id, content, saved_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(pipe_id) DO UPDATE SET content = excluded.content, saved_at = excluded.saved_at
+    `).run(pipe.id, backedUpContent);
+
+    const setConfigCalls: any[] = [];
+    const restoreSetConfig = stubProtoFn('setConfigContent', async function (this: any, id: string, content: string) {
+      setConfigCalls.push([id, content]);
+    });
+    try {
+      await pipeSourceService.rollbackConfig(pipe.id);
+      assert.deepEqual(setConfigCalls, [[pipe.id, backedUpContent]]);
+    } finally {
+      restoreSetConfig();
+    }
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('rollbackConfig(): undo/redo falls out naturally -- a second rollback restores what a first rollback replaced', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipe = await createRadioPipeForConfigTests('task14-rollback-undoredo', calls);
+    const destPath = `/etc/systemd/system/${getSystemdServiceName(pipe.name)}.service`;
+    let currentOnDisk = '[Unit]\nDescription=version ONE\n';
+    const restoreFs = stubFsPromises({
+      readFile: async (p: string) => {
+        if (p === destPath) return currentOnDisk;
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      },
+    });
+    try {
+      // Edit 1 -> ONE backed up, TWO installed.
+      await pipeSourceService.setConfigContent(pipe.id, '[Unit]\nDescription=version TWO\n');
+      currentOnDisk = '[Unit]\nDescription=version TWO\n';
+      assert.equal(getBackupRow(pipe.id)!.content, '[Unit]\nDescription=version ONE\n');
+
+      // Rollback 1 -> installs ONE (undo), backs up TWO in the process.
+      await pipeSourceService.rollbackConfig(pipe.id);
+      const installCallsAfterFirstRollback = calls.filter(c => c.kind === 'files.installPrivilegedFile');
+      assert.equal(
+        installCallsAfterFirstRollback[installCallsAfterFirstRollback.length - 1].args[1],
+        '[Unit]\nDescription=version ONE\n',
+      );
+      currentOnDisk = '[Unit]\nDescription=version ONE\n';
+      assert.equal(getBackupRow(pipe.id)!.content, '[Unit]\nDescription=version TWO\n');
+
+      // Rollback 2 (redo) -> installs TWO again.
+      await pipeSourceService.rollbackConfig(pipe.id);
+      const installCallsAfterSecondRollback = calls.filter(c => c.kind === 'files.installPrivilegedFile');
+      assert.equal(
+        installCallsAfterSecondRollback[installCallsAfterSecondRollback.length - 1].args[1],
+        '[Unit]\nDescription=version TWO\n',
+      );
+    } finally {
+      restoreFs();
+    }
+  } finally {
+    restorePlatform();
+  }
+});
+
+// ---- 3c. route: POST /:id/config/rollback ----
+
+/** Finds a specific route's terminal handler function directly on the
+ * router's internal stack and invokes it, bypassing the router.use()
+ * middleware chain (authenticateToken) entirely -- this codebase has no
+ * existing supertest-style HTTP route-test harness (routes are otherwise
+ * untested at the HTTP layer), and adding one is out of scope for this
+ * task / would need a new dependency. This still exercises the REAL route
+ * handler function exported by routes/pipeSources.ts, just invoked
+ * directly with fake req/res instead of through a live HTTP server. */
+function getRouteHandler(router: any, method: 'get' | 'post' | 'put' | 'delete', routePath: string) {
+  const layer = router.stack.find(
+    (l: any) => l.route && l.route.path === routePath && l.route.methods[method],
+  );
+  if (!layer) throw new Error(`Route ${method.toUpperCase()} ${routePath} not found on router`);
+  return layer.route.stack[0].handle as (req: any, res: any) => Promise<void> | void;
+}
+
+function fakeRes() {
+  const res: any = { statusCode: 200, body: undefined };
+  res.status = (code: number) => { res.statusCode = code; return res; };
+  res.json = (body: any) => { res.body = body; return res; };
+  return res;
+}
+
+test('POST /:id/config/rollback maps "no previous version" to 404', async () => {
+  const handler = getRouteHandler(pipeSourcesRouter, 'post', '/:id/config/rollback');
+  const restoreRollback = stubModuleFn(pipeSourceService, 'rollbackConfig', async () => {
+    throw new Error('No previous version to roll back to');
+  });
+  try {
+    const req: any = { params: { id: 'some-pipe-id' }, body: {} };
+    const res = fakeRes();
+    await handler(req, res);
+    assert.equal(res.statusCode, 404);
+    assert.match(res.body.error, /No previous version to roll back to/);
+  } finally {
+    restoreRollback();
+  }
+});
+
+test('POST /:id/config/rollback returns 200 with a clear message on success', async () => {
+  const handler = getRouteHandler(pipeSourcesRouter, 'post', '/:id/config/rollback');
+  const rollbackCalls: string[] = [];
+  const restoreRollback = stubModuleFn(pipeSourceService, 'rollbackConfig', async (id: string) => {
+    rollbackCalls.push(id);
+  });
+  try {
+    const req: any = { params: { id: 'some-pipe-id' }, body: {} };
+    const res = fakeRes();
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.ok(res.body && res.body.ok !== false);
+    assert.ok(typeof res.body.message === 'string' && res.body.message.length > 0);
+    assert.deepEqual(rollbackCalls, ['some-pipe-id']);
+  } finally {
+    restoreRollback();
   }
 });

@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { randomUUID } from 'crypto';
 import db from '../database';
 import { configService } from './config';
@@ -201,6 +202,110 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 `;
+}
+
+// ---- Task 14: harden PUT /:id/config for radio-type pipes ----
+
+/**
+ * The only three top-level sections a systemd `.service` unit legitimately
+ * needs for this app -- confirmed against `buildRadioServiceContent()`
+ * above, which produces exactly these three and nothing else. The raw
+ * config editor (`setConfigContent()` below) lets an admin freely edit
+ * DIRECTIVES within these sections (ExecStart=, User=, Restart=, ...) --
+ * this allowlist is only about section STRUCTURE, closing off smuggling in
+ * an unrelated systemd unit-type section (`[Timer]`, `[Socket]`, `[Path]`,
+ * `[Mount]`, ...) that has no legitimate purpose in a `.service` file this
+ * app manages.
+ */
+const ALLOWED_RADIO_UNIT_SECTIONS = new Set(['Unit', 'Service', 'Install']);
+
+/**
+ * Rejects any top-level `[SectionName]` header other than `[Unit]`,
+ * `[Service]`, or `[Install]`. Deliberately does NOT inspect the
+ * directives/keys inside allowed sections -- a full directive allowlist
+ * would defeat this endpoint's purpose as a power-user raw-config override.
+ * Runs BEFORE `verifyRadioServiceContent()` in `setConfigContent()` below:
+ * a cheap, synchronous structural check is a reasonable thing to reject on
+ * before paying for a `systemd-analyze` spawn, though nothing here depends
+ * on that ordering -- `systemd-analyze verify` would independently reject
+ * many (not all -- an otherwise well-formed `[Timer]` section could parse
+ * fine on its own) of the same inputs.
+ */
+function assertAllowedRadioUnitSections(content: string): void {
+  for (const line of content.split(/\r?\n/)) {
+    const match = line.match(/^\[([^\]]+)\]/);
+    if (match && !ALLOWED_RADIO_UNIT_SECTIONS.has(match[1]!)) {
+      throw new Error(
+        `Unexpected unit-file section "[${match[1]}]" -- a radio pipe's .service file may only contain ` +
+        '[Unit], [Service], and [Install] sections',
+      );
+    }
+  }
+}
+
+/**
+ * Validates candidate radio `.service` content via `systemd-analyze verify`
+ * on a private, unpredictable temp file (never a fixed/predictable path --
+ * same `fs.mkdtemp` discipline as `platform/files.ts`'s
+ * `installPrivilegedFile()`) before `setConfigContent()` installs it for
+ * real. Three distinct outcomes, deliberately NOT conflated (this
+ * distinction is the whole point of this function -- see Task 5's
+ * `isInstalled()` bug this codebase has documented history of getting
+ * wrong, and `platform/apt.ts`'s `isInstalled()` for the canonical
+ * "exitCode === null means the tool itself never ran" pattern this
+ * mirrors):
+ *
+ *  1. `run()` resolves (exit 0) -- content is valid. Return normally.
+ *  2. `run()` rejects with an `ExecError` whose `exitCode !== null` --
+ *     `systemd-analyze` actually ran and found a real problem. This is
+ *     INVALID content: throw, surfacing the verifier's actual stdout/stderr
+ *     in the error message (the one place in this app where echoing raw
+ *     command output back to the API response is correct and desired --
+ *     it's the admin's own submitted content being validated, not a
+ *     secret). The caller (`setConfigContent()`) must not install the file
+ *     or restart the service when this throws.
+ *  3. `run()` rejects with an `ExecError` whose `exitCode === null` (a
+ *     spawn failure -- `systemd-analyze` missing from PATH, ENOENT, or
+ *     similar) -- the verifier TOOL itself could not run, which is not the
+ *     same claim as "the content is invalid". This app targets
+ *     systemd-based Debian/RPi hosts where `systemd-analyze` is always
+ *     present in production; a dev/CI environment without it degrades
+ *     gracefully (matches `watchdog.ts`'s macOS `lsof` fallback pattern):
+ *     log a clear warning and let the caller proceed unverified rather than
+ *     blocking every edit because this one environment lacks the tool.
+ *     A non-`ExecError` throw (e.g. a synchronous argument-validation throw
+ *     inside `run()` itself) is treated the same as case 3 here -- it is
+ *     not evidence the submitted content is invalid either, so it also
+ *     degrades to a warning rather than blocking the edit.
+ */
+async function verifyRadioServiceContent(content: string): Promise<void> {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'snapmanager-verify-'));
+  try {
+    const tmpFile = path.join(tmpDir, 'candidate.service');
+    await fs.writeFile(tmpFile, content, 'utf-8');
+
+    try {
+      await run('systemd-analyze', ['verify', tmpFile]);
+      // Exit 0 -- valid. Fall through and return normally.
+    } catch (err) {
+      if (err instanceof ExecError && err.exitCode !== null) {
+        const output = [err.stdout, err.stderr].filter(s => s && s.trim().length > 0).join('\n').trim();
+        throw new Error(
+          `systemd-analyze verify rejected this unit file -- not installed:\n${output || '(no output captured)'}`,
+        );
+      }
+      // exitCode === null (spawn failure), or a non-ExecError throw: the
+      // verifier tool itself couldn't run. Graceful degradation -- warn,
+      // don't block the edit, and don't claim the content is invalid.
+      console.warn(
+        '[pipeSources] systemd-analyze is not available on this system -- skipping unit-file verification ' +
+        'for this edit and proceeding unverified.',
+        err,
+      );
+    }
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
 }
 
 // ---- MPD: extract single audio_output block ----
@@ -872,9 +977,36 @@ export class PipeSourceService {
     }
   }
 
+  /**
+   * Task 14: hardened raw-config editor for `PUT /:id/config`. This is an
+   * intentional power-user override -- the admin can already view and fully
+   * overwrite a pipe's unit file / mpd.conf block (see this class's
+   * `getConfigContent()`) -- so the checks below are RELIABILITY guards
+   * (catch a syntax mistake before it breaks a running pipe, keep a way
+   * back), not an authorization boundary.
+   *
+   * Order of operations for the `radio` branch: (1) cheap, synchronous
+   * section-structure check -- `assertAllowedRadioUnitSections()` -- runs
+   * first since there's no reason to pay for a `systemd-analyze` spawn on
+   * content that's structurally rejected already; (2) `systemd-analyze
+   * verify` on a temp file -- `verifyRadioServiceContent()`; (3) only once
+   * both pass does this back up the CURRENT on-disk content (best-effort --
+   * see `backupCurrentConfig()`) and then actually install the new content.
+   * A rejection at (1) or (2) throws before anything on disk changes and
+   * before any systemd call is made. `mpd`-type pipes have no unit-file
+   * syntax to verify (their content is an `audio_output {}` block inside
+   * `mpd.conf`) -- they skip straight to the backup step.
+   */
   async setConfigContent(id: string, content: string): Promise<void> {
     const pipe = this.getById(id);
     if (!pipe) throw new Error(`Pipe source ${id} not found`);
+
+    if (pipe.type === 'radio') {
+      assertAllowedRadioUnitSections(content);
+      await verifyRadioServiceContent(content);
+    }
+
+    await this.backupCurrentConfig(id);
 
     if (pipe.type === 'radio') {
       await installPrivilegedFile(getServiceFilePath(pipe.name), content, { mode: 0o644 });
@@ -892,6 +1024,61 @@ export class PipeSourceService {
       await installPrivilegedFile(confPath, newContent);
       await systemdControl(MPD_UNIT, 'restart').catch(() => {});
     }
+  }
+
+  /**
+   * Task 14, requirement 3: saves whatever is CURRENTLY on disk for this
+   * pipe into the single-slot `pipe_source_config_backup` table, just
+   * before `setConfigContent()` overwrites it with new content. Reuses the
+   * existing, unmodified `getConfigContent()` read path -- if that throws
+   * (most commonly a first-time edit where the file doesn't exist yet, but
+   * also any other read failure), there is nothing to preserve, so this
+   * is a no-op rather than a hard failure that would block the edit itself.
+   *
+   * The `INSERT ... ON CONFLICT(pipe_id) DO UPDATE` upsert is what keeps
+   * this to exactly ONE backup slot per pipe (per the plan's singular "la
+   * versión previa") -- a second edit overwrites the first backup row
+   * rather than accumulating a history.
+   */
+  private async backupCurrentConfig(id: string): Promise<void> {
+    let previous: string;
+    try {
+      ({ content: previous } = await this.getConfigContent(id));
+    } catch {
+      return;
+    }
+    db.prepare(`
+      INSERT INTO pipe_source_config_backup (pipe_id, content, saved_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(pipe_id) DO UPDATE SET content = excluded.content, saved_at = excluded.saved_at
+    `).run(id, previous);
+  }
+
+  /**
+   * Task 14, requirement 3: restores the single previously-backed-up
+   * version for this pipe. Deliberately routes through the SAME
+   * `setConfigContent()` call every other write goes through -- a rollback
+   * is not a bypass of the section-allowlist/`systemd-analyze` checks, it's
+   * just another edit whose content happens to come from the backup table
+   * instead of the request body.
+   *
+   * Because `setConfigContent()` itself backs up whatever is on disk before
+   * installing, calling it here to install the backed-up content
+   * automatically re-backs-up the content being rolled back FROM into the
+   * same slot. That gives free undo/redo: a second `rollbackConfig()` call
+   * restores what the first one just replaced. No extra bookkeeping is
+   * needed for this to work.
+   */
+  async rollbackConfig(id: string): Promise<void> {
+    const pipe = this.getById(id);
+    if (!pipe) throw new Error(`Pipe source ${id} not found`);
+
+    const row = db.prepare('SELECT content FROM pipe_source_config_backup WHERE pipe_id = ?').get(id) as
+      | { content: string }
+      | undefined;
+    if (!row) throw new Error('No previous version to roll back to');
+
+    await this.setConfigContent(id, row.content);
   }
 
   private async writeRadioServiceFile(pipe: PipeSource): Promise<void> {

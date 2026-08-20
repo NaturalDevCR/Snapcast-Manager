@@ -141,6 +141,17 @@ router.put('/:id/config', async (req, res) => {
   }
 });
 
+// POST /api/pipe-sources/:id/config/rollback
+router.post('/:id/config/rollback', async (req, res) => {
+  try {
+    await pipeSourceService.rollbackConfig(req.params.id);
+    res.json({ ok: true, message: 'Rolled back to the previous configuration' });
+  } catch (err: any) {
+    const status = err.message.includes('No previous version') || err.message.includes('not found') ? 404 : 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 // GET /api/pipe-sources/system/zombies
 router.get('/system/zombies', async (req, res) => {
   try {

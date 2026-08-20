@@ -71,6 +71,20 @@ const init = () => {
       enabled INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- Task 14: one-slot-per-pipe backup of a pipe source's raw config
+    -- content (systemd unit text for radio, mpd audio_output block for
+    -- mpd), written by services/pipeSources.ts's setConfigContent() just
+    -- before it installs new content, and restored by rollbackConfig().
+    -- PRIMARY KEY pipe_id (not an autoincrement id) is what keeps this to
+    -- exactly one previous version per pipe -- a second backup for the same
+    -- pipe_id overwrites the first via the upsert in setConfigContent(),
+    -- it never accumulates a history.
+    CREATE TABLE IF NOT EXISTS pipe_source_config_backup (
+      pipe_id TEXT PRIMARY KEY,
+      content TEXT NOT NULL,
+      saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Migration: add type column to pipe sources (radio | mpd)
