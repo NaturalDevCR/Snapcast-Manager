@@ -13,7 +13,7 @@ defineProps<{
             <slot name="icon"></slot>
         </div>
         <div>
-            <h3 v-if="title" class="text-sm font-black text-white tracking-wide">{{ title }}</h3>
+            <h3 v-if="title" class="text-sm font-black text-text-main tracking-wide">{{ title }}</h3>
             <slot v-else name="title"></slot>
         </div>
       </div>

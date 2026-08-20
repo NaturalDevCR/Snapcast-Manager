@@ -1,20 +1,45 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Theme init must run synchronously here, before any CSS paints and
+      before Vue mounts, so that:
+        1. Login.vue and Setup.vue (which don't render Layout.vue, and
+           therefore never triggered the old Layout.vue-onMounted-only
+           initTheme() call) get the correct theme class from the very
+           first paint.
+        2. Every route avoids a flash-of-wrong-theme between first paint
+           and Vue's mount (which previously always rendered hardcoded
+           class="dark" for a frame regardless of stored preference).
+      This logic must mirror useUIStore's `isDark` default exactly
+      (localStorage 'theme' !== 'light' => dark) or the two would fall
+      out of sync on first load.
+    -->
+    <script>
+      (function () {
+        try {
+          var isDark = localStorage.getItem('theme') !== 'light';
+          document.documentElement.classList.toggle('dark', isDark);
+        } catch (e) {
+          // localStorage unavailable (e.g. private mode edge cases) - default to dark.
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Snapcast Manager</title>
-    
+
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
+
     <!-- Google Fonts: Material Symbols Outlined -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
   </head>
-  <body class="bg-brand-bg text-white antialiased min-h-screen">
+  <body class="bg-brand-bg text-text-main antialiased min-h-screen">
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -42,7 +42,7 @@ const handleLogin = async () => {
            <h2 class="text-3xl font-black text-text-main tracking-tight leading-tight">
             Snapcast Manager
           </h2>
-          <p class="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-white/40">Secure Network Authentication</p>
+          <p class="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-text-muted">Secure Network Authentication</p>
         </div>
 
         <form class="space-y-6" @submit.prevent="handleLogin">

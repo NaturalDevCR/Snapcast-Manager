@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
-import { useUIStore } from '../stores/ui';
 import { useSystemStore } from '../stores/system';
 import { useRoute, useRouter } from 'vue-router';
 import ToastNotification from './ToastNotification.vue';
@@ -10,13 +9,15 @@ import PromptDialog from './PromptDialog.vue';
 import { version } from '../../package.json';
 
 const authStore = useAuthStore();
-const uiStore = useUIStore();
 const systemStore = useSystemStore();
 const route = useRoute();
 const router = useRouter();
 
 onMounted(async () => {
-  uiStore.initTheme();
+  // Theme is now initialized synchronously in index.html before Vue even
+  // mounts (see the inline <script> there) so that Login.vue/Setup.vue -
+  // which don't render this component - also get the correct theme on
+  // first paint. Calling uiStore.initTheme() here would be redundant.
   document.addEventListener('click', handleClickOutside);
   await systemStore.fetchMode();
   // Auto-redirect to the correct view based on install mode
@@ -94,7 +95,7 @@ function handleClickOutside(e: MouseEvent) {
 </script>
 
 <template>
-  <div :class="['min-h-screen bg-brand-bg text-white font-sans flex flex-col transition-colors duration-500 relative', isClientMode ? 'theme-client' : 'theme-server']">
+  <div :class="['min-h-screen bg-brand-bg text-text-main font-sans flex flex-col transition-colors duration-500 relative', isClientMode ? 'theme-client' : 'theme-server']">
     <!-- Background Accents -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div class="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-brand-primary/10 blur-[120px] rounded-full"></div>
@@ -109,7 +110,7 @@ function handleClickOutside(e: MouseEvent) {
           <!-- Burger Button (Mobile) -->
           <button
             @click="isMobileMenuOpen = !isMobileMenuOpen"
-            class="p-2 mr-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl border border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center"
+            class="p-2 mr-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-text-main rounded-xl border border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center"
             title="Open Menu"
           >
             <span class="material-symbols-outlined text-[1.2rem]">menu</span>
@@ -120,7 +121,7 @@ function handleClickOutside(e: MouseEvent) {
             <div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-lg shadow-brand-primary/20">
                 <img src="../assets/logo.png" alt="Logo" class="w-full h-full rounded-lg object-cover" />
             </div>
-            <span class="text-base font-black tracking-tight text-white hidden sm:block drop-shadow-sm">Snapcast <span class="text-brand-primary">Manager</span></span>
+            <span class="text-base font-black tracking-tight text-text-main hidden sm:block drop-shadow-sm">Snapcast <span class="text-brand-primary">Manager</span></span>
           </div>
 
           <!-- Desktop Nav -->
@@ -130,14 +131,14 @@ function handleClickOutside(e: MouseEvent) {
             <div v-if="systemStore.snapcastMode === 'both'" class="flex items-center bg-white/5 rounded-lg p-0.5 border border-white/5 mr-3">
               <button
                 @click="switchMode('server')"
-                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
+                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
               >
                 <span class="material-symbols-outlined text-[0.85rem]">dns</span>
                 Server
               </button>
               <button
                 @click="switchMode('client')"
-                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
+                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
               >
                 <span class="material-symbols-outlined text-[0.85rem]">speaker</span>
                 Client
@@ -159,8 +160,8 @@ function handleClickOutside(e: MouseEvent) {
               :to="item.href"
               :class="[
                 isNavActive(item.href)
-                  ? 'bg-white/10 text-white border border-white/5'
-                  : 'text-gray-400 hover:bg-white/5 hover:text-white border border-transparent',
+                  ? 'bg-white/10 text-text-main border border-white/5'
+                  : 'text-gray-400 hover:bg-white/5 hover:text-text-main border border-transparent',
                 'px-3 py-1.5 rounded-lg font-bold text-xs transition-all duration-200 flex items-center gap-1.5 uppercase tracking-wide'
               ]"
             >
@@ -174,8 +175,8 @@ function handleClickOutside(e: MouseEvent) {
                 @click.stop="isSystemMenuOpen = !isSystemMenuOpen"
                 :class="[
                   isSystemActive
-                    ? 'bg-white/10 text-white border-white/5'
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white border-transparent',
+                    ? 'bg-white/10 text-text-main border-white/5'
+                    : 'text-gray-400 hover:bg-white/5 hover:text-text-main border-transparent',
                   'px-3 py-1.5 rounded-lg font-bold text-xs transition-all duration-200 flex items-center gap-1.5 uppercase tracking-wide border'
                 ]"
               >
@@ -208,8 +209,8 @@ function handleClickOutside(e: MouseEvent) {
                     @click="isSystemMenuOpen = false"
                     :class="[
                       isItemActive(item)
-                        ? 'bg-brand-primary/15 text-white'
-                        : 'text-gray-400 hover:bg-white/5 hover:text-white',
+                        ? 'bg-brand-primary/15 text-text-main'
+                        : 'text-gray-400 hover:bg-white/5 hover:text-text-main',
                       'flex items-center gap-3 px-4 py-2.5 transition-all duration-150 mx-1.5 rounded-xl'
                     ]"
                   >
@@ -232,7 +233,7 @@ function handleClickOutside(e: MouseEvent) {
           <div class="flex items-center gap-2">
             <div class="flex items-center gap-2.5 sm:pl-3 sm:border-l sm:border-white/10">
                 <div class="text-right hidden sm:block">
-                    <p class="text-xs font-bold text-white leading-tight">Admin</p>
+                    <p class="text-xs font-bold text-text-main leading-tight">Admin</p>
                     <p class="text-[10px] text-brand-primary font-medium">Session Active</p>
                 </div>
                 <button
@@ -277,9 +278,9 @@ function handleClickOutside(e: MouseEvent) {
                 <div class="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
                     <img src="../assets/logo.png" alt="Logo" class="w-full h-full rounded-xl object-cover" />
                 </div>
-                <span class="text-lg font-black text-white">Snapcast <span class="text-brand-primary">Manager</span></span>
+                <span class="text-lg font-black text-text-main">Snapcast <span class="text-brand-primary">Manager</span></span>
               </div>
-              <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5">
+              <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl text-gray-400 hover:text-text-main hover:bg-white/5">
                 <span class="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -288,14 +289,14 @@ function handleClickOutside(e: MouseEvent) {
             <div v-if="systemStore.snapcastMode === 'both'" class="flex items-center bg-white/5 rounded-xl p-1 border border-white/5 mt-5">
               <button
                 @click="switchMode('server')"
-                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
+                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
               >
                 <span class="material-symbols-outlined text-[0.9rem]">dns</span>
                 Server
               </button>
               <button
                 @click="switchMode('client')"
-                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-white', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
+                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
               >
                 <span class="material-symbols-outlined text-[0.9rem]">speaker</span>
                 Client
@@ -317,8 +318,8 @@ function handleClickOutside(e: MouseEvent) {
                 @click="isMobileMenuOpen = false"
                 :class="[
                   isNavActive(item.href)
-                    ? 'bg-white/10 text-white border border-white/5'
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white border border-transparent',
+                    ? 'bg-white/10 text-text-main border border-white/5'
+                    : 'text-gray-400 hover:bg-white/5 hover:text-text-main border border-transparent',
                   'px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200 flex items-center gap-3'
                 ]"
               >
@@ -333,8 +334,8 @@ function handleClickOutside(e: MouseEvent) {
                   @click="isMobileSystemOpen = !isMobileSystemOpen"
                   :class="[
                     isSystemActive
-                      ? 'bg-white/10 text-white border-white/5'
-                      : 'text-gray-400 hover:bg-white/5 hover:text-white border-transparent',
+                      ? 'bg-white/10 text-text-main border-white/5'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-text-main border-transparent',
                     'px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200 flex items-center gap-3 border w-full text-left mt-1'
                   ]"
                 >
@@ -363,7 +364,7 @@ function handleClickOutside(e: MouseEvent) {
                       @click="isMobileMenuOpen = false"
                       :class="[
                         isItemActive(item)
-                          ? 'text-white'
+                          ? 'text-text-main'
                           : 'text-gray-500 hover:text-gray-300',
                         'py-2 text-sm font-bold transition-all duration-200 flex items-center gap-2.5'
                       ]"
@@ -379,7 +380,7 @@ function handleClickOutside(e: MouseEvent) {
             <!-- User Info (Bottom) -->
             <div class="mt-auto pt-5 border-t border-white/5 flex items-center justify-between">
               <div>
-                <p class="text-sm font-bold text-white">Admin</p>
+                <p class="text-sm font-bold text-text-main">Admin</p>
                 <p class="text-xs text-brand-primary font-medium">Session Active</p>
               </div>
               <button
@@ -406,15 +407,15 @@ function handleClickOutside(e: MouseEvent) {
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-500">
         <div class="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
           <span class="font-black tracking-widest uppercase text-[10px]">&copy; 2026 Snapcast Manager Ecosystem</span>
-          <span class="hidden sm:inline-block text-white/20">&bull;</span>
+          <span class="hidden sm:inline-block text-text-muted/40">&bull;</span>
           <span class="font-black tracking-widest uppercase text-[10px]">VERSION {{ version }}</span>
         </div>
         <div class="flex flex-col sm:flex-row items-center gap-4">
-          <a href="https://github.com/NaturalDevCR/TCP-Streamer" target="_blank" class="flex items-center gap-1 hover:text-white text-gray-400 font-bold transition-colors duration-300">
+          <a href="https://github.com/NaturalDevCR/TCP-Streamer" target="_blank" class="flex items-center gap-1 hover:text-text-main text-gray-400 font-bold transition-colors duration-300">
             <span class="material-symbols-outlined text-[1rem]">link</span>
             TCP-Streamer
           </a>
-          <span class="hidden sm:inline-block text-white/20">&bull;</span>
+          <span class="hidden sm:inline-block text-text-muted/40">&bull;</span>
           <a href="https://github.com/jdavidoa91/Snapcast-Manager" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1 text-brand-primary hover:text-[#8e0bc9] font-black transition-colors group">
              <span>Developed by NaturalDevCR</span>
              <span class="material-symbols-outlined text-[14px] group-hover:translate-x-1 transition-transform">arrow_forward</span>

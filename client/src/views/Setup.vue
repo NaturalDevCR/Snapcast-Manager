@@ -57,12 +57,12 @@ const handleSetup = async () => {
             <!-- Glow Effect -->
             <div class="absolute -inset-1 bg-brand-primary/20 rounded-[2.5rem] blur opacity-15 group-hover:opacity-30 transition duration-1000"></div>
             
-            <div class="relative bg-black/40 shadow-2xl rounded-[2.5rem] p-8 md:p-14 border border-white/5 backdrop-blur-xl animate-in fade-in zoom-in duration-1000">
+            <div class="relative bg-brand-surface/80 backdrop-blur-3xl shadow-2xl rounded-[2.5rem] p-8 md:p-14 border border-white/[0.04] animate-in fade-in zoom-in duration-1000">
                 <div class="text-center mb-12">
                      <div class="inline-flex items-center justify-center p-5 bg-brand-primary/10 rounded-3xl mb-8 border border-brand-primary/20 shadow-[inset_0_0_15px_rgba(166,13,242,0.1)]">
                         <span class="material-symbols-outlined text-[3rem] text-brand-primary drop-shadow-[0_0_15px_rgba(166,13,242,0.4)]">rocket_launch</span>
                      </div>
-                     <h2 class="text-4xl font-black text-white tracking-tight leading-tight mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
+                     <h2 class="text-4xl font-black text-text-main tracking-tight leading-tight mb-4">
                         System Ignition
                     </h2>
                     <p class="text-slate-500 dark:text-slate-400 font-medium text-lg">
@@ -82,7 +82,7 @@ const handleSetup = async () => {
                                     v-model="username" 
                                     type="text" 
                                     required
-                                    class="block w-full pl-12 pr-6 py-4 bg-black/40 border border-white/5 rounded-2xl text-white placeholder-gray-500 focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
+                                    class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
                                     placeholder="Choose username..." 
                                 />
                             </div>
@@ -99,7 +99,7 @@ const handleSetup = async () => {
                                         v-model="password" 
                                         type="password" 
                                         required
-                                        class="block w-full pl-12 pr-6 py-4 bg-black/40 border border-white/5 rounded-2xl text-white placeholder-gray-500 focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
+                                        class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
                                         placeholder="Min 8 chars" 
                                     />
                                 </div>
@@ -114,7 +114,7 @@ const handleSetup = async () => {
                                         v-model="confirmPassword" 
                                         type="password" 
                                         required
-                                        class="block w-full pl-12 pr-6 py-4 bg-black/40 border border-white/5 rounded-2xl text-white placeholder-gray-500 focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
+                                        class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
                                         placeholder="Repeat password" 
                                     />
                                 </div>

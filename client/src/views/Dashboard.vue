@@ -98,7 +98,7 @@ const openMympd = () => {
       <div v-if="systemStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-brand-bg/40 backdrop-blur-sm pointer-events-none">
           <div class="bg-brand-surface/90 p-5 rounded-2xl shadow-2xl flex items-center space-x-3 border border-brand-primary/20 animate-in fade-in zoom-in duration-300 pointer-events-auto backdrop-blur-xl">
               <span class="material-symbols-outlined animate-spin text-brand-primary text-2xl">sync</span>
-              <span class="text-sm font-bold text-white tracking-widest uppercase">{{ systemStore.loadingMessage || 'Syncing...' }}</span>
+              <span class="text-sm font-bold text-text-main tracking-widest uppercase">{{ systemStore.loadingMessage || 'Syncing...' }}</span>
           </div>
       </div>
 
@@ -125,20 +125,20 @@ const openMympd = () => {
                     </div>
                     
                     <div class="space-y-2 max-h-[140px] overflow-y-auto pr-2 custom-scrollbar">
-                        <div v-for="stream in snapcastStore.status.streams" :key="stream.id" 
+                        <div v-for="stream in snapcastStore.status.streams" :key="stream.id"
                              class="group/item flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-brand-primary/30 transition-all duration-300">
                             <div class="flex items-center space-x-3 min-w-0">
                                 <div class="w-1.5 h-1.5 rounded-full transition-colors" :class="stream.status === 'playing' ? 'bg-emerald-400' : 'bg-white/10'"></div>
-                                <span class="text-xs font-semibold text-white/70 truncate group-hover/item:text-white transition-colors" :title="stream.id">
+                                <span class="text-xs font-semibold text-text-main/70 truncate group-hover/item:text-text-main transition-colors" :title="stream.id">
                                     {{ stream.uri?.query?.name || stream.id }}
                                 </span>
                             </div>
-                            <span :class="stream.status === 'playing' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-white/30 bg-white/5 border-white/10'" 
+                            <span :class="stream.status === 'playing' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-text-muted bg-white/5 border-white/10'"
                                   class="px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider transition-all">
                                 {{ stream.status }}
                             </span>
                         </div>
-                        <div v-if="snapcastStore.status.streams.length === 0" class="flex flex-col items-center justify-center py-6 text-white/10 italic">
+                        <div v-if="snapcastStore.status.streams.length === 0" class="flex flex-col items-center justify-center py-6 text-text-muted/40 italic">
                             <span class="material-symbols-outlined text-2xl mb-1">music_off</span>
                             <span class="text-[10px] uppercase font-black tracking-widest">No active streams</span>
                         </div>
@@ -164,10 +164,10 @@ const openMympd = () => {
                             <div v-for="client in group.clients.filter(c => c.connected)" :key="client.id" 
                                  class="group/item flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-brand-primary/30 transition-all duration-300">
                                 <div class="flex flex-col min-w-0">
-                                    <span class="text-xs font-semibold text-white/70 truncate group-hover/item:text-white transition-colors">
+                                    <span class="text-xs font-semibold text-text-main/70 truncate group-hover/item:text-text-main transition-colors">
                                         {{ client.config.name || client.host.name }}
                                     </span>
-                                    <span class="text-[9px] text-white/30 font-mono mt-0.5">{{ client.host.ip }}</span>
+                                    <span class="text-[9px] text-text-muted font-mono mt-0.5">{{ client.host.ip }}</span>
                                 </div>
                                 <div class="flex items-center space-x-2">
                                     <div class="h-1 w-12 bg-white/5 rounded-full overflow-hidden">
@@ -179,8 +179,8 @@ const openMympd = () => {
                                 </div>
                             </div>
                         </template>
-                        <div v-if="snapcastStore.status.groups.reduce((acc, g) => acc + g.clients.filter(c => c.connected).length, 0) === 0" 
-                             class="flex flex-col items-center justify-center py-6 text-white/10 italic">
+                        <div v-if="snapcastStore.status.groups.reduce((acc, g) => acc + g.clients.filter(c => c.connected).length, 0) === 0"
+                             class="flex flex-col items-center justify-center py-6 text-text-muted/40 italic">
                             <span class="material-symbols-outlined text-2xl mb-1">link_off</span>
                             <span class="text-[10px] uppercase font-black tracking-widest">No clients detected</span>
                         </div>
@@ -209,7 +209,7 @@ const openMympd = () => {
                     <div class="grid grid-cols-2 gap-3">
                         <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col items-center justify-center text-center space-y-1">
                             <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">Version</span>
-                            <span class="text-xs font-mono font-semibold text-brand-primary group-hover:text-white transition-colors">
+                            <span class="text-xs font-mono font-semibold text-brand-primary group-hover:text-text-main transition-colors">
                                 {{ systemStore.packageVersions.snapserver || (snapcastStore.status ? snapcastStore.status.server.version : '...') }}
                             </span>
                         </div>
@@ -238,7 +238,7 @@ const openMympd = () => {
       <!-- System/Daemon Offline State -->
       <div v-else-if="!snapcastStore.loading && snapcastStore.error" class="bg-[#ff3b30]/10 border border-[#ff3b30]/30 rounded-2xl p-8 text-center backdrop-blur-xl shadow-[0_0_30px_rgba(255,59,48,0.1)]">
           <span class="material-symbols-outlined text-[3rem] text-[#ff3b30] drop-shadow-[0_0_15px_rgba(255,59,48,0.5)] mb-4">cloud_off</span>
-          <h3 class="text-sm font-black text-white uppercase tracking-[0.2em] mb-2">Snapserver Offline or Unreachable</h3>
+          <h3 class="text-sm font-black text-text-main uppercase tracking-[0.2em] mb-2">Snapserver Offline or Unreachable</h3>
           <p class="text-xs text-gray-400 max-w-md mx-auto">{{ snapcastStore.error }}</p>
       </div>
 
@@ -286,7 +286,7 @@ const openMympd = () => {
 
             <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages.snapserver">
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'snapserver')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
+                    <button @click="systemStore.controlService('restart', 'snapserver')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-text-main border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
                     <button v-if="systemStore.snapserverStatus === 'active'" @click="systemStore.controlService('stop', 'snapserver')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
                     <button v-else @click="systemStore.controlService('start', 'snapserver')" class="px-3 py-2.5 bg-[#00ff9d]/10 hover:bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
                 </div>
@@ -295,7 +295,7 @@ const openMympd = () => {
                             'w-full px-4 py-3 rounded-xl text-xs font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 uppercase',
                             systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown'
                             ? 'bg-brand-primary text-white border border-brand-primary/50 shadow-xl shadow-brand-primary/30 hover:shadow-brand-primary/50 hover:bg-brand-primary/80' 
-                            : 'bg-black/40 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'
+                            : 'bg-black/40 text-gray-400 hover:bg-white/10 hover:text-text-main border border-white/5'
                         ]"
                         :disabled="systemStore.loading">
                     {{ systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' ? 'Install Update' : 'Clean Reinstall' }}
@@ -439,7 +439,7 @@ const openMympd = () => {
                 <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-inner shadow-brand-primary/10">
                     <p class="text-[10px] font-bold text-brand-primary uppercase tracking-widest leading-relaxed text-center">FFmpeg is optimized and ready for high-fidelity audio transcoding.</p>
                 </div>
-                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-300 rounded-xl hover:bg-white/10 hover:text-white border border-white/5 transition-all text-xs font-bold uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Refresh Packages</button>
+                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-300 rounded-xl hover:bg-white/10 hover:text-text-main border border-white/5 transition-all text-xs font-bold uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Refresh Packages</button>
             </div>
         </div>
       </Card>
@@ -469,7 +469,7 @@ const openMympd = () => {
              </div>
             <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages['shairport-sync']">
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'shairport-sync')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
+                    <button @click="systemStore.controlService('restart', 'shairport-sync')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-text-main border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
                     <button v-if="systemStore.shairportSyncStatus === 'active'" @click="systemStore.controlService('stop', 'shairport-sync')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
                     <button v-else @click="systemStore.controlService('start', 'shairport-sync')" class="px-3 py-2.5 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
                 </div>
@@ -512,7 +512,7 @@ const openMympd = () => {
             </div>
             <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages['mpd']">
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'mpd')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
+                    <button @click="systemStore.controlService('restart', 'mpd')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-text-main border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
                     <button v-if="systemStore.mpdStatus === 'active'" @click="systemStore.controlService('stop', 'mpd')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
                     <button v-else @click="systemStore.controlService('start', 'mpd')" class="px-3 py-2.5 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
                 </div>
@@ -558,7 +558,7 @@ const openMympd = () => {
                     <span class="material-symbols-outlined text-[1rem] mr-1 align-middle">open_in_new</span>Open myMPD
                 </button>
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'mympd')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
+                    <button @click="systemStore.controlService('restart', 'mympd')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-text-main border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Restart</button>
                     <button v-if="systemStore.mympdStatus === 'active'" @click="systemStore.controlService('stop', 'mympd')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Stop</button>
                     <button v-else @click="systemStore.controlService('start', 'mympd')" class="px-3 py-2.5 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">Start</button>
                 </div>
