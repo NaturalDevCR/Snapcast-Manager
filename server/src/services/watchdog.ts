@@ -1,9 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { run, needsSudo } from '../platform/exec';
 
 const WATCHDOGS_CONFIG_DIR = '/etc/snapcast-manager';
 const WATCHDOGS_CONFIG_PATH = path.join(WATCHDOGS_CONFIG_DIR, 'watchdogs.json');
@@ -159,7 +156,12 @@ export class WatchdogService {
     for (const port of ports) {
       if (!Number.isInteger(port) || port < 1 || port > 65535) continue;
       try {
-        const { stdout } = await execAsync(`ss -t -i -n -a '( sport = :${port} or dport = :${port} )'`);
+        // The `( sport = :N or dport = :N )` filter expression is `ss`'s OWN
+        // filter-expression syntax (parsed by `ss` itself), not a shell
+        // feature -- it is a single argv element handed to `ss` via execFile,
+        // which never shell-interprets it regardless of content. No sudo:
+        // this is a read-only query.
+        const { stdout } = await run('ss', ['-t', '-i', '-n', '-a', `( sport = :${port} or dport = :${port} )`]);
         portStats.push(...this.parseSocketStats(stdout));
       } catch (error) {
         if (process.platform === 'darwin') {
@@ -225,7 +227,7 @@ export class WatchdogService {
 
   private async getFallbackStatsMac(port: number): Promise<SocketStat[]> {
     try {
-      const { stdout } = await execAsync(`lsof -i :${port} -n -P`);
+      const { stdout } = await run('lsof', ['-i', `:${port}`, '-n', '-P']);
       return this.parseLsofStats(stdout, port);
     } catch (error) {
        return [];
@@ -277,7 +279,7 @@ export class WatchdogService {
   }
 
   async killConnection(id: string, peerIp: string, peerPort: number): Promise<boolean> {
-     // These values are interpolated into a shell command — validate strictly
+     // These values are passed as argv elements to `ss` — validate strictly
      // even though the route already does (defense in depth).
      if (!/^[0-9a-fA-F.:\[\]]+$/.test(peerIp)) throw new Error('Invalid peer IP');
      if (!Number.isInteger(peerPort) || peerPort < 1 || peerPort > 65535) throw new Error('Invalid peer port');
@@ -286,19 +288,25 @@ export class WatchdogService {
      const watchdog = watchdogs.find(w => w.id === id);
      if (!watchdog) throw new Error('Watchdog not found');
 
+     // Single needsSudo()-gated decision, matching the standard pattern used
+     // everywhere else in this codebase (platform/systemd.ts's control(),
+     // services/backup.ts, services/system.ts) rather than the original's
+     // "always try sudo first, silently fall back to no-sudo on any
+     // failure" -- see watchdog.test.ts's header comment / the task report
+     // for why the original's blind fallback doesn't buy anything real for
+     // this app's actual deployment shape (no ambient capability grant, no
+     // passwordless-sudo carve-out for `ss` in scripts/install.sh).
+     const argv = ['ss', '-K', 'dst', peerIp, 'dport', '=', String(peerPort)];
      try {
-        // Add sudo in case service isn't running as root
-        await execAsync(`sudo ss -K dst ${peerIp} dport = ${peerPort}`);
+        if (needsSudo()) {
+           await run('sudo', argv);
+        } else {
+           await run(argv[0], argv.slice(1));
+        }
         return true;
      } catch (error) {
-        console.error(`Failed to kill connection with sudo ${peerIp}:${peerPort}, trying without...`, error);
-        try {
-           await execAsync(`ss -K dst ${peerIp} dport = ${peerPort}`);
-           return true;
-        } catch (e2) {
-           console.error(`Failed to kill connection without sudo ${peerIp}:${peerPort}:`, e2);
-           return false;
-        }
+        console.error(`Failed to kill connection ${peerIp}:${peerPort}:`, error);
+        return false;
      }
   }
 }
