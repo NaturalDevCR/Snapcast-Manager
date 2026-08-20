@@ -1,0 +1,105 @@
+# /etc/sudoers.d/snapcast-manager
+#
+# Managed by Snapcast Manager's installer (scripts/install.sh, Task 16) --
+# DO NOT hand-edit the installed copy, it will be overwritten (after
+# `visudo -c` validation) on the next install/update run. To change what
+# this grants, edit THIS source file in the repo and re-run the installer.
+#
+# Grants the dedicated, unprivileged `snapmanager` system user passwordless
+# (NOPASSWD) root access to EXACTLY the commands this application issues as
+# root, cross-referenced against every `run('sudo', ...)` /
+# `installPrivilegedFile()` / `platform/systemd.ts` / `platform/apt.ts` call
+# site in server/src as of Task 16 -- see SECURITY.md's "Privilege model"
+# section and .superpowers/sdd/task-16-report.md for the full reasoning,
+# especially why the package-management line below is intentionally broad
+# rather than narrowly wildcarded.
+#
+# Validate any manual edit BEFORE it can take effect:
+#   visudo -c -f /etc/sudoers.d/snapcast-manager
+# A syntactically broken sudoers file installed live can lock out ALL sudo
+# access on the host -- this check is not optional, and scripts/install.sh
+# always runs it against a temp copy before installing.
+
+# aptGetInstallFix() (server/src/services/system.ts) runs
+# `sudo DEBIAN_FRONTEND=noninteractive apt-get install -f ...` -- sudo's
+# default env_reset policy strips env-var assignments passed on the sudo
+# command line unless the target variable is explicitly kept. Scoped to
+# this one user/variable only; does not relax env handling for anyone else.
+Defaults:snapmanager env_keep += "DEBIAN_FRONTEND"
+
+# This process runs as a systemd service (Type=simple) and NEVER has a
+# controlling TTY -- if the target host's global sudoers has
+# `Defaults requiretty` set, every sudo call below would otherwise fail
+# outright regardless of the NOPASSWD grants. Scoped to this user only.
+Defaults:snapmanager !requiretty
+
+# ---- systemd unit control: this app's own managed services ----
+# One line per literal, fixed unit name, covering exactly the 5 mutating
+# actions server/src/platform/systemd.ts's control() can issue
+# (start/stop/restart/enable/disable). Every literal unit name below was
+# grepped out of server/src/services/*.ts, server/src/routes/*.ts, and
+# server/src/platform/systemd.ts -- not written from memory.
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl start snapserver.service, /usr/bin/systemctl stop snapserver.service, /usr/bin/systemctl restart snapserver.service, /usr/bin/systemctl enable snapserver.service, /usr/bin/systemctl disable snapserver.service
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl start snapclient.service, /usr/bin/systemctl stop snapclient.service, /usr/bin/systemctl restart snapclient.service, /usr/bin/systemctl enable snapclient.service, /usr/bin/systemctl disable snapclient.service
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl start shairport-sync.service, /usr/bin/systemctl stop shairport-sync.service, /usr/bin/systemctl restart shairport-sync.service, /usr/bin/systemctl enable shairport-sync.service, /usr/bin/systemctl disable shairport-sync.service
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl start nqptp.service, /usr/bin/systemctl stop nqptp.service, /usr/bin/systemctl restart nqptp.service, /usr/bin/systemctl enable nqptp.service, /usr/bin/systemctl disable nqptp.service
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl start mpd.service, /usr/bin/systemctl stop mpd.service, /usr/bin/systemctl restart mpd.service, /usr/bin/systemctl enable mpd.service, /usr/bin/systemctl disable mpd.service
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl start mpd.socket, /usr/bin/systemctl stop mpd.socket, /usr/bin/systemctl restart mpd.socket, /usr/bin/systemctl enable mpd.socket, /usr/bin/systemctl disable mpd.socket
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl start mympd.service, /usr/bin/systemctl stop mympd.service, /usr/bin/systemctl restart mympd.service, /usr/bin/systemctl enable mympd.service, /usr/bin/systemctl disable mympd.service
+# librespot.service: server/src/routes/system.ts's POST /api/system/service/:action/:service
+# and server/src/services/system.ts's start/stop/restart/enable/disableService()
+# all accept 'librespot' as a controllable service name -- not in the
+# original task brief's list, found via the grep pass required by this task.
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl start librespot.service, /usr/bin/systemctl stop librespot.service, /usr/bin/systemctl restart librespot.service, /usr/bin/systemctl enable librespot.service, /usr/bin/systemctl disable librespot.service
+
+# Per-instance units this app generates itself (server/src/services/
+# snapclientInstances.ts's serviceFileName()/unitName(), server/src/
+# services/pipeSources.ts's getSystemdServiceName()/toUnit()) -- a single
+# trailing wildcard per pattern, since the instance-id/name-slug suffix is
+# unbounded by design. Every unit name that actually reaches systemctl is
+# re-validated by server/src/platform/systemd.ts's assertValidUnitName()
+# AND the calling service's own DB-row lookup before this grant is ever
+# exercised (see snapclientInstances.ts's header comment) -- this wildcard
+# is not the only check standing between user input and root systemctl
+# calls, it's the last of several layers.
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl start snapclient-manager-*.service, /usr/bin/systemctl stop snapclient-manager-*.service, /usr/bin/systemctl restart snapclient-manager-*.service, /usr/bin/systemctl enable snapclient-manager-*.service, /usr/bin/systemctl disable snapclient-manager-*.service
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl start snapcast-radio-*.service, /usr/bin/systemctl stop snapcast-radio-*.service, /usr/bin/systemctl restart snapcast-radio-*.service, /usr/bin/systemctl enable snapcast-radio-*.service, /usr/bin/systemctl disable snapcast-radio-*.service
+
+# ---- systemd: general-purpose, non-unit-scoped commands ----
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload
+snapmanager ALL=(root) NOPASSWD: /usr/bin/systemctl unmask mpd.service
+# journalctl: read-only, but platform/systemd.ts's logs() sudo-gates it via
+# needsSudo() exactly like the mutating systemctl calls above (confirmed
+# against that module's own source, not assumed) -- units it reads include
+# every service above PLUS this app's own 'snapmanager' unit (see
+# routes/system.ts's getServiceLogs()), so this grant is deliberately not
+# scoped to a single unit name the way the systemctl ones are.
+snapmanager ALL=(root) NOPASSWD: /usr/bin/journalctl -u * -n * --no-pager
+
+# ---- package management: broad by necessity, NOT narrowly restricted ----
+# See SECURITY.md's "Privilege model" section for the full reasoning this
+# summarizes: this app's own purpose includes installing/upgrading Debian
+# packages and installing arbitrary downloaded .deb files
+# (executeDebUpdate() in server/src/services/system.ts) as part of normal,
+# legitimate operation. sudoers pattern-matches the command LINE, not
+# semantic argument types -- no wildcard on apt-get/dpkg's arguments can
+# distinguish "a real package name / a .deb this app itself downloaded"
+# from "a path to an attacker-planted local .deb" or "an attacker-chosen
+# package name". Narrowing this further would be security theater, not
+# real containment. This file's actual, honest security property is: it
+# prevents a compromised snapmanager process from acting as root via
+# anything OUTSIDE this specific toolset (no shell, no arbitrary binary) --
+# it does NOT prevent a compromised snapmanager process from eventually
+# reaching root through the package-management tools it is deliberately
+# granted here, if it can also control what those tools are pointed at.
+#
+# /usr/sbin/usermod: server/src/services/system.ts's executeDebUpdate()
+# runs `usermod -d /var/lib/snapserver snapserver` after a clean snapserver
+# reinstall -- not in the original task brief's list, found via the grep
+# pass required by this task.
+#
+# The ONE bash invocation below is the single, literal, versioned
+# install-shairport-sync.sh path -- NOT `/bin/bash *` or any other
+# general-purpose shell/interpreter wildcard, which would trivially defeat
+# every other line in this file. Do not add one.
+snapmanager ALL=(root) NOPASSWD: /usr/bin/apt-get, /usr/bin/dpkg, /usr/bin/wget, /usr/bin/mkdir, /usr/bin/chmod, /usr/bin/chown, /usr/bin/rm, /usr/bin/cp, /usr/bin/mv, /usr/bin/find, /usr/bin/gpg, /usr/bin/tee, /usr/sbin/useradd, /usr/sbin/groupadd, /usr/sbin/usermod, /usr/bin/make, /bin/bash /opt/snapcast-manager/server/scripts/install-shairport-sync.sh, /usr/bin/systemd-analyze verify *, /usr/sbin/ss -K *, /usr/sbin/alsactl store
