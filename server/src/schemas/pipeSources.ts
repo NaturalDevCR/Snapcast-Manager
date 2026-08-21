@@ -22,6 +22,7 @@ import type {
   CreatePipeSourceInput,
   PipeSourceType,
   SetPipeSourceConfigInput,
+  UpdatePipeSourceInput,
 } from '@shared/pipeSources';
 
 // ---- validateStreamUrl: Stage 1 security guarantee, unchanged ----
@@ -116,7 +117,7 @@ export const createPipeSourceBodySchema = z
 // silently written to SQLite as-is) -- see this file's header comment;
 // the update path had effectively no field-level validation before this
 // task, so this is new safety, not a removed check.
-export const updatePipeSourceBodySchema = z
+export const updatePipeSourceBodySchema: z.ZodSchema<UpdatePipeSourceInput> = z
   .object({
     name: z.string().min(1).optional(),
     type: z.enum(['radio', 'mpd']).optional(),

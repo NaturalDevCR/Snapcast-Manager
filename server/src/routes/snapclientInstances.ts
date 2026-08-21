@@ -7,7 +7,11 @@ import {
   createSnapclientInstanceBodySchema,
   setAlsaVolumeBodySchema,
 } from '../schemas/snapclientInstances';
-import type { CreateSnapclientInstanceInput, SetAlsaVolumeInput, SnapclientControlAction } from '@shared/snapclientInstances';
+import type {
+  ControlSnapclientInstanceParams,
+  CreateSnapclientInstanceInput,
+  SetAlsaVolumeInput,
+} from '@shared/snapclientInstances';
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -102,7 +106,7 @@ router.post(
   validate({ params: controlSnapclientInstanceParamsSchema }),
   async (req: Request, res: Response) => {
     try {
-      const { id, action } = (req as ValidatedRequest<unknown, { id: string; action: SnapclientControlAction }>).validated.params;
+      const { id, action } = (req as ValidatedRequest<unknown, ControlSnapclientInstanceParams>).validated.params;
       const ok = await snapclientInstanceService.controlInstance(id, action);
       if (!ok) return res.status(404).json({ error: 'Instance not found' });
       const status = await snapclientInstanceService.getInstanceStatus(id);

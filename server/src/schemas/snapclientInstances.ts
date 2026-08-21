@@ -14,7 +14,11 @@
 // still adopts the shared `UpdateSnapclientInstanceInput` type for
 // compile-time typing.
 import { z } from 'zod';
-import type { CreateSnapclientInstanceInput, SetAlsaVolumeInput } from '@shared/snapclientInstances';
+import type {
+  ControlSnapclientInstanceParams,
+  CreateSnapclientInstanceInput,
+  SetAlsaVolumeInput,
+} from '@shared/snapclientInstances';
 
 // ---- POST /api/snapclient-instances ----
 //
@@ -55,7 +59,7 @@ export const setAlsaVolumeBodySchema: z.ZodSchema<SetAlsaVolumeInput> = z.object
 // validates the WHOLE params object (both `id` and `action`) because the
 // validate() middleware overwrites `req.params` with the parsed result;
 // omitting `id` here would silently drop it from `req.params` downstream.
-export const controlSnapclientInstanceParamsSchema = z.object({
+export const controlSnapclientInstanceParamsSchema: z.ZodSchema<ControlSnapclientInstanceParams> = z.object({
   id: z.string(),
   action: z.enum(['start', 'stop', 'restart', 'enable', 'disable'], {
     message: 'Invalid action',

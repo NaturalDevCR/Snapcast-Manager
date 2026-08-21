@@ -60,3 +60,9 @@ export interface SetAlsaVolumeInput {
   control: string;
   percent: number;
 }
+
+/** Request params for POST /api/snapclient-instances/:id/:action. */
+export interface ControlSnapclientInstanceParams {
+  id: string;
+  action: SnapclientControlAction;
+}
