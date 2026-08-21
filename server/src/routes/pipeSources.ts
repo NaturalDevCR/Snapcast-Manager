@@ -1,22 +1,25 @@
 import { Router } from 'express';
 import { pipeSourceService, getFifoPath, getSystemdServiceName } from '../services/pipeSources';
 import { authenticateToken } from '../auth';
+import { validate, ValidatedRequest } from '../middleware/validate';
+import {
+  adoptPipeSourceBodySchema,
+  controlPipeSourceBodySchema,
+  createPipeSourceBodySchema,
+  setPipeSourceConfigBodySchema,
+  updatePipeSourceBodySchema,
+} from '../schemas/pipeSources';
+import type {
+  AdoptPipeSourceInput,
+  ControlPipeSourceInput,
+  CreatePipeSourceInput,
+  SetPipeSourceConfigInput,
+  UpdatePipeSourceInput,
+} from '@shared/pipeSources';
 
 const router = Router();
 
 router.use(authenticateToken);
-
-// The URL ends up inside the ExecStart line of a systemd unit (shell context),
-// so reject anything that could break out of the quoted string.
-function validateStreamUrl(url: string): string | null {
-  if (!/^https?:\/\/\S+$/i.test(url)) {
-    return 'URL must start with http:// or https:// and contain no spaces';
-  }
-  if (/["'`$\\;\n\r]/.test(url)) {
-    return 'URL contains invalid characters (quotes, backticks, $, \\, or ;)';
-  }
-  return null;
-}
 
 // GET /api/pipe-sources
 router.get('/', async (req, res) => {
@@ -36,26 +39,15 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/pipe-sources
-router.post('/', async (req, res) => {
+router.post('/', validate({ body: createPipeSourceBodySchema }), async (req, res) => {
   try {
-    const { name, type = 'radio', url, reconnect, reconnectStreamed, reconnectAtEof, reconnectDelayMax, idleThreshold, enabled } = req.body;
-    if (!name) return res.status(400).json({ error: 'name is required' });
-    if (type === 'radio' && !url) return res.status(400).json({ error: 'url is required for radio sources' });
-    if (url) {
-      const urlError = validateStreamUrl(String(url).trim());
-      if (urlError) return res.status(400).json({ error: urlError });
-    }
-    const pipe = await pipeSourceService.create({
-      name: String(name).trim(),
-      type: type === 'mpd' ? 'mpd' : 'radio',
-      url: url ? String(url).trim() : '',
-      reconnect: reconnect !== false,
-      reconnectStreamed: reconnectStreamed !== false,
-      reconnectAtEof: reconnectAtEof !== false,
-      reconnectDelayMax: Number(reconnectDelayMax) || 30,
-      idleThreshold: Number(idleThreshold) || 15000,
-      enabled: enabled !== false,
-    });
+    // Task 23: `req.validated.body` (equivalently `req.body`, which
+    // validate() also overwrites in place) is the parsed/coerced output of
+    // createPipeSourceBodySchema -- name is trimmed, url is
+    // trimmed+allowlist-checked, type/booleans/numbers already have their
+    // defaults applied. No re-derivation of any of that here.
+    const data = (req as ValidatedRequest<CreatePipeSourceInput>).validated.body;
+    const pipe = await pipeSourceService.create(data);
     res.json(pipe);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -63,13 +55,10 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/pipe-sources/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate({ body: updatePipeSourceBodySchema }), async (req, res) => {
   try {
-    if (req.body.url !== undefined && req.body.url !== '') {
-      const urlError = validateStreamUrl(String(req.body.url).trim());
-      if (urlError) return res.status(400).json({ error: urlError });
-    }
-    const pipe = await pipeSourceService.update(req.params.id, req.body);
+    const data = (req as ValidatedRequest<UpdatePipeSourceInput>).validated.body;
+    const pipe = await pipeSourceService.update(req.params.id, data);
     res.json(pipe);
   } catch (err: any) {
     res.status(err.message.includes('not found') ? 404 : 500).json({ error: err.message });
@@ -87,11 +76,9 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /api/pipe-sources/:id/control
-router.post('/:id/control', async (req, res) => {
+router.post('/:id/control', validate({ body: controlPipeSourceBodySchema }), async (req, res) => {
   try {
-    const { action } = req.body;
-    const allowed = ['start', 'stop', 'restart', 'enable', 'disable'];
-    if (!allowed.includes(action)) return res.status(400).json({ error: 'Invalid action' });
+    const { action } = (req as ValidatedRequest<ControlPipeSourceInput>).validated.body;
     await pipeSourceService.control(req.params.id, action);
     res.json({ ok: true });
   } catch (err: any) {
@@ -130,10 +117,9 @@ router.get('/:id/config', async (req, res) => {
 });
 
 // PUT /api/pipe-sources/:id/config
-router.put('/:id/config', async (req, res) => {
+router.put('/:id/config', validate({ body: setPipeSourceConfigBodySchema }), async (req, res) => {
   try {
-    const { content } = req.body;
-    if (typeof content !== 'string') return res.status(400).json({ error: 'content is required' });
+    const { content } = (req as ValidatedRequest<SetPipeSourceConfigInput>).validated.body;
     await pipeSourceService.setConfigContent(req.params.id, content);
     res.json({ ok: true });
   } catch (err: any) {
@@ -173,26 +159,10 @@ router.get('/discover', async (req, res) => {
 });
 
 // POST /api/pipe-sources/adopt
-router.post('/adopt', async (req, res) => {
+router.post('/adopt', validate({ body: adoptPipeSourceBodySchema }), async (req, res) => {
   try {
-    const { name, type = 'radio', url, reconnect, reconnectStreamed, reconnectAtEof, reconnectDelayMax, idleThreshold, enabled, existingServiceName } = req.body;
-    if (!name) return res.status(400).json({ error: 'name is required' });
-    if (url) {
-      const urlError = validateStreamUrl(String(url).trim());
-      if (urlError) return res.status(400).json({ error: urlError });
-    }
-    const pipe = await pipeSourceService.adopt({
-      name: String(name).trim(),
-      type: type === 'mpd' ? 'mpd' : 'radio',
-      url: url ? String(url).trim() : '',
-      reconnect: reconnect !== false,
-      reconnectStreamed: reconnectStreamed !== false,
-      reconnectAtEof: reconnectAtEof !== false,
-      reconnectDelayMax: Number(reconnectDelayMax) || 30,
-      idleThreshold: Number(idleThreshold) || 15000,
-      enabled: enabled !== false,
-      existingServiceName: existingServiceName || undefined,
-    });
+    const data = (req as ValidatedRequest<AdoptPipeSourceInput>).validated.body;
+    const pipe = await pipeSourceService.adopt(data);
     res.json(pipe);
   } catch (err: any) {
     // "existingServiceName does not match any discovered..." means the

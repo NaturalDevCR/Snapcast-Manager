@@ -1,0 +1,34 @@
+{
+  // Task 23: this project is a plain sibling TypeScript directory (NOT an
+  // npm package, NOT an npm workspace -- see .superpowers/sdd/task-23-brief.md
+  // "Out of scope"), consumed by both server/ and client/ via a `@shared/*`
+  // path alias plus a TypeScript project reference from each side's own
+  // tsconfig. `composite: true` is required so a referencing project (which
+  // does NOT include these files in its own `rootDir`) can resolve
+  // `@shared/*` imports against this project's declaration output instead
+  // of pulling the .ts sources directly into its own program -- see the
+  // shared-types-wiring section of task-23-report.md for the rootDir
+  // conflict this avoids and the alternatives that were tried first.
+  //
+  // Every file here should be pure type declarations (interfaces, type
+  // aliases) -- no runtime logic. Both consumers only ever import from here
+  // with `import type`, which both tsc and esbuild/Vite erase completely at
+  // compile time; this project's own `dist/` output (a couple of
+  // near-empty .js files plus .d.ts declarations, needed only so the
+  // composite/project-reference build graph has something to point at) is
+  // never shipped -- the release workflow (.github/workflows/release.yml)
+  // only packages `server/dist` + `server/package.json` +
+  // `server/package-lock.json`, and `shared/dist` is gitignored.
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "commonjs",
+    "composite": true,
+    "declaration": true,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["*.ts"]
+}

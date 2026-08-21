@@ -1,51 +1,26 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { fetchApi } from '../utils/api';
+// Task 23: these shapes now come from shared/pipeSources.ts (a single
+// definition consumed by both the server's Zod schemas/routes and this
+// store) instead of being redeclared here -- see
+// server/src/schemas/pipeSources.ts and server/src/routes/pipeSources.ts.
+// Re-exported under this module's original local names so every existing
+// `import { type PipeSource, ... } from '../stores/pipeSources'` call site
+// (e.g. src/views/PipeSources.vue) keeps working unchanged.
+import type {
+  AdoptPipeSourceInput,
+  CreatePipeSourceInput,
+  DiscoveredPipe,
+  ExistingService,
+  PipeSource,
+  PipeSourceControlAction,
+  PipeSourceType,
+} from '@shared/pipeSources';
 
-export type PipeSourceType = 'radio' | 'mpd';
-
-export interface PipeSource {
-  id: string;
-  name: string;
-  type: PipeSourceType;
-  url: string;
-  reconnect: boolean;
-  reconnectStreamed: boolean;
-  reconnectAtEof: boolean;
-  reconnectDelayMax: number;
-  idleThreshold: number;
-  enabled: boolean;
-  createdAt: string;
-  status: string;
-  fifoPath: string;
-  serviceName: string;
-}
-
-export type PipeSourceFormData = Omit<PipeSource, 'id' | 'createdAt' | 'status' | 'fifoPath' | 'serviceName'>;
-
-export interface ExistingService {
-  name: string;
-  filePath: string;
-  url: string;
-  reconnect: boolean;
-  reconnectStreamed: boolean;
-  reconnectAtEof: boolean;
-  reconnectDelayMax: number;
-  isActive: boolean;
-}
-
-export interface DiscoveredPipe {
-  name: string;
-  fifoPath: string;
-  sourceUri: string;
-  idleThreshold: number;
-  detectedType: PipeSourceType;
-  existingService: ExistingService | null;
-}
-
-export interface AdoptInput extends PipeSourceFormData {
-  existingServiceName?: string;
-}
+export type { DiscoveredPipe, ExistingService, PipeSource, PipeSourceType };
+export type PipeSourceFormData = CreatePipeSourceInput;
+export type AdoptInput = AdoptPipeSourceInput;
 
 export const usePipeSourcesStore = defineStore('pipeSources', () => {
   const pipes = ref<PipeSource[]>([]);
@@ -84,7 +59,7 @@ export const usePipeSourcesStore = defineStore('pipeSources', () => {
     await fetchPipes();
   }
 
-  async function controlPipe(id: string, action: 'start' | 'stop' | 'restart' | 'enable' | 'disable'): Promise<void> {
+  async function controlPipe(id: string, action: PipeSourceControlAction): Promise<void> {
     await fetchApi(`/pipe-sources/${id}/control`, {
       method: 'POST',
       body: JSON.stringify({ action }),

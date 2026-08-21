@@ -7,7 +7,30 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    // Task 23: resolves to the shared/ directory at the repo root (a plain
+    // sibling TypeScript project, not an npm package/workspace -- see
+    // shared/tsconfig.json). Only ever consumed via `import type`, so it
+    // erases completely from server/dist -- verified in task-23-report.md.
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    },
+    // Keeps the incremental build-info file inside dist/ (already
+    // gitignored) instead of littering the project root.
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo"
   },
-  "exclude": ["node_modules", "src/**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "src/**/*.test.ts"
+  ],
+  // Required so `tsc -b` resolves `@shared/*` against shared/'s compiled
+  // declaration output rather than pulling its .ts sources directly into
+  // this project's own `rootDir` (which would fail: shared/ lives outside
+  // server/src). Plain `tsc -p tsconfig.json` (no -b) would NOT build this
+  // reference automatically -- server/package.json's build script uses
+  // `tsc -b` for exactly this reason.
+  "references": [
+    { "path": "../shared" }
+  ]
 }

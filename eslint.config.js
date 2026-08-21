@@ -42,6 +42,21 @@ module.exports = tseslint.config(
     },
   },
 
+  // ── shared/: plain TypeScript, type-only, consumed by both server and
+  // client (Task 23) -- see server/tsconfig.json / client/tsconfig.app.json
+  // for the `@shared/*` path alias each side resolves this through.
+  {
+    files: ['shared/**/*.ts'],
+    extends: [...tseslint.configs.recommended],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+
   // ── client/src: Vue 3 SFCs + TypeScript ────────────────────────────────────
   {
     files: ['client/src/**/*.{ts,vue}'],

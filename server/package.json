@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test --import ts-node/register src/*.test.ts src/**/*.test.ts",
     "dev": "ts-node src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -b tsconfig.json",
     "start": "node dist/index.js"
   },
   "keywords": [],
@@ -21,7 +21,8 @@
     "express": "^5.2.1",
     "helmet": "^8.3.0",
     "ini": "^6.0.0",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

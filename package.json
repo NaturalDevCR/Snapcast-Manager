@@ -7,7 +7,7 @@
     "bump:patch": "bash scripts/bump.sh patch",
     "bump:minor": "bash scripts/bump.sh minor",
     "bump:major": "bash scripts/bump.sh major",
-    "lint": "eslint server/src client/src",
+    "lint": "eslint server/src client/src shared",
     "format": "prettier --write \"server/src/**/*.ts\" \"client/src/**/*.{ts,vue}\"",
     "format:check": "prettier --check \"server/src/**/*.ts\" \"client/src/**/*.{ts,vue}\""
   },
