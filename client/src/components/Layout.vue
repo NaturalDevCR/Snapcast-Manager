@@ -7,6 +7,12 @@ import ToastNotification from './ToastNotification.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import PromptDialog from './PromptDialog.vue';
 import { version } from '../../package.json';
+import {
+  serverNavGroups,
+  isServerNavItemActive,
+  isServerNavGroupActive,
+  isAnyServerNavGroupActive,
+} from '../utils/serverNav';
 
 const authStore = useAuthStore();
 const systemStore = useSystemStore();
@@ -46,19 +52,12 @@ const serverPrimaryNav = [
   { name: 'Audio Matrix', href: '/routing', icon: 'grid_view' },
 ];
 
-// System submenu items
-const serverSystemNav: Array<{
-  name: string; href: string; icon: string; description: string;
-  to?: string | object;
-  activeWhen?: (r: typeof route) => boolean;
-}> = [
-  { name: 'Logs', href: '/logs', icon: 'terminal', description: 'Service logs' },
-  { name: 'Configuration', href: '/server', icon: 'settings', description: 'Snapserver settings' },
-  { name: 'Tools', href: '/tools', icon: 'build_circle', description: 'Crontab, scripts & MPD' },
-  { name: 'Security', href: '/security', icon: 'security', description: 'Admin access' },
-  { name: 'Pipe Sources', href: '/pipe-sources', icon: 'sensors', description: 'Radio & MPD pipe sources' },
-  { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart', description: 'Service monitors' },
-];
+// Task 30: the previously-flat 6-item "System" dropdown is now four
+// task-based groups (Audio, Sistema, Configuración, Seguridad) -- see
+// client/src/utils/serverNav.ts for the grouping data and the
+// active-route matching logic (unit-tested there independently of this
+// component).
+const serverMenuGroups = serverNavGroups;
 
 const clientNavigation = [
   { name: 'Dashboard', href: '/client', icon: 'speaker' },
@@ -67,14 +66,16 @@ const clientNavigation = [
 
 const navigation = computed(() => isClientMode.value ? clientNavigation : serverPrimaryNav);
 
-const isItemActive = (item: typeof serverSystemNav[number]) => {
-  if (item.activeWhen) return item.activeWhen(route);
-  return isNavActive(item.href);
-};
+const isItemActive = (item: { href: string }) => isServerNavItemActive(item, route.path);
 
-const isSystemActive = computed(() =>
-  serverSystemNav.some(item => isItemActive(item))
-);
+const isGroupActive = (group: typeof serverMenuGroups[number]) =>
+  isServerNavGroupActive(group, route.path);
+
+// Drives the dropdown trigger button's (desktop) / collapsible section
+// header's (mobile) active highlighting -- true when the current route is
+// inside ANY of the four grouped-menu items, matching the old flat
+// isSystemActive's intent.
+const isSystemActive = computed(() => isAnyServerNavGroupActive(route.path));
 
 const isNavActive = (href: string) => {
   if (href === '/') return route.path === '/';
@@ -169,7 +170,9 @@ function handleClickOutside(e: MouseEvent) {
               {{ item.name }}
             </router-link>
 
-            <!-- System Dropdown (Server mode only) -->
+            <!-- Grouped menu dropdown: Audio (minus Audio Matrix, which
+                 stays a standalone primary link above), Sistema,
+                 Configuración, Seguridad (Server mode only) -->
             <div v-if="!isClientMode" ref="systemMenuRef" class="relative ml-0.5">
               <button
                 @click.stop="isSystemMenuOpen = !isSystemMenuOpen"
@@ -180,8 +183,8 @@ function handleClickOutside(e: MouseEvent) {
                   'px-3 py-1.5 rounded-lg font-bold text-xs transition-all duration-200 flex items-center gap-1.5 uppercase tracking-wide border'
                 ]"
               >
-                <span class="material-symbols-outlined text-[1rem]" :class="isSystemActive ? 'text-brand-primary' : ''">build</span>
-                System
+                <span class="material-symbols-outlined text-[1rem]" :class="isSystemActive ? 'text-brand-primary' : ''">apps</span>
+                Menu
                 <span
                   class="material-symbols-outlined text-[0.85rem] transition-transform duration-200 opacity-60"
                   :class="isSystemMenuOpen ? 'rotate-180' : ''"
@@ -199,31 +202,41 @@ function handleClickOutside(e: MouseEvent) {
               >
                 <div
                   v-if="isSystemMenuOpen"
-                  class="absolute top-full left-0 mt-2 w-52 border border-white/10 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden z-50 py-1.5"
+                  class="absolute top-full left-0 mt-2 w-56 border border-white/10 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden z-50 py-1.5"
                   style="background-color: var(--brand-bg);"
                 >
-                  <router-link
-                    v-for="item in serverSystemNav"
-                    :key="item.name"
-                    :to="item.to ?? item.href"
-                    @click="isSystemMenuOpen = false"
-                    :class="[
-                      isItemActive(item)
-                        ? 'bg-brand-primary/15 text-text-main'
-                        : 'text-gray-400 hover:bg-white/5 hover:text-text-main',
-                      'flex items-center gap-3 px-4 py-2.5 transition-all duration-150 mx-1.5 rounded-xl'
-                    ]"
-                  >
-                    <span
-                      class="material-symbols-outlined text-[1.1rem] flex-shrink-0"
-                      :class="isItemActive(item) ? 'text-brand-primary' : 'text-gray-500'"
-                    >{{ item.icon }}</span>
-                    <div>
-                      <p class="text-xs font-black uppercase tracking-wide leading-tight">{{ item.name }}</p>
-                      <p class="text-[10px] text-gray-500 font-medium mt-0.5">{{ item.description }}</p>
-                    </div>
-                    <span v-if="isItemActive(item)" class="ml-auto w-1.5 h-1.5 rounded-full bg-brand-primary shadow-md shadow-brand-primary/80"></span>
-                  </router-link>
+                  <template v-for="(group, groupIndex) in serverMenuGroups" :key="group.key">
+                    <div
+                      v-if="groupIndex > 0"
+                      class="my-1.5 mx-3 border-t border-white/5"
+                    ></div>
+                    <p
+                      class="px-4 pt-1 pb-1 text-[10px] font-black uppercase tracking-widest"
+                      :class="isGroupActive(group) ? 'text-brand-primary/80' : 'text-gray-500'"
+                    >{{ group.label }}</p>
+                    <router-link
+                      v-for="item in group.items"
+                      :key="item.name"
+                      :to="item.href"
+                      @click="isSystemMenuOpen = false"
+                      :class="[
+                        isItemActive(item)
+                          ? 'bg-brand-primary/15 text-text-main'
+                          : 'text-gray-400 hover:bg-white/5 hover:text-text-main',
+                        'flex items-center gap-3 px-4 py-2.5 transition-all duration-150 mx-1.5 rounded-xl'
+                      ]"
+                    >
+                      <span
+                        class="material-symbols-outlined text-[1.1rem] flex-shrink-0"
+                        :class="isItemActive(item) ? 'text-brand-primary' : 'text-gray-500'"
+                      >{{ item.icon }}</span>
+                      <div>
+                        <p class="text-xs font-black uppercase tracking-wide leading-tight">{{ item.name }}</p>
+                        <p class="text-[10px] text-gray-500 font-medium mt-0.5">{{ item.description }}</p>
+                      </div>
+                      <span v-if="isItemActive(item)" class="ml-auto w-1.5 h-1.5 rounded-full bg-brand-primary shadow-md shadow-brand-primary/80"></span>
+                    </router-link>
+                  </template>
                 </div>
               </Transition>
             </div>
@@ -327,9 +340,11 @@ function handleClickOutside(e: MouseEvent) {
                 {{ item.name }}
               </router-link>
 
-              <!-- System Section (Server mode only) -->
+              <!-- Grouped menu section: Audio (minus Audio Matrix, which
+                   stays a standalone primary link above), Sistema,
+                   Configuración, Seguridad (Server mode only) -->
               <template v-if="!isClientMode">
-                <!-- System collapsible header -->
+                <!-- Collapsible header -->
                 <button
                   @click="isMobileSystemOpen = !isMobileSystemOpen"
                   :class="[
@@ -339,39 +354,45 @@ function handleClickOutside(e: MouseEvent) {
                     'px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200 flex items-center gap-3 border w-full text-left mt-1'
                   ]"
                 >
-                  <span class="material-symbols-outlined text-[1.2rem]" :class="isSystemActive ? 'text-brand-primary' : ''">build</span>
-                  <span class="flex-1">System</span>
+                  <span class="material-symbols-outlined text-[1.2rem]" :class="isSystemActive ? 'text-brand-primary' : ''">apps</span>
+                  <span class="flex-1">Menu</span>
                   <span
                     class="material-symbols-outlined text-[1rem] opacity-50 transition-transform duration-200"
                     :class="isMobileSystemOpen || isSystemActive ? 'rotate-180' : ''"
                   >expand_more</span>
                 </button>
 
-                <!-- System submenu items -->
+                <!-- Grouped submenu items -->
                 <Transition
                   enter-active-class="transition-all duration-200 ease-out overflow-hidden"
                   enter-from-class="opacity-0 max-h-0"
-                  enter-to-class="opacity-100 max-h-40"
+                  enter-to-class="opacity-100 max-h-[28rem]"
                   leave-active-class="transition-all duration-150 ease-in overflow-hidden"
-                  leave-from-class="opacity-100 max-h-40"
+                  leave-from-class="opacity-100 max-h-[28rem]"
                   leave-to-class="opacity-0 max-h-0"
                 >
-                  <div v-if="isMobileSystemOpen || isSystemActive" class="ml-4 flex flex-col gap-1 border-l border-white/10 pl-3">
-                    <router-link
-                      v-for="item in serverSystemNav"
-                      :key="item.name"
-                      :to="item.to ?? item.href"
-                      @click="isMobileMenuOpen = false"
-                      :class="[
-                        isItemActive(item)
-                          ? 'text-text-main'
-                          : 'text-gray-500 hover:text-gray-300',
-                        'py-2 text-sm font-bold transition-all duration-200 flex items-center gap-2.5'
-                      ]"
-                    >
-                      <span class="material-symbols-outlined text-[1rem]" :class="isItemActive(item) ? 'text-brand-primary' : ''">{{ item.icon }}</span>
-                      {{ item.name }}
-                    </router-link>
+                  <div v-if="isMobileSystemOpen || isSystemActive" class="ml-4 flex flex-col gap-2.5 border-l border-white/10 pl-3">
+                    <div v-for="group in serverMenuGroups" :key="group.key" class="flex flex-col gap-1">
+                      <p
+                        class="text-[10px] font-black uppercase tracking-widest"
+                        :class="isGroupActive(group) ? 'text-brand-primary/80' : 'text-gray-500'"
+                      >{{ group.label }}</p>
+                      <router-link
+                        v-for="item in group.items"
+                        :key="item.name"
+                        :to="item.href"
+                        @click="isMobileMenuOpen = false"
+                        :class="[
+                          isItemActive(item)
+                            ? 'text-text-main'
+                            : 'text-gray-500 hover:text-gray-300',
+                          'py-1 text-sm font-bold transition-all duration-200 flex items-center gap-2.5'
+                        ]"
+                      >
+                        <span class="material-symbols-outlined text-[1rem]" :class="isItemActive(item) ? 'text-brand-primary' : ''">{{ item.icon }}</span>
+                        {{ item.name }}
+                      </router-link>
+                    </div>
                   </div>
                 </Transition>
               </template>
