@@ -52,7 +52,7 @@ const tmpDbPath = path.join(os.tmpdir(), `pipesources-test-${process.pid}-${Date
 process.env.DB_PATH = tmpDbPath;
 process.env.NODE_ENV = 'test';
 
-import { pipeSourceService, getFifoPath, getSystemdServiceName } from '../services/pipeSources';
+import { pipeSourceService, getFifoPath, getSystemdServiceName, parseProcStatState } from '../services/pipeSources';
 import * as execModule from '../platform/exec';
 import { ExecError } from '../platform/exec';
 import * as systemdModule from '../platform/systemd';
@@ -119,6 +119,17 @@ function stubAllPlatformCalls(calls: Call[], opts: { needsSudo?: boolean } = {})
     }),
   ];
   return () => restores.forEach(r => r());
+}
+
+/** Task 26, Part 2: temporarily overrides process.platform (same pattern as
+ * watchdog.test.ts's identical helper) so getZombieCount()'s
+ * Linux-vs-non-Linux branch can be tested on any host this suite runs on. */
+function stubPlatform(value: NodeJS.Platform): () => void {
+  const original = Object.getOwnPropertyDescriptor(process, 'platform')!;
+  Object.defineProperty(process, 'platform', { value, configurable: true });
+  return () => {
+    Object.defineProperty(process, 'platform', original);
+  };
 }
 
 function stubDiscover(result: any[]): () => void {
@@ -621,38 +632,138 @@ test('getStatus() calls systemd.activeState() with the derived unit name', async
   }
 });
 
-test('getZombieCount() calls run("ps", ["aux"]) via argv and counts defunct lines excluding grep\'s own line', async () => {
-  const restoreRun = stubModuleFn(execModule, 'run', async (bin: string, args: string[]) => {
-    assert.equal(bin, 'ps');
-    assert.deepEqual(args, ['aux']);
-    return {
-      stdout: [
-        'root  1  0.0  0.0  1000  100 ?  Ss  10:00  0:00 init',
-        'user  2  0.0  0.0  1000  100 ?  Z   10:00  0:00 [zombie1] <defunct>',
-        'user  3  0.0  0.0  1000  100 ?  Z   10:00  0:00 [zombie2] <defunct>',
-        'user  4  0.0  0.0  1000  100 ?  S   10:00  0:00 grep defunct',
-        '',
-      ].join('\n'),
-      stderr: '',
-    };
+// ============================================================================
+// Task 26, Part 2: getZombieCount() via real /proc/<pid>/stat process-state
+// parsing, replacing the old `ps aux` + string-match-on-"defunct" false
+// positive (matched any process whose COMMAND LINE contained that word).
+// ============================================================================
+
+// ---- parseProcStatState(): the well-known parenthesized-comm gotcha ----
+
+/** Builds a syntactically-plausible /proc/<pid>/stat line: `pid (comm)
+ * state` followed by enough trailing numeric fields to look real, matching
+ * the kernel's actual field count is not required for this parser (it
+ * only ever reads the state field), just the shape. */
+function fakeStatLine(pid: number, comm: string, state: string): string {
+  const trailingFields = Array(47).fill('0').join(' '); // ppid..the rest
+  return `${pid} (${comm}) ${state} ${trailingFields}\n`;
+}
+
+test('parseProcStatState() extracts the state field from a normal /proc/pid/stat line', () => {
+  assert.equal(parseProcStatState(fakeStatLine(1234, 'bash', 'S')), 'S');
+});
+
+test('parseProcStatState() returns Z for an actual zombie process', () => {
+  assert.equal(parseProcStatState(fakeStatLine(5678, 'defunct-child', 'Z')), 'Z');
+});
+
+test('parseProcStatState() parses past a comm field containing spaces AND parens (the well-known /proc/pid/stat gotcha)', () => {
+  // A process can rename itself (prctl(PR_SET_NAME, ...)) to something
+  // containing spaces and even its own parens -- naively .split(' ') and
+  // indexing would grab a fragment of the comm field instead of the real
+  // state. Parsing past the LAST ')' is what makes this safe regardless of
+  // what's inside the parens.
+  assert.equal(parseProcStatState(fakeStatLine(9999, 'some (weird) prog', 'Z')), 'Z');
+});
+
+test('parseProcStatState() does not confuse a non-zombie state for a zombie one', () => {
+  assert.equal(parseProcStatState(fakeStatLine(42, 'sleeper', 'S')), 'S');
+  assert.equal(parseProcStatState(fakeStatLine(43, 'runner', 'R')), 'R');
+});
+
+test('parseProcStatState() returns \'\' (not a throw) for a malformed line with no comm parens', () => {
+  assert.equal(parseProcStatState('not a real stat line at all'), '');
+});
+
+// ---- getZombieCount(): platform gating + /proc scan ----
+
+test('getZombieCount() returns 0 without ever reading /proc on a non-Linux platform', async () => {
+  const restorePlatform = stubPlatform('darwin');
+  const readdirCalls: string[] = [];
+  const restoreFs = stubFsPromises({
+    readdir: async (p: string) => {
+      readdirCalls.push(p);
+      return [];
+    },
+  });
+  try {
+    const count = await pipeSourceService.getZombieCount();
+    assert.equal(count, 0);
+    assert.deepEqual(readdirCalls, [], 'must not touch /proc on a non-Linux platform');
+  } finally {
+    restoreFs();
+    restorePlatform();
+  }
+});
+
+test('getZombieCount() counts only zombie (Z) processes among numeric /proc entries, ignoring non-numeric ones', async () => {
+  const restorePlatform = stubPlatform('linux');
+  const statByPid: Record<string, string> = {
+    '1': fakeStatLine(1, 'init', 'S'),
+    '2': fakeStatLine(2, 'zombie-one', 'Z'),
+    '3': fakeStatLine(3, 'zombie-two', 'Z'),
+    '4': fakeStatLine(4, 'sleeping-thing', 'S'),
+  };
+  const restoreFs = stubFsPromises({
+    readdir: async (p: string) => {
+      assert.equal(p, '/proc');
+      // 'self', 'net', 'cpuinfo' are the kind of non-numeric /proc entries
+      // that must be filtered out before ever attempting to read them as a
+      // PID's stat file.
+      return ['1', '2', '3', '4', 'self', 'net', 'cpuinfo'];
+    },
+    readFile: async (p: string) => {
+      const match = p.match(/^\/proc\/(\d+)\/stat$/);
+      if (!match || !(match[1] in statByPid)) {
+        throw Object.assign(new Error(`ENOENT: no such file or directory, open '${p}'`), { code: 'ENOENT' });
+      }
+      return statByPid[match[1]!]!;
+    },
   });
   try {
     const count = await pipeSourceService.getZombieCount();
     assert.equal(count, 2);
   } finally {
-    restoreRun();
+    restoreFs();
+    restorePlatform();
   }
 });
 
-test('getZombieCount() returns 0 (not a throw) when run() fails', async () => {
-  const restoreRun = stubModuleFn(execModule, 'run', async () => {
-    throw new Error('ps not found');
+test('getZombieCount() skips a PID that disappears mid-scan (ENOENT on readFile) rather than failing the whole count', async () => {
+  const restorePlatform = stubPlatform('linux');
+  const restoreFs = stubFsPromises({
+    readdir: async () => ['1', '2'],
+    readFile: async (p: string) => {
+      if (p === '/proc/1/stat') {
+        // Simulates the process exiting between readdir() and this
+        // readFile() call -- an inherent TOCTOU race scanning /proc.
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      }
+      return fakeStatLine(2, 'survivor', 'Z');
+    },
+  });
+  try {
+    const count = await pipeSourceService.getZombieCount();
+    assert.equal(count, 1);
+  } finally {
+    restoreFs();
+    restorePlatform();
+  }
+});
+
+test('getZombieCount() returns 0 (not a throw) when fs.readdir(\'/proc\') itself fails', async () => {
+  const restorePlatform = stubPlatform('linux');
+  const restoreFs = stubFsPromises({
+    readdir: async () => {
+      throw new Error('EACCES: permission denied');
+    },
   });
   try {
     const count = await pipeSourceService.getZombieCount();
     assert.equal(count, 0);
   } finally {
-    restoreRun();
+    restoreFs();
+    restorePlatform();
   }
 });
 
@@ -1714,5 +1825,263 @@ test('POST /:id/config/rollback returns 200 with a clear message on success', as
     assert.deepEqual(rollbackCalls, ['some-pipe-id']);
   } finally {
     restoreRollback();
+  }
+});
+
+// ============================================================================
+// Task 26, Part 3: pipe-source slug-collision prevention.
+//   1. create()/adopt() reject a name whose slug would be empty.
+//   2. create()/adopt() reject a name that collides (after slugging) with
+//      an EXISTING pipe source's name -- both for identical raw names and
+//      for names that only collide after slugging.
+//   3. routes/pipeSources.ts maps both validation failures to 400, not 500.
+//   4. scanForSlugCollisions() detects (without mutating) a collision that
+//      already existed before this validation shipped.
+// ============================================================================
+
+let rawIdCounter = 0;
+/** Direct SQL insert, bypassing pipeSourceService.create()'s validation
+ * entirely -- used only to simulate a pre-existing install that already
+ * has colliding names (which the NEW create()/adopt() validation would now
+ * reject, so it can no longer be reached through the service). Returns the
+ * generated id. */
+function insertRawPipeRow(name: string): string {
+  rawIdCounter += 1;
+  const id = `raw-pipe-${rawIdCounter}-${Date.now()}`;
+  db.prepare(`
+    INSERT INTO radio_pipe_streams (id, name, type, url, reconnect, reconnect_streamed, reconnect_at_eof, reconnect_delay_max, idle_threshold, enabled)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, name, 'radio', 'https://example.com/raw-stream.mp3', 1, 1, 1, 30, 15000, 1);
+  return id;
+}
+
+function baseCreateInput(overrides: Partial<any> = {}) {
+  return {
+    name: uniqueName('slug-test'),
+    type: 'radio' as const,
+    url: 'https://example.com/slug-test-stream.mp3',
+    reconnect: true,
+    reconnectStreamed: true,
+    reconnectAtEof: true,
+    reconnectDelayMax: 30,
+    idleThreshold: 15000,
+    enabled: true,
+    ...overrides,
+  };
+}
+
+// ---- create(): empty-slug rejection ----
+
+test('create() rejects a name whose slug would be empty, before any DB row or platform call', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    await assert.rejects(
+      () => pipeSourceService.create(baseCreateInput({ name: '!!!' })),
+      /has no alphanumeric characters/,
+    );
+    assert.equal(calls.length, 0, `expected zero platform calls, got: ${JSON.stringify(calls)}`);
+    assert.equal(pipeSourceService.list().find((p: any) => p.name === '!!!'), undefined);
+  } finally {
+    restorePlatform();
+  }
+});
+
+// ---- create(): slug-collision rejection ----
+
+test('create() rejects a name IDENTICAL to an existing pipe source\'s name', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const existingName = uniqueName('slug-collision-identical');
+    await pipeSourceService.create(baseCreateInput({ name: existingName }));
+    calls.length = 0;
+
+    await assert.rejects(
+      () => pipeSourceService.create(baseCreateInput({ name: existingName })),
+      /conflicting name already exists/,
+    );
+    assert.equal(calls.length, 0, `expected zero platform calls for the rejected create(), got: ${JSON.stringify(calls)}`);
+    assert.equal(pipeSourceService.list().filter((p: any) => p.name === existingName).length, 1);
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('create() rejects a name that only collides with an existing one AFTER slugging (different raw strings)', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const base = uniqueName('collide-base');
+    const nameA = `My ${base}`;
+    const nameB = nameA.toLowerCase().replace(/\s+/g, '-'); // e.g. "My Radio 1 ..." -> "my-radio-1-..."
+    await pipeSourceService.create(baseCreateInput({ name: nameA }));
+    calls.length = 0;
+
+    await assert.rejects(
+      () => pipeSourceService.create(baseCreateInput({ name: nameB })),
+      /conflicting name already exists/,
+    );
+    assert.equal(calls.length, 0, `expected zero platform calls, got: ${JSON.stringify(calls)}`);
+    assert.equal(pipeSourceService.list().find((p: any) => p.name === nameB), undefined);
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('create() accepts two names that are merely similar but slug DIFFERENTLY (sanity check -- not over-rejecting)', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const base = uniqueName('distinct-slugs');
+    const pipeA = await pipeSourceService.create(baseCreateInput({ name: `${base} Alpha` }));
+    const pipeB = await pipeSourceService.create(baseCreateInput({ name: `${base} Beta` }));
+    assert.notEqual(pipeA.id, pipeB.id);
+  } finally {
+    restorePlatform();
+  }
+});
+
+// ---- adopt(): empty-slug and slug-collision rejection ----
+
+test('adopt() rejects a name whose slug would be empty, before any DB row or platform call', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    await assert.rejects(
+      () => pipeSourceService.adopt(baseAdoptInput({ name: '###' })),
+      /has no alphanumeric characters/,
+    );
+    assert.equal(calls.length, 0, `expected zero platform calls, got: ${JSON.stringify(calls)}`);
+    assert.equal(pipeSourceService.list().find((p: any) => p.name === '###'), undefined);
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('adopt() rejects a name that collides (after slugging) with an existing pipe source', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const base = uniqueName('adopt-collide-base');
+    const nameA = `Adopt ${base}`;
+    const nameB = nameA.toLowerCase().replace(/\s+/g, '-');
+    await pipeSourceService.create(baseCreateInput({ name: nameA }));
+    calls.length = 0;
+
+    await assert.rejects(
+      () => pipeSourceService.adopt(baseAdoptInput({ name: nameB })),
+      /conflicting name already exists/,
+    );
+    assert.equal(calls.length, 0, `expected zero platform calls, got: ${JSON.stringify(calls)}`);
+    assert.equal(pipeSourceService.list().find((p: any) => p.name === nameB), undefined);
+  } finally {
+    restorePlatform();
+  }
+});
+
+// ---- routes/pipeSources.ts: validation errors map to 400, not 500 ----
+
+test('POST /api/pipe-sources maps an empty-slug validation error to 400, not 500', async () => {
+  const handler = getRouteHandler(pipeSourcesRouter, 'post', '/');
+  const restoreCreate = stubModuleFn(pipeSourceService, 'create', async () => {
+    throw new Error('Pipe source name "!!!" has no alphanumeric characters -- choose a different name.');
+  });
+  try {
+    const req: any = { validated: { body: baseCreateInput({ name: '!!!' }) } };
+    const res = fakeRes();
+    await handler(req, res);
+    assert.equal(res.statusCode, 400);
+  } finally {
+    restoreCreate();
+  }
+});
+
+test('POST /api/pipe-sources maps a slug-collision validation error to 400, not 500', async () => {
+  const handler = getRouteHandler(pipeSourcesRouter, 'post', '/');
+  const restoreCreate = stubModuleFn(pipeSourceService, 'create', async () => {
+    throw new Error('A pipe source with a conflicting name already exists: "x" and "y" both slug the same.');
+  });
+  try {
+    const req: any = { validated: { body: baseCreateInput() } };
+    const res = fakeRes();
+    await handler(req, res);
+    assert.equal(res.statusCode, 400);
+  } finally {
+    restoreCreate();
+  }
+});
+
+test('POST /api/pipe-sources/adopt maps a slug-collision validation error to 400, not 500', async () => {
+  const handler = getRouteHandler(pipeSourcesRouter, 'post', '/adopt');
+  const restoreAdopt = stubModuleFn(pipeSourceService, 'adopt', async () => {
+    throw new Error('A pipe source with a conflicting name already exists: "x" and "y" both slug the same.');
+  });
+  try {
+    const req: any = { validated: { body: baseAdoptInput() } };
+    const res = fakeRes();
+    await handler(req, res);
+    assert.equal(res.statusCode, 400);
+  } finally {
+    restoreAdopt();
+  }
+});
+
+// ---- scanForSlugCollisions(): startup detection-only scan (Task 7 style) ----
+
+test('scanForSlugCollisions() detects and logs a pre-existing collision without crashing or mutating data', async () => {
+  const uniquePart = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const nameA = `Scan Collide ${uniquePart}`;
+  const nameB = nameA.toLowerCase().replace(/\s+/g, '-');
+  const idA = insertRawPipeRow(nameA);
+  const idB = insertRawPipeRow(nameB);
+
+  const warnCalls: any[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: any[]) => { warnCalls.push(args); };
+  try {
+    await pipeSourceService.scanForSlugCollisions();
+
+    assert.ok(warnCalls.length > 0, 'expected a warning to be logged for the colliding pair');
+    const loggedText = warnCalls.map(args => args.join(' ')).join('\n');
+    assert.ok(loggedText.includes(nameA), `expected the warning to name "${nameA}"`);
+    assert.ok(loggedText.includes(nameB), `expected the warning to name "${nameB}"`);
+
+    // Detection-only: neither row was touched -- both names/ids unchanged.
+    assert.equal(pipeSourceService.getById(idA)?.name, nameA);
+    assert.equal(pipeSourceService.getById(idB)?.name, nameB);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('scanForSlugCollisions() does not warn about pipe sources whose slugs are all distinct', async () => {
+  const uniquePart = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const nameA = `Totally Distinct A ${uniquePart}`;
+  const nameB = `Totally Distinct B ${uniquePart}`;
+  insertRawPipeRow(nameA);
+  insertRawPipeRow(nameB);
+
+  const warnCalls: any[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: any[]) => { warnCalls.push(args); };
+  try {
+    await pipeSourceService.scanForSlugCollisions();
+    const loggedText = warnCalls.map(args => args.join(' ')).join('\n');
+    assert.ok(!loggedText.includes(nameA), 'distinct-slug name A must not appear in any collision warning');
+    assert.ok(!loggedText.includes(nameB), 'distinct-slug name B must not appear in any collision warning');
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('scanForSlugCollisions() never throws, even if list() itself fails', async () => {
+  const restoreList = stubModuleFn(Object.getPrototypeOf(pipeSourceService), 'list', () => {
+    throw new Error('DB unavailable');
+  });
+  try {
+    await assert.doesNotReject(() => pipeSourceService.scanForSlugCollisions());
+  } finally {
+    restoreList();
   }
 });

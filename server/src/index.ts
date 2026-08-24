@@ -117,6 +117,18 @@ async function start(): Promise<void> {
     console.error('[startup] Pipe-source FIFO migration failed unexpectedly:', err);
   }
 
+  // Task 26, Part 3: detect (never mutate) pipe sources whose names collide
+  // after slugging -- possible on an install that predates create()/
+  // adopt()'s own slug-collision validation. scanForSlugCollisions() itself
+  // already never throws (see its docstring in services/pipeSources.ts),
+  // but this try/catch is kept as defense in depth, mirroring the
+  // migrateFifoPaths() call above.
+  try {
+    await pipeSourceService.scanForSlugCollisions();
+  } catch (err) {
+    console.error('[startup] Pipe-source slug-collision scan failed unexpectedly:', err);
+  }
+
   // Task 25: connect eagerly at startup rather than lazily on first request,
   // so the cache is already warm by the time the first GET /api/snapcast/status
   // or /api/events client shows up (per the task brief's stated preference).

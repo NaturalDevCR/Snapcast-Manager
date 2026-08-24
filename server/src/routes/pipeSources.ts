@@ -21,6 +21,17 @@ const router = Router();
 
 router.use(authenticateToken);
 
+// Task 26, Part 3: pipeSourceService.create()/adopt() reject a name whose
+// slug would be empty, or that collides (after slugging) with an existing
+// pipe source's name -- see assertNoSlugCollision()'s docstring in
+// services/pipeSources.ts. Those are caller-input validation failures
+// (like adopt()'s existingServiceName mismatch below), not server errors,
+// so both POST routes below map them to 400 via this same substring check
+// rather than falling through to the generic 500.
+function isSlugValidationError(message: string): boolean {
+  return /has no alphanumeric characters|conflicting name already exists/.test(message);
+}
+
 // GET /api/pipe-sources
 router.get('/', async (req, res) => {
   try {
@@ -50,7 +61,8 @@ router.post('/', validate({ body: createPipeSourceBodySchema }), async (req, res
     const pipe = await pipeSourceService.create(data);
     res.json(pipe);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const status = isSlugValidationError(err.message) ? 400 : 500;
+    res.status(status).json({ error: err.message });
   }
 });
 
@@ -165,12 +177,12 @@ router.post('/adopt', validate({ body: adoptPipeSourceBodySchema }), async (req,
     const pipe = await pipeSourceService.adopt(data);
     res.json(pipe);
   } catch (err: any) {
-    // "existingServiceName does not match any discovered..." means the
-    // caller supplied something invalid/unverifiable -- 400, not a server
-    // error. The authoritative check lives in pipeSourceService.adopt()
-    // itself (see its docstring), not here; this only maps its error to
-    // the right HTTP status.
-    const status = err.message.includes('existingServiceName') ? 400 : 500;
+    // "existingServiceName does not match any discovered..." and the
+    // slug-validation errors below both mean the caller supplied something
+    // invalid -- 400, not a server error. The authoritative checks live in
+    // pipeSourceService.adopt() itself (see its docstring), not here; this
+    // only maps its errors to the right HTTP status.
+    const status = err.message.includes('existingServiceName') || isSlugValidationError(err.message) ? 400 : 500;
     res.status(status).json({ error: err.message });
   }
 });

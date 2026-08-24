@@ -70,6 +70,69 @@ function hyphenSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+// ---- Task 26, Part 3: slug-collision validation helpers ----
+//
+// underscoreSlug() and hyphenSlug() above both collapse runs of
+// non-alphanumeric characters via the SAME `[^a-z0-9]+` character class --
+// they only differ in the separator they join on ('_' vs '-'). That means
+// two names produce the same underscoreSlug() if and only if they also
+// produce the same hyphenSlug(): checking one is sufficient to detect a
+// collision under either. It also means a name collapses to '' under one
+// if and only if it collapses to '' under the other (zero alphanumeric
+// characters in the name -- e.g. "!!!" or "---").
+
+/** True iff `name`'s slug would be empty -- i.e. it has zero alphanumeric
+ * characters, which would produce an ambiguous/broken FIFO path
+ * (`/run/snapcast-manager/snapfifo_`) or systemd unit name
+ * (`snapcast-radio-.service`). */
+function hasEmptySlug(name: string): boolean {
+  return underscoreSlug(name) === '';
+}
+
+/** True iff `nameA` and `nameB` would produce the same slug (e.g. "My
+ * Radio" and "my-radio" both slug to "my_radio"/"my-radio"). */
+function slugsCollide(nameA: string, nameB: string): boolean {
+  return underscoreSlug(nameA) === underscoreSlug(nameB);
+}
+
+// ---- Task 26, Part 2: /proc/<pid>/stat process-state parsing ----
+
+/**
+ * Extracts the process-state field (the third whitespace-separated field)
+ * from the raw contents of a `/proc/<pid>/stat` file. Exported standalone
+ * (not inlined into getZombieCount()) specifically so this parsing logic
+ * stays independently unit-testable against real-shaped sample lines.
+ *
+ * The well-known gotcha this exists to get right: `/proc/<pid>/stat`'s
+ * format is `pid (comm) state ...`, space-separated -- but `comm` (the
+ * command name, field 2) is wrapped in its OWN parens and can itself
+ * contain spaces AND parens (a process can rename itself via
+ * `prctl(PR_SET_NAME, ...)` to something like `some (weird) prog`).
+ * Naively `.split(' ')`-ing the whole line and indexing into it would put
+ * the wrong value in the "state" slot whenever `comm` contains a space.
+ * The kernel's own `/proc/<pid>/stat` documentation notes exactly this and
+ * recommends parsing past the LAST `)` in the line before splitting the
+ * remaining fields on whitespace -- since `comm` is truncated to 16 bytes
+ * and pid is numeric-only, the LAST `)` is guaranteed to be the closing
+ * paren of the comm field, not a paren occurring inside it. Everything
+ * after that last `)` is `state pid ppid ...` starting fresh, unambiguous,
+ * whitespace-separated fields -- so `state` is simply the first token
+ * after it.
+ *
+ * Returns '' (never throws) if the line doesn't have the expected shape at
+ * all (e.g. no `)` found) -- getZombieCount()'s `=== 'Z'` comparison
+ * treats that the same as "not a zombie", which is the only safe default
+ * for malformed/unexpected input here.
+ */
+export function parseProcStatState(statLine: string): string {
+  const trimmed = statLine.trim();
+  const lastParen = trimmed.lastIndexOf(')');
+  if (lastParen === -1) return '';
+  const afterComm = trimmed.slice(lastParen + 1).trim();
+  const fields = afterComm.split(/\s+/);
+  return fields[0] ?? '';
+}
+
 // ---- runtime directory (Task 7) ----
 // A tmpfs directory this app controls -- unlike /tmp, only root and members
 // of the `audio` group can read/write inside it (mode 0770, group audio).
@@ -469,7 +532,87 @@ export class PipeSourceService {
     return row ? this.rowToModel(row) : null;
   }
 
+  /**
+   * Task 26, Part 3: rejects `name` BEFORE any DB row is inserted or any
+   * privileged file/systemd call is made (same "reject with zero side
+   * effects" discipline `adopt()`'s existingServiceName check already
+   * follows) if either:
+   *   1. its slug would be empty (zero alphanumeric characters -- would
+   *      produce an ambiguous/broken FIFO path or systemd unit name), or
+   *   2. it collides, after slugging, with any EXISTING pipe source's name
+   *      (e.g. "My Radio" vs "my-radio" -- different raw strings, same
+   *      slug, so they'd fight over the same FIFO path / unit file).
+   *
+   * Deliberately does NOT auto-rename or otherwise mutate anything -- per
+   * the Task 26 brief, that's a judgment call left to the operator. Called
+   * only from create()/adopt() (the brief's explicit scope: "at creation
+   * time") -- update() is not in scope, so renaming an EXISTING pipe
+   * source to collide with another is not caught here; see
+   * scanForSlugCollisions() below for the startup-time detection net that
+   * covers collisions however they arose.
+   */
+  private assertNoSlugCollision(name: string): void {
+    if (hasEmptySlug(name)) {
+      throw new Error(
+        `Pipe source name "${name}" has no alphanumeric characters -- it would produce an empty/ambiguous ` +
+        'FIFO path and systemd unit name. Choose a name with at least one letter or digit.',
+      );
+    }
+    const conflict = this.list().find(p => slugsCollide(p.name, name));
+    if (conflict) {
+      throw new Error(
+        `A pipe source with a conflicting name already exists: "${name}" and existing pipe source ` +
+        `"${conflict.name}" (id=${conflict.id}) both slug to the same FIFO path / systemd unit name. ` +
+        'Choose a name that differs by more than case or punctuation.',
+      );
+    }
+  }
+
+  /**
+   * Task 26, Part 3: startup-time detection net for slug collisions among
+   * pipe sources that ALREADY EXISTED before this task's create()/adopt()
+   * validation shipped (so they were never checked against each other).
+   * Mirrors migrateFifoPaths()'s startup-scan pattern/style (see that
+   * method's docstring above) but is detection-only: per the brief,
+   * auto-renaming a user's existing pipe source is a judgment call that
+   * stays with the operator, so this only logs a clear, actionable warning
+   * identifying every colliding group -- it never touches the DB or any
+   * file, and this does not need to block startup. Like
+   * migrateFifoPaths(), this method itself never throws.
+   */
+  async scanForSlugCollisions(): Promise<void> {
+    try {
+      const pipes = this.list();
+      const groups = new Map<string, PipeSource[]>();
+      for (const pipe of pipes) {
+        const slug = underscoreSlug(pipe.name);
+        const group = groups.get(slug);
+        if (group) {
+          group.push(pipe);
+        } else {
+          groups.set(slug, [pipe]);
+        }
+      }
+
+      for (const [slug, group] of groups) {
+        if (group.length < 2) continue;
+        const names = group.map(p => `"${p.name}" (id=${p.id})`).join(', ');
+        console.warn(
+          `[pipeSources] SLUG COLLISION DETECTED: ${group.length} pipe sources share the slug "${slug}" -- ` +
+          `${names}. They will fight over the same FIFO path (/run/snapcast-manager/snapfifo_${slug}) and/or ` +
+          `systemd unit (snapcast-radio-${slug.replace(/_/g, '-')}.service). This install predates ` +
+          'slug-collision validation and was NOT auto-corrected -- rename all but one of these pipe sources ' +
+          '(PUT /api/pipe-sources/:id) to resolve.',
+        );
+      }
+    } catch (err) {
+      console.error('[pipeSources] Slug-collision scan failed unexpectedly:', err);
+    }
+  }
+
   async create(data: Omit<PipeSource, 'id' | 'createdAt'>): Promise<PipeSource> {
+    this.assertNoSlugCollision(data.name);
+
     const id = randomUUID();
     db.prepare(`
       INSERT INTO radio_pipe_streams (id, name, type, url, reconnect, reconnect_streamed, reconnect_at_eof, reconnect_delay_max, idle_threshold, enabled)
@@ -760,23 +903,49 @@ export class PipeSourceService {
   }
 
   /**
-   * Counts zombie ("defunct") processes. Out of scope for Task 6's security
-   * migration (tracked separately in Stage 3, item 3.9, as a fragility fix
-   * via /proc parsing) -- this is a trivial, logic-preserving port of the
-   * old `ps aux | grep defunct | grep -v grep | wc -l` shell pipeline onto
-   * a single argv-based `run('ps', ['aux'])` call plus in-process line
-   * filtering, replacing the shell pipe rather than the counting logic
-   * itself. `grep -v grep` in the old pipeline existed only to exclude the
-   * `grep defunct` process's own `ps aux` line from matching itself; the
-   * `!line.includes('grep')` filter below does the same thing.
+   * Counts zombie processes via real `/proc/<pid>/stat` process-state
+   * parsing (Task 26, Part 2 -- Stage 3, item 3.9). The PREVIOUS
+   * implementation (Task 6's shell-pipe migration; see git history) counted
+   * `ps aux` lines containing the literal string "defunct" -- a false
+   * positive for any process whose COMMAND LINE happens to contain that
+   * word, not just actual zombies (state `Z`). `/proc/<pid>/stat`'s third
+   * whitespace-separated field is the kernel's own authoritative process
+   * state, so this reads that directly instead of pattern-matching `ps`
+   * output.
+   *
+   * Every PID currently under /proc is read independently and any single
+   * failure (most commonly ENOENT -- a process exits between `readdir()`
+   * and this file's `readFile()`, an inherent TOCTOU race scanning /proc)
+   * is skipped rather than failing the whole count -- see the loop below.
    */
   async getZombieCount(): Promise<number> {
+    // /proc only exists on Linux -- same live-environment fallback
+    // convention watchdog.ts's getStats() uses for its `process.platform
+    // === 'darwin'` branch: gracefully degrade to a default (0) rather
+    // than throwing on a platform where this feature has no meaning.
+    if (process.platform !== 'linux') return 0;
+
+    let entries: string[];
     try {
-      const { stdout } = await run('ps', ['aux']);
-      return stdout.split('\n').filter(line => line.includes('defunct') && !line.includes('grep')).length;
+      entries = await fs.readdir('/proc');
     } catch {
       return 0;
     }
+
+    let zombies = 0;
+    for (const entry of entries) {
+      if (!/^\d+$/.test(entry)) continue; // only numeric entries are PIDs
+      try {
+        const stat = await fs.readFile(`/proc/${entry}/stat`, 'utf-8');
+        if (parseProcStatState(stat) === 'Z') zombies++;
+      } catch {
+        // Most commonly ENOENT (the process exited between readdir() and
+        // this readFile() -- ordinary TOCTOU race scanning /proc) but any
+        // other per-PID failure (e.g. a permission error) is likewise not
+        // this whole count's problem: skip just this PID and keep going.
+      }
+    }
+    return zombies;
   }
 
   async discover(): Promise<DiscoveredPipe[]> {
@@ -909,6 +1078,8 @@ export class PipeSourceService {
    * or any privileged command is run.
    */
   async adopt(data: AdoptInput): Promise<PipeSource> {
+    this.assertNoSlugCollision(data.name);
+
     let matchedServiceName: string | undefined;
 
     if (data.type === 'radio' && data.existingServiceName) {

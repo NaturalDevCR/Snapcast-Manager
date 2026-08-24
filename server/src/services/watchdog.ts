@@ -30,9 +30,58 @@ export class WatchdogService {
   private configPath = WATCHDOGS_CONFIG_PATH;
   private previousStats: Map<string, SocketStat[]> = new Map();
   private intervalId: NodeJS.Timeout | null = null;
+  // Task 26: resolves once the constructor's initial load()-and-decide pass
+  // (see applyAutoCleanupState() below) has run. Nothing in this class
+  // depends on it -- addWatchdog/updateWatchdog/deleteWatchdog all await
+  // their own save() call, which re-derives state synchronously with no
+  // extra load() -- but tests use it to deterministically observe the
+  // one-time construction-time decision without polling or a real wait.
+  private ready: Promise<void>;
 
   constructor() {
-    this.startAutoCleanup();
+    this.ready = this.load()
+      .then(watchdogs => this.applyAutoCleanupState(watchdogs))
+      .catch(error => {
+        console.error('Watchdog auto-cleanup initialization error:', error);
+      });
+  }
+
+  /**
+   * Task 26 (Stage 3, item 3.8): the auto-cleanup poll used to run via an
+   * unconditional setInterval() started at construction time -- for the
+   * entire process lifetime, on every tick, regardless of whether any
+   * watchdog was even configured, let alone whether any configured
+   * watchdog actually had `enabled && autoKillDuplicates` set (the only
+   * combination checkAndCleanupDuplicates() is ever invoked for -- see the
+   * interval callback in startAutoCleanup() below, unchanged). That meant
+   * a disk read (this.load()) every 4 seconds for the life of the process
+   * even with zero qualifying watchdogs.
+   *
+   * This decides, from a watchdog list already in hand (never a fresh
+   * load() call of its own -- see the two call sites below), whether the
+   * timer SHOULD be running right now, and starts/stops it accordingly.
+   * Both startAutoCleanup() and stopAutoCleanup() are idempotent (their own
+   * `if (this.intervalId)` / `if (this.intervalId)` guards), so calling
+   * this redundantly is always safe and cheap.
+   *
+   * Call sites (every point that can change whether a qualifying watchdog
+   * exists):
+   *   - the constructor above, via load(), so a restart with an
+   *     already-qualifying persisted config resumes polling immediately
+   *     rather than waiting for the first mutation;
+   *   - save() below, which addWatchdog()/updateWatchdog()/deleteWatchdog()
+   *     all route through to persist -- and which the bulk
+   *     `PUT /api/watchdog/bulk` route (routes/watchdog.ts) also calls
+   *     directly -- so this is the single place that covers every mutation
+   *     path without needing a separate call in each of them.
+   */
+  private applyAutoCleanupState(watchdogs: Watchdog[]): void {
+    const shouldRun = watchdogs.some(wd => wd.enabled && wd.autoKillDuplicates);
+    if (shouldRun) {
+      this.startAutoCleanup();
+    } else {
+      this.stopAutoCleanup();
+    }
   }
 
   async startAutoCleanup() {
@@ -49,6 +98,16 @@ export class WatchdogService {
         console.error('Watchdog auto-cleanup error:', error);
       }
     }, 4000); // check interval
+  }
+
+  /** Task 26: idempotent counterpart to startAutoCleanup() -- stops the poll
+   * and clears the handle, matching startAutoCleanup()'s own
+   * `if (this.intervalId) return;` idempotent-start guard style. */
+  stopAutoCleanup(): void {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
   }
 
   async checkAndCleanupDuplicates(wd: Watchdog) {
@@ -106,6 +165,11 @@ export class WatchdogService {
   async save(watchdogs: Watchdog[]): Promise<void> {
     const path = await this.ensureConfig();
     await fs.writeFile(path, JSON.stringify(watchdogs, null, 2), 'utf-8');
+    // Task 26: re-derive the auto-cleanup timer's should-it-run state from
+    // the array just persisted -- see applyAutoCleanupState()'s docstring
+    // for why this single call site covers every mutation entry point
+    // (addWatchdog/updateWatchdog/deleteWatchdog, and the bulk-save route).
+    this.applyAutoCleanupState(watchdogs);
   }
 
   async getWatchdogs(): Promise<Watchdog[]> {

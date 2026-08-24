@@ -35,6 +35,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { writeFileSync, unlinkSync } from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import * as execModule from '../platform/exec';
 import { ExecError } from '../platform/exec';
 import { WatchdogService, Watchdog } from './watchdog';
@@ -65,23 +68,71 @@ function stubNeedsSudo(value: boolean): () => void {
 }
 
 /**
- * Constructs a WatchdogService without letting the real constructor start
- * its 4-second auto-cleanup setInterval() (out of scope for this task per
- * the brief, and a live interval referencing a real fs-backed load() would
- * both pollute run()-call assertions if a test happens to straddle a tick
- * and keep this test file's `node --test` child process alive after the
- * test run finishes). startAutoCleanup() itself is not modified -- only
- * stubbed out for the duration of construction.
+ * Constructs a WatchdogService without letting the real constructor's
+ * Task-26 construction-time load()-and-decide pass (see
+ * applyAutoCleanupState() in watchdog.ts) see any real, disk-backed
+ * watchdog config -- a live interval referencing a real fs-backed load()
+ * would both pollute run()-call assertions if a test happens to straddle a
+ * tick and keep this test file's `node --test` child process alive after
+ * the test run finishes. Stubs load() (returning an empty list, so
+ * applyAutoCleanupState() finds nothing qualifying and never starts the
+ * timer) at the PROTOTYPE level for the duration of construction only --
+ * the constructor calls this.load() synchronously as part of dispatching
+ * its promise chain, so by the time `new WatchdogService()` returns the
+ * stub has already been captured; restoring the prototype right after is
+ * safe (same reasoning the pre-existing stubLoad() below documents for
+ * instance-level overrides). Neither load() nor startAutoCleanup() /
+ * applyAutoCleanupState() themselves are modified -- only stubbed out for
+ * the duration of construction.
  */
 function newService(): WatchdogService {
   const proto = WatchdogService.prototype as any;
-  const original = proto.startAutoCleanup;
-  proto.startAutoCleanup = async () => {};
+  const original = proto.load;
+  proto.load = async () => [];
   try {
     return new WatchdogService();
   } finally {
-    proto.startAutoCleanup = original;
+    proto.load = original;
   }
+}
+
+/**
+ * Task 26: constructs a WatchdogService backed by a real, isolated,
+ * throwaway JSON file (in the OS temp dir, never the real
+ * /etc/snapcast-manager path or the repo-local dev fallback) so the REAL
+ * load()/save()/ensureConfig() chain -- and therefore the real
+ * applyAutoCleanupState() wiring inside save() and the constructor -- runs
+ * end-to-end for these on-demand-timer tests, rather than being
+ * short-circuited by an in-memory stub. `ensureConfig()` is overridden at
+ * the PROTOTYPE level (like newService() above) so the constructor's own
+ * synchronous this.load() dispatch picks it up; UNLIKE newService(), the
+ * override is deliberately left in place (restored only by the returned
+ * `restore()`, which the caller must invoke in a `finally`) so every
+ * subsequent addWatchdog()/updateWatchdog()/deleteWatchdog() call made
+ * during the test keeps reading/writing the same temp file.
+ */
+function newServiceWithTempConfig(initial?: Watchdog[]): { service: WatchdogService; restore: () => void } {
+  const configPath = path.join(
+    os.tmpdir(),
+    `watchdog-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+  );
+  if (initial !== undefined) {
+    writeFileSync(configPath, JSON.stringify(initial, null, 2), 'utf-8');
+  }
+  const proto = WatchdogService.prototype as any;
+  const original = proto.ensureConfig;
+  proto.ensureConfig = async () => configPath;
+  const service = new WatchdogService();
+  const restore = () => {
+    proto.ensureConfig = original;
+    (service as any).stopAutoCleanup();
+    try {
+      unlinkSync(configPath);
+    } catch {
+      // already gone / never written -- fine.
+    }
+  };
+  return { service, restore };
 }
 
 /** Overrides the instance's own load() (shadows the prototype method) so
@@ -345,5 +396,173 @@ test('killConnection() throws "Watchdog not found" for an unknown id (still reje
     assert.deepEqual(calls, []);
   } finally {
     restoreRun();
+  }
+});
+
+// ============================================================================
+// Task 26, Part 1: the auto-cleanup poll starts/stops on demand -- only
+// while at least one persisted watchdog has `enabled && autoKillDuplicates`
+// -- instead of running unconditionally for the process lifetime.
+// ============================================================================
+
+test('timer starts on construction when a qualifying watchdog is already persisted', async () => {
+  const { service, restore } = newServiceWithTempConfig([
+    { id: 'wd1', name: 'Already Qualifying', ports: [4953], enabled: true, autoKillDuplicates: true },
+  ]);
+  try {
+    await (service as any).ready;
+    assert.notEqual((service as any).intervalId, null, 'expected the timer to be running');
+  } finally {
+    restore();
+  }
+});
+
+test('timer stays off on construction when the persisted watchdog is enabled but autoKillDuplicates is not set', async () => {
+  const { service, restore } = newServiceWithTempConfig([
+    { id: 'wd1', name: 'Enabled Only', ports: [4953], enabled: true, autoKillDuplicates: false },
+  ]);
+  try {
+    await (service as any).ready;
+    assert.equal((service as any).intervalId, null, 'expected the timer to stay off');
+  } finally {
+    restore();
+  }
+});
+
+test('timer stays off on construction when the persisted watchdog has autoKillDuplicates set but is disabled', async () => {
+  const { service, restore } = newServiceWithTempConfig([
+    { id: 'wd1', name: 'AutoKill Only', ports: [4953], enabled: false, autoKillDuplicates: true },
+  ]);
+  try {
+    await (service as any).ready;
+    assert.equal((service as any).intervalId, null, 'expected the timer to stay off');
+  } finally {
+    restore();
+  }
+});
+
+test('timer stays off on construction with an empty persisted watchdog list', async () => {
+  const { service, restore } = newServiceWithTempConfig([]);
+  try {
+    await (service as any).ready;
+    assert.equal((service as any).intervalId, null, 'expected the timer to stay off');
+  } finally {
+    restore();
+  }
+});
+
+test('timer stays off on construction when no config file exists yet (load() returns [])', async () => {
+  // No `initial` argument -- newServiceWithTempConfig() never writes the
+  // temp file, so ensureConfig() points at a path that doesn't exist yet
+  // and the real load()'s own try/catch (unmodified) returns [].
+  const { service, restore } = newServiceWithTempConfig();
+  try {
+    await (service as any).ready;
+    assert.equal((service as any).intervalId, null, 'expected the timer to stay off');
+  } finally {
+    restore();
+  }
+});
+
+test('timer starts after updateWatchdog() enables autoKillDuplicates on the only watchdog', async () => {
+  const { service, restore } = newServiceWithTempConfig([
+    { id: 'wd1', name: 'To Be Upgraded', ports: [4953], enabled: true, autoKillDuplicates: false },
+  ]);
+  try {
+    await (service as any).ready;
+    assert.equal((service as any).intervalId, null, 'expected the timer to start off');
+
+    await service.updateWatchdog('wd1', { autoKillDuplicates: true });
+    assert.notEqual((service as any).intervalId, null, 'expected the timer to start after the update');
+  } finally {
+    restore();
+  }
+});
+
+test('timer stops after the last qualifying watchdog is deleted', async () => {
+  const { service, restore } = newServiceWithTempConfig([
+    { id: 'wd1', name: 'The Only Qualifier', ports: [4953], enabled: true, autoKillDuplicates: true },
+  ]);
+  try {
+    await (service as any).ready;
+    assert.notEqual((service as any).intervalId, null, 'expected the timer to start on construction');
+
+    await service.deleteWatchdog('wd1');
+    assert.equal((service as any).intervalId, null, 'expected the timer to stop after deletion');
+  } finally {
+    restore();
+  }
+});
+
+test('timer stops after the last qualifying watchdog is disabled via updateWatchdog()', async () => {
+  const { service, restore } = newServiceWithTempConfig([
+    { id: 'wd1', name: 'About To Be Disabled', ports: [4953], enabled: true, autoKillDuplicates: true },
+  ]);
+  try {
+    await (service as any).ready;
+    assert.notEqual((service as any).intervalId, null, 'expected the timer to start on construction');
+
+    await service.updateWatchdog('wd1', { enabled: false });
+    assert.equal((service as any).intervalId, null, 'expected the timer to stop once disabled');
+  } finally {
+    restore();
+  }
+});
+
+test('timer stays on when one of two watchdogs stops qualifying but the other still does', async () => {
+  const { service, restore } = newServiceWithTempConfig([
+    { id: 'wd1', name: 'Stays Qualifying', ports: [4953], enabled: true, autoKillDuplicates: true },
+    { id: 'wd2', name: 'Will Be Disabled', ports: [443], enabled: true, autoKillDuplicates: true },
+  ]);
+  try {
+    await (service as any).ready;
+    assert.notEqual((service as any).intervalId, null, 'expected the timer to start on construction');
+
+    await service.updateWatchdog('wd2', { enabled: false });
+    assert.notEqual((service as any).intervalId, null, 'expected the timer to stay on -- wd1 still qualifies');
+  } finally {
+    restore();
+  }
+});
+
+test('timer starts after addWatchdog() adds a qualifying watchdog to an empty config', async () => {
+  const { service, restore } = newServiceWithTempConfig([]);
+  try {
+    await (service as any).ready;
+    assert.equal((service as any).intervalId, null, 'expected the timer to start off');
+
+    await service.addWatchdog({ name: 'Freshly Added', ports: [4953], enabled: true, autoKillDuplicates: true });
+    assert.notEqual((service as any).intervalId, null, 'expected the timer to start after the add');
+  } finally {
+    restore();
+  }
+});
+
+test('timer stays off after addWatchdog() adds a non-qualifying watchdog', async () => {
+  const { service, restore } = newServiceWithTempConfig([]);
+  try {
+    await (service as any).ready;
+    await service.addWatchdog({ name: 'Not Qualifying', ports: [4953], enabled: false, autoKillDuplicates: true });
+    assert.equal((service as any).intervalId, null, 'expected the timer to stay off');
+  } finally {
+    restore();
+  }
+});
+
+test('startAutoCleanup()/stopAutoCleanup() are idempotent (calling either twice in a row is a no-op the second time)', async () => {
+  const { service, restore } = newServiceWithTempConfig([]);
+  try {
+    await (service as any).ready;
+    await service.startAutoCleanup();
+    const firstHandle = (service as any).intervalId;
+    await service.startAutoCleanup();
+    assert.equal((service as any).intervalId, firstHandle, 'a second start must not replace the handle');
+
+    service.stopAutoCleanup();
+    assert.equal((service as any).intervalId, null);
+    service.stopAutoCleanup();
+    assert.equal((service as any).intervalId, null, 'a second stop on an already-stopped timer must not throw');
+  } finally {
+    restore();
   }
 });
