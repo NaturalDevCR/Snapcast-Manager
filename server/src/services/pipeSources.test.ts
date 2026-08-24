@@ -2085,3 +2085,104 @@ test('scanForSlugCollisions() never throws, even if list() itself fails', async 
     restoreList();
   }
 });
+
+// ============================================================================
+// Task 26 review fix: update() (PUT /:id, the rename path) must also reject a
+// rename whose new slug collides with a DIFFERENT existing pipe source --
+// previously only create()/adopt() called assertNoSlugCollision(), so
+// renaming pipe A to collide with pipe B's slug would silently overwrite B's
+// live systemd unit file via writeRadioServiceFile() (both resolve to the
+// same getServiceFilePath()). The fix adds an excludeId-aware variant of the
+// existing check so a no-op rename (submitting the pipe's own current name)
+// is correctly NOT rejected against itself.
+// ============================================================================
+
+test('update() rejects a rename to a name IDENTICAL to a DIFFERENT existing pipe source\'s name, before any write', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const nameB = uniqueName('update-collision-identical-b');
+    const pipeA = await pipeSourceService.create(baseCreateInput({ name: uniqueName('update-collision-identical-a') }));
+    await pipeSourceService.create(baseCreateInput({ name: nameB }));
+    calls.length = 0;
+
+    await assert.rejects(
+      () => pipeSourceService.update(pipeA.id, { name: nameB }),
+      /conflicting name already exists/,
+    );
+    assert.equal(calls.length, 0, `expected zero platform calls for the rejected update(), got: ${JSON.stringify(calls)}`);
+    assert.equal(pipeSourceService.getById(pipeA.id)?.name, pipeA.name, 'pipe A must be unchanged after a rejected rename');
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('update() rejects a rename that only collides with a DIFFERENT existing pipe source AFTER slugging', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const base = uniqueName('update-collide-base');
+    const nameB = `My ${base}`;
+    const nameBSlugCollider = nameB.toLowerCase().replace(/\s+/g, '-');
+
+    const pipeA = await pipeSourceService.create(baseCreateInput({ name: uniqueName('update-collide-a') }));
+    await pipeSourceService.create(baseCreateInput({ name: nameB }));
+    calls.length = 0;
+
+    await assert.rejects(
+      () => pipeSourceService.update(pipeA.id, { name: nameBSlugCollider }),
+      /conflicting name already exists/,
+    );
+    assert.equal(calls.length, 0, `expected zero platform calls for the rejected update(), got: ${JSON.stringify(calls)}`);
+    assert.equal(pipeSourceService.getById(pipeA.id)?.name, pipeA.name, 'pipe A must be unchanged after a rejected rename');
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('update() allows renaming a pipe source to a name whose slug does not collide with anything', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipeA = await pipeSourceService.create(baseCreateInput({ name: uniqueName('update-allow-rename-a') }));
+    calls.length = 0;
+
+    const newName = uniqueName('update-allow-rename-a-new');
+    const updated = await pipeSourceService.update(pipeA.id, { name: newName });
+    assert.equal(updated.name, newName);
+    assert.equal(pipeSourceService.getById(pipeA.id)?.name, newName);
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('update() allows a no-op "rename" -- submitting the pipe source\'s own current name -- without rejecting it against itself', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipeA = await pipeSourceService.create(baseCreateInput({ name: uniqueName('update-noop-rename-a') }));
+    calls.length = 0;
+
+    const updated = await pipeSourceService.update(pipeA.id, { name: pipeA.name });
+    assert.equal(updated.name, pipeA.name);
+    assert.equal(pipeSourceService.getById(pipeA.id)?.name, pipeA.name);
+  } finally {
+    restorePlatform();
+  }
+});
+
+test('update() allows changing OTHER fields (not name) without spuriously rejecting due to the collision check', async () => {
+  const calls: Call[] = [];
+  const restorePlatform = stubAllPlatformCalls(calls);
+  try {
+    const pipeA = await pipeSourceService.create(baseCreateInput({ name: uniqueName('update-other-fields-a'), idleThreshold: 15000 }));
+    calls.length = 0;
+
+    const updated = await pipeSourceService.update(pipeA.id, { idleThreshold: 20000 });
+    assert.equal(updated.name, pipeA.name);
+    assert.equal(updated.idleThreshold, 20000);
+    assert.equal(pipeSourceService.getById(pipeA.id)?.idleThreshold, 20000);
+  } finally {
+    restorePlatform();
+  }
+});

@@ -545,20 +545,26 @@ export class PipeSourceService {
    *
    * Deliberately does NOT auto-rename or otherwise mutate anything -- per
    * the Task 26 brief, that's a judgment call left to the operator. Called
-   * only from create()/adopt() (the brief's explicit scope: "at creation
-   * time") -- update() is not in scope, so renaming an EXISTING pipe
-   * source to collide with another is not caught here; see
-   * scanForSlugCollisions() below for the startup-time detection net that
-   * covers collisions however they arose.
+   * from create()/adopt() (the brief's explicit scope: "at creation time")
+   * with no `excludeId`, and from update() (Task 26 review fix -- see
+   * below) with `excludeId` set to the row being renamed, so a rename is
+   * checked against every OTHER pipe source without ever colliding with
+   * its own current name/slug.
+   *
+   * `excludeId` is what makes this safe to call unconditionally from
+   * update() on every edit (including ones that don't touch `name` at
+   * all, and true no-op "renames" that resubmit the pipe's own current
+   * name): the row being updated is skipped from the collision scan, so it
+   * can never be reported as colliding with itself.
    */
-  private assertNoSlugCollision(name: string): void {
+  private assertNoSlugCollision(name: string, excludeId?: string): void {
     if (hasEmptySlug(name)) {
       throw new Error(
         `Pipe source name "${name}" has no alphanumeric characters -- it would produce an empty/ambiguous ` +
         'FIFO path and systemd unit name. Choose a name with at least one letter or digit.',
       );
     }
-    const conflict = this.list().find(p => slugsCollide(p.name, name));
+    const conflict = this.list().find(p => p.id !== excludeId && slugsCollide(p.name, name));
     if (conflict) {
       throw new Error(
         `A pipe source with a conflicting name already exists: "${name}" and existing pipe source ` +
@@ -649,6 +655,17 @@ export class PipeSourceService {
 
     const oldName = existing.name;
     const updated: PipeSource = { ...existing, ...data };
+
+    // Task 26 review fix: reject a rename whose new slug collides with a
+    // DIFFERENT existing pipe source BEFORE any write happens -- previously
+    // only create()/adopt() called assertNoSlugCollision(), so renaming pipe
+    // A to a name that slugs the same as pipe B's would sail straight
+    // through to writeRadioServiceFile(updated) below, which silently
+    // overwrote B's live systemd unit file (both resolve to the same
+    // getServiceFilePath() path derived purely from the slug). excludeId
+    // skips the row being updated so a no-op rename (or any edit that
+    // doesn't touch `name`) is never rejected against its own current name.
+    this.assertNoSlugCollision(updated.name, id);
 
     db.prepare(`
       UPDATE radio_pipe_streams
