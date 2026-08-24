@@ -429,3 +429,123 @@ test('a message carrying an id (a response, not a notification) is ignored', asy
   await new Promise((r) => setImmediate(r));
   assert.equal(fetchStatusCallCount(), 1);
 });
+
+// ---- review fix regression: malformed Server.OnUpdate must not crash the process ----
+//
+// Reviewer-reproduced scenario: a Server.OnUpdate whose `params.server` is
+// truthy but missing `groups`/`streams` used to be accepted wholesale as a
+// full-cache replacement (only `!!params.server` was checked). The very
+// next notification that touched `status.server.groups`/`.streams` (e.g.
+// Group.OnMute's `status.server.groups.find(...)`) then threw
+// `TypeError: Cannot read properties of undefined (reading 'find')`
+// synchronously out of the `ws` 'message' handler -- uncaught, since
+// handleMessage() only wraps JSON.parse in try/catch. These tests reproduce
+// that exact sequence and assert it now falls back to a refetch instead.
+
+test('Server.OnUpdate missing groups/streams is rejected (falls back to refetch), does not corrupt the cache', async () => {
+  const { client, openLatest, notify, fetchStatusCallCount } = newTestClient();
+  client.start();
+  await openLatest();
+  assert.equal(fetchStatusCallCount(), 1);
+
+  // Malformed: `server` is truthy but has no `groups`/`streams` arrays.
+  await notify('Server.OnUpdate', { server: { server: { version: '2' } } });
+
+  assert.equal(fetchStatusCallCount(), 2, 'malformed Server.OnUpdate must trigger a fallback refetch');
+  // The refetch (baseStatus()) restores a valid cache -- the malformed
+  // payload must never have been written in.
+  assert.deepEqual(client.getCachedStatus(), baseStatus());
+});
+
+test('reviewer-reproduced crash scenario: malformed Server.OnUpdate followed by Group.OnMute no longer throws', async () => {
+  const { client, openLatest, notify, fetchStatusCallCount } = newTestClient();
+  client.start();
+  await openLatest();
+
+  // Step 1: the malformed Server.OnUpdate that used to be accepted as-is.
+  await notify('Server.OnUpdate', { server: { server: { version: '2' } } });
+  assert.equal(fetchStatusCallCount(), 2, 'step 1 falls back to refetch and restores a valid cache');
+
+  // Step 2: previously, status.server.groups was undefined at this point,
+  // so Group.OnMute's `status.server.groups.find(...)` threw synchronously
+  // out of the notify() call below. Asserting this doesn't throw IS the
+  // regression test.
+  await assert.doesNotReject(notify('Group.OnMute', { id: 'group1', mute: true }));
+
+  // Group.OnMute merges cleanly against the refetched (valid) cache.
+  assert.equal(fetchStatusCallCount(), 2, 'Group.OnMute against a valid cache is a precise merge, no extra refetch');
+  assert.equal(client.getCachedStatus()!.server.groups[0].muted, true);
+});
+
+test('Client.OnConnect with a malformed client object (missing config.volume) is rejected, falls back to refetch', async () => {
+  const { client, openLatest, notify, fetchStatusCallCount } = newTestClient();
+  client.start();
+  await openLatest();
+
+  await notify('Client.OnConnect', {
+    id: 'client1',
+    client: { id: 'client1', host: { ip: '1.2.3.4' }, config: { name: 'Kitchen' } /* missing volume */, connected: true },
+  });
+
+  assert.equal(fetchStatusCallCount(), 2, 'malformed client payload must trigger a fallback refetch');
+  // Cache wasn't corrupted with the malformed object.
+  assert.deepEqual(client.getCachedStatus()!.server.groups[0].clients[0].config.volume, { muted: false, percent: 50 });
+});
+
+test('Client.OnDisconnect with a malformed client object (volume fields wrong type) is rejected, falls back to refetch', async () => {
+  const { client, openLatest, notify, fetchStatusCallCount } = newTestClient();
+  client.start();
+  await openLatest();
+
+  await notify('Client.OnDisconnect', {
+    id: 'client1',
+    client: {
+      id: 'client1',
+      host: { ip: '1.2.3.4' },
+      config: { name: 'Kitchen', volume: { muted: 'not-a-bool', percent: '50' } },
+      connected: false,
+    },
+  });
+
+  assert.equal(fetchStatusCallCount(), 2, 'malformed client payload must trigger a fallback refetch');
+});
+
+test('Stream.OnUpdate with a malformed stream object (missing uri) is rejected, falls back to refetch', async () => {
+  const { client, openLatest, notify, fetchStatusCallCount } = newTestClient();
+  client.start();
+  await openLatest();
+
+  await notify('Stream.OnUpdate', { id: 'stream1', stream: { id: 'stream1', status: 'idle' /* missing uri */ } });
+
+  assert.equal(fetchStatusCallCount(), 2, 'malformed stream payload must trigger a fallback refetch');
+  assert.equal(client.getCachedStatus()!.server.streams[0].status, 'playing', 'cache must not be corrupted');
+});
+
+// ---- review fix regression: defense-in-depth try/catch around notification handling ----
+
+test('an unexpected exception thrown while applying a precise merge is caught, logged, and falls back to a refetch rather than crashing', async () => {
+  const { client, openLatest, notify, fetchStatusCallCount, errors } = newTestClient();
+  client.start();
+  await openLatest();
+
+  const cached = client.getCachedStatus()!;
+  // Force applyPreciseMerge's Client.OnVolumeChanged branch to throw by
+  // making `findClient`'s traversal blow up: groups is replaced with a
+  // getter-free plain value whose .find() throws when actually invoked
+  // (simulating a wholly unanticipated runtime error mid-merge, not just a
+  // shape-validation failure).
+  Object.defineProperty(cached.server, 'groups', {
+    get() {
+      throw new Error('boom: unexpected runtime error mid-merge');
+    },
+    configurable: true,
+  });
+
+  await assert.doesNotReject(notify('Client.OnVolumeChanged', { id: 'client1', volume: { muted: true, percent: 10 } }));
+
+  assert.equal(fetchStatusCallCount(), 2, 'the exception must trigger a fallback refetch');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /unexpected error applying Client\.OnVolumeChanged/);
+  // The refetch (baseStatus()) restored a valid, uncorrupted cache.
+  assert.deepEqual(client.getCachedStatus(), baseStatus());
+});

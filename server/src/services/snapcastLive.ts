@@ -1,7 +1,13 @@
 import { EventEmitter } from 'events';
 import WebSocket from 'ws';
 import { executeSnapcastRpc } from '../utils/snapcastRpc';
-import type { SnapcastGetStatusResult, SnapcastClient, SnapcastGroup } from '@shared/snapcast';
+import type {
+  SnapcastGetStatusResult,
+  SnapcastClient,
+  SnapcastGroup,
+  SnapcastServerState,
+  SnapcastStream,
+} from '@shared/snapcast';
 
 // Task 25: a long-lived WebSocket connection to snapserver's JSON-RPC
 // endpoint (`ws://127.0.0.1:1780/jsonrpc` -- the exact same host:port
@@ -102,6 +108,66 @@ const PRECISE_MERGE_METHODS = new Set([
   'Group.OnNameChanged',
   'Stream.OnUpdate',
 ]);
+
+/**
+ * Structural guard for a `Server.OnUpdate` replacement `server` object.
+ * `applyPreciseMerge`'s OTHER handlers all dereference `status.server.groups`
+ * / `status.server.streams` as arrays (`.find`, `.findIndex`, `.push`) --
+ * accepting a `server` replacement without checking those are actually
+ * arrays leaves a landmine for the very next notification to step on and
+ * throw uncaught (reproduced live: a `Server.OnUpdate` missing `groups`
+ * followed by a `Group.OnMute` threw `Cannot read properties of undefined
+ * (reading 'find')`). This checks exactly the substructure this file's own
+ * merge logic depends on -- not a full deep schema validation.
+ */
+function isValidServerState(server: any): server is SnapcastServerState {
+  return !!server && typeof server === 'object' && Array.isArray(server.groups) && Array.isArray(server.streams);
+}
+
+/**
+ * Structural guard for a `client` object accepted wholesale by
+ * `Client.OnConnect`/`Client.OnDisconnect`. Nothing in the merge itself
+ * dereferences these subfields, but an under-validated object here would
+ * sit in the cache and be served verbatim to `GET /api/snapcast/status`
+ * callers, and would then be exactly the kind of malformed shape that could
+ * crash a LATER `Client.OnVolumeChanged`/`OnNameChanged` merge (which does
+ * write into `client.config.volume`/`client.config.name`). Mirrors
+ * `SnapcastClient`'s shape in shared/snapcast.ts.
+ */
+function isValidClient(client: any): client is SnapcastClient {
+  return (
+    !!client &&
+    typeof client === 'object' &&
+    typeof client.id === 'string' &&
+    !!client.host &&
+    typeof client.host === 'object' &&
+    !!client.config &&
+    typeof client.config === 'object' &&
+    typeof client.config.name === 'string' &&
+    !!client.config.volume &&
+    typeof client.config.volume === 'object' &&
+    typeof client.config.volume.percent === 'number' &&
+    typeof client.config.volume.muted === 'boolean' &&
+    typeof client.connected === 'boolean'
+  );
+}
+
+/**
+ * Structural guard for a `stream` object accepted wholesale by
+ * `Stream.OnUpdate`. Same rationale as `isValidClient` above -- mirrors
+ * `SnapcastStream`'s shape in shared/snapcast.ts.
+ */
+function isValidStream(stream: any): stream is SnapcastStream {
+  return (
+    !!stream &&
+    typeof stream === 'object' &&
+    typeof stream.id === 'string' &&
+    typeof stream.status === 'string' &&
+    !!stream.uri &&
+    typeof stream.uri === 'object' &&
+    typeof stream.uri.scheme === 'string'
+  );
+}
 
 export class SnapcastLiveClient extends EventEmitter {
   private deps: SnapcastLiveDeps;
@@ -242,7 +308,26 @@ export class SnapcastLiveClient extends EventEmitter {
       this.refreshFullStatus(`no base cache for ${method}`);
       return;
     }
-    if (!PRECISE_MERGE_METHODS.has(method) || !this.applyPreciseMerge(method, params)) {
+    // Defense in depth: applyPreciseMerge()'s handlers are each individually
+    // guarded against the malformed-payload shapes we've anticipated, but
+    // the notification schema itself is verified against public docs, not a
+    // live snapserver (see this file's header comment) -- there could be an
+    // entirely unanticipated shape that still slips past a handler's own
+    // checks and throws. A synchronous throw from a `ws` 'message' listener
+    // has nothing else to catch it and would crash the whole process, so
+    // this catches ANY exception from merge logic and falls back to a full
+    // refetch rather than letting it escape uncaught.
+    let merged: boolean;
+    try {
+      merged = PRECISE_MERGE_METHODS.has(method) && this.applyPreciseMerge(method, params);
+    } catch (err: any) {
+      this.deps.logger.error(
+        `[snapcastLive] unexpected error applying ${method} notification, falling back to refetch: ${err?.message ?? err}`,
+      );
+      this.refreshFullStatus(`exception applying ${method}`);
+      return;
+    }
+    if (!merged) {
       this.refreshFullStatus(`fallback for ${method}`);
       return;
     }
@@ -256,16 +341,21 @@ export class SnapcastLiveClient extends EventEmitter {
       case 'Server.OnUpdate': {
         // Server.OnUpdate's params carry a full replacement `server` object
         // -- same shape as Server.GetStatus's own result.server -- a
-        // genuine full-cache replacement, not a delta merge.
-        if (!params || typeof params !== 'object' || !params.server) return false;
+        // genuine full-cache replacement, not a delta merge. Every OTHER
+        // handler below reads/writes `status.server.groups`/`.streams` as
+        // arrays, so a replacement missing that substructure must be
+        // rejected here -- otherwise it's accepted silently and the very
+        // next notification (e.g. Group.OnMute doing
+        // `status.server.groups.find(...)`) throws on `undefined`.
+        if (!params || typeof params !== 'object' || !isValidServerState(params.server)) return false;
         status.server = params.server;
         return true;
       }
       case 'Client.OnConnect':
       case 'Client.OnDisconnect': {
         const id: string | undefined = params?.id;
-        const client: SnapcastClient | undefined = params?.client;
-        if (!id || !client) return false;
+        const client: unknown = params?.client;
+        if (!id || !isValidClient(client)) return false;
         const group = this.findGroupWithClient(status, id);
         if (!group) return false; // brand-new client we've never seen -- unknown group placement, refetch instead of guessing
         const idx = group.clients.findIndex((c) => c.id === id);
@@ -319,8 +409,8 @@ export class SnapcastLiveClient extends EventEmitter {
       }
       case 'Stream.OnUpdate': {
         const id: string | undefined = params?.id;
-        const stream = params?.stream;
-        if (!id || !stream) return false;
+        const stream: unknown = params?.stream;
+        if (!id || !isValidStream(stream)) return false;
         const idx = status.server.streams.findIndex((s) => s.id === id);
         if (idx === -1) {
           status.server.streams.push(stream);
