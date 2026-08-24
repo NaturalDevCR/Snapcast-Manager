@@ -1,6 +1,28 @@
 import { randomUUID } from 'crypto';
+import { EventEmitter } from 'events';
 import Database from 'better-sqlite3';
 import defaultDb from '../database';
+
+/**
+ * Task 25: fires an 'update' event (payload: the current `Job`) whenever a
+ * job starts, gets a new log() line appended, or reaches a terminal status
+ * (done/error/interrupted) -- narrowly scoped to exactly that, per the
+ * brief's "don't build a general pub/sub framework" instruction. Consumed
+ * by routes/events.ts's SSE endpoint so job progress is pushed to the
+ * browser instead of polled (design-spec §4.4: "El log se transmite por SSE
+ * en vez de sondearse"). Exported (not private to the class) so a caller
+ * that doesn't hold a reference to the specific `JobService` instance --
+ * e.g. the SSE route, which only imports the default `jobService` singleton
+ * -- can still subscribe. Injectable via the constructor (default: this
+ * module-level singleton) for the same reason `db` is: tests can pass an
+ * isolated emitter instead of sharing this one across the whole test file.
+ */
+export const jobEvents = new EventEmitter();
+// Every concurrent GET /api/events SSE connection (routes/events.ts) adds
+// its own listener here (a multi-tab/multi-device app can easily exceed
+// EventEmitter's default cap of 10) -- unbounded, same reasoning as
+// snapcastLive.ts's SnapcastLiveClient constructor.
+jobEvents.setMaxListeners(0);
 
 export interface Job {
   id: string;
@@ -60,11 +82,13 @@ function rowToJob(row: JobRow): Job {
  */
 export class JobService {
   private db: Database.Database;
+  private events: EventEmitter;
   private currentJobId: string | null = null;
   private currentLog: string[] = [];
 
-  constructor(db: Database.Database = defaultDb) {
+  constructor(db: Database.Database = defaultDb, events: EventEmitter = jobEvents) {
     this.db = db;
+    this.events = events;
     this.interruptStaleJobs();
   }
 
@@ -127,18 +151,21 @@ export class JobService {
 
     this.currentJobId = job.id;
     this.currentLog = [];
+    this.events.emit('update', job);
 
     task()
       .then(output => {
         this.db
           .prepare(`UPDATE jobs SET status = 'done', output = ?, finished_at = ? WHERE id = ?`)
           .run(output, Date.now(), job.id);
+        this.emitCurrent(job.id);
       })
       .catch(err => {
         const message = err?.message || String(err);
         this.db
           .prepare(`UPDATE jobs SET status = 'error', error = ?, finished_at = ? WHERE id = ?`)
           .run(message, Date.now(), job.id);
+        this.emitCurrent(job.id);
       })
       .finally(() => {
         if (this.currentJobId === job.id) this.currentJobId = null;
@@ -146,6 +173,12 @@ export class JobService {
       });
 
     return job;
+  }
+
+  /** Re-reads a job row and emits it on `events` -- used after a DB write so listeners get the persisted, authoritative state rather than a hand-assembled copy. */
+  private emitCurrent(id: string): void {
+    const current = this.get(id);
+    if (current) this.events.emit('update', current);
   }
 
   /**
@@ -179,10 +212,17 @@ export class JobService {
       this.currentLog.splice(0, this.currentLog.length - MAX_LOG_LINES);
     }
     this.db.prepare(`UPDATE jobs SET log = ? WHERE id = ?`).run(JSON.stringify(this.currentLog), this.currentJobId);
+    this.emitCurrent(this.currentJobId);
   }
 
   get(id: string): Job | undefined {
     const row = this.db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as JobRow | undefined;
+    return row ? rowToJob(row) : undefined;
+  }
+
+  /** The currently-running job, if any -- used by the SSE endpoint to send an initial snapshot to a client that connects mid-job, without waiting for the next log() line. */
+  getCurrent(): Job | undefined {
+    const row = this.db.prepare(`SELECT * FROM jobs WHERE status = 'running' LIMIT 1`).get() as JobRow | undefined;
     return row ? rowToJob(row) : undefined;
   }
 

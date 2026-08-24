@@ -13,7 +13,9 @@ import watchdogRouter from './routes/watchdog';
 import snapclientInstancesRouter from './routes/snapclientInstances';
 import toolsRouter from './routes/tools';
 import pipeSourcesRouter from './routes/pipeSources';
+import eventsRouter from './routes/events';
 import { pipeSourceService } from './services/pipeSources';
+import { snapcastLive } from './services/snapcastLive';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -66,6 +68,7 @@ app.use('/api/snapclient-instances', snapclientInstancesRouter);
 app.use('/api/tools', toolsRouter);
 app.use('/api/pipe-sources', pipeSourcesRouter);
 app.use('/api/radio-pipes', pipeSourcesRouter); // backwards compat alias
+app.use('/api/events', eventsRouter);
 
 // Basic status route
 app.get('/api/status', (req, res) => {
@@ -113,6 +116,15 @@ async function start(): Promise<void> {
   } catch (err) {
     console.error('[startup] Pipe-source FIFO migration failed unexpectedly:', err);
   }
+
+  // Task 25: connect eagerly at startup rather than lazily on first request,
+  // so the cache is already warm by the time the first GET /api/snapcast/status
+  // or /api/events client shows up (per the task brief's stated preference).
+  // Never throws -- snapcastLive.ts's own reconnect-with-backoff loop is the
+  // only handling a snapserver that's slow to start, or not installed/running
+  // at all, needs (see that file's header for the log-rate-limiting that
+  // keeps a permanently-absent snapserver from flooding the console).
+  snapcastLive.start();
 
   const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

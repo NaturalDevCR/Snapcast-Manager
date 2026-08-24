@@ -1,14 +1,30 @@
 import express, { Request, Response } from 'express';
 import { authenticateToken } from '../auth';
 import { executeSnapcastRpc } from '../utils/snapcastRpc';
+import { snapcastLive } from '../services/snapcastLive';
 
 const router = express.Router();
 
 router.use(authenticateToken);
 
+// Task 25: serves from snapcastLive.ts's in-memory cache (kept current by
+// its persistent WebSocket connection + notification merges) instead of
+// making a fresh HTTP JSON-RPC round trip to snapserver on every poll --
+// this is the exact "polling storm" design-spec finding #20 called out.
+// Response shape is UNCHANGED (`{ status: <Server.GetStatus result> }`) --
+// client/src/stores/snapcast.ts's fetchStatus() keeps working as-is.
+//
+// Falls back to the original direct RPC call when the cache hasn't warmed
+// up yet (server just started, WS not connected yet, or snapserver was
+// never reachable) -- this route's public contract (same shape, same
+// failure mode) must keep working even before the persistent connection
+// has caught up, per the task brief.
 router.get('/status', async (req: Request, res: Response) => {
+    const cached = snapcastLive.getCachedStatus();
+    if (cached) {
+        return res.json({ status: cached });
+    }
     try {
-        // Query the snapserver for its full status via JSON-RPC
         const status = await executeSnapcastRpc('Server.GetStatus');
         res.json({ status });
     } catch (error: any) {
