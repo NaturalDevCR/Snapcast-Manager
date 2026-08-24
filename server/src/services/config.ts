@@ -8,7 +8,7 @@ import {
   surgicallyRemoveStreamSourcesByFifo,
 } from '../utils/snapConfigEdit';
 import { DEFAULT_SNAPSERVER_CONF } from '../constants/defaultConfig';
-import { writeFileAtomic } from '../platform/files';
+import { writeFileAtomic, installPrivilegedFile } from '../platform/files';
 import { KeyedMutex } from '../platform/mutex';
 
 // Default locations on Debian. Overridable via env var so tests can point
@@ -25,13 +25,13 @@ const SNAPSERVER_CONFIG_BAK = `${SNAPSERVER_CONFIG_PATH}.bak`;
 // A conventional, readable-by-everyone mode for these config files,
 // asserted explicitly on every write. Plain in-place `fs.writeFile` (the
 // old code) preserved whatever mode the file already had forever, because
-// truncate-in-place never touches an inode's mode bits. `writeFileAtomic`
-// instead renames a FRESH inode over the destination on every write, so
-// without an explicit mode the file's permissions would silently start
-// tracking the writing process's umask instead of staying fixed -- pinning
-// it here keeps behavior equivalent to (and no less predictable than) the
-// old code's steady state on a real install (created via `touch` + the
-// default 022 umask in scripts/install.sh, i.e. already 644).
+// truncate-in-place never touches an inode's mode bits. Both
+// `writeFileAtomic` (rename of a fresh inode) and `installPrivilegedFile`
+// (sudo `cp` + a separate sudo `chmod`) can otherwise leave the file's mode
+// tracking the writing process's/umask's default instead of staying fixed
+// -- pinning it here keeps behavior equivalent to (and no less predictable
+// than) the old code's steady state on a real install (created via `touch`
+// + the default 022 umask in scripts/install.sh, i.e. already 644).
 const CONFIG_FILE_MODE = 0o644;
 
 // All config-mutating public methods below serialize on this ONE key (not
@@ -46,6 +46,34 @@ const CONFIG_FILE_MODE = 0o644;
 // install-triggered, never a hot path), so serializing the whole subsystem
 // behind one key costs nothing in practice.
 const CONFIG_LOCK_KEY = 'snapserver-config';
+
+// `/etc/snapserver.conf`, `.base`, and `.bak` are written via
+// `installPrivilegedFile()` (sudo-elevated `cp`/`chmod`), NOT
+// `writeFileAtomic()` -- see the review fix in this file's git history for
+// the full writeup. `writeFileAtomic()` creates its temp file in the SAME
+// DIRECTORY as the destination and then `rename()`s it into place; both
+// steps need write permission on the CONTAINING DIRECTORY (/etc), not just
+// on the destination file itself. `scripts/install.sh` `chown`s these three
+// files INDIVIDUALLY to `snapmanager:snapmanager` but deliberately leaves
+// `/etc` itself root-owned (see install.sh's own comment above its `chown`
+// loop for these paths) -- so on a real install, every `writeFileAtomic()`
+// call against one of these three paths would fail with `EACCES` trying to
+// create its temp file. `installPrivilegedFile()` sidesteps this entirely:
+// it stages content in a private `mkdtemp` scratch directory the process
+// fully owns, then does `sudo cp`/`sudo chmod` into the destination -- sudo
+// (root) can write into /etc regardless of the directory's own permissions.
+// `cp` overwriting an EXISTING destination file opens and truncates that
+// file's existing inode rather than unlinking/recreating it (confirmed
+// empirically -- same inode number before/after `cp` onto an existing
+// destination), so this does NOT reset these files back to root-owned
+// after each write; they stay `snapmanager`-owned exactly as install.sh
+// left them.
+//
+// The segment-file write below (SNAPSERVER_CONFIG_DIR, .conf files under
+// /etc/snapserver.conf.d/) is UNCHANGED -- install.sh `chown -R`s that
+// directory itself (not just the files in it) to `snapmanager`, so the
+// process genuinely has write permission on the containing directory and
+// `writeFileAtomic()` is correct there.
 
 export class ConfigService {
   private mutex = new KeyedMutex();
@@ -75,11 +103,13 @@ export class ConfigService {
   }
 
   /**
-   * Validate, `.bak`-rotate, then atomically write `content` as the new
-   * master config. This is the ONE place every write to
-   * SNAPSERVER_CONFIG_PATH funnels through (directly here, or via
-   * rebuildMasterConfigCore()), so validation and backup apply uniformly
-   * regardless of which public method triggered the write.
+   * Validate, `.bak`-rotate, then write `content` as the new master config
+   * via `installPrivilegedFile()` (sudo-elevated `cp`/`chmod` -- see the
+   * top-of-file comment on why this can't be plain `writeFileAtomic()`).
+   * This is the ONE place every write to SNAPSERVER_CONFIG_PATH funnels
+   * through (directly here, or via rebuildMasterConfigCore()), so
+   * validation and backup apply uniformly regardless of which public
+   * method triggered the write.
    *
    * Caller MUST already hold CONFIG_LOCK_KEY -- this method does not lock
    * itself, so it's safe to call from other already-locked Core methods
@@ -88,7 +118,7 @@ export class ConfigService {
   private async writeServerConfigCore(content: string): Promise<void> {
     this.assertParseable(content);
     await this.rotateMasterBak();
-    await writeFileAtomic(SNAPSERVER_CONFIG_PATH, content, { mode: CONFIG_FILE_MODE });
+    await installPrivilegedFile(SNAPSERVER_CONFIG_PATH, content, { mode: CONFIG_FILE_MODE });
   }
 
   /**
@@ -141,7 +171,7 @@ export class ConfigService {
     } catch {
       return;
     }
-    await writeFileAtomic(SNAPSERVER_CONFIG_BAK, current, { mode: CONFIG_FILE_MODE });
+    await installPrivilegedFile(SNAPSERVER_CONFIG_BAK, current, { mode: CONFIG_FILE_MODE });
   }
 
   async ensureModularStructure(): Promise<void> {
@@ -159,9 +189,9 @@ export class ConfigService {
         console.log(`Migrating ${SNAPSERVER_CONFIG_PATH} to ${SNAPSERVER_CONFIG_BASE}...`);
         const current = await this.readServerConfig();
         if (current && current.length > 50) { // arbitrary length to avoid migrating empty/broken files
-          await writeFileAtomic(SNAPSERVER_CONFIG_BASE, current, { mode: CONFIG_FILE_MODE });
+          await installPrivilegedFile(SNAPSERVER_CONFIG_BASE, current, { mode: CONFIG_FILE_MODE });
         } else {
-          await writeFileAtomic(SNAPSERVER_CONFIG_BASE, DEFAULT_SNAPSERVER_CONF, { mode: CONFIG_FILE_MODE });
+          await installPrivilegedFile(SNAPSERVER_CONFIG_BASE, DEFAULT_SNAPSERVER_CONF, { mode: CONFIG_FILE_MODE });
         }
       }
     } catch (error) {
@@ -290,7 +320,7 @@ export class ConfigService {
         await fs.access(SNAPSERVER_CONFIG_BASE);
         const baseRaw = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
         const baseUpdated = surgicallySetIniKey(baseRaw, 'http', 'doc_root', docRootPath);
-        await writeFileAtomic(SNAPSERVER_CONFIG_BASE, baseUpdated, { mode: CONFIG_FILE_MODE });
+        await installPrivilegedFile(SNAPSERVER_CONFIG_BASE, baseUpdated, { mode: CONFIG_FILE_MODE });
       } catch {
         // No base file — nothing to keep in sync.
       }
@@ -302,7 +332,7 @@ export class ConfigService {
       await this.ensureModularStructureCore();
       const baseRaw = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
       const updated = surgicallySetIniKey(baseRaw, 'http', 'doc_root', docRootPath);
-      await writeFileAtomic(SNAPSERVER_CONFIG_BASE, updated, { mode: CONFIG_FILE_MODE });
+      await installPrivilegedFile(SNAPSERVER_CONFIG_BASE, updated, { mode: CONFIG_FILE_MODE });
       await this.rebuildMasterConfigCore();
     } catch (error) {
       console.error('Failed to update doc_root:', error);
@@ -346,7 +376,7 @@ export class ConfigService {
   }
 
   private async resetToDefaultCore(): Promise<void> {
-    await writeFileAtomic(SNAPSERVER_CONFIG_BASE, DEFAULT_SNAPSERVER_CONF, { mode: CONFIG_FILE_MODE });
+    await installPrivilegedFile(SNAPSERVER_CONFIG_BASE, DEFAULT_SNAPSERVER_CONF, { mode: CONFIG_FILE_MODE });
     await this.rebuildMasterConfigCore();
   }
 
@@ -356,7 +386,7 @@ export class ConfigService {
       await fs.access(SNAPSERVER_CONFIG_BASE);
       const baseRaw = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
       const updated = transform(baseRaw);
-      if (updated !== baseRaw) await writeFileAtomic(SNAPSERVER_CONFIG_BASE, updated, { mode: CONFIG_FILE_MODE });
+      if (updated !== baseRaw) await installPrivilegedFile(SNAPSERVER_CONFIG_BASE, updated, { mode: CONFIG_FILE_MODE });
     } catch {
       // No base file — nothing to keep in sync.
     }
@@ -381,7 +411,7 @@ export class ConfigService {
     const base = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
     const updated = surgicallyAddStreamSource(base, uri);
     if (updated !== base) {
-      await writeFileAtomic(SNAPSERVER_CONFIG_BASE, updated, { mode: CONFIG_FILE_MODE });
+      await installPrivilegedFile(SNAPSERVER_CONFIG_BASE, updated, { mode: CONFIG_FILE_MODE });
       await this.rebuildMasterConfigCore();
     }
   }
@@ -402,7 +432,7 @@ export class ConfigService {
     const base = await fs.readFile(SNAPSERVER_CONFIG_BASE, 'utf-8');
     const updated = surgicallyRemoveStreamSourcesByFifo(base, fifoPath);
     if (updated !== base) {
-      await writeFileAtomic(SNAPSERVER_CONFIG_BASE, updated, { mode: CONFIG_FILE_MODE });
+      await installPrivilegedFile(SNAPSERVER_CONFIG_BASE, updated, { mode: CONFIG_FILE_MODE });
       await this.rebuildMasterConfigCore();
     }
   }

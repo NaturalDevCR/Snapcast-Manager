@@ -49,15 +49,42 @@ already expect group-`audio` access.
 `chown`s these paths to `snapmanager:snapmanager`:**
 - The entire `/opt/snapcast-manager` install tree, including `server/data/`
   (the SQLite database) and `server/snapshots/` (config snapshots).
-- `/etc/snapserver.conf`, `/etc/snapserver.conf.base`, `/etc/snapserver.conf.d/`
-  -- written directly via `fs.writeFile`/`fs.mkdir` in
-  `server/src/services/config.ts`, never through `sudo`.
-- `/etc/snapcast-manager/` (watchdog config) -- same pattern, in
-  `server/src/services/watchdog.ts`.
-- `/etc/default/snapclient` -- same pattern, in `server/src/routes/config.ts`.
+- `/etc/snapserver.conf.d/` -- written directly via `writeFileAtomic()`
+  (`platform/files.ts`) in `server/src/services/config.ts`, never through
+  `sudo`. The installer `chown -R`s this DIRECTORY (not just files in it)
+  to `snapmanager`, and `writeFileAtomic()` needs write access to the
+  containing directory (it creates its temp file there before renaming it
+  into place), which this directory genuinely has.
+- `/etc/snapcast-manager/` (watchdog config) -- same pattern (directory
+  `chown -R`'d, `writeFileAtomic()`), in `server/src/services/watchdog.ts`.
+- `/etc/default/snapclient` -- writes directly via `fs.writeFile` in
+  `server/src/routes/config.ts`; this one file's containing directory
+  (`/etc`) is not `snapmanager`-writable, but `fs.writeFile` truncates the
+  already-`chown`'d file in place rather than creating a new inode next to
+  it, so it needs no directory permission.
 
 **Via the scoped `sudo` grants in `/etc/sudoers.d/snapcast-manager`
 (installed with `visudo -c` validation, mode `0440`, owned `root:root`):**
+- `/etc/snapserver.conf`, `/etc/snapserver.conf.base`, and
+  `/etc/snapserver.conf.bak` -- written via `installPrivilegedFile()`
+  (`platform/files.ts`, sudo-elevated `cp`/`chmod`) in
+  `server/src/services/config.ts`. **This changed from the row above** in a
+  post-Task-24 review fix: the installer `chown`s these three paths
+  INDIVIDUALLY, not their containing directory (`/etc` itself stays
+  root-owned by design -- see `scripts/install.sh`'s comment above its
+  `chown` loop for these three paths), so the plain-`fs.writeFile`-derived
+  `writeFileAtomic()` (which needs to create a temp file IN THAT DIRECTORY
+  before renaming it into place) fails with `EACCES` on a real install even
+  though `snapmanager` owns the files themselves. `installPrivilegedFile()`
+  stages the new content in a private, process-owned scratch directory and
+  installs it via `sudo cp`/`sudo chmod`, which -- being root -- can write
+  into `/etc` regardless of the directory's own permissions. `cp` onto an
+  EXISTING destination file opens and overwrites that file's existing
+  inode rather than unlinking/recreating it, so these three files remain
+  `snapmanager`-owned after every write (verified empirically: `cp`'s
+  destination inode number is unchanged before/after copying onto an
+  existing file) -- this fix does not require broadening the installer's
+  directory-ownership grants.
 - Start/stop/restart/enable/disable exactly the systemd units this app
   manages: `snapserver.service`, `snapclient.service`, `shairport-sync.service`,
   `nqptp.service`, `mpd.service`, `mpd.socket`, `mympd.service`,
