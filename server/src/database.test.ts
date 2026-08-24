@@ -13,7 +13,10 @@
 // tsconfig's project) or the production `database.ts` file, which has no
 // such pragma and is fully type-checked.
 //
-// Tests the Task 9 `managed` column migration on `script_paths`.
+// Tests the Task 9 `managed` column migration on `script_paths`, exercised
+// end-to-end through the REAL `../database` singleton (i.e. through
+// Task 24's `runMigrations()` + `database/migrations.ts`, not just the
+// lower-level unit tests in `database/migrations.test.ts`).
 //
 // DB isolation: same pattern as services/pipeSources.test.ts -- set
 // DB_PATH to a fresh temp file BEFORE importing '../database' (module-load
@@ -22,12 +25,21 @@
 // real app DB or with other test files.
 //
 // To simulate a pre-Task-9 upgrade (an existing installation whose
-// `script_paths` table predates the `managed` column), this file manually
-// creates the table WITHOUT that column and seeds two rows -- one whose
-// path resolves inside MANAGED_SCRIPTS_DIR, one whose path resolves
-// outside it -- using a raw better-sqlite3 handle, BEFORE importing
-// '../database'. Importing '../database' then runs its migration logic
-// against this pre-seeded table, exactly as it would on a real upgrade.
+// `script_paths` table predates the `managed` column, and -- since this
+// predates Task 24 too -- has no `schema_migrations` table at all), this
+// file manually creates the table WITHOUT that column and seeds two rows
+// -- one whose path resolves inside MANAGED_SCRIPTS_DIR, one whose path
+// resolves outside it -- using a raw better-sqlite3 handle, BEFORE
+// importing '../database'. Importing '../database' then runs
+// `runMigrations()` against this pre-seeded table, exactly as it would on
+// a real upgrade: migration 4 (script_paths.managed) detects the column is
+// missing via `isApplied()`, runs its ALTER TABLE + reclassify loop for
+// real, while migrations 1-3 and 5-6 detect THEIR effects are either
+// already present (migration 1's other 7 tables aren't, so it also
+// creates those for real here) or genuinely new, and get recorded
+// accordingly -- see database/migrations.test.ts for the dedicated,
+// broader backfill test covering every table/column at once with seeded
+// data in each.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -76,8 +88,13 @@ test('managed column migration classifies a pre-existing out-of-managed-dir row 
   assert.equal(row.managed, 0);
 });
 
-test('re-adding the managed column raises (confirming why database.ts wraps the migration in try/catch to stay idempotent across boots)', () => {
+test('re-adding the managed column raises at the raw SQLite level (this is exactly the error runMigrations() now avoids via isApplied(), instead of swallowing it with try/catch)', () => {
   assert.throws(() => {
     db.exec('ALTER TABLE script_paths ADD COLUMN managed INTEGER NOT NULL DEFAULT 1');
   }, /duplicate column name/);
+});
+
+test('a second boot against the same DB does not re-run migration 4 -- schema_migrations records it exactly once', () => {
+  const row = db.prepare('SELECT version FROM schema_migrations WHERE version = 4').get() as { version: number } | undefined;
+  assert.ok(row, 'migration 4 (script_paths.managed) must be recorded as applied');
 });
