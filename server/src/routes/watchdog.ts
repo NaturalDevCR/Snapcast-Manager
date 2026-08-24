@@ -4,7 +4,12 @@ import { configService } from '../services/config';
 import { authenticateToken } from '../auth';
 
 const router = Router();
-const watchdogService = new WatchdogService();
+// Task 27: exported (was module-private) so index.ts's graceful-shutdown
+// handler can call stopAutoCleanup() on the SAME instance this router
+// actually uses -- services/watchdog.ts has no module-level singleton of
+// its own (unlike pipeSources.ts/jobs.ts/snapcastLive.ts), this router's
+// own instantiation IS the app's one WatchdogService instance.
+export const watchdogService = new WatchdogService();
 
 router.use(authenticateToken);
 

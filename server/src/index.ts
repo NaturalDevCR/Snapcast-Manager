@@ -9,7 +9,7 @@ import systemRouter from './routes/system';
 import configRouter from './routes/config';
 import snapshotRouter from './routes/snapshot';
 import snapcastRouter from './routes/snapcast';
-import watchdogRouter from './routes/watchdog';
+import watchdogRouter, { watchdogService } from './routes/watchdog';
 import snapclientInstancesRouter from './routes/snapclientInstances';
 import toolsRouter from './routes/tools';
 import pipeSourcesRouter from './routes/pipeSources';
@@ -17,9 +17,25 @@ import eventsRouter from './routes/events';
 import { pipeSourceService } from './services/pipeSources';
 import { snapcastLive } from './services/snapcastLive';
 import { errorHandler } from './middleware/errorHandler';
+import { logger } from './logger';
+import { gracefulShutdown } from './shutdown';
+import db from './database';
+
+const log = logger.child({ component: 'index' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Task 27, Part 2: hard bound on the graceful-shutdown sequence (see
+// shutdown.ts) -- if any cleanup step hangs, force-exit rather than
+// leaving `systemctl stop` waiting forever (which would eventually hit
+// systemd's own TimeoutStopSec and SIGKILL anyway, but a clean, bounded
+// shutdown is better than relying on that). 10s per the task brief's own
+// suggested value -- generous for this app's actual cleanup work (closing
+// a handful of SSE responses, one WebSocket, one sqlite handle, one
+// interval timer), while still well under systemd's own default
+// TimeoutStopSec (90s) so this fires first if anything ever does hang.
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 // Task 15: HTTP security headers. The CSP is built on helmet's own strict
 // defaults (default-src 'self', object-src 'none', no 'unsafe-inline'
@@ -114,7 +130,7 @@ async function start(): Promise<void> {
   try {
     await pipeSourceService.migrateFifoPaths();
   } catch (err) {
-    console.error('[startup] Pipe-source FIFO migration failed unexpectedly:', err);
+    log.error({ err }, '[startup] Pipe-source FIFO migration failed unexpectedly');
   }
 
   // Task 26, Part 3: detect (never mutate) pipe sources whose names collide
@@ -126,7 +142,7 @@ async function start(): Promise<void> {
   try {
     await pipeSourceService.scanForSlugCollisions();
   } catch (err) {
-    console.error('[startup] Pipe-source slug-collision scan failed unexpectedly:', err);
+    log.error({ err }, '[startup] Pipe-source slug-collision scan failed unexpectedly');
   }
 
   // Task 25: connect eagerly at startup rather than lazily on first request,
@@ -139,7 +155,7 @@ async function start(): Promise<void> {
   snapcastLive.start();
 
   const server = app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    log.info(`Server running on http://localhost:${PORT}`);
   });
 
   // Task 15: request timeout via Node's own http.Server#setTimeout, applied
@@ -156,6 +172,43 @@ async function start(): Promise<void> {
   // GET /system/backups/download/:name) while still bounding a
   // slow-loris-style hung connection.
   server.setTimeout(2 * 60 * 1000);
+
+  // Task 27, Part 2: SIGTERM/SIGINT graceful shutdown. `gracefulShutdown()`
+  // itself lives in ./shutdown.ts (see that file for the full ordering
+  // rationale) so it's independently unit-testable with mocked
+  // dependencies -- this is just the real wiring: the actual http.Server,
+  // the real SSE connection tracking (routes/events.ts's
+  // closeAllConnections()), the real snapserver WebSocket client
+  // (snapcastLive.stop()), the real watchdog auto-cleanup timer
+  // (watchdogService.stopAutoCleanup()), and the real sqlite handle
+  // (db.close()).
+  //
+  // `shuttingDown` guards against a second SIGTERM/SIGINT arriving while
+  // the first is still in flight (e.g. an impatient double Ctrl-C, or
+  // systemd sending both signals) re-entering the whole sequence -- a
+  // second call to gracefulShutdown() would try to close an
+  // already-closing http.Server/db/etc. a second time, which is at best
+  // redundant work and at worst a confusing double force-exit-timer race.
+  let shuttingDown = false;
+  const handleShutdownSignal = (signal: NodeJS.Signals) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log.info(`Received ${signal}, starting graceful shutdown...`);
+    void gracefulShutdown({
+      httpServer: server,
+      closeSse: () => eventsRouter.closeAllConnections(),
+      disconnectSnapcastLive: () => snapcastLive.stop(),
+      stopWatchdog: () => watchdogService.stopAutoCleanup(),
+      closeDb: () => {
+        db.close();
+      },
+      exit: (code) => process.exit(code),
+      timeoutMs: SHUTDOWN_TIMEOUT_MS,
+      logger: log,
+    });
+  };
+  process.on('SIGTERM', () => handleShutdownSignal('SIGTERM'));
+  process.on('SIGINT', () => handleShutdownSignal('SIGINT'));
 }
 
 start();

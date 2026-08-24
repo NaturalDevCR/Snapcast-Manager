@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { logger } from '../logger';
 import { configService } from './config';
 import { snapclientInstanceService } from './snapclientInstances';
 import { backupService, BackupComponent } from './backup';
@@ -86,6 +87,14 @@ export function selectSnapCtrlDownloadUrl(release: any): string {
   return release?.zipball_url || '';
 }
 
+// Task 27: this file's console.log/console.error call sites migrated to a
+// pino child logger, prioritized per the task brief as one of the
+// highest-value targets. The literal "[system]"/etc. text prefixes these
+// messages used to carry are dropped -- that's now redundant with the
+// structured `component: "system"` field every line from this logger
+// already carries.
+const log = logger.child({ component: 'system' });
+
 export class SystemService {
   private distroCodename: string | null = null;
   private releaseCache: Record<string, { timestamp: number, data: any }> = {};
@@ -104,13 +113,13 @@ export class SystemService {
     try {
       const result = await backupService.createPreUpdateBackup(component);
       if (result.path) {
-        console.log(`[system] Pre-${component} backup: ${result.path}`);
+        log.info(`Pre-${component} backup: ${result.path}`);
         return result.path;
       }
-      console.log(`[system] No files to back up for ${component}`);
+      log.info(`No files to back up for ${component}`);
       return '';
     } catch (err: any) {
-      console.error(`[system] Backup before ${component} failed:`, err.message || err);
+      log.error({ err }, `Backup before ${component} failed`);
       return '';
     }
   }
@@ -517,7 +526,7 @@ export class SystemService {
    * (`platform/files.ts`'s `installPrivilegedFile()`).
    */
   private async executeDebUpdate(downloadUrl: string, fileName: string, clean: boolean = false, pkg: 'snapserver' | 'snapclient' = 'snapserver'): Promise<string> {
-    console.log(`Downloading ${pkg} from ${downloadUrl}... (Clean: ${clean})`);
+    log.info(`Downloading ${pkg} from ${downloadUrl}... (Clean: ${clean})`);
 
     if (clean) {
       jobService.log(`Cleaning up existing ${pkg} installation...`);
@@ -606,7 +615,7 @@ export class SystemService {
       throw new Error('Invalid Node.js major version');
     }
     this.invalidatePackageCache();
-    console.log(`Updating Node.js to version ${version}...`);
+    log.info(`Updating Node.js to version ${version}...`);
 
     // Only `gpg` is installed here -- `updateNodeJs()` can be triggered
     // independently of installMympd() (in either order), so it cannot
@@ -722,7 +731,7 @@ export class SystemService {
       // (Task 11).
       return await systemdLogs(`${service}.service`, 100);
     } catch (error: any) {
-      console.error(`[getServiceLogs] Failed for ${service}:`, error.message || error);
+      log.error({ err: error }, `getServiceLogs failed for ${service}`);
       return `Failed to retrieve logs:\n${error.message || error}`;
     }
   }
@@ -834,7 +843,7 @@ export class SystemService {
       if (!version || version === '(none)') return 'unknown';
       return version;
     } catch (error) {
-      console.error(`Error checking latest version for ${pkg}:`, error);
+      log.error({ err: error }, `Error checking latest version for ${pkg}`);
       return 'unknown';
     }
   }
@@ -970,7 +979,7 @@ export class SystemService {
    * with the full build toolchain installed -- see task-12-report.md.
    */
   async installShairportSync(): Promise<string> {
-      console.log('Installing shairport-sync and nqptp from source... (AirPlay 2)');
+      log.info('Installing shairport-sync and nqptp from source... (AirPlay 2)');
       const scriptPath = path.join(__dirname, '../../scripts/install-shairport-sync.sh');
       jobService.log('Installing build dependencies and compiling shairport-sync + nqptp from source (this can take several minutes on a Raspberry Pi)...');
       await run('bash', [scriptPath], {
@@ -1043,7 +1052,7 @@ export class SystemService {
       const installPath = '/usr/share/snapserver/snap-ctrl';
       const docRootPath = path.join(installPath, 'dist');
 
-      console.log('Installing snap-ctrl...');
+      log.info('Installing snap-ctrl...');
 
       jobService.log('Fetching latest snap-ctrl release metadata...');
       const release = await this.getLatestGitHubRelease('NaturalDevCR', 'snap-ctrl');
@@ -1097,7 +1106,7 @@ export class SystemService {
           await configService.setSnapserverDocRoot(docRootPath);
           await this.restartService('snapserver');
       } catch (err) {
-          console.error('Failed to update snapserver config for snap-ctrl:', err);
+          log.error({ err }, 'Failed to update snapserver config for snap-ctrl');
       }
 
       return result;

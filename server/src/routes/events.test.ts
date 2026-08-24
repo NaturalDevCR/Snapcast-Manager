@@ -374,6 +374,60 @@ test('client disconnect removes the snapcast/job listeners and stops the service
   }
 });
 
+// ---- Task 27: graceful-shutdown connection tracking ----
+
+test('closeAllConnections() sends a shutdown event and ends every open SSE connection', async () => {
+  const eventsApp = express();
+  const snapcastEvents = new EventEmitter();
+  const jobEventsEmitter = new EventEmitter();
+  const router = createEventsRouter({
+    snapcastEvents,
+    getCachedSnapcastStatus: () => null,
+    jobEventsEmitter,
+    getCurrentJob: () => undefined,
+    activeState: async () => 'active',
+    services: [],
+    pollIntervalMs: 1000,
+  });
+  eventsApp.use('/api/events', router);
+  const s = eventsApp.listen(0, '127.0.0.1');
+  await new Promise((r) => s.once('listening', r));
+  const port = (s.address() as any).port;
+  try {
+    const resA = await fetch(`http://127.0.0.1:${port}/api/events`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    const resB = await fetch(`http://127.0.0.1:${port}/api/events`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    await waitFor(() => snapcastEvents.listenerCount('update') === 2);
+
+    router.closeAllConnections();
+
+    // Initial burst is TWO events even with services: [] (snapcast(null) +
+    // service-status([]) -- see the sibling tests above for why an
+    // empty-array service-status result still differs from the "nothing
+    // polled yet" null sentinel) plus the shutdown event makes three.
+    const eventsA = await readSseEvents(resA, 3);
+    const eventsB = await readSseEvents(resB, 3);
+    assert.ok(eventsA.some((e) => e.type === 'shutdown'), 'client A must receive a shutdown event');
+    assert.ok(eventsB.some((e) => e.type === 'shutdown'), 'client B must receive a shutdown event');
+
+    // Both server-side responses must actually have ended -- the listeners
+    // this router added to snapcastEvents/jobEventsEmitter must be cleaned
+    // up, same as an ordinary client disconnect.
+    await waitFor(() => snapcastEvents.listenerCount('update') === 0, 1000);
+  } finally {
+    s.closeAllConnections();
+    await new Promise((r) => s.close(r));
+  }
+});
+
+test('closeAllConnections() is a no-op when no SSE clients are connected', () => {
+  const router = createEventsRouter({ pollIntervalMs: 1000, services: [] });
+  assert.doesNotThrow(() => router.closeAllConnections());
+});
+
 // ---- concurrency: two independent SSE clients don't clobber each other ----
 
 test('two concurrent SSE clients get independent listeners; disconnecting one leaves the other intact', async () => {

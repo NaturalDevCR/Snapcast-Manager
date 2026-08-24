@@ -21,7 +21,7 @@
 
 import type { SnapcastGetStatusResult } from './snapcast';
 
-export type SseEventType = 'snapcast' | 'service-status' | 'job';
+export type SseEventType = 'snapcast' | 'service-status' | 'job' | 'shutdown';
 
 /**
  * Current snapserver state, straight from snapcastLive.ts's cache. `null`
@@ -82,4 +82,17 @@ export interface JobSseEvent {
   data: JobSnapshot;
 }
 
-export type SseEvent = SnapcastSseEvent | ServiceStatusSseEvent | JobSseEvent;
+/**
+ * Task 27, Part 2: sent once, immediately before the server closes an SSE
+ * connection as part of a graceful shutdown (see server/src/shutdown.ts) --
+ * lets a client that cares distinguish "the server is shutting down
+ * cleanly" from an ordinary dropped connection. Not required reading for
+ * `EventSource`-based clients: they auto-reconnect on any dropped
+ * connection regardless, this is purely an optional, nicer signal.
+ */
+export interface ShutdownSseEvent {
+  type: 'shutdown';
+  data: { message: string };
+}
+
+export type SseEvent = SnapcastSseEvent | ServiceStatusSseEvent | JobSseEvent | ShutdownSseEvent;

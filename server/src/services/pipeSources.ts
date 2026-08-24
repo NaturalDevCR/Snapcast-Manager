@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import { randomUUID } from 'crypto';
 import db from '../database';
+import { logger } from '../logger';
 import { configService } from './config';
 import { run, needsSudo, ExecError } from '../platform/exec';
 import {
@@ -60,6 +61,25 @@ export interface DiscoveredPipe {
 export interface AdoptInput extends Omit<PipeSource, 'id' | 'createdAt'> {
   existingServiceName?: string;
 }
+
+// Task 27: this file's console.log/warn/error call sites migrated to a
+// pino child logger, prioritized per the task brief as one of the
+// highest-value targets. Used by both the module-level functions below
+// (e.g. verifyRadioServiceContent()) and PipeSourceService's own methods.
+// The literal "[pipeSources]" text prefixes these messages used to carry
+// are dropped -- redundant with the structured `component: "pipeSources"`
+// field every line from this logger already carries.
+//
+// Exported (not module-private) so pipeSources.test.ts's existing
+// "a warning gets logged" tests (predating this task, when they stubbed
+// `console.warn` directly) can keep asserting on that behavior -- they now
+// monkey-patch `log.warn`/`log.error` on this SAME shared object instead.
+// This works because they mutate a property on the object every internal
+// call site also holds a reference to, not because reassigning the
+// export binding itself would be visible internally (it wouldn't be, for
+// a same-module `const` -- see pipeSources.test.ts's comment at the two
+// call sites that do this for the full explanation).
+export const log = logger.child({ component: 'pipeSources' });
 
 // ---- slug helpers ----
 function underscoreSlug(name: string): string {
@@ -360,10 +380,9 @@ async function verifyRadioServiceContent(content: string): Promise<void> {
       // exitCode === null (spawn failure), or a non-ExecError throw: the
       // verifier tool itself couldn't run. Graceful degradation -- warn,
       // don't block the edit, and don't claim the content is invalid.
-      console.warn(
-        '[pipeSources] systemd-analyze is not available on this system -- skipping unit-file verification ' +
-        'for this edit and proceeding unverified.',
-        err,
+      log.warn(
+        { err },
+        'systemd-analyze is not available on this system -- skipping unit-file verification for this edit and proceeding unverified.',
       );
     }
   } finally {
@@ -449,7 +468,7 @@ async function ensureRuntimeDir(): Promise<void> {
       await run('mkdir', ['-p', '-m', '0770', RUNTIME_DIR]);
     }
   } catch (err) {
-    console.warn(`[pipeSources] Could not create ${RUNTIME_DIR}:`, err);
+    log.warn({ err }, `Could not create ${RUNTIME_DIR}`);
   }
   try {
     if (sudo) {
@@ -603,8 +622,8 @@ export class PipeSourceService {
       for (const [slug, group] of groups) {
         if (group.length < 2) continue;
         const names = group.map(p => `"${p.name}" (id=${p.id})`).join(', ');
-        console.warn(
-          `[pipeSources] SLUG COLLISION DETECTED: ${group.length} pipe sources share the slug "${slug}" -- ` +
+        log.warn(
+          `SLUG COLLISION DETECTED: ${group.length} pipe sources share the slug "${slug}" -- ` +
           `${names}. They will fight over the same FIFO path (/run/snapcast-manager/snapfifo_${slug}) and/or ` +
           `systemd unit (snapcast-radio-${slug.replace(/_/g, '-')}.service). This install predates ` +
           'slug-collision validation and was NOT auto-corrected -- rename all but one of these pipe sources ' +
@@ -612,7 +631,7 @@ export class PipeSourceService {
         );
       }
     } catch (err) {
-      console.error('[pipeSources] Slug-collision scan failed unexpectedly:', err);
+      log.error({ err }, 'Slug-collision scan failed unexpectedly');
     }
   }
 
@@ -795,10 +814,10 @@ export class PipeSourceService {
       try {
         await this.migrateOnePipeFifoPath(pipe);
       } catch (err) {
-        console.error(
-          `[pipeSources] FIFO migration FAILED for pipe "${pipe.name}" (${pipe.type}, id=${pipe.id}) -- ` +
-          'leaving it on its current path; will retry on next server startup. Error:',
-          err,
+        log.error(
+          { err },
+          `FIFO migration FAILED for pipe "${pipe.name}" (${pipe.type}, id=${pipe.id}) -- ` +
+          'leaving it on its current path; will retry on next server startup.',
         );
       }
     }
@@ -843,8 +862,8 @@ export class PipeSourceService {
 
     if (!stillOnOldPath) return;
 
-    console.log(
-      `[pipeSources] Migrating pipe "${pipe.name}" (${pipe.type}) FIFO from the old path ${oldFifo} ` +
+    log.info(
+      `Migrating pipe "${pipe.name}" (${pipe.type}) FIFO from the old path ${oldFifo} ` +
       `to the new path ${newFifo}...`,
     );
 
@@ -891,7 +910,7 @@ export class PipeSourceService {
       await systemdControl(MPD_UNIT, 'restart').catch(() => {});
     }
 
-    console.log(`[pipeSources] Migration complete for pipe "${pipe.name}": now using ${newFifo}`);
+    log.info(`Migration complete for pipe "${pipe.name}": now using ${newFifo}`);
   }
 
   async getStatus(id: string): Promise<string> {

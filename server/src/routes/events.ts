@@ -61,19 +61,43 @@ function sameServiceStatuses(a: ServiceStatusEntry[], b: ServiceStatusEntry[]): 
   return a.every((entry, i) => entry.service === b[i].service && entry.status === b[i].status);
 }
 
+/** The default export's return type, plus the one extra method Task 27's graceful shutdown needs. */
+export interface EventsRouter extends express.Router {
+  /**
+   * Task 27, Part 2: sends every currently-connected SSE client a `shutdown`
+   * event (see shared/events.ts's `ShutdownSseEvent`) and ends its
+   * response, then clears this router's connection-tracking set. Called
+   * from server/src/shutdown.ts's gracefulShutdown() during SIGTERM/SIGINT
+   * handling. Safe to call with zero connections open (a no-op), and safe
+   * to call more than once (the set is only ever emptied, never
+   * re-populated by this method).
+   */
+  closeAllConnections(): void;
+}
+
 /**
  * Builds the events router. Production code uses the default export below
  * (real snapcastLive/jobService/systemd, 5s poll); tests call this directly
  * with fakes and a short `pollIntervalMs` so cleanup-on-disconnect and
  * change-only-emission are deterministic and fast to verify.
  */
-export function createEventsRouter(deps: Partial<EventsRouterDeps> = {}): express.Router {
+export function createEventsRouter(deps: Partial<EventsRouterDeps> = {}): EventsRouter {
   const d: EventsRouterDeps = { ...defaultDeps, ...deps };
-  const router = express.Router();
+  const router = express.Router() as EventsRouter;
 
   router.use(authenticateToken);
 
+  // Task 27, Part 2: every currently-open SSE response, tracked so a
+  // graceful shutdown can notify and cleanly end each one instead of just
+  // dropping the process out from under them (routes/events.ts previously
+  // had no such tracking mechanism at all -- see the task brief). Scoped to
+  // THIS router instance (a closure variable, not module-level state) so
+  // that createEventsRouter() calls in tests never share connections with
+  // each other or with the production singleton below.
+  const activeConnections = new Set<Response>();
+
   router.get('/', (req: Request, res: Response) => {
+    activeConnections.add(res);
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -128,11 +152,26 @@ export function createEventsRouter(deps: Partial<EventsRouterDeps> = {}): expres
       clearInterval(serviceInterval);
       d.snapcastEvents.off('update', onSnapcastUpdate);
       d.jobEventsEmitter.off('update', onJobUpdate);
+      activeConnections.delete(res);
     };
 
     req.on('close', cleanup);
     res.on('error', cleanup);
   });
+
+  router.closeAllConnections = () => {
+    for (const res of activeConnections) {
+      try {
+        writeSseEvent(res, { type: 'shutdown', data: { message: 'Server is shutting down' } });
+        res.end();
+      } catch {
+        // Best-effort -- the connection may already be half-closed; the
+        // 'close'/'error' listeners registered above will still run and
+        // remove it from activeConnections via cleanup().
+      }
+    }
+    activeConnections.clear();
+  };
 
   return router;
 }

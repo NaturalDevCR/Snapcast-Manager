@@ -52,7 +52,7 @@ const tmpDbPath = path.join(os.tmpdir(), `pipesources-test-${process.pid}-${Date
 process.env.DB_PATH = tmpDbPath;
 process.env.NODE_ENV = 'test';
 
-import { pipeSourceService, getFifoPath, getSystemdServiceName, parseProcStatState } from '../services/pipeSources';
+import { pipeSourceService, getFifoPath, getSystemdServiceName, parseProcStatState, log as pipeSourcesLog } from '../services/pipeSources';
 import * as execModule from '../platform/exec';
 import { ExecError } from '../platform/exec';
 import * as systemdModule from '../platform/systemd';
@@ -1457,9 +1457,18 @@ test('setConfigContent() (radio): systemd-analyze missing (ExecError exitCode: n
     }
     return { stdout: '', stderr: '' };
   });
+  // Task 27: setConfigContent()'s systemd-analyze-missing warning now goes
+  // through the pino child logger exported from services/pipeSources.ts
+  // (`log`), not console.warn directly. Monkey-patching `.warn` on that
+  // SAME shared object (rather than reassigning the `log` export binding
+  // itself) is what makes this visible: pipeSources.ts's internal call
+  // sites hold a reference to this exact object via a module-local
+  // `const log`, and reassigning `pipeSourcesLog.warn = ...` mutates a
+  // property on that shared object -- unlike reassigning the export
+  // binding, which those internal call sites would never observe.
   const warnCalls: any[] = [];
-  const originalWarn = console.warn;
-  console.warn = (...args: any[]) => { warnCalls.push(args); };
+  const originalWarn = pipeSourcesLog.warn;
+  (pipeSourcesLog as any).warn = (...args: any[]) => { warnCalls.push(args); };
   try {
     const pipe = await createRadioPipeForConfigTests('task14-verify-missing', calls);
 
@@ -1474,7 +1483,7 @@ test('setConfigContent() (radio): systemd-analyze missing (ExecError exitCode: n
     const installCalls = calls.filter(c => c.kind === 'files.installPrivilegedFile');
     assert.equal(installCalls.length, 1, 'install must still proceed when the verifier tool itself is missing');
   } finally {
-    console.warn = originalWarn;
+    (pipeSourcesLog as any).warn = originalWarn;
     restorePlatform();
     restoreRun();
   }
@@ -2036,9 +2045,13 @@ test('scanForSlugCollisions() detects and logs a pre-existing collision without 
   const idA = insertRawPipeRow(nameA);
   const idB = insertRawPipeRow(nameB);
 
+  // Task 27: see the identical monkey-patch note at the "systemd-analyze
+  // missing" test above -- this mutates a property on the SAME shared
+  // pino child object pipeSources.ts's internal call sites hold a
+  // reference to, rather than reassigning the `log` export binding.
   const warnCalls: any[] = [];
-  const originalWarn = console.warn;
-  console.warn = (...args: any[]) => { warnCalls.push(args); };
+  const originalWarn = pipeSourcesLog.warn;
+  (pipeSourcesLog as any).warn = (...args: any[]) => { warnCalls.push(args); };
   try {
     await pipeSourceService.scanForSlugCollisions();
 
@@ -2051,7 +2064,7 @@ test('scanForSlugCollisions() detects and logs a pre-existing collision without 
     assert.equal(pipeSourceService.getById(idA)?.name, nameA);
     assert.equal(pipeSourceService.getById(idB)?.name, nameB);
   } finally {
-    console.warn = originalWarn;
+    (pipeSourcesLog as any).warn = originalWarn;
   }
 });
 
@@ -2063,15 +2076,15 @@ test('scanForSlugCollisions() does not warn about pipe sources whose slugs are a
   insertRawPipeRow(nameB);
 
   const warnCalls: any[] = [];
-  const originalWarn = console.warn;
-  console.warn = (...args: any[]) => { warnCalls.push(args); };
+  const originalWarn = pipeSourcesLog.warn;
+  (pipeSourcesLog as any).warn = (...args: any[]) => { warnCalls.push(args); };
   try {
     await pipeSourceService.scanForSlugCollisions();
     const loggedText = warnCalls.map(args => args.join(' ')).join('\n');
     assert.ok(!loggedText.includes(nameA), 'distinct-slug name A must not appear in any collision warning');
     assert.ok(!loggedText.includes(nameB), 'distinct-slug name B must not appear in any collision warning');
   } finally {
-    console.warn = originalWarn;
+    (pipeSourcesLog as any).warn = originalWarn;
   }
 });
 

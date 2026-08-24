@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import WebSocket from 'ws';
+import { logger } from '../logger';
 import { executeSnapcastRpc } from '../utils/snapcastRpc';
 import type {
   SnapcastGetStatusResult,
@@ -87,13 +88,19 @@ export interface SnapcastLiveDeps {
   logger: Logger;
 }
 
+// Task 27: a pino child logger satisfies this module's own minimal `Logger`
+// interface (just `.error(message: string)`) with no wrapper needed -- pino
+// accepts a plain string as its sole argument exactly like console.error
+// did. Tests never use this default (see snapcastLive.test.ts's own fake
+// `logger` passed via SnapcastLiveDeps), so swapping it out here doesn't
+// touch any test's behavior.
 const defaultDeps: SnapcastLiveDeps = {
   wsFactory: (url: string) => new WebSocket(url) as unknown as WsLike,
   fetchStatus: () => executeSnapcastRpc<SnapcastGetStatusResult>('Server.GetStatus'),
   setTimeoutFn: (cb, ms) => setTimeout(cb, ms),
   clearTimeoutFn: (t) => clearTimeout(t),
   random: () => Math.random(),
-  logger: console,
+  logger: logger.child({ component: 'snapcastLive' }),
 };
 
 /** Notification methods this module applies as a precise in-place cache merge, without a full refetch. Anything else falls back to fetchStatus(). */
