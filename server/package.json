@@ -4,7 +4,7 @@
   "description": "Backend API for Snapcast Manager",
   "main": "dist/index.js",
   "scripts": {
-    "test": "node --test --import ts-node/register src/*.test.ts src/**/*.test.ts",
+    "test": "LOG_LEVEL=silent node --test --import ts-node/register src/*.test.ts src/**/*.test.ts",
     "dev": "ts-node src/index.ts",
     "build": "tsc -b tsconfig.json",
     "start": "node dist/index.js"
