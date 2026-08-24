@@ -113,6 +113,7 @@ function handleClickOutside(e: MouseEvent) {
             @click="isMobileMenuOpen = !isMobileMenuOpen"
             class="p-2 mr-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-text-main rounded-xl border border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center"
             title="Open Menu"
+            :aria-label="isMobileMenuOpen ? 'Close menu' : 'Open menu'"
           >
             <span class="material-symbols-outlined text-[1.2rem]">menu</span>
           </button>
@@ -253,6 +254,7 @@ function handleClickOutside(e: MouseEvent) {
                   @click="authStore.logout()"
                   class="p-2 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300 group flex items-center justify-center"
                   title="Sign out"
+                  aria-label="Sign out"
                 >
                     <span class="material-symbols-outlined text-[1.1rem] group-hover:scale-110 transition-transform">logout</span>
                 </button>
@@ -293,7 +295,7 @@ function handleClickOutside(e: MouseEvent) {
                 </div>
                 <span class="text-lg font-black text-text-main">Snapcast <span class="text-brand-primary">Manager</span></span>
               </div>
-              <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl text-gray-400 hover:text-text-main hover:bg-white/5">
+              <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl text-gray-400 hover:text-text-main hover:bg-white/5" aria-label="Close menu">
                 <span class="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -407,6 +409,7 @@ function handleClickOutside(e: MouseEvent) {
               <button
                 @click="authStore.logout(); isMobileMenuOpen = false"
                 class="p-2.5 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300"
+                aria-label="Sign out"
               >
                 <span class="material-symbols-outlined text-[1.2rem]">logout</span>
               </button>

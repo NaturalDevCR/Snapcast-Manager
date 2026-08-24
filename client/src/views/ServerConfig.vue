@@ -840,10 +840,10 @@ const handleSave = () => {
                             </span>
                           </div>
                           <div class="flex items-center space-x-1">
-                            <button @click="openEditSourceDialog(idx as number)" class="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors border border-transparent hover:border-brand-primary/20" title="Edit source">
+                            <button @click="openEditSourceDialog(idx as number)" class="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors border border-transparent hover:border-brand-primary/20" title="Edit source" :aria-label="`Edit ${extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'source'}`">
                               <span class="material-symbols-outlined text-[16px]">edit</span>
                             </button>
-                            <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 text-gray-400 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors border border-transparent hover:border-[#ff3b30]/20" title="Remove source">
+                            <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 text-gray-400 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors border border-transparent hover:border-[#ff3b30]/20" title="Remove source" :aria-label="`Remove ${extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'source'}`">
                               <span class="material-symbols-outlined text-[16px]">delete</span>
                             </button>
                           </div>
@@ -892,13 +892,14 @@ const handleSave = () => {
                         ]">
                         <!-- Enable/Disable Toggle -->
                         <div class="md:col-span-1 flex items-center pt-1">
-                          <button 
+                          <button
                             @click="toggleProperty('stream', key)"
                             :class="[
                               'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
                               isPropertyEnabled('stream', key) ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
                             ]"
                             :title="isPropertyEnabled('stream', key) ? 'Disable this property' : 'Enable this property'"
+                            :aria-label="`${isPropertyEnabled('stream', key) ? 'Disable' : 'Enable'} ${getMetaForKey('stream', key)?.label || key}`"
                           >
                             <span :class="[isPropertyEnabled('stream', key) ? 'translate-x-4' : 'translate-x-0', 'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                           </button>
@@ -945,12 +946,13 @@ const handleSave = () => {
 
                           <!-- Boolean Toggle -->
                           <div v-else-if="getMetaForKey('stream', key)?.type === 'boolean'" class="flex items-center py-1">
-                            <button 
+                            <button
                               @click="setPropertyValue('stream', key, String(getPropertyValue('stream', key)) === 'true' ? 'false' : 'true')"
                               :class="[
                                 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 dark:focus:ring-offset-slate-900',
                                 String(getPropertyValue('stream', key)) === 'true' ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
                               ]"
+                              :aria-label="`${String(getPropertyValue('stream', key)) === 'true' ? 'Disable' : 'Enable'} ${getMetaForKey('stream', key)?.label || key}`"
                             >
                               <span :class="[String(getPropertyValue('stream', key)) === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                             </button>
@@ -1013,13 +1015,14 @@ const handleSave = () => {
                       
                       <!-- Enable/Disable Toggle (col 1) -->
                       <div class="md:col-span-1 flex items-center pt-1">
-                        <button 
+                        <button
                           @click="toggleProperty(activeSection, key)"
                           :class="[
                             'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
                             isPropertyEnabled(activeSection, key) ? 'bg-brand-primary' : 'bg-gray-700'
                           ]"
                           :title="isPropertyEnabled(activeSection, key) ? 'Disable this property' : 'Enable this property'"
+                          :aria-label="`${isPropertyEnabled(activeSection, key) ? 'Disable' : 'Enable'} ${getMetaForKey(activeSection, key)?.label || key}`"
                         >
                           <span :class="[isPropertyEnabled(activeSection, key) ? 'translate-x-4' : 'translate-x-0', 'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                         </button>
@@ -1053,12 +1056,13 @@ const handleSave = () => {
 
                           <!-- Boolean Toggle -->
                           <div v-else-if="getMetaForKey(activeSection, key)?.type === 'boolean'" class="flex items-center py-1">
-                            <button 
+                            <button
                               @click="setPropertyValue(activeSection, key, String(getPropertyValue(activeSection, key)) === 'true' ? 'false' : 'true')"
                               :class="[
                                 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 focus:ring-offset-black',
                                 String(getPropertyValue(activeSection, key)) === 'true' ? 'bg-brand-primary' : 'bg-gray-700'
                               ]"
+                              :aria-label="`${String(getPropertyValue(activeSection, key)) === 'true' ? 'Disable' : 'Enable'} ${getMetaForKey(activeSection, key)?.label || key}`"
                             >
                               <span :class="[String(getPropertyValue(activeSection, key)) === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                             </button>
@@ -1226,7 +1230,8 @@ const handleSave = () => {
                                       Restore
                                   </button>
                                   <button @click="triggerDeleteSnapshot(snapshot.id)"
-                                    class="p-2 text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 border border-transparent hover:border-[#ff3b30]/20 rounded-lg transition-all group-hover:opacity-100 md:opacity-0 active:scale-95">
+                                    class="p-2 text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 border border-transparent hover:border-[#ff3b30]/20 rounded-lg transition-all group-hover:opacity-100 md:opacity-0 active:scale-95"
+                                    :aria-label="`Delete snapshot ${snapshot.name}`">
                                       <span class="material-symbols-outlined text-[18px]">delete</span>
                                   </button>
                               </div>
@@ -1257,7 +1262,7 @@ const handleSave = () => {
                   <h3 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">{{ isEditingSource ? 'Edit Audio Source' : 'Add Audio Source' }}</h3>
                   <p class="text-[10px] text-gray-500 mt-0.5">{{ isEditingSource ? 'Modify the source parameters' : 'Select a source type and configure its parameters' }}</p>
                 </div>
-                <button @click="showAddSourceDialog = false" class="p-2 text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all">
+                <button @click="showAddSourceDialog = false" class="p-2 text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all" aria-label="Close">
                   <span class="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
@@ -1386,6 +1391,7 @@ const handleSave = () => {
                               :disabled="idx === 0"
                               class="p-1 rounded-lg transition-colors"
                               :class="idx === 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-white/10'"
+                              :aria-label="`Move ${srcName} up`"
                             >
                               <span class="material-symbols-outlined text-[16px]">arrow_upward</span>
                             </button>
@@ -1394,6 +1400,7 @@ const handleSave = () => {
                               :disabled="idx === metaSelectedSources.length - 1"
                               class="p-1 rounded-lg transition-colors"
                               :class="idx === metaSelectedSources.length - 1 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-white/10'"
+                              :aria-label="`Move ${srcName} down`"
                             >
                               <span class="material-symbols-outlined text-[16px]">arrow_downward</span>
                             </button>
@@ -1401,6 +1408,7 @@ const handleSave = () => {
                             <button
                               @click="removeMetaSource(idx)"
                               class="p-1 text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors"
+                              :aria-label="`Remove ${srcName}`"
                             >
                               <span class="material-symbols-outlined text-[16px]">close</span>
                             </button>
@@ -1429,12 +1437,13 @@ const handleSave = () => {
                       
                       <!-- Boolean param -->
                       <div v-if="param.type === 'boolean'" class="flex items-center">
-                        <button 
+                        <button
                           @click="sourceFormParams[param.key] = sourceFormParams[param.key] === 'true' ? 'false' : 'true'"
                           :class="[
                             'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:ring-2 focus:ring-brand-primary focus:outline-none focus:ring-offset-2 focus:ring-offset-brand-bg',
                             sourceFormParams[param.key] === 'true' ? 'bg-brand-primary shadow-[0_0_10px_rgb(var(--brand-primary-rgb)/0.4)]' : 'bg-gray-700'
                           ]"
+                          :aria-label="sourceFormParams[param.key] === 'true' ? `Disable ${param.label}` : `Enable ${param.label}`"
                         >
                           <span :class="[sourceFormParams[param.key] === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200']" />
                         </button>

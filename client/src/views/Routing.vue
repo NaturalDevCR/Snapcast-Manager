@@ -486,9 +486,10 @@ const updateVolume = (client: any, event: Event) => {
                           
                           <!-- Group Controls -->
                           <div class="flex items-center gap-2 shrink-0">
-                            <button @click.stop="snapcastStore.setGroupMute(group.id, !group.muted)" 
+                            <button @click.stop="snapcastStore.setGroupMute(group.id, !group.muted)"
                                     class="w-8 h-8 rounded-xl transition-all duration-300 border flex items-center justify-center group/mute shadow-md shrink-0"
-                                    :class="group.muted ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-brand-surface text-text-muted border-white/5 hover:text-text-main hover:border-white/10'">
+                                    :class="group.muted ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-brand-surface text-text-muted border-white/5 hover:text-text-main hover:border-white/10'"
+                                    :aria-label="`${group.muted ? 'Unmute' : 'Mute'} ${group.name || 'Zone ' + group.id.slice(0,4)}`">
                                 <span class="material-symbols-outlined text-sm transition-transform group-hover/mute:scale-110">{{ group.muted ? 'volume_off' : 'volume_up' }}</span>
                             </button>
                             <div class="w-8 h-8 rounded-full flex items-center justify-center text-text-muted transition-transform duration-300"
@@ -532,9 +533,10 @@ const updateVolume = (client: any, event: Event) => {
                               
                               <!-- Volume Controls -->
                               <div class="flex items-center gap-3 w-full sm:w-auto shrink-0 justify-end">
-                                  <button @click="snapcastStore.setClientVolume(client.id, { percent: client.config.volume.percent, muted: !client.config.volume.muted })" 
+                                  <button @click="snapcastStore.setClientVolume(client.id, { percent: client.config.volume.percent, muted: !client.config.volume.muted })"
                                           class="p-2 rounded-xl transition-all hover:bg-white/5 border border-transparent"
-                                          :class="client.config.volume.muted ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-text-muted hover:text-text-main hover:border-white/10'">
+                                          :class="client.config.volume.muted ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-text-muted hover:text-text-main hover:border-white/10'"
+                                          :aria-label="`${client.config.volume.muted ? 'Unmute' : 'Mute'} ${client.config.name || client.host.name || 'client'}`">
                                       <span class="material-symbols-outlined text-[18px]">{{ client.config.volume.muted ? 'volume_off' : 'volume_up' }}</span>
                                   </button>
                                   <div class="flex items-center gap-3">

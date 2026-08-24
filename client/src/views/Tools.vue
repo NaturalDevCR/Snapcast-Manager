@@ -374,7 +374,8 @@ onMounted(() => {
             <div class="px-5 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
               <span class="text-sm font-black text-white uppercase tracking-widest">Scripts</span>
               <button @click="showAddForm = !showAddForm"
-                class="p-1.5 bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary rounded-lg transition-all">
+                class="p-1.5 bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary rounded-lg transition-all"
+                :aria-label="showAddForm ? 'Cancel add script' : 'Add script'">
                 <span class="material-symbols-outlined text-[1rem]">{{ showAddForm ? 'close' : 'add' }}</span>
               </button>
             </div>
@@ -405,7 +406,8 @@ onMounted(() => {
                   <p class="text-[10px] font-mono text-gray-500 truncate mt-0.5">{{ script.path }}</p>
                 </div>
                 <button @click.stop="confirmRemoveScript(script.id)"
-                  class="opacity-0 group-hover:opacity-100 p-1 text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-all flex-shrink-0">
+                  class="opacity-0 group-hover:opacity-100 p-1 text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-all flex-shrink-0"
+                  :aria-label="`Remove ${script.label}`">
                   <span class="material-symbols-outlined text-[0.9rem]">delete</span>
                 </button>
               </div>

@@ -72,10 +72,11 @@ const typeConfigs = {
           {{ toast.message }}
         </div>
 
-        <button 
+        <button
           @click="uiStore.removeToast(toast.id)"
           class="ml-4 flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
           :class="typeConfigs[toast.type].text"
+          aria-label="Dismiss notification"
         >
           <XMarkIcon class="h-4 w-4" />
         </button>

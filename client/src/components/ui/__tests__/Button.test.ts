@@ -61,4 +61,17 @@ describe('Button.vue', () => {
     const wrapper = mount(Button, { props: { size } });
     expect(wrapper.exists()).toBe(true);
   });
+
+  // Task 32: Button.vue is a single-root <button> wrapper with no declared
+  // `aria-label` prop and no `inheritAttrs: false`, so Vue's automatic
+  // attribute fallthrough should forward a caller-supplied aria-label onto
+  // the real <button> element untouched -- this guards that behavior for
+  // icon-only usages of this component (e.g. an icon-only Button with no
+  // slot text) so a future refactor can't silently swallow it.
+  it('forwards a caller-supplied aria-label onto the underlying <button>', () => {
+    const wrapper = mount(Button, {
+      attrs: { 'aria-label': 'Delete pipe source' },
+    });
+    expect(wrapper.attributes('aria-label')).toBe('Delete pipe source');
+  });
 });
