@@ -155,6 +155,106 @@ test('GET /api/events without a token is rejected (401)', async () => {
   }
 });
 
+// ---- Task 28: SSE ticket auth (POST /api/auth/sse-ticket + GET /api/events fallback) ----
+
+test('POST /api/auth/sse-ticket requires authentication', async () => {
+  const res = await fetch(`${baseUrl}/api/auth/sse-ticket`, { method: 'POST' });
+  assert.equal(res.status, 401);
+});
+
+test('POST /api/auth/sse-ticket mints a ticket for an authenticated user', async () => {
+  const res = await fetch(`${baseUrl}/api/auth/sse-ticket`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  assert.equal(res.status, 201);
+  const json = await res.json();
+  assert.equal(typeof json.ticket, 'string');
+  assert.ok(json.ticket.length > 0);
+  assert.ok(json.expiresAt > Date.now(), 'expiresAt must be in the future');
+});
+
+test('GET /api/events accepts a valid ticket in place of an Authorization header', async () => {
+  const ticketRes = await fetch(`${baseUrl}/api/auth/sse-ticket`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  const { ticket } = await ticketRes.json();
+
+  const eventsApp = express();
+  eventsApp.use('/api/events', createEventsRouter({ pollIntervalMs: 1000, services: [] }));
+  const s = eventsApp.listen(0, '127.0.0.1');
+  await new Promise((r) => s.once('listening', r));
+  const port = (s.address() as any).port;
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/events?ticket=${encodeURIComponent(ticket)}`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') || '', /text\/event-stream/);
+    await res.body?.cancel();
+  } finally {
+    s.closeAllConnections();
+    await new Promise((r) => s.close(r));
+  }
+});
+
+test('GET /api/events rejects a replayed (already-used) ticket -- single-use enforcement', async () => {
+  const ticketRes = await fetch(`${baseUrl}/api/auth/sse-ticket`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  const { ticket } = await ticketRes.json();
+
+  const eventsApp = express();
+  eventsApp.use('/api/events', createEventsRouter({ pollIntervalMs: 1000, services: [] }));
+  const s = eventsApp.listen(0, '127.0.0.1');
+  await new Promise((r) => s.once('listening', r));
+  const port = (s.address() as any).port;
+  try {
+    const first = await fetch(`http://127.0.0.1:${port}/api/events?ticket=${encodeURIComponent(ticket)}`);
+    assert.equal(first.status, 200, 'first use must succeed');
+    await first.body?.cancel();
+
+    const second = await fetch(`http://127.0.0.1:${port}/api/events?ticket=${encodeURIComponent(ticket)}`);
+    assert.equal(second.status, 403, 'a replayed ticket must be rejected, even though it has not expired');
+  } finally {
+    s.closeAllConnections();
+    await new Promise((r) => s.close(r));
+  }
+});
+
+test('GET /api/events rejects a made-up/unknown ticket', async () => {
+  const eventsApp = express();
+  eventsApp.use('/api/events', createEventsRouter({ pollIntervalMs: 1000, services: [] }));
+  const s = eventsApp.listen(0, '127.0.0.1');
+  await new Promise((r) => s.once('listening', r));
+  const port = (s.address() as any).port;
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/events?ticket=not-a-real-ticket`);
+    assert.equal(res.status, 403);
+  } finally {
+    s.closeAllConnections();
+    await new Promise((r) => s.close(r));
+  }
+});
+
+test('GET /api/events still accepts a normal Authorization header, unchanged (backward compatible)', async () => {
+  const eventsApp = express();
+  eventsApp.use('/api/events', createEventsRouter({ pollIntervalMs: 1000, services: [] }));
+  const s = eventsApp.listen(0, '127.0.0.1');
+  await new Promise((r) => s.once('listening', r));
+  const port = (s.address() as any).port;
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/events`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    assert.equal(res.status, 200);
+    await res.body?.cancel();
+  } finally {
+    s.closeAllConnections();
+    await new Promise((r) => s.close(r));
+  }
+});
+
 // ---- shape + baseline emission ----
 
 test('GET /api/events streams an initial snapcast event and a service-status event', async () => {

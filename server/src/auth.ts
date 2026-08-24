@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
 import db from './database';
+import { sseTicketStore } from './services/sseTickets';
 
 const router = express.Router();
 
@@ -217,6 +218,55 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
     (req as any).user = decoded;
     next();
   });
+};
+
+// Task 28: mints a short-lived, single-use ticket that GET /api/events
+// accepts via a `?ticket=` query param -- the browser's native EventSource
+// API cannot set a custom Authorization header, so this is the
+// workaround (see server/src/services/sseTickets.ts for the full
+// design/tradeoff, and routes/events.ts for the consuming side). Behind
+// the NORMAL authenticateToken middleware, same as every other route --
+// minting a ticket itself still requires a valid JWT.
+router.post('/sse-ticket', authenticateToken, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { ticket, expiresAt } = sseTicketStore.mint(user.id, req.ip || 'unknown');
+  res.status(201).json({ ticket, expiresAt });
+});
+
+// Task 28: GET /api/events' auth fallback. A plain browser EventSource
+// can't set the Authorization header a normal API request would (see
+// task-28-brief.md), so this accepts EITHER:
+//   - a normal `Authorization: Bearer <jwt>` header, delegating to
+//     authenticateToken exactly as before -- so any future direct API
+//     consumer of /api/events is completely unaffected; OR
+//   - a single-use ticket minted by POST /sse-ticket above, passed as
+//     `?ticket=`.
+// On the ticket path, this attaches the SAME `req.user` shape
+// authenticateToken does (id/username/role/tokenVersion, looked up fresh
+// from the users table -- the ticket itself only carries a userId) so
+// downstream code (routes/events.ts) never needs to know which auth path
+// was used. Failure modes mirror authenticateToken's own: 401 for "no
+// credential presented at all" (no header AND no ticket param), 403 for
+// "a credential was presented but is invalid" (missing/expired/
+// already-used/wrong-IP ticket, or a user that's since been deleted).
+export const authenticateTokenOrSseTicket = (req: Request, res: Response, next: NextFunction) => {
+  if (req.headers['authorization']) {
+    return authenticateToken(req, res, next);
+  }
+
+  const ticket = req.query.ticket;
+  if (typeof ticket !== 'string' || !ticket) return res.sendStatus(401);
+
+  const userId = sseTicketStore.consume(ticket, req.ip || 'unknown');
+  if (userId === null) return res.sendStatus(403);
+
+  const row = db.prepare('SELECT id, username, role, token_version FROM users WHERE id = ?').get(userId) as
+    | { id: number; username: string; role: string; token_version: number }
+    | undefined;
+  if (!row) return res.sendStatus(403);
+
+  (req as any).user = { id: row.id, username: row.username, role: row.role, tokenVersion: row.token_version ?? 0 };
+  next();
 };
 
 router.post('/change-password', authenticateToken, loginRateLimiter, (req: Request, res: Response) => {

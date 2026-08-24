@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { EventEmitter } from 'events';
-import { authenticateToken } from '../auth';
+import { authenticateTokenOrSseTicket } from '../auth';
 import { snapcastLive } from '../services/snapcastLive';
 import { jobService, jobEvents, type Job } from '../services/jobs';
 import { activeState } from '../platform/systemd';
@@ -85,7 +85,13 @@ export function createEventsRouter(deps: Partial<EventsRouterDeps> = {}): Events
   const d: EventsRouterDeps = { ...defaultDeps, ...deps };
   const router = express.Router() as EventsRouter;
 
-  router.use(authenticateToken);
+  // Task 28: accepts either a normal Bearer header OR a single-use SSE
+  // ticket (?ticket=) minted by POST /api/auth/sse-ticket -- see auth.ts's
+  // authenticateTokenOrSseTicket for the full auth-fallback design. A
+  // plain browser EventSource can't set the Authorization header, so the
+  // ticket path is what a real client actually uses; the header path
+  // stays available unchanged for any other API consumer.
+  router.use(authenticateTokenOrSseTicket);
 
   // Task 27, Part 2: every currently-open SSE response, tracked so a
   // graceful shutdown can notify and cleanly end each one instead of just
