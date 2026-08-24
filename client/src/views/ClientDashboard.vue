@@ -5,6 +5,7 @@ import { useUIStore } from '../stores/ui';
 import { useSnapclientInstancesStore, type SnapclientInstance, type AlsaControl } from '../stores/snapclientInstances';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
+import ConfirmDestructive from '../components/ui/ConfirmDestructive.vue';
 
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
@@ -74,14 +75,26 @@ async function submitForm() {
   }
 }
 
-async function handleDelete(inst: SnapclientInstance) {
-  if (!confirm(`Delete instance "${inst.name}"? This will stop its service and remove all its files.`)) return;
+// ── Delete instance (destructive: deletes files) ────────────────────────
+const showConfirmDeleteInstance = ref(false);
+const pendingDeleteInstance = ref<SnapclientInstance | null>(null);
+
+function confirmDeleteInstance(inst: SnapclientInstance) {
+  pendingDeleteInstance.value = inst;
+  showConfirmDeleteInstance.value = true;
+}
+
+async function handleDelete() {
+  const inst = pendingDeleteInstance.value;
+  if (!inst) return;
   try {
     await instanceStore.deleteInstance(inst.id);
     uiStore.showToast(`Instance "${inst.name}" deleted.`, 'success');
     await instanceStore.fetchDevices();
   } catch (err: any) {
     uiStore.showToast('Delete failed: ' + err.message, 'error');
+  } finally {
+    pendingDeleteInstance.value = null;
   }
 }
 
@@ -93,8 +106,18 @@ async function handleControl(inst: SnapclientInstance, action: 'start' | 'stop' 
   }
 }
 
-async function handleUpdate(clean = false) {
-  if (clean && !confirm('WARNING: This will UNINSTALL snapclient and DELETE its config before a fresh installation. Continue?')) return;
+// ── Clean reinstall (destructive: deletes config first) ─────────────────
+const showConfirmReinstall = ref(false);
+
+function handleUpdate(clean = false) {
+  if (clean) {
+    showConfirmReinstall.value = true;
+    return;
+  }
+  performUpdate(false);
+}
+
+async function performUpdate(clean: boolean) {
   try {
     await systemStore.updatePackage('snapclient', clean);
     uiStore.showToast(`snapclient ${clean ? 'reinstalled' : 'updated'} successfully!`, 'success');
@@ -103,8 +126,14 @@ async function handleUpdate(clean = false) {
   }
 }
 
-async function handleUninstall() {
-  if (!confirm('Are you sure you want to UNINSTALL snapclient? All instances will be deleted.')) return;
+// ── Uninstall (destructive: deletes all instances) ──────────────────────
+const showConfirmUninstall = ref(false);
+
+function handleUninstall() {
+  showConfirmUninstall.value = true;
+}
+
+async function performUninstall() {
   try {
     await systemStore.uninstallPackage('snapclient');
     uiStore.showToast('snapclient uninstalled successfully!', 'success');
@@ -344,7 +373,7 @@ onMounted(async () => {
                     <button v-else @click="handleControl(inst, 'start')" class="py-2 bg-[#00ff9d]/10 hover:bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/20 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">Start</button>
                     <button @click="openEdit(inst)" class="py-2 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-[10px] font-bold active:scale-95">Edit</button>
                   </div>
-                  <button @click="handleDelete(inst)" class="w-full py-2 bg-[#ff3b30]/5 hover:bg-[#ff3b30]/15 text-[#ff3b30]/60 hover:text-[#ff3b30] border border-[#ff3b30]/10 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">
+                  <button @click="confirmDeleteInstance(inst)" class="w-full py-2 bg-[#ff3b30]/5 hover:bg-[#ff3b30]/15 text-[#ff3b30]/60 hover:text-[#ff3b30] border border-[#ff3b30]/10 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">
                     Delete Instance
                   </button>
                 </div>
@@ -427,6 +456,34 @@ onMounted(async () => {
           </div>
         </div>
       </Transition>
+
+      <!-- ── Destructive-action confirmations (Task 31) ─────────────────── -->
+      <ConfirmDestructive
+        v-model="showConfirmDeleteInstance"
+        title="Delete Instance"
+        message="This will stop its service and remove all its files."
+        :entity-name="pendingDeleteInstance?.name ?? ''"
+        confirm-label="Delete"
+        @confirm="handleDelete"
+      />
+
+      <ConfirmDestructive
+        v-model="showConfirmReinstall"
+        title="Clean Reinstall Snapclient"
+        message="This will UNINSTALL snapclient and DELETE its config before a fresh installation."
+        entity-name="snapclient"
+        confirm-label="Reinstall"
+        @confirm="performUpdate(true)"
+      />
+
+      <ConfirmDestructive
+        v-model="showConfirmUninstall"
+        title="Uninstall Snapclient"
+        message="This will uninstall snapclient. All instances will be deleted."
+        entity-name="snapclient"
+        confirm-label="Uninstall"
+        @confirm="performUninstall"
+      />
 
     </div>
   </Layout>

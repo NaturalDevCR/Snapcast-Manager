@@ -4,6 +4,8 @@ import { fetchApi } from '../utils/api';
 import { useUIStore } from '../stores/ui';
 import { useSystemStore } from '../stores/system';
 import Layout from '../components/Layout.vue';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
+import ConfirmDestructive from '../components/ui/ConfirmDestructive.vue';
 
 const uiStore = useUIStore();
 const systemStore = useSystemStore();
@@ -112,8 +114,20 @@ async function addScriptPath() {
   }
 }
 
-async function removeScriptPath(id: string) {
-  if (!confirm('Remove this script from the list?')) return;
+// Removing a registration never deletes the underlying file (verified
+// against server/src/routes/tools.ts's DELETE /scripts/:id handler) --
+// disruptive but not data-destructive, so this uses the plain ConfirmDialog.
+const showConfirmRemoveScript = ref(false);
+const pendingRemoveScriptId = ref<string | null>(null);
+
+function confirmRemoveScript(id: string) {
+  pendingRemoveScriptId.value = id;
+  showConfirmRemoveScript.value = true;
+}
+
+async function removeScriptPath() {
+  const id = pendingRemoveScriptId.value;
+  if (!id) return;
   try {
     await fetchApi(`/tools/scripts/${id}`, { method: 'DELETE' });
     scriptPaths.value = scriptPaths.value.filter(s => s.id !== id);
@@ -124,6 +138,8 @@ async function removeScriptPath(id: string) {
     uiStore.showToast('Script path removed', 'success');
   } catch (e: any) {
     uiStore.showToast('Failed to remove script: ' + e.message, 'error');
+  } finally {
+    pendingRemoveScriptId.value = null;
   }
 }
 
@@ -184,8 +200,19 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-async function restoreBackup(backup: BackupEntry) {
-  if (!confirm(`Restore "${backup.name}"?\n\nThis will overwrite the current configuration files with the ones in the backup.`)) return;
+// Overwrites the live config -- data-destructive, so this uses
+// ConfirmDestructive (type the backup's name to confirm).
+const showConfirmRestoreBackup = ref(false);
+const pendingRestoreBackup = ref<BackupEntry | null>(null);
+
+function confirmRestoreBackup(backup: BackupEntry) {
+  pendingRestoreBackup.value = backup;
+  showConfirmRestoreBackup.value = true;
+}
+
+async function restoreBackup() {
+  const backup = pendingRestoreBackup.value;
+  if (!backup) return;
   backupsLoading.value = true;
   try {
     await fetchApi('/system/backups/restore', { method: 'POST', body: JSON.stringify({ name: backup.name }) });
@@ -194,17 +221,29 @@ async function restoreBackup(backup: BackupEntry) {
     uiStore.showToast('Failed to restore backup: ' + e.message, 'error');
   } finally {
     backupsLoading.value = false;
+    pendingRestoreBackup.value = null;
   }
 }
 
-async function deleteBackup(backup: BackupEntry) {
-  if (!confirm(`Delete backup "${backup.name}"? This cannot be undone.`)) return;
+const showConfirmDeleteBackup = ref(false);
+const pendingDeleteBackup = ref<BackupEntry | null>(null);
+
+function confirmDeleteBackup(backup: BackupEntry) {
+  pendingDeleteBackup.value = backup;
+  showConfirmDeleteBackup.value = true;
+}
+
+async function deleteBackup() {
+  const backup = pendingDeleteBackup.value;
+  if (!backup) return;
   try {
     await fetchApi(`/system/backups/${encodeURIComponent(backup.name)}`, { method: 'DELETE' });
     backups.value = backups.value.filter(b => b.name !== backup.name);
     uiStore.showToast('Backup deleted', 'success');
   } catch (e: any) {
     uiStore.showToast('Failed to delete backup: ' + e.message, 'error');
+  } finally {
+    pendingDeleteBackup.value = null;
   }
 }
 
@@ -365,7 +404,7 @@ onMounted(() => {
                   <p class="text-xs font-black text-white truncate">{{ script.label }}</p>
                   <p class="text-[10px] font-mono text-gray-500 truncate mt-0.5">{{ script.path }}</p>
                 </div>
-                <button @click.stop="removeScriptPath(script.id)"
+                <button @click.stop="confirmRemoveScript(script.id)"
                   class="opacity-0 group-hover:opacity-100 p-1 text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-all flex-shrink-0">
                   <span class="material-symbols-outlined text-[0.9rem]">delete</span>
                 </button>
@@ -497,12 +536,12 @@ onMounted(() => {
                     <span class="material-symbols-outlined text-[0.9rem] mr-1">download</span>
                     Download
                   </button>
-                  <button @click="restoreBackup(backup)" :disabled="backupsLoading"
+                  <button @click="confirmRestoreBackup(backup)" :disabled="backupsLoading"
                     class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-[#ffcc00] hover:bg-[#ffcc00]/10 border border-[#ffcc00]/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
                     <span class="material-symbols-outlined text-[0.9rem] mr-1">restore</span>
                     Restore
                   </button>
-                  <button @click="deleteBackup(backup)"
+                  <button @click="confirmDeleteBackup(backup)"
                     class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-[#ff3b30] hover:bg-[#ff3b30]/10 border border-[#ff3b30]/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
                     <span class="material-symbols-outlined text-[0.9rem] mr-1">delete</span>
                     Delete
@@ -513,6 +552,33 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <!-- ── Confirmations (Task 31) ─────────────────────────────────── -->
+      <ConfirmDialog
+        v-model="showConfirmRemoveScript"
+        title="Remove Script"
+        message="Remove this script from the list? The underlying file on disk is not deleted."
+        confirm-text="Remove"
+        @confirm="removeScriptPath"
+      />
+
+      <ConfirmDestructive
+        v-model="showConfirmRestoreBackup"
+        title="Restore Backup"
+        message="This will overwrite the current configuration files with the ones in the backup."
+        :entity-name="pendingRestoreBackup?.name ?? ''"
+        confirm-label="Restore"
+        @confirm="restoreBackup"
+      />
+
+      <ConfirmDestructive
+        v-model="showConfirmDeleteBackup"
+        title="Delete Backup"
+        message="This cannot be undone."
+        :entity-name="pendingDeleteBackup?.name ?? ''"
+        confirm-label="Delete"
+        @confirm="deleteBackup"
+      />
 
     </div>
   </Layout>

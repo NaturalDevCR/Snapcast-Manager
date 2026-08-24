@@ -8,6 +8,8 @@ import { sseStatusBadge } from '../utils/sseStatus';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
 import Badge from '../components/ui/Badge.vue';
+import ConfirmDestructive from '../components/ui/ConfirmDestructive.vue';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
 import { version } from '../../package.json';
 
 const systemStore = useSystemStore();
@@ -43,11 +45,23 @@ onMounted(async () => {
   snapcastStore.fetchStatus();
 });
 
-const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'mpd' | 'mympd', clean: boolean = false) => {
-  if (clean && !confirm(`WARNING: This will UNINSTALL ${pkg} and DELETE ALL its configuration and data files before a fresh installation. Continue?`)) {
-      return;
+type UpdatablePackage = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'mpd' | 'mympd';
+type UninstallablePackage = 'shairport-sync' | 'mpd' | 'mympd';
+
+// ── Clean reinstall (destructive: deletes config first) ─────────────────
+const showConfirmReinstall = ref(false);
+const pendingReinstallPkg = ref<UpdatablePackage | null>(null);
+
+const handleUpdate = (pkg: UpdatablePackage, clean: boolean = false) => {
+  if (clean) {
+    pendingReinstallPkg.value = pkg;
+    showConfirmReinstall.value = true;
+    return;
   }
-  
+  performUpdate(pkg, false);
+};
+
+const performUpdate = async (pkg: UpdatablePackage, clean: boolean) => {
   try {
     await systemStore.updatePackage(pkg, clean);
     uiStore.showToast(`${pkg} ${clean ? 'reinstalled' : 'updated'} successfully!`, 'success');
@@ -56,19 +70,37 @@ const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 's
   }
 };
 
-const handleUninstall = async (pkg: 'shairport-sync' | 'mpd' | 'mympd') => {
-  if (!confirm(`Are you sure you want to UNINSTALL ${pkg}? This will remove its binaries and service files.`)) return;
+// ── Uninstall (destructive: removes binaries and service files) ─────────
+const showConfirmUninstall = ref(false);
+const pendingUninstallPkg = ref<UninstallablePackage | null>(null);
+
+const handleUninstall = (pkg: UninstallablePackage) => {
+  pendingUninstallPkg.value = pkg;
+  showConfirmUninstall.value = true;
+};
+
+const performUninstall = async () => {
+  const pkg = pendingUninstallPkg.value;
+  if (!pkg) return;
   try {
     await systemStore.uninstallPackage(pkg);
     uiStore.showToast(`${pkg} uninstalled successfully!`, 'success');
     await systemStore.refreshAll(); // Refresh status
   } catch (err: any) {
     uiStore.showToast(`Failed to uninstall ${pkg}: ` + err.message, 'error');
+  } finally {
+    pendingUninstallPkg.value = null;
   }
 };
 
+// ── Update Node.js (disruptive, NOT data-destructive: no deletion) ──────
+const showConfirmUpdateNode = ref(false);
+
+const triggerUpdateNodeJs = () => {
+  showConfirmUpdateNode.value = true;
+};
+
 const handleUpdateNodeJs = async () => {
-    if (!confirm(`This will update Node.js to the latest ${selectedNodeVersion.value}.x version. The service might restart briefly. Continue?`)) return;
     try {
         await systemStore.updateNodeJs(selectedNodeVersion.value);
         uiStore.showToast(`Node.js ${selectedNodeVersion.value} update initiated successfully!`, 'success');
@@ -350,7 +382,7 @@ const openMympd = () => {
                  </div>
             </div>
             <div class="pt-5 border-t border-white/5">
-                 <button @click="handleUpdateNodeJs" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
+                 <button @click="triggerUpdateNodeJs" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     Update to v{{ selectedNodeVersion }}
                  </button>
             </div>
@@ -585,6 +617,33 @@ const openMympd = () => {
       </Card>
 
       </div>
+
+      <!-- ── Destructive-action confirmations (Task 31) ─────────────────── -->
+      <ConfirmDestructive
+        v-model="showConfirmReinstall"
+        title="Clean Reinstall"
+        :message="`This will UNINSTALL ${pendingReinstallPkg} and DELETE ALL its configuration and data files before a fresh installation.`"
+        :entity-name="pendingReinstallPkg ?? ''"
+        confirm-label="Reinstall"
+        @confirm="performUpdate(pendingReinstallPkg!, true)"
+      />
+
+      <ConfirmDestructive
+        v-model="showConfirmUninstall"
+        title="Uninstall"
+        :message="`This will remove ${pendingUninstallPkg}'s binaries and service files.`"
+        :entity-name="pendingUninstallPkg ?? ''"
+        confirm-label="Uninstall"
+        @confirm="performUninstall"
+      />
+
+      <ConfirmDialog
+        v-model="showConfirmUpdateNode"
+        title="Update Node.js"
+        :message="`This will update Node.js to the latest ${selectedNodeVersion}.x version. The service might restart briefly. Continue?`"
+        confirm-text="Update"
+        @confirm="handleUpdateNodeJs"
+      />
   </div>
 </Layout>
 </template>
