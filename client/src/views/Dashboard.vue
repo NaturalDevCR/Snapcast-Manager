@@ -1,18 +1,28 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useSystemStore } from '../stores/system';
 import { useUIStore } from '../stores/ui';
 import { useSnapcastStore } from '../stores/snapcast';
+import { useEventSource } from '../composables/useEventSource';
+import { sseStatusBadge } from '../utils/sseStatus';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
+import Badge from '../components/ui/Badge.vue';
 import { version } from '../../package.json';
 
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
 const snapcastStore = useSnapcastStore();
 
+// Task 29: snapcast state updates now arrive via the app-wide SSE
+// connection (Task 28, connected/disconnected by App.vue) instead of this
+// view polling `snapcastStore.fetchStatus()` on its own timer -- see
+// useEventSource.ts's applySnapcastUpdate(), which writes to the exact same
+// `snapcastStore.status` field this view already reads. The live/
+// reconnecting indicator below surfaces that connection's own status.
+const sse = useEventSource();
+
 const selectedNodeVersion = ref('20');
-let pollingInterval: number | undefined;
 
 onMounted(async () => {
   await systemStore.refreshAll();
@@ -26,17 +36,11 @@ onMounted(async () => {
     }
   }
 
+  // Fast first paint before the SSE connection's first `snapcast` event
+  // arrives -- the connection is app-wide/shared, so it may already be
+  // connected and have fresh data by the time this view mounts, but this
+  // explicit fetch is a safety net for that initial window.
   snapcastStore.fetchStatus();
-  // Poll Snapcast status every 3 seconds for live dashboard updates
-  pollingInterval = window.setInterval(() => {
-    snapcastStore.fetchStatus();
-  }, 3000);
-});
-
-onUnmounted(() => {
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-  }
 });
 
 const handleUpdate = async (pkg: 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'mpd' | 'mympd', clean: boolean = false) => {
@@ -85,7 +89,10 @@ const openMympd = () => {
       <!-- Header Section -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 class="text-3xl font-black tracking-tight text-text-main">System Dashboard</h1>
+          <div class="flex items-center gap-3">
+            <h1 class="text-3xl font-black tracking-tight text-text-main">System Dashboard</h1>
+            <Badge :variant="sseStatusBadge(sse.status.value).variant" size="sm">{{ sseStatusBadge(sse.status.value).label }}</Badge>
+          </div>
           <p class="text-text-muted font-medium mt-1">Manage and monitor your Snapcast infrastructure.</p>
         </div>
         <button @click="systemStore.refreshAll()" :disabled="systemStore.loading" class="inline-flex items-center px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-brand-primary/30 active:scale-95 disabled:opacity-50 group border border-brand-primary/50">

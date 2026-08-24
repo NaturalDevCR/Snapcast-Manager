@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import Layout from '../components/Layout.vue';
+import Badge from '../components/ui/Badge.vue';
 import { useSnapcastStore } from '../stores/snapcast';
-import { onMounted, onUnmounted, ref, computed } from 'vue';
+import { useEventSource } from '../composables/useEventSource';
+import { sseStatusBadge } from '../utils/sseStatus';
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
 
 const vFocus = {
   mounted: (el: HTMLElement) => el.focus()
 };
 
 const snapcastStore = useSnapcastStore();
-let refreshInterval: any = null;
+// Task 29: snapcast state updates now arrive via the app-wide SSE
+// connection (Task 28, connected/disconnected by App.vue) instead of this
+// view polling `snapcastStore.fetchStatus()` on its own timer. The live/
+// reconnecting indicator below surfaces that connection's own status.
+const sse = useEventSource();
 const renamingClientId = ref<string | null>(null);
 const newClientName = ref('');
 const renamingGroupId = ref<string | null>(null);
@@ -46,6 +53,18 @@ const toggleGroup = (groupId: string) => {
 const connectionsVersion = ref(0);
 const triggerRedraw = () => { connectionsVersion.value++; };
 
+// Task 29: redraw the cable connections whenever fresh snapcast data
+// arrives, whether that's the initial fetchStatus() call, a manual
+// RE-SYNC click, or a pushed SSE `snapcast` event -- all three replace
+// `snapcastStore.status` with a new object (see stores/snapcast.ts's
+// fetchStatus() and useEventSource.ts's applySnapcastUpdate()), so a plain
+// (non-deep) watch on the store's `status` reference is the natural,
+// transport-agnostic replacement for the old "poll tick -> triggerRedraw()"
+// pairing -- this view stays decoupled from how the data got here.
+watch(() => snapcastStore.status, () => {
+  triggerRedraw();
+});
+
 // Colors for streams
 const streamColors = [
     '#3b82f6', // blue
@@ -65,23 +84,21 @@ const getStreamColor = (streamId: string) => {
 };
 
 onMounted(() => {
+    // Fast first paint before the SSE connection's first `snapcast` event
+    // arrives -- see Dashboard.vue's identical comment for why this
+    // explicit fetch stays even though polling doesn't.
     snapcastStore.fetchStatus();
-    refreshInterval = setInterval(() => {
-        snapcastStore.fetchStatus();
-        triggerRedraw(); // ensure redraw on fetch to catch new groups/streams
-    }, 2000);
     window.addEventListener('resize', triggerRedraw);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('touchend', handleMouseUp);
-    
+
     // Initial draw delay to ensure DOM is ready
     setTimeout(triggerRedraw, 200);
 });
 
 onUnmounted(() => {
-    if (refreshInterval) clearInterval(refreshInterval);
     window.removeEventListener('resize', triggerRedraw);
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('touchmove', handleTouchMove);
@@ -317,7 +334,10 @@ const updateVolume = (client: any, event: Event) => {
                 <span class="material-symbols-outlined text-brand-primary text-3xl">hub</span>
             </div>
             <div>
-                <h1 class="text-3xl font-black text-text-main tracking-tight">Audio Matrix</h1>
+                <div class="flex items-center gap-3">
+                    <h1 class="text-3xl font-black text-text-main tracking-tight">Audio Matrix</h1>
+                    <Badge :variant="sseStatusBadge(sse.status.value).variant" size="sm">{{ sseStatusBadge(sse.status.value).label }}</Badge>
+                </div>
                 <p class="text-[10px] text-white/40 font-black uppercase tracking-[0.3em] mt-1">Infrastructure Routing & Zone Control</p>
             </div>
         </div>
