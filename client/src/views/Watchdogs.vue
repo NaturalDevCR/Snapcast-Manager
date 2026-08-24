@@ -5,6 +5,8 @@ import { useUIStore } from '../stores/ui';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
+import EmptyState from '../components/ui/EmptyState.vue';
+import Button from '../components/ui/Button.vue';
 import { basicEditor } from 'prism-code-editor/setups';
 import 'prism-code-editor/prism/languages/json';
 import 'prism-code-editor/layout.css';
@@ -171,8 +173,19 @@ function formatBytes(bytes?: number) {
       </div>
 
       <!-- Empty State -->
-      <div v-if="watchdogStore.watchdogs.length === 0" class="text-center py-16 border border-dashed border-zinc-800 rounded-lg">
-         <p class="text-zinc-500">No watchdogs configured yet.</p>
+      <div v-if="watchdogStore.watchdogs.length === 0" class="border border-dashed border-zinc-800 rounded-lg">
+        <EmptyState
+          icon="monitor_heart"
+          title="No watchdogs configured yet"
+          description="Add a watchdog to monitor TCP Server source connections in real-time."
+        >
+          <template #action>
+            <Button @click="showAddDialog = true">
+              <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">add</span>
+              Add Watchdog
+            </Button>
+          </template>
+        </EmptyState>
       </div>
 
       <!-- Watchdog Grids -->

@@ -6,6 +6,8 @@ import { useSnapclientInstancesStore, type SnapclientInstance, type AlsaControl 
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
 import ConfirmDestructive from '../components/ui/ConfirmDestructive.vue';
+import EmptyState from '../components/ui/EmptyState.vue';
+import Button from '../components/ui/Button.vue';
 
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
@@ -282,10 +284,19 @@ onMounted(async () => {
           </div>
 
           <!-- Empty state -->
-          <div v-if="instanceStore.instances.length === 0" class="flex flex-col items-center justify-center py-16 rounded-2xl border border-white/5 bg-white/[0.02] text-center">
-            <span class="material-symbols-outlined text-[3rem] text-white/10 mb-3">speaker_notes_off</span>
-            <p class="text-sm font-black text-white/20 uppercase tracking-widest">No instances configured</p>
-            <p class="text-xs text-gray-600 mt-1">Create an instance for each audio output device.</p>
+          <div v-if="instanceStore.instances.length === 0" class="rounded-2xl border border-white/5 bg-white/[0.02]">
+            <EmptyState
+              icon="speaker"
+              title="No instances configured"
+              description="Create an instance for each audio output device."
+            >
+              <template #action>
+                <Button :disabled="instanceStore.loading" @click="openCreate">
+                  <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">add</span>
+                  New Instance
+                </Button>
+              </template>
+            </EmptyState>
           </div>
 
           <!-- Instance cards -->

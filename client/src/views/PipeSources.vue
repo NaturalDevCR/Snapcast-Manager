@@ -3,6 +3,8 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
+import EmptyState from '../components/ui/EmptyState.vue';
+import Button from '../components/ui/Button.vue';
 import { usePipeSourcesStore, type PipeSource, type PipeSourceFormData, type PipeSourceType, type DiscoveredPipe, type AdoptInput } from '../stores/pipeSources';
 import { useUIStore } from '../stores/ui';
 import { fetchApi } from '../utils/api';
@@ -427,11 +429,19 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
 
       <!-- Empty state -->
       <div v-if="!store.loading && store.pipes.length === 0"
-        class="text-center py-16 border border-dashed border-zinc-800 rounded-lg">
-        <span class="material-symbols-outlined text-4xl text-zinc-700 mb-3 block">sensors</span>
-        <p class="text-zinc-500">No pipe sources configured.</p>
-        <p class="text-zinc-600 text-sm mt-1">Add a Radio or MPD source to replace your
-          <code class="text-xs bg-zinc-800 px-1 rounded">process://</code> entries.</p>
+        class="border border-dashed border-zinc-800 rounded-lg">
+        <EmptyState
+          icon="sensors"
+          title="No pipe sources configured"
+          description="Add a Radio or MPD source to replace your process:// entries."
+        >
+          <template #action>
+            <Button @click="openAdd">
+              <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">add</span>
+              Add Source
+            </Button>
+          </template>
+        </EmptyState>
       </div>
 
       <!-- Source cards -->
@@ -698,9 +708,8 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
               <span class="material-symbols-outlined animate-spin inline-block mr-2 text-[1.2rem]">refresh</span>
               Scanning snapserver config…
             </div>
-            <div v-else-if="discovered.length === 0" class="text-center py-8 text-zinc-500 text-sm">
-              <span class="material-symbols-outlined text-3xl block mb-2 text-zinc-700">check_circle</span>
-              No unmanaged pipe:// sources found.
+            <div v-else-if="discovered.length === 0" class="text-sm">
+              <EmptyState icon="check_circle" title="No unmanaged pipe:// sources found" />
             </div>
             <div v-else-if="pendingDiscovered.length === 0" class="text-center py-8 text-zinc-500 text-sm">
               <span class="material-symbols-outlined text-3xl block mb-2 text-green-600">check_circle</span>

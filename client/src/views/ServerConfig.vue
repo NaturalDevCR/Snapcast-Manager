@@ -15,6 +15,7 @@ import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import PromptDialog from '../components/PromptDialog.vue';
+import EmptyState from '../components/ui/EmptyState.vue';
 
 
 
@@ -820,10 +821,14 @@ const handleSave = () => {
                       </button>
                     </div>
                     
-                    <div v-if="!localParsedConfig.stream?.source" class="text-center py-8 border border-dashed border-white/10 rounded-xl bg-black/20">
-                      <span class="material-symbols-outlined text-[32px] text-gray-500 mx-auto mb-2 drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">library_music</span>
-                      <p class="text-xs font-black text-gray-400 uppercase tracking-widest">No sources configured</p>
-                      <p class="text-[10px] text-gray-500 mt-1">Use "Add Source" to create your first audio stream</p>
+                    <div v-if="!localParsedConfig.stream?.source" class="border border-dashed border-white/10 rounded-xl bg-black/20">
+                      <!-- No CTA here: the "Add Source" button is already visible directly
+                           above this empty state in the section header (Task 33). -->
+                      <EmptyState
+                        icon="library_music"
+                        title="No sources configured"
+                        description='Use "Add Source" above to create your first audio stream.'
+                      />
                     </div>
                     
                     <div v-else class="space-y-3">
@@ -1327,10 +1332,15 @@ const handleSave = () => {
                           <span class="material-symbols-outlined text-[12px] align-middle mr-1">library_music</span>
                           Available Sources
                         </label>
-                        <div v-if="availableMetaSources.length === 0" class="text-center py-6 border border-dashed border-white/10 rounded-xl bg-black/20">
-                          <span class="material-symbols-outlined text-[24px] text-gray-600">info</span>
-                          <p class="text-[10px] text-gray-500 mt-1 font-bold uppercase tracking-widest">No non-meta sources configured yet</p>
-                          <p class="text-[9px] text-gray-600 mt-0.5">Add other audio sources first, then create a meta-stream to combine them</p>
+                        <div v-if="availableMetaSources.length === 0" class="border border-dashed border-white/10 rounded-xl bg-black/20">
+                          <!-- No CTA here: creating a source happens in the separate "Audio
+                               Sources" sub-section, not from within this meta-stream picker
+                               (Task 33). -->
+                          <EmptyState
+                            icon="info"
+                            title="No non-meta sources configured yet"
+                            description="Add other audio sources first, then create a meta-stream to combine them."
+                          />
                         </div>
                         <div v-else class="flex flex-wrap gap-2">
                           <button
