@@ -15,10 +15,14 @@
 // ConfirmDialog's amber/red icon backgrounds) — none of these are part of
 // the brand's purple/teal palette, so they're the brief's justified
 // "semantic status color" exception. `neutral` and `brand` are fully
-// token-driven (text-text-muted/brand-surface and text-brand-primary
+// token-driven (text-text-muted/brand-surface and text-brand-primary-text
 // respectively) — `brand` replaces the ad-hoc `purple-500`/`purple-300`
 // literal used for PipeSources.vue's "Radio" pipe-type pill with the real
-// brand-primary token.
+// brand-primary-text token. (`text-brand-primary-text`, not
+// `text-brand-primary` itself, per the Task 37 review fix — see
+// client/src/style.css's `--brand-primary-text` comment: `--brand-primary`
+// as TEXT fails AA in one theme or the other, so the text-specific token
+// carries separate light/dark values.)
 import { computed } from 'vue';
 
 export interface BadgeProps {
@@ -36,7 +40,7 @@ const variantClasses: Record<NonNullable<BadgeProps['variant']>, string> = {
   warning: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
   danger: 'text-red-400 bg-red-400/10 border-red-400/20',
   neutral: 'text-text-muted bg-brand-surface border-brand-primary/10',
-  brand: 'text-purple-400 bg-brand-primary/10 border-brand-primary/20',
+  brand: 'text-brand-primary-text bg-brand-primary/10 border-brand-primary/20',
 };
 
 const sizeClasses: Record<NonNullable<BadgeProps['size']>, string> = {

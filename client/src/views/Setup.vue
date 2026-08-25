@@ -65,7 +65,7 @@ const handleSetup = async () => {
                      <h2 class="text-4xl font-black text-text-main tracking-tight leading-tight mb-4">
                         System Ignition
                     </h2>
-                    <p class="text-slate-500 dark:text-slate-400 font-medium text-lg">
+                    <p class="text-slate-400 font-medium text-lg">
                         Let's set up your master administrator account.
                     </p>
                 </div>

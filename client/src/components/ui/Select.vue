@@ -73,7 +73,7 @@ function onUpdate(value: string | number) {
             <li
               :class="[
                 'relative flex items-center justify-between cursor-pointer select-none py-2 px-4',
-                active ? 'bg-brand-primary/10 text-purple-400' : 'text-text-main',
+                active ? 'bg-brand-primary/10 text-brand-primary-text' : 'text-text-main',
               ]"
             >
               <span :class="isSelected ? 'font-bold' : 'font-medium'">{{ option.label }}</span>

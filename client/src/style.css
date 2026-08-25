@@ -50,6 +50,8 @@
   --color-brand-surface: var(--brand-surface);
   --color-text-main: var(--text-main);
   --color-text-muted: var(--text-muted);
+  --color-brand-primary-text: var(--brand-primary-text);
+  --color-terminal-muted: var(--terminal-muted);
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
@@ -62,6 +64,53 @@
     --brand-surface: #ffffff;
     --text-main: #111827;
     --text-muted: #4b5563;
+    /*
+     * --brand-primary-text (Task 37 review fix, Finding 1): a THEME-AWARE
+     * text color for `--brand-primary` used as small/normal-size TEXT
+     * (Button.vue secondary variant, Badge.vue brand variant, Select.vue's
+     * active-option highlight) — as opposed to `--brand-primary` used as a
+     * background/border/icon color, which is unaffected and stays as-is.
+     * `--brand-primary` itself (#a60df2) is identical in both :root/.dark
+     * and only computes ~5.0-5.3:1 here in light theme (passing) but
+     * ~3.2-3.6:1 in dark theme (failing AA) — and no single shade passes
+     * both themes' real backgrounds (page/surface/card/composited badge
+     * contexts), so this token carries distinct light/dark values instead,
+     * following the same :root/.dark pattern as --text-main/--text-muted
+     * above. Light value = Tailwind purple-700 (#7e22ce): computed
+     * 5.60-6.98:1 against every light-theme context these 3 primitives
+     * actually render in (page bg, surface, card body, Select's
+     * brand/10-over-surface highlight, Badge's brand/10-over-bg and
+     * brand/10-over-card-body). Dark value = Tailwind purple-400 (#c084fc,
+     * matches Task 37's original dark-theme-only fix): computed
+     * 6.47-7.27:1 against the equivalent dark-theme contexts. See
+     * `.superpowers/sdd/task-37-report.md`'s "Fix pass" section for the
+     * full computed matrix.
+     */
+    --brand-primary-text: #7e22ce;
+    /*
+     * --terminal-muted (Task 37 review fix, Finding 3): a THEME-AWARE muted
+     * text color for the literal `bg-black/40` "terminal"-styled panels in
+     * Logs.vue/Tools.vue (script list, crontab/mpd/backup panels, service
+     * tabs) — as opposed to the token-driven `--brand-bg`/`--brand-surface`
+     * panels Group A's `text-text-muted` already covers. `bg-black/40`
+     * composites very differently per theme: over dark `--brand-bg` it's
+     * near-black (~#110a14), but over light `--brand-bg` it's a *mid-gray*
+     * (~#959596, not a dark panel at all) — so no single Tailwind gray
+     * shade passes both (light gray-400, the original Task 37 Group B fix,
+     * is 7.68:1 dark/PASS but only 1.18:1 light/FAIL — worse than either
+     * pre-fix shade in light theme). Light value = Tailwind gray-800
+     * (#1f2937): computed 4.91-5.59:1 against this panel family's real
+     * light-theme composites (plain `bg-black/40` and the `bg-white/5`-
+     * nested sub-headers). Dark value = Tailwind gray-400 (#9ca3af,
+     * unchanged from the original Group B fix): 6.96-7.68:1 dark, still
+     * passing. See `.superpowers/sdd/task-37-report.md`'s "Fix pass"
+     * section for the full computed matrix and which specific lines use
+     * this token (not e.g. `ServerConfig.vue:1153`, whose panel nests
+     * inside an additional near-opaque `bg-[#140b1b]/80` layer that keeps
+     * its real composite dark in both themes — gray-400 alone already
+     * passes there).
+     */
+    --terminal-muted: #1f2937;
   }
 
   /* Default / Server theme */
@@ -73,6 +122,8 @@
     --brand-surface: #140b1b;
     --text-main: #ffffff;
     --text-muted: #9ca3af;
+    --brand-primary-text: #c084fc;
+    --terminal-muted: #9ca3af;
   }
 
   /* Client theme variant */

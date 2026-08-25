@@ -913,7 +913,7 @@ const handleSave = () => {
                         <!-- Label Column -->
                         <div class="md:col-span-3">
                           <div class="flex flex-col min-w-0">
-                            <label class="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                            <label class="text-[11px] font-black text-slate-300 uppercase tracking-wide">
                               {{ getMetaForKey('stream', key)?.label || key }}
                             </label>
                             <span v-if="getMetaForKey('stream', key)?.description" 
@@ -962,7 +962,7 @@ const handleSave = () => {
                             >
                               <span :class="[String(getPropertyValue('stream', key)) === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                             </button>
-                            <span class="ml-3 text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">
+                            <span class="ml-3 text-xs text-slate-400 font-bold uppercase tracking-widest">
                               {{ String(getPropertyValue('stream', key)) === 'true' ? 'Enabled' : 'Disabled' }}
                             </span>
                           </div>
