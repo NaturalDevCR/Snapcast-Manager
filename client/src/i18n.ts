@@ -1,6 +1,8 @@
 import { createI18n } from 'vue-i18n';
 import enCommon from './locales/en/common.json';
 import esCommon from './locales/es/common.json';
+import enLayout from './locales/en/layout.json';
+import esLayout from './locales/es/layout.json';
 
 export type SupportedLocale = 'en' | 'es';
 export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'es'];
@@ -20,8 +22,8 @@ export const i18n = createI18n({
   locale: initialLocale,
   fallbackLocale: 'en',
   messages: {
-    en: { common: enCommon },
-    es: { common: esCommon },
+    en: { common: enCommon, layout: enLayout },
+    es: { common: esCommon, layout: esLayout },
   },
 });
 
