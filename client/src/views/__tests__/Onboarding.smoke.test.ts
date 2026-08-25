@@ -5,6 +5,7 @@ import { useOnboardingStore } from '../../stores/onboarding';
 import { useSystemStore } from '../../stores/system';
 import { usePipeSourcesStore } from '../../stores/pipeSources';
 import { useSnapcastStore } from '../../stores/snapcast';
+import { useUIStore } from '../../stores/ui';
 import { mountSmokeTest } from '../../test/mountView';
 
 describe('Onboarding.vue', () => {
@@ -138,5 +139,72 @@ describe('Onboarding.vue', () => {
 
     expect(setGroupStreamSpy).toHaveBeenCalledWith('g1', 'a');
     expect(setStepSpy).toHaveBeenCalledWith(3); // marks complete; adjust to whatever "done" sentinel Step 3 implementation actually uses
+  });
+
+  // --- i18n (Task 55) ---------------------------------------------------
+  // Task 55 extracts every literal English string in this view into the
+  // `onboarding` i18n namespace. These two tests prove the extraction:
+  // default-English rendering stays byte-identical to the pre-extraction
+  // hardcoded copy (so all the tests above keep passing unmodified), and
+  // switching locale to "es" via useUIStore().setLocale() re-renders the
+  // real Costa-Rica-Spanish translations -- including step 3's dynamic
+  // zone-name interpolation, both with a real group name and via the
+  // `zoneFallbackName` fallback when a group has no name.
+  it('renders English copy by default across all 3 steps (i18n)', async () => {
+    const wrapper = await mountSmokeTest(Onboarding, '/onboarding');
+    const onboardingStore = useOnboardingStore();
+    const systemStore = useSystemStore();
+    const snapcastStore = useSnapcastStore();
+
+    onboardingStore.step = 1;
+    systemStore.installedPackages.snapserver = false;
+    await nextTick();
+    expect(wrapper.text()).toContain('1. Set Up Snapserver');
+    expect(wrapper.text()).toContain('Skip for now');
+
+    onboardingStore.step = 2;
+    await nextTick();
+    expect(wrapper.text()).toContain('2. Add your first source');
+
+    onboardingStore.step = 3;
+    snapcastStore.status = {
+      server: { version: '1.0' },
+      groups: [{ id: 'g1abcd', name: '', clients: [{ id: 'c1' }], stream_id: '', muted: false }],
+      streams: [],
+    } as any;
+    await nextTick();
+    expect(wrapper.text()).toContain('3. Assign your first zone');
+    // Dynamic zone-name interpolation via the `zoneFallbackName` key when
+    // the group has no name (matches the original `'Zone ' + id.slice(0,4)`
+    // string-concatenation behavior it replaces).
+    expect(wrapper.text()).toContain('Zone g1ab is ready');
+  });
+
+  it('renders Spanish copy across all 3 steps when useUIStore().locale is "es" (i18n)', async () => {
+    const wrapper = await mountSmokeTest(Onboarding, '/onboarding');
+    const onboardingStore = useOnboardingStore();
+    const systemStore = useSystemStore();
+    const snapcastStore = useSnapcastStore();
+    useUIStore().setLocale('es');
+
+    onboardingStore.step = 1;
+    systemStore.installedPackages.snapserver = false;
+    await nextTick();
+    expect(wrapper.text()).toContain('1. Configurar Snapserver');
+    expect(wrapper.text()).toContain('Omitir por ahora');
+
+    onboardingStore.step = 2;
+    await nextTick();
+    expect(wrapper.text()).toContain('2. Agrega tu primera fuente');
+
+    onboardingStore.step = 3;
+    snapcastStore.status = {
+      server: { version: '1.0' },
+      groups: [{ id: 'g1', name: 'Sala', clients: [{ id: 'c1' }], stream_id: '', muted: false }],
+      streams: [],
+    } as any;
+    await nextTick();
+    expect(wrapper.text()).toContain('3. Asigna tu primera zona');
+    expect(wrapper.text()).toContain('Sala está lista');
   });
 });

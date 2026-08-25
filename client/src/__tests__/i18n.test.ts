@@ -87,4 +87,37 @@ describe('real i18n singleton has all namespaces registered', () => {
     expect(i18n.global.t('setup.title')).toBe('Ignición del Sistema');
     expect(i18n.global.t('setup.submit')).toBe('Completar Configuración y Lanzar');
   });
+
+  it.each(['en', 'es'] as const)('resolves onboarding.step1Title for locale "%s" (not the raw key)', (locale) => {
+    i18n.global.locale.value = locale;
+    expect(i18n.global.t('onboarding.step1Title')).not.toBe('onboarding.step1Title');
+  });
+
+  it('resolves onboarding.step1Title and onboarding.skip to the correct translated string per locale', () => {
+    i18n.global.locale.value = 'en';
+    expect(i18n.global.t('onboarding.step1Title')).toBe('1. Set Up Snapserver');
+    expect(i18n.global.t('onboarding.skip')).toBe('Skip for now');
+
+    i18n.global.locale.value = 'es';
+    expect(i18n.global.t('onboarding.step1Title')).toBe('1. Configurar Snapserver');
+    expect(i18n.global.t('onboarding.skip')).toBe('Omitir por ahora');
+  });
+
+  // Step 3's dynamic zone-name interpolation (Task 55 CRITICAL note):
+  // proves the real singleton resolves named interpolation, not just flat
+  // strings, for both the "has a real name" and "falls back to a synthetic
+  // name from the id" cases.
+  it('resolves onboarding.step3ZoneReady and onboarding.zoneFallbackName with named interpolation per locale', () => {
+    i18n.global.locale.value = 'en';
+    expect(i18n.global.t('onboarding.step3ZoneReady', { zoneName: 'Living Room' })).toBe(
+      'Living Room is ready. Pick a source for it:',
+    );
+    expect(i18n.global.t('onboarding.zoneFallbackName', { id: 'g1ab' })).toBe('Zone g1ab');
+
+    i18n.global.locale.value = 'es';
+    expect(i18n.global.t('onboarding.step3ZoneReady', { zoneName: 'Sala' })).toBe(
+      'Sala está lista. Elige una fuente para ella:',
+    );
+    expect(i18n.global.t('onboarding.zoneFallbackName', { id: 'g1ab' })).toBe('Zona g1ab');
+  });
 });

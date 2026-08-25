@@ -1,0 +1,17 @@
+{
+  "getStarted": "Comencemos",
+  "skip": "Omitir por ahora",
+  "progressLabel": "Progreso de la configuración inicial",
+  "step1Title": "1. Configurar Snapserver",
+  "step1Description": "Snapserver es el servidor de audio que esta aplicación administra.",
+  "installSnapserver": "Instalar Snapserver",
+  "step1Complete": "Snapserver está instalado.",
+  "next": "Siguiente",
+  "step2Title": "2. Agrega tu primera fuente",
+  "step2AlreadyHave": "Ya tienes {count} fuente(s) configurada(s).",
+  "step3Title": "3. Asigna tu primera zona",
+  "step3Waiting": "Esperando que se conecte un cliente. Conecta un dispositivo snapclient físico en tu red, o usa el modo Cliente local de esta aplicación -- esta página se actualiza automáticamente en cuanto aparezca uno.",
+  "step3ZoneReady": "{zoneName} está lista. Elige una fuente para ella:",
+  "zoneFallbackName": "Zona {id}",
+  "chooseSourcePlaceholder": "Elige una fuente"
+}

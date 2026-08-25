@@ -1,0 +1,17 @@
+{
+  "getStarted": "Get Started",
+  "skip": "Skip for now",
+  "progressLabel": "Onboarding progress",
+  "step1Title": "1. Set Up Snapserver",
+  "step1Description": "Snapserver is the audio server this app manages.",
+  "installSnapserver": "Install Snapserver",
+  "step1Complete": "Snapserver is installed.",
+  "next": "Next",
+  "step2Title": "2. Add your first source",
+  "step2AlreadyHave": "You already have {count} source(s) configured.",
+  "step3Title": "3. Assign your first zone",
+  "step3Waiting": "Waiting for a client to connect. Connect a physical snapclient device on your network, or use this app's own local Client mode -- this page updates automatically once one appears.",
+  "step3ZoneReady": "{zoneName} is ready. Pick a source for it:",
+  "zoneFallbackName": "Zone {id}",
+  "chooseSourcePlaceholder": "Choose a source"
+}

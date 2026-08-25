@@ -11,6 +11,7 @@
 //      calling snapcastStore.setGroupStream()). Marks onboarding complete
 //      and redirects to `/` on assignment.
 import { ref, computed, onMounted, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import Layout from '../components/Layout.vue';
 import Button from '../components/ui/Button.vue';
 import Select from '../components/ui/Select.vue';
@@ -21,6 +22,7 @@ import { usePipeSourcesStore } from '../stores/pipeSources';
 import { useSnapcastStore } from '../stores/snapcast';
 import { useRouter } from 'vue-router';
 
+const { t } = useI18n({ useScope: 'global' });
 const onboardingStore = useOnboardingStore();
 const systemStore = useSystemStore();
 const pipeSourcesStore = usePipeSourcesStore();
@@ -65,6 +67,15 @@ const firstGroupWithClient = computed(() =>
   snapcastStore.status?.groups.find((g) => g.clients.length > 0) ?? null
 );
 
+// Named interpolation for step 3's dynamic zone name (t('onboarding.
+// zoneFallbackName', { id }) rather than string concatenation) -- see
+// task-55-brief.md's CRITICAL note.
+const zoneDisplayName = computed(() => {
+  const group = firstGroupWithClient.value;
+  if (!group) return '';
+  return group.name || t('onboarding.zoneFallbackName', { id: group.id.slice(0, 4) });
+});
+
 const streamSelectOptions = computed(() =>
   (snapcastStore.status?.streams || []).map((stream: any) => ({
     value: stream.id,
@@ -102,56 +113,53 @@ async function skip() {
   <Layout>
     <div class="max-w-2xl mx-auto py-12 space-y-8">
       <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-black text-text-main">Get Started</h1>
+        <h1 class="text-2xl font-black text-text-main">{{ t('onboarding.getStarted') }}</h1>
         <button @click="skip" class="text-xs font-bold text-text-muted hover:text-text-main uppercase tracking-widest">
-          Skip for now
+          {{ t('onboarding.skip') }}
         </button>
       </div>
 
-      <div class="flex items-center gap-2" aria-label="Onboarding progress">
+      <div class="flex items-center gap-2" :aria-label="t('onboarding.progressLabel')">
         <div v-for="n in 3" :key="n" class="flex-1 h-1 rounded-full"
              :class="onboardingStore.step >= n ? 'bg-brand-primary' : 'bg-white/10'"></div>
       </div>
 
       <div v-if="onboardingStore.step === 1" class="space-y-4">
-        <h2 class="text-lg font-bold text-text-main">1. Set Up Snapserver</h2>
-        <p class="text-sm text-text-muted">Snapserver is the audio server this app manages.</p>
+        <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step1Title') }}</h2>
+        <p class="text-sm text-text-muted">{{ t('onboarding.step1Description') }}</p>
         <div v-if="!step1Done">
-          <Button :loading="systemStore.loading" @click="handleInstallSnapserver">Install Snapserver</Button>
+          <Button :loading="systemStore.loading" @click="handleInstallSnapserver">{{ t('onboarding.installSnapserver') }}</Button>
         </div>
         <div v-else class="space-y-3">
-          <p class="text-sm text-[#00ff9d]">Snapserver is installed.</p>
-          <Button @click="advanceTo(2)">Next</Button>
+          <p class="text-sm text-[#00ff9d]">{{ t('onboarding.step1Complete') }}</p>
+          <Button @click="advanceTo(2)">{{ t('onboarding.next') }}</Button>
         </div>
       </div>
 
       <div v-else-if="onboardingStore.step === 2" class="space-y-4">
-        <h2 class="text-lg font-bold text-text-main">2. Add your first source</h2>
+        <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step2Title') }}</h2>
         <p v-if="step2Done" class="text-sm text-text-muted">
-          You already have {{ pipeSourcesStore.pipes.length }} source(s) configured.
+          {{ t('onboarding.step2AlreadyHave', { count: pipeSourcesStore.pipes.length }) }}
         </p>
-        <Button v-if="step2Done" @click="advanceTo(3)">Next</Button>
+        <Button v-if="step2Done" @click="advanceTo(3)">{{ t('onboarding.next') }}</Button>
         <AddEditPipeDialog ref="addEditDialog" @saved="handlePipeSaved" />
       </div>
 
       <div v-else-if="onboardingStore.step === 3" class="space-y-4">
-        <h2 class="text-lg font-bold text-text-main">3. Assign your first zone</h2>
+        <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step3Title') }}</h2>
         <div v-if="!firstGroupWithClient" class="space-y-2">
           <p class="text-sm text-text-muted">
-            Waiting for a client to connect. Connect a physical snapclient device
-            on your network, or use this app's own local Client mode -- this page
-            updates automatically once one appears.
+            {{ t('onboarding.step3Waiting') }}
           </p>
         </div>
         <div v-else class="space-y-3">
           <p class="text-sm text-text-muted">
-            {{ firstGroupWithClient.name || 'Zone ' + firstGroupWithClient.id.slice(0, 4) }} is ready.
-            Pick a source for it:
+            {{ t('onboarding.step3ZoneReady', { zoneName: zoneDisplayName }) }}
           </p>
           <Select
             :model-value="firstGroupWithClient.stream_id"
             :options="streamSelectOptions"
-            placeholder="Choose a source"
+            :placeholder="t('onboarding.chooseSourcePlaceholder')"
             @update:model-value="handleZoneAssignment"
           />
         </div>
