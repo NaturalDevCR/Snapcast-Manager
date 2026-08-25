@@ -109,4 +109,41 @@ describe('Routing.vue', () => {
       expect(button.getAttribute('aria-label')).toBeTruthy();
     }
   });
+
+  // Task 34: the cable-drag gesture is mouse/touch-only, so every zone also
+  // gets a keyboard/screen-reader-usable <Select> listing every available
+  // stream. Picking a different stream there must call the exact same
+  // snapcastStore.setGroupStream() the drag-and-drop path calls -- proving
+  // the two interaction modes don't fork into divergent implementations.
+  it('lets a zone route audio via its accessible Source <Select>, calling the same snapcastStore.setGroupStream() the drag gesture uses', async () => {
+    const wrapper = await mountSmokeTest(Routing, '/routing');
+    const snapcastStore = useSnapcastStore();
+    const setGroupStreamSpy = vi.spyOn(snapcastStore, 'setGroupStream').mockResolvedValue(undefined);
+
+    snapcastStore.status = {
+      server: { version: '1.2.3' },
+      groups: [{ id: 'g1', name: 'Living Room', clients: [], stream_id: 'a', muted: false }],
+      streams: [
+        { id: 'a', status: 'playing', uri: { query: { name: 'Radio A' }, scheme: 'tcp' } },
+        { id: 'b', status: 'idle', uri: { query: { name: 'Radio B' }, scheme: 'tcp' } },
+      ],
+    };
+    await nextTick();
+    await nextTick();
+
+    // The zone's Source <Select> trigger shows the currently-assigned
+    // stream's label ("Radio A") as its button text (Select.vue's own
+    // tests exercise it the same way: find the trigger button, click to
+    // open, click the [role="option"] for the desired value).
+    const selectButton = wrapper.findAll('button').find((b) => b.text().includes('Radio A'));
+    expect(selectButton, 'expected to find the zone Source <Select> trigger showing "Radio A"').toBeTruthy();
+    await selectButton!.trigger('click');
+
+    const optionB = wrapper.findAll('[role="option"]').find((o) => o.text().includes('Radio B'));
+    expect(optionB, 'expected a "Radio B" option in the Source <Select>').toBeTruthy();
+    await optionB!.trigger('click');
+    await nextTick();
+
+    expect(setGroupStreamSpy).toHaveBeenCalledWith('g1', 'b');
+  });
 });

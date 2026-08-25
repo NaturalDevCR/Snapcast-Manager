@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Layout from '../components/Layout.vue';
 import Badge from '../components/ui/Badge.vue';
+import Select from '../components/ui/Select.vue';
 import { useSnapcastStore } from '../stores/snapcast';
 import { useEventSource } from '../composables/useEventSource';
 import { sseStatusBadge } from '../utils/sseStatus';
@@ -287,6 +288,34 @@ const getStreamLabel = (stream: any) => {
     return stream.id || 'Unknown Stream';
 };
 
+// Task 34: keyboard/screen-reader-usable alternative to the mouse/touch
+// "cable" drag gesture above. Every zone gets a <Select> listing all
+// available streams; picking one routes audio exactly the way dropping a
+// dragged cable on the zone does -- both paths call the same
+// snapcastStore.setGroupStream() with the same optimistic-update pattern
+// (see handleMouseUp above), so behavior never forks between the two
+// interaction modes.
+const streamSelectOptions = computed(() =>
+    (snapcastStore.status?.streams || []).map((stream) => ({
+        value: stream.id,
+        label: getStreamLabel(stream),
+    }))
+);
+
+const onZoneSourceChange = (groupId: string, newStreamId: string | number) => {
+    const streamId = String(newStreamId);
+    const currentGroup = snapcastStore.status?.groups.find(g => g.id === groupId);
+    if (!currentGroup || currentGroup.stream_id === streamId) return;
+
+    // Optimistic UI update, mirroring handleMouseUp's drag-and-drop path.
+    currentGroup.stream_id = streamId;
+    triggerRedraw();
+
+    snapcastStore.setGroupStream(groupId, streamId).catch(err => {
+        console.error("Failed to set stream, resetting optimistic update", err);
+    });
+};
+
 const startRename = (clientId: string, currentName: string) => {
     renamingClientId.value = clientId;
     newClientName.value = currentName;
@@ -361,7 +390,11 @@ const updateVolume = (client: any, event: Event) => {
       <!-- Interactive Matrix -->
       <div v-else class="relative w-full min-h-[600px]" ref="containerRef">
          <!-- SVG Overlay for Cables -->
-         <svg class="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
+         <!-- Task 34: decorative now that each zone's <Select> below provides
+              the real accessible routing interaction (requirement 1) -- a
+              screen reader has nothing useful to announce about these <path>
+              cable curves, so hide the whole overlay from the a11y tree. -->
+         <svg class="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible hidden lg:block" role="presentation" aria-hidden="true">
             <!-- Active Cables -->
             <path v-for="conn in activeConnections" :key="conn.groupId"
                   :d="conn.path" 
@@ -414,12 +447,18 @@ const updateVolume = (client: any, event: Event) => {
                       </div>
                       
                       <!-- Output Connector Node (Draggable Handle) -->
+                      <!-- Task 34: mouse/touch-only drag gesture, fully
+                           replaced for non-mouse users by each zone's
+                           accessible <Select> below -- hidden from the a11y
+                           tree, and from layout on mobile where the SVG
+                           cable overlay is also hidden (see requirement 3). -->
                       <div :ref="setSourceRef(stream.id)"
                            @mousedown.prevent="startDrag(stream.id, $event)"
                            @touchstart.prevent="startDrag(stream.id, $event)"
-                           class="w-8 h-8 rounded-full bg-brand-surface border-[3px] flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-110 transition-transform shadow-[0_0_15px_rgba(0,0,0,0.5)] z-30 shrink-0 right-[-16px] absolute lg:right-[-16px]"
+                           class="hidden lg:flex w-8 h-8 rounded-full bg-brand-surface border-[3px] items-center justify-center cursor-grab active:cursor-grabbing hover:scale-110 transition-transform shadow-[0_0_15px_rgba(0,0,0,0.5)] z-30 shrink-0 right-[-16px] absolute lg:right-[-16px]"
                            :style="{ borderColor: getStreamColor(stream.id) }"
-                           title="Drag to connect to a zone">
+                           title="Drag to connect to a zone"
+                           aria-hidden="true">
                            <div class="w-3 h-3 rounded-full transition-all duration-300" 
                                 :class="{'animate-ping opacity-50': isDragging && draggedStreamId === stream.id}"
                                 :style="{ backgroundColor: getStreamColor(stream.id) }"></div>
@@ -443,10 +482,14 @@ const updateVolume = (client: any, event: Event) => {
                       ]">
                       
                       <!-- Input Connector Node (Drop Target) -->
+                      <!-- Task 34: same rationale as the source connector
+                           node above -- decorative/hidden from the a11y tree,
+                           hidden on mobile alongside the SVG cable overlay. -->
                       <div :ref="setZoneRef(group.id)"
-                           class="w-10 h-10 rounded-full bg-brand-surface border-[3px] flex items-center justify-center transition-all duration-300 z-30 shrink-0 absolute left-[-20px] top-[20px] shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                           class="hidden lg:flex w-10 h-10 rounded-full bg-brand-surface border-[3px] items-center justify-center transition-all duration-300 z-30 shrink-0 absolute left-[-20px] top-[20px] shadow-[0_0_15px_rgba(0,0,0,0.5)]"
                            :class="hoverZoneId === group.id ? 'scale-125' : ''"
-                           :style="{ borderColor: group.stream_id ? getStreamColor(group.stream_id) : '#4b5563' }">
+                           :style="{ borderColor: group.stream_id ? getStreamColor(group.stream_id) : '#4b5563' }"
+                           aria-hidden="true">
                            <div class="w-4 h-4 rounded-full transition-all duration-300"
                                 :class="hoverZoneId === group.id ? 'animate-ping opacity-50' : ''"
                                 :style="{ backgroundColor: group.stream_id ? getStreamColor(group.stream_id) : '#374151' }"></div>
@@ -497,6 +540,38 @@ const updateVolume = (client: any, event: Event) => {
                                 <span class="material-symbols-outlined">expand_more</span>
                             </div>
                           </div>
+                      </div>
+
+                      <!-- Accessible Source Selector (Task 34) -->
+                      <!-- Keyboard/screen-reader-usable alternative to the
+                           mouse/touch cable-drag gesture above: lists every
+                           available stream and shows the zone's current
+                           assignment as the selected value. Native
+                           <select>-equivalent keyboard behavior (Up/Down/
+                           Home/End/typeahead) comes for free from Select.vue
+                           (headlessui Listbox). Wrapping in <label> gives the
+                           inner Listbox trigger <button> an accessible name
+                           without needing Select.vue to expose an aria-label
+                           prop. Always visible (not gated behind the
+                           expand/collapse toggle) so it's reachable without
+                           extra steps, and works identically on mobile,
+                           where it's the primary routing path once the cable
+                           UI is hidden below the `lg` breakpoint. -->
+                      <div class="px-4 pb-4 relative z-10">
+                          <label class="flex items-center gap-3 w-full">
+                              <span class="text-[9px] font-black text-text-muted uppercase tracking-[0.15em] shrink-0 flex items-center gap-1.5">
+                                  <span class="material-symbols-outlined text-sm" aria-hidden="true">tune</span>
+                                  Source
+                              </span>
+                              <span class="flex-1 min-w-0">
+                                  <Select
+                                      :model-value="group.stream_id"
+                                      :options="streamSelectOptions"
+                                      placeholder="No source assigned"
+                                      @update:model-value="(value) => onZoneSourceChange(group.id, value)"
+                                  />
+                              </span>
+                          </label>
                       </div>
 
                       <!-- Clients List (Expanded) -->
