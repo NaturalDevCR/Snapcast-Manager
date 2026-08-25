@@ -9,6 +9,8 @@ import enSetup from './locales/en/setup.json';
 import esSetup from './locales/es/setup.json';
 import enOnboarding from './locales/en/onboarding.json';
 import esOnboarding from './locales/es/onboarding.json';
+import enDashboard from './locales/en/dashboard.json';
+import esDashboard from './locales/es/dashboard.json';
 
 export type SupportedLocale = 'en' | 'es';
 export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'es'];
@@ -28,8 +30,8 @@ export const i18n = createI18n({
   locale: initialLocale,
   fallbackLocale: 'en',
   messages: {
-    en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding },
-    es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding },
+    en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard },
+    es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard },
   },
 });
 

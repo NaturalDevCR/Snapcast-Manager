@@ -120,4 +120,30 @@ describe('real i18n singleton has all namespaces registered', () => {
     );
     expect(i18n.global.t('onboarding.zoneFallbackName', { id: 'g1ab' })).toBe('Zona g1ab');
   });
+
+  it.each(['en', 'es'] as const)('resolves dashboard.headerTitle for locale "%s" (not the raw key)', (locale) => {
+    i18n.global.locale.value = locale;
+    expect(i18n.global.t('dashboard.headerTitle')).not.toBe('dashboard.headerTitle');
+  });
+
+  it('resolves dashboard.headerTitle and dashboard.syncAllButton to the correct translated string per locale', () => {
+    i18n.global.locale.value = 'en';
+    expect(i18n.global.t('dashboard.headerTitle')).toBe('System Dashboard');
+    expect(i18n.global.t('dashboard.syncAllButton')).toBe('SYNC ALL');
+
+    i18n.global.locale.value = 'es';
+    expect(i18n.global.t('dashboard.headerTitle')).toBe('Panel del Sistema');
+    expect(i18n.global.t('dashboard.syncAllButton')).toBe('SINCRONIZAR TODO');
+  });
+
+  // Named interpolation (Task 56 CRITICAL note): proves the real singleton
+  // resolves dashboard.* placeholders, not just flat strings, mirroring
+  // Task 55's onboarding.step3ZoneReady proof above.
+  it('resolves dashboard.newVersionAvailable with named interpolation per locale', () => {
+    i18n.global.locale.value = 'en';
+    expect(i18n.global.t('dashboard.newVersionAvailable', { version: '1.2.3' })).toBe('NEW VERSION: 1.2.3');
+
+    i18n.global.locale.value = 'es';
+    expect(i18n.global.t('dashboard.newVersionAvailable', { version: '1.2.3' })).toBe('NUEVA VERSIÓN: 1.2.3');
+  });
 });
