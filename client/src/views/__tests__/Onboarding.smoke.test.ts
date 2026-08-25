@@ -80,6 +80,28 @@ describe('Onboarding.vue', () => {
     expect(wrapper.text().toLowerCase()).toContain('waiting for a client');
   });
 
+  it('step 3 still shows the waiting state when a group exists but has zero connected clients', async () => {
+    // Regression coverage for firstGroupWithClient's `g.clients.length > 0`
+    // check (Onboarding.vue): a group existing at all is not sufficient --
+    // it must actually have a connected client. Without this test, a
+    // mutation of that check to `>= 0` (or removing it) would slip through
+    // undetected, since the other waiting-state test only supplies
+    // `groups: []` (no group objects at all).
+    const wrapper = await mountSmokeTest(Onboarding, '/onboarding');
+    const onboardingStore = useOnboardingStore();
+    const snapcastStore = useSnapcastStore();
+    onboardingStore.step = 3;
+    snapcastStore.status = {
+      server: { version: '1.0' },
+      groups: [{ id: 'g1', name: 'Living Room', clients: [], stream_id: '', muted: false }],
+      streams: [],
+    } as any;
+    await nextTick();
+
+    expect(wrapper.text().toLowerCase()).toContain('waiting for a client');
+    expect(wrapper.findAll('button').find(b => b.text() === 'Choose a source')).toBeFalsy();
+  });
+
   it('step 3 shows a zone-assignment Select once a group with a client exists, and completes onboarding on assignment', async () => {
     const wrapper = await mountSmokeTest(Onboarding, '/onboarding');
     const onboardingStore = useOnboardingStore();
