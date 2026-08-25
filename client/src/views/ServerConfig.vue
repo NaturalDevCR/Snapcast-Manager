@@ -16,7 +16,7 @@ import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import PromptDialog from '../components/PromptDialog.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
-import Skeleton from '../components/ui/Skeleton.vue';
+import SnapshotsPanel from '../components/server-config/SnapshotsPanel.vue';
 
 
 
@@ -55,8 +55,6 @@ const enabledProperties = ref<Record<string, Record<string, boolean>>>({});
 
 // Dialog State
 const showConfirmRestart = ref(false);
-const showConfirmRestore = ref(false);
-const showConfirmDeleteSnapshot = ref(false);
 const showConfirmReset = ref(false);
 const showPromptAddProperty = ref(false);
 const showAddSourceDialog = ref(false);
@@ -140,8 +138,6 @@ const openEditSourceDialog = (idx: number) => {
   showAddSourceDialog.value = true;
 };
 
-const pendingRestoreId = ref<number | null>(null);
-const pendingDeleteSnapshotId = ref<number | null>(null);
 const activePromptSection = ref('');
 
 // Source creation state
@@ -401,9 +397,6 @@ const handleRestartConfirm = async () => {
   }
 };
 
-const snapshotName = ref('');
-const snapshotDescription = ref('');
-
 const isExporting = ref(false);
 
 const handleExportBackup = async () => {
@@ -449,48 +442,14 @@ const handleExportBackup = async () => {
     }
 };
 
-const handleCreateSnapshot = async () => {
-    if (!snapshotName.value) return;
-    try {
-        await snapshotStore.createSnapshot(snapshotName.value, snapshotDescription.value);
-        snapshotName.value = '';
-        snapshotDescription.value = '';
-        uiStore.showToast('Snapshot created successfully!', 'success');
-    } catch (e: any) {
-        uiStore.showToast('Failed to create snapshot: ' + e.message, 'error');
-    }
-};
-
-const triggerRestoreSnapshot = (id: number) => {
-  pendingRestoreId.value = id;
-  showConfirmRestore.value = true;
-};
-
-const handleRestoreSnapshot = async () => {
-    if (pendingRestoreId.value === null) return;
-    try {
-        await snapshotStore.restoreSnapshot(pendingRestoreId.value);
-        await fetchBoth();
-        uiStore.showToast('Snapshot restored successfully!', 'success');
-        showConfirmRestart.value = true;
-    } catch (e: any) {
-        uiStore.showToast('Failed to restore snapshot: ' + e.message, 'error');
-    }
-};
-
-const triggerDeleteSnapshot = (id: number) => {
-  pendingDeleteSnapshotId.value = id;
-  showConfirmDeleteSnapshot.value = true;
-};
-
-const handleDeleteSnapshot = async () => {
-    if (pendingDeleteSnapshotId.value === null) return;
-    try {
-        await snapshotStore.deleteSnapshot(pendingDeleteSnapshotId.value);
-        uiStore.showToast('Snapshot deleted', 'info');
-    } catch (e: any) {
-        uiStore.showToast('Failed to delete snapshot: ' + e.message, 'error');
-    }
+// Task 38: SnapshotsPanel.vue owns the restore/delete/create flow itself
+// (it talks to snapshotStore directly) but a successful restore also
+// needs THIS view to re-fetch the Standard/Expert tabs' config state and
+// offer a Snapserver restart — both are ServerConfig.vue-owned concerns,
+// so the child emits 'restored' and this handler does that part.
+const handleSnapshotRestored = async () => {
+    await fetchBoth();
+    showConfirmRestart.value = true;
 };
 
 const triggerAddProperty = (section: string) => {
@@ -1181,80 +1140,8 @@ const handleSave = () => {
       </div>
 
       <!-- ==================== SNAPSHOTS TAB ==================== -->
-      <div v-else-if="activeTab === 'snapshots'" class="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div class="lg:col-span-1">
-                  <Card title="Checkpoint">
-                      <template #icon>
-                        <span class="material-symbols-outlined text-[20px] text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.5)]">content_copy</span>
-                      </template>
-                      <div class="space-y-5">
-                          <div>
-                              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">Identifier</label>
-                              <input v-model="snapshotName" type="text" placeholder="e.g. Pre-optimization" 
-                                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600">
-                          </div>
-                          <div>
-                              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">Notes</label>
-                              <textarea v-model="snapshotDescription" placeholder="Briefly describe why this checkpoint is being made..." 
-                                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600 h-32 resize-none"></textarea>
-                          </div>
-                          <button 
-                            @click="handleCreateSnapshot"
-                            :disabled="snapshotStore.loading || !snapshotName"
-                            class="w-full px-6 py-3 bg-brand-primary text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#b526ff] shadow-[0_0_15px_rgba(166,13,242,0.4)] hover:shadow-[0_0_20px_rgba(166,13,242,0.6)] disabled:opacity-50 transition-all active:scale-95 border border-brand-primary"
-                          >
-                            Capture State
-                          </button>
-                      </div>
-                  </Card>
-              </div>
-              <div class="lg:col-span-2">
-                  <Card title="Version History">
-                      <template #icon>
-                        <span class="material-symbols-outlined text-[20px] text-[#00d4ff] drop-shadow-[0_0_5px_rgba(0,212,255,0.5)]">history</span>
-                      </template>
-                      <!-- Task 35: shaped like the real snapshot rows in
-                           the v-else branch below (same p-5/rounded-2xl
-                           card, a title-width bar, a shorter timestamp
-                           chip) instead of a bare spinner icon, so it
-                           reads as "list rows about to appear". -->
-                      <div v-if="snapshotStore.loading && snapshotStore.snapshots.length === 0" class="space-y-4">
-                          <div v-for="n in 3" :key="n" class="p-5 border border-white/5 rounded-2xl bg-black/30 space-y-2">
-                              <Skeleton variant="text" width="45%" height="14px" />
-                              <Skeleton variant="text" width="20%" height="10px" />
-                          </div>
-                      </div>
-                      <div v-else-if="snapshotStore.snapshots.length === 0" class="text-center py-24 bg-black/20 rounded-2xl border border-dashed border-white/10">
-                          <p class="text-xs font-black text-text-muted uppercase tracking-[0.2em]">No snapshots archived</p>
-                      </div>
-                      <div v-else class="space-y-4">
-                          <div v-for="snapshot in snapshotStore.snapshots" :key="snapshot.id" 
-                            class="p-5 border border-white/5 rounded-2xl flex justify-between items-center bg-black/30 hover:bg-black/50 hover:border-brand-primary/30 transition-all group shadow-sm">
-                              <div class="space-y-1">
-                                  <h4 class="font-black text-white uppercase tracking-tight drop-shadow-[0_0_5px_rgba(255,255,255,0.2)]">{{ snapshot.name }}</h4>
-                                  <p v-if="snapshot.description" class="text-xs font-semibold text-gray-400">{{ snapshot.description }}</p>
-                                  <div class="flex items-center text-[10px] font-bold text-brand-primary bg-brand-primary/10 border border-brand-primary/20 px-2 py-0.5 rounded w-fit mt-2 uppercase tracking-widest">
-                                    {{ new Date(snapshot.timestamp).toLocaleString() }}
-                                  </div>
-                              </div>
-                              <div class="flex space-x-2">
-                                  <button @click="triggerRestoreSnapshot(snapshot.id)" 
-                                    class="text-[10px] font-black uppercase tracking-widest px-4 py-2 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 rounded-lg hover:bg-brand-primary hover:text-white transition-all shadow-[inset_0_0_10px_rgba(166,13,242,0.1)] hover:shadow-[0_0_15px_rgba(166,13,242,0.3)] active:scale-95">
-                                      Restore
-                                  </button>
-                                  <button @click="triggerDeleteSnapshot(snapshot.id)"
-                                    class="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 border border-transparent hover:border-[#ff3b30]/20 rounded-lg transition-all group-hover:opacity-100 md:opacity-0 active:scale-95"
-                                    :aria-label="`Delete snapshot ${snapshot.name}`">
-                                      <span class="material-symbols-outlined text-[18px]">delete</span>
-                                  </button>
-                              </div>
-                          </div>
-                      </div>
-                  </Card>
-              </div>
-          </div>
-      </div>
+      <!-- Task 38: extracted to components/server-config/SnapshotsPanel.vue -->
+      <SnapshotsPanel v-else-if="activeTab === 'snapshots'" @restored="handleSnapshotRestored" />
 
       <!-- ==================== ADD SOURCE DIALOG ==================== -->
       <Teleport to="body">
@@ -1533,24 +1420,6 @@ const handleSave = () => {
         message="Configuration saved! Restart now to apply changes?"
         confirmText="Restart Now"
         @confirm="handleRestartConfirm"
-      />
-
-      <ConfirmDialog
-        v-model="showConfirmRestore"
-        title="Restore Snapshot?"
-        message="Are you sure you want to restore this snapshot? Current configuration will be overwritten."
-        type="danger"
-        confirmText="Overwrite & Restore"
-        @confirm="handleRestoreSnapshot"
-      />
-
-      <ConfirmDialog
-        v-model="showConfirmDeleteSnapshot"
-        title="Delete Snapshot?"
-        message="This action cannot be undone."
-        type="danger"
-        confirmText="Delete Permanently"
-        @confirm="handleDeleteSnapshot"
       />
 
       <ConfirmDialog
