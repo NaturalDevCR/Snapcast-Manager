@@ -1,0 +1,10 @@
+{
+  "title": "Snapcast Manager",
+  "subtitle": "Autenticación Segura de Red",
+  "usernamePlaceholder": "Usuario",
+  "passwordPlaceholder": "Contraseña",
+  "authenticating": "Autenticando...",
+  "signIn": "Iniciar Sesión",
+  "welcomeBack": "¡Bienvenido de nuevo!",
+  "authFailed": "Error de autenticación"
+}

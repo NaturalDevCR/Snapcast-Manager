@@ -57,4 +57,19 @@ describe('real i18n singleton has all namespaces registered', () => {
     i18n.global.locale.value = 'es';
     expect(i18n.global.t('layout.dashboard')).toBe('Panel');
   });
+
+  it.each(['en', 'es'] as const)('resolves login.title for locale "%s" (not the raw key)', (locale) => {
+    i18n.global.locale.value = locale;
+    expect(i18n.global.t('login.title')).not.toBe('login.title');
+  });
+
+  it('resolves login.title and login.signIn to the correct translated string per locale', () => {
+    i18n.global.locale.value = 'en';
+    expect(i18n.global.t('login.title')).toBe('Snapcast Manager');
+    expect(i18n.global.t('login.signIn')).toBe('Sign In');
+
+    i18n.global.locale.value = 'es';
+    expect(i18n.global.t('login.title')).toBe('Snapcast Manager');
+    expect(i18n.global.t('login.signIn')).toBe('Iniciar Sesión');
+  });
 });

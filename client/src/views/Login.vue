@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 import { useUIStore } from '../stores/ui';
 import { useRouter } from 'vue-router';
 
+const { t } = useI18n({ useScope: 'global' });
 const username = ref('');
 const password = ref('');
 const loading = ref(false);
@@ -15,10 +17,10 @@ const handleLogin = async () => {
   loading.value = true;
   try {
     await authStore.login(username.value, password.value);
-    uiStore.showToast('Welcome back!', 'success');
+    uiStore.showToast(t('login.welcomeBack'), 'success');
     router.push('/');
   } catch (err: any) {
-    uiStore.showToast(err.message || 'Authentication failed', 'error');
+    uiStore.showToast(err.message || t('login.authFailed'), 'error');
   } finally {
     loading.value = false;
   }
@@ -40,9 +42,9 @@ const handleLogin = async () => {
               <span class="material-symbols-outlined text-4xl text-brand-primary">settings_input_antenna</span>
            </div>
            <h2 class="text-3xl font-black text-text-main tracking-tight leading-tight">
-            Snapcast Manager
+            {{ t('login.title') }}
           </h2>
-          <p class="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-text-muted">Secure Network Authentication</p>
+          <p class="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-text-muted">{{ t('login.subtitle') }}</p>
         </div>
 
         <form class="space-y-6" @submit.prevent="handleLogin">
@@ -57,7 +59,7 @@ const handleLogin = async () => {
                 required 
                 v-model="username" 
                 class="block w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-medium"
-                placeholder="Username"
+                :placeholder="t('login.usernamePlaceholder')"
               >
             </div>
             <div class="relative">
@@ -70,7 +72,7 @@ const handleLogin = async () => {
                 required 
                 v-model="password"
                 class="block w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-medium"
-                placeholder="Password"
+                :placeholder="t('login.passwordPlaceholder')"
               >
             </div>
           </div>
@@ -80,9 +82,9 @@ const handleLogin = async () => {
             :disabled="loading"
             class="group w-full flex items-center justify-center py-4 px-6 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-brand-primary/30 border border-brand-primary/50 transition-all active:scale-[0.98] disabled:opacity-50"
           >
-            <span v-if="loading" class="animate-pulse flex items-center gap-2"><span class="material-symbols-outlined animate-spin text-lg">sync</span>Authenticating...</span>
+            <span v-if="loading" class="animate-pulse flex items-center gap-2"><span class="material-symbols-outlined animate-spin text-lg">sync</span>{{ t('login.authenticating') }}</span>
             <div v-else class="flex items-center">
-                <span>Sign In</span>
+                <span>{{ t('login.signIn') }}</span>
                 <span class="material-symbols-outlined ml-2 group-hover:translate-x-1 transition-transform text-lg">login</span>
             </div>
           </button>

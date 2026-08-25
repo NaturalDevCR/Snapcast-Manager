@@ -1,0 +1,10 @@
+{
+  "title": "Snapcast Manager",
+  "subtitle": "Secure Network Authentication",
+  "usernamePlaceholder": "Username",
+  "passwordPlaceholder": "Password",
+  "authenticating": "Authenticating...",
+  "signIn": "Sign In",
+  "welcomeBack": "Welcome back!",
+  "authFailed": "Authentication failed"
+}

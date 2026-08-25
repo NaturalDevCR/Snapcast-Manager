@@ -8,11 +8,14 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { createPinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { createI18n } from 'vue-i18n';
-import type { Component } from 'vue';
+import { watch, type Component } from 'vue';
 import enCommon from '../locales/en/common.json';
 import esCommon from '../locales/es/common.json';
 import enLayout from '../locales/en/layout.json';
 import esLayout from '../locales/es/layout.json';
+import enLogin from '../locales/en/login.json';
+import esLogin from '../locales/es/login.json';
+import { useUIStore } from '../stores/ui';
 
 // A fresh i18n instance per mount (not the app's shared singleton) so tests
 // never leak locale state between each other; always defaults to 'en' so
@@ -24,8 +27,8 @@ function createTestI18n() {
     locale: 'en',
     fallbackLocale: 'en',
     messages: {
-      en: { common: enCommon, layout: enLayout },
-      es: { common: esCommon, layout: esLayout },
+      en: { common: enCommon, layout: enLayout, login: enLogin },
+      es: { common: esCommon, layout: esLayout, login: esLogin },
     },
   });
 }
@@ -40,6 +43,25 @@ export async function mountSmokeTest(component: Component, initialPath = '/'): P
 
   await router.push(initialPath);
   await router.isReady();
+
+  // `useUIStore().setLocale()` mutates the REAL, app-wide `i18n.global.locale`
+  // singleton exported by `client/src/i18n.ts` (see `stores/ui.ts`), not this
+  // mount's own `testI18n` instance created above. Left unhandled, a test
+  // that calls `setLocale('es')` would flip `useUIStore().locale` but the
+  // mounted component's `t()` — bound to `testI18n`, which nothing else
+  // updates — would keep rendering English forever. Bridge the gap here by
+  // watching the store's `locale` ref (which setLocale always updates,
+  // regardless of which i18n instance it also mutates) and mirroring it onto
+  // this mount's own i18n instance, so locale-switch tests genuinely
+  // re-render.
+  const uiStore = useUIStore(pinia);
+  watch(
+    () => uiStore.locale,
+    (locale) => {
+      testI18n.global.locale.value = locale;
+    },
+    { immediate: true },
+  );
 
   const wrapper = mount(component, {
     global: {
