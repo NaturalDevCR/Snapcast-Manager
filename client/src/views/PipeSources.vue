@@ -8,6 +8,7 @@ import Button from '../components/ui/Button.vue';
 import Skeleton from '../components/ui/Skeleton.vue';
 import LogsModal from '../components/pipe-sources/LogsModal.vue';
 import ImportModal from '../components/pipe-sources/ImportModal.vue';
+import ConfigEditorModal from '../components/pipe-sources/ConfigEditorModal.vue';
 import { usePipeSourcesStore, type PipeSource, type PipeSourceFormData, type PipeSourceType } from '../stores/pipeSources';
 import { useUIStore } from '../stores/ui';
 import { fetchApi } from '../utils/api';
@@ -190,45 +191,10 @@ async function restartSnapserver() {
 }
 
 // ---- config editor ----
-const showConfigEditor = ref(false);
-const configEditorPipe = ref<PipeSource | null>(null);
-const configContent = ref('');
-const configFilePath = ref('');
-const loadingConfig = ref(false);
-const savingConfig = ref(false);
-
-async function openConfigEditor(pipe: PipeSource) {
-  configEditorPipe.value = pipe;
-  configContent.value = '';
-  configFilePath.value = '';
-  showConfigEditor.value = true;
-  loadingConfig.value = true;
-  try {
-    const result = await store.getConfig(pipe.id);
-    configContent.value = result.content;
-    configFilePath.value = result.filePath;
-  } catch (err: any) {
-    uiStore.showToast(err.message || 'Failed to load config', 'error');
-    showConfigEditor.value = false;
-  } finally {
-    loadingConfig.value = false;
-  }
-}
-
-async function saveConfigEditor() {
-  if (!configEditorPipe.value) return;
-  savingConfig.value = true;
-  try {
-    await store.setConfig(configEditorPipe.value.id, configContent.value);
-    uiStore.showToast('Config saved and service restarted', 'success');
-    showConfigEditor.value = false;
-    await store.fetchPipes();
-  } catch (err: any) {
-    uiStore.showToast(err.message || 'Failed to save config', 'error');
-  } finally {
-    savingConfig.value = false;
-  }
-}
+// Task 41: moved into ConfigEditorModal.vue -- this view only needs a
+// template ref to imperatively open it for a given pipe (see
+// configEditorModal.value?.open(pipe) below).
+const configEditorModal = ref<InstanceType<typeof ConfigEditorModal> | null>(null);
 
 // ---- logs ----
 // Task 39: moved into LogsModal.vue -- this view only needs a template ref
@@ -466,7 +432,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
               <span class="material-symbols-outlined text-[1rem]" :class="{ 'animate-spin': regeneratingId === pipe.id }">sync</span>
               {{ regeneratingId === pipe.id ? 'Regenerating...' : (pipe.type === 'radio' ? 'Regenerate service' : 'Regenerate MPD') }}
             </button>
-            <button @click="openConfigEditor(pipe)"
+            <button @click="configEditorModal?.open(pipe)"
               class="px-3 py-1.5 rounded bg-amber-600/15 hover:bg-amber-600/30 text-amber-300 text-xs font-medium transition flex items-center gap-1.5">
               <span class="material-symbols-outlined text-[1rem]">description</span>
               {{ pipe.type === 'radio' ? 'Service file' : 'MPD block' }}
@@ -612,55 +578,8 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
     <!-- Import Existing Modal (Task 40: extracted into ImportModal.vue) -->
     <ImportModal ref="importModal" />
 
-    <!-- Config File Editor Modal -->
-    <Teleport to="body">
-      <div v-if="showConfigEditor" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div class="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-3xl flex flex-col shadow-2xl" style="max-height: 85vh;">
-          <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-800 flex-shrink-0">
-            <div>
-              <h3 class="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[1rem] text-amber-400">description</span>
-                {{ configEditorPipe?.type === 'mpd' ? 'MPD audio_output block' : 'Systemd Service File' }}
-                — {{ configEditorPipe?.name }}
-              </h3>
-              <p class="text-xs text-zinc-400 mt-0.5 font-mono">{{ configFilePath }}</p>
-            </div>
-            <button @click="showConfigEditor = false" class="text-zinc-500 hover:text-zinc-300 transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close config editor">
-              <span class="material-symbols-outlined text-[1.2rem]">close</span>
-            </button>
-          </div>
-
-          <div class="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
-            <div v-if="loadingConfig" class="text-zinc-400 text-sm text-center py-8">Loading…</div>
-            <template v-else>
-              <p v-if="configEditorPipe?.type === 'mpd'" class="text-xs text-blue-300 bg-blue-500/5 border border-blue-500/20 rounded px-3 py-2">
-                Editing only the <code>audio_output</code> block managed by Snapcast Manager. Other mpd.conf content is preserved.
-              </p>
-              <p v-else class="text-xs text-amber-300 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2">
-                Changes are written directly to the service file and trigger a <code>daemon-reload</code> + restart. Be careful with syntax.
-              </p>
-              <textarea
-                v-model="configContent"
-                spellcheck="false"
-                class="flex-1 w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-xs text-zinc-200 font-mono leading-5 focus:border-amber-500 focus:outline-none resize-none min-h-0"
-                style="min-height: 300px;"
-              ></textarea>
-            </template>
-          </div>
-
-          <div class="flex justify-end gap-3 px-5 py-4 border-t border-zinc-800 flex-shrink-0">
-            <button @click="showConfigEditor = false" class="px-4 py-2 border border-zinc-700 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 text-sm transition">
-              Cancel
-            </button>
-            <button @click="saveConfigEditor" :disabled="savingConfig || loadingConfig"
-              class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded text-sm font-medium transition disabled:opacity-50 flex items-center gap-2">
-              <span v-if="savingConfig" class="material-symbols-outlined animate-spin text-[1rem]">refresh</span>
-              {{ savingConfig ? 'Saving…' : 'Save & Restart Service' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- Config File Editor Modal (Task 41: extracted into ConfigEditorModal.vue) -->
+    <ConfigEditorModal ref="configEditorModal" />
 
     <!-- Confirm Delete -->
     <ConfirmDialog
