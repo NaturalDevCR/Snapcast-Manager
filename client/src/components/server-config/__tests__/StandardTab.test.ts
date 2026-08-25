@@ -49,6 +49,11 @@ const CONFIG_SECTIONS: Record<string, { label: string; description: string }> = 
   logging: { label: 'Logging', description: 'Log output and filtering' },
 };
 
+// Task 44 (fix pass): sectionOrder is now a prop (previously duplicated as
+// a local constant inside StandardTab.vue) -- mirrors the same fixed list
+// ServerConfig.vue owns and passes down.
+const SECTION_ORDER = ['server', 'ssl', 'http', 'tcp-control', 'tcp-streaming', 'stream', 'streaming_client', 'logging'];
+
 // Minimal source template so the Audio Sources sub-section's "Add Source"
 // button reaches a real AddEditSourceDialog.vue (Task 43) with at least one
 // choosable type -- this is an INTEGRATION check (the dialog's own behavior
@@ -152,6 +157,7 @@ function mountTab(opts: {
       configMetadata: configMetadata.value,
       configSections: configSections.value,
       sourceTemplates: sourceTemplates.value,
+      sectionOrder: SECTION_ORDER,
     },
   });
 

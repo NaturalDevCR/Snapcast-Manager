@@ -54,14 +54,14 @@ const enabledProperties = ref<Record<string, Record<string, boolean>>>({});
 const showConfirmRestart = ref(false);
 const showConfirmReset = ref(false);
 
-// Task 44: duplicated from StandardTab.vue's copy (needed there for the
-// section-switcher tab order). initializeEnabledState() below stays in
-// this parent (it's tied to fetchBoth()'s lifecycle, used by more than
-// just the Standard tab) but needs the fixed section list to seed
-// `enabledProperties` for every section, not just whichever section
-// happens to be active. A small, pure constant -- duplicating it here
-// matches Task 43's precedent for extractSourceName rather than building
-// shared-utils machinery for one 8-item array.
+// Task 44 (fix pass): single-owner declaration. initializeEnabledState()
+// below needs the fixed section list to seed `enabledProperties` for every
+// section (it's tied to fetchBoth()'s lifecycle, used by more than just the
+// Standard tab), and StandardTab.vue needs the same list for its
+// section-switcher tab order. Declared once here and passed down as a
+// static prop (`:sectionOrder="sectionOrder"`), exactly like `configMetadata`
+// /`configSections`/`sourceTemplates` below -- no reason to duplicate a
+// plain readonly array when the parent already owns it first.
 const sectionOrder = ['server', 'ssl', 'http', 'tcp-control', 'tcp-streaming', 'stream', 'streaming_client', 'logging'];
 
 // Initialize enabledProperties tracking based on what's actually in the parsed config
@@ -339,6 +339,7 @@ const handleSave = () => {
             :configMetadata="configMetadata"
             :configSections="configSections"
             :sourceTemplates="sourceTemplates"
+            :sectionOrder="sectionOrder"
             @reset-requested="showConfirmReset = true"
           />
       </div>

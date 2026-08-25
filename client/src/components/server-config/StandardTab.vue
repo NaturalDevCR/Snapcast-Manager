@@ -31,6 +31,7 @@ const props = defineProps<{
   configMetadata: Record<string, any>;
   configSections: Record<string, any>;
   sourceTemplates: any[];
+  sectionOrder: string[];
 }>();
 
 // Task 44: the "Reset Configuration to Default" trigger lives inside this
@@ -69,10 +70,12 @@ const sectionIcons: Record<string, string> = {
   logging: 'article',
 };
 
-const sectionOrder = ['server', 'ssl', 'http', 'tcp-control', 'tcp-streaming', 'stream', 'streaming_client', 'logging'];
-
+// Task 44 (fix pass): sectionOrder is now owned by ServerConfig.vue and
+// passed down as a static prop (a sixth prop, exactly like configMetadata/
+// configSections/sourceTemplates) instead of being duplicated here -- see
+// ServerConfig.vue's comment on its own `sectionOrder` declaration.
 const orderedSections = computed(() => {
-  return sectionOrder.filter(s => props.configSections[s]);
+  return props.sectionOrder.filter(s => props.configSections[s]);
 });
 
 const currentSectionMeta = computed(() => {
@@ -210,20 +213,23 @@ const removeSourceEntry = (idx: number) => {
 // on `localParsedConfig.stream.source[idx]` -- fine when
 // `localParsedConfig` was a local ref, but `vue/no-mutating-props` (rightly)
 // flags a `v-model` binding straight onto a nested prop path in the
-// template, since there's no way to scope an eslint-disable comment around
-// a template expression the same way the script-side mutations above are
-// scoped. Same behavior, expressed as an explicit :value/@input pair like
-// the sibling non-array input just below it already does via
-// `setPropertyValue`, with the actual mutation isolated (and
-// eslint-disabled) here in the script.
+// template. A template-level
+// `<!-- eslint-disable-next-line vue/no-mutating-props -->` would also
+// suppress it (review-verified, Task 44 fix pass), but this component keeps
+// the mutation in script instead -- consistent with the sibling non-array
+// input just below it, which already does this via `setPropertyValue`, and
+// keeps the mutation logic testable outside an HTML comment. Same behavior,
+// expressed as an explicit :value/@input pair.
 const updateSourceAtIndex = (idx: number, value: string) => {
   const sources = props.localParsedConfig.stream?.source;
   if (Array.isArray(sources)) {
     // Intentional mutation of the shared `localParsedConfig` prop -- see
-    // the file header comment.
-    /* eslint-disable vue/no-mutating-props */
+    // the file header comment. Note: unlike `removeSourceEntry` above,
+    // this assignment is index-write on a local `const` alias of the
+    // nested array (`sources[idx] = value`), which `vue/no-mutating-props`
+    // does not flag (the rule only catches direct `props.x...` member
+    // expressions), so no eslint-disable is needed here.
     sources[idx] = value;
-    /* eslint-enable vue/no-mutating-props */
   }
 };
 </script>
