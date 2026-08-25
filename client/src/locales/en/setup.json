@@ -1,0 +1,16 @@
+{
+  "title": "System Ignition",
+  "subtitle": "Let's set up your master administrator account.",
+  "usernameLabel": "Admin Username",
+  "usernamePlaceholder": "Choose username...",
+  "passwordLabel": "Password",
+  "passwordPlaceholder": "Min 8 chars",
+  "confirmLabel": "Confirm",
+  "confirmPlaceholder": "Repeat password",
+  "initializing": "Initializing System...",
+  "submit": "Complete Setup & Launch",
+  "footer": "By completing setup, you become the primary controller of this Snapcast infrastructure instance.",
+  "passwordMismatch": "Passwords do not match",
+  "successToast": "System initialized! Welcome aboard.",
+  "failureToast": "Setup failed"
+}

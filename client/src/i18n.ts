@@ -5,6 +5,8 @@ import enLayout from './locales/en/layout.json';
 import esLayout from './locales/es/layout.json';
 import enLogin from './locales/en/login.json';
 import esLogin from './locales/es/login.json';
+import enSetup from './locales/en/setup.json';
+import esSetup from './locales/es/setup.json';
 
 export type SupportedLocale = 'en' | 'es';
 export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'es'];
@@ -24,8 +26,8 @@ export const i18n = createI18n({
   locale: initialLocale,
   fallbackLocale: 'en',
   messages: {
-    en: { common: enCommon, layout: enLayout, login: enLogin },
-    es: { common: esCommon, layout: esLayout, login: esLogin },
+    en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup },
+    es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup },
   },
 });
 

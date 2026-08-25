@@ -1,0 +1,16 @@
+{
+  "title": "Ignición del Sistema",
+  "subtitle": "Configuremos tu cuenta de administrador principal.",
+  "usernameLabel": "Usuario Administrador",
+  "usernamePlaceholder": "Elige un usuario...",
+  "passwordLabel": "Contraseña",
+  "passwordPlaceholder": "Mín. 8 caracteres",
+  "confirmLabel": "Confirmar",
+  "confirmPlaceholder": "Repite la contraseña",
+  "initializing": "Inicializando Sistema...",
+  "submit": "Completar Configuración y Lanzar",
+  "footer": "Al completar la configuración, te conviertes en el controlador principal de esta instancia de infraestructura Snapcast.",
+  "passwordMismatch": "Las contraseñas no coinciden",
+  "successToast": "¡Sistema inicializado! Bienvenido a bordo.",
+  "failureToast": "Error en la configuración"
+}

@@ -72,4 +72,19 @@ describe('real i18n singleton has all namespaces registered', () => {
     expect(i18n.global.t('login.title')).toBe('Snapcast Manager');
     expect(i18n.global.t('login.signIn')).toBe('Iniciar Sesión');
   });
+
+  it.each(['en', 'es'] as const)('resolves setup.title for locale "%s" (not the raw key)', (locale) => {
+    i18n.global.locale.value = locale;
+    expect(i18n.global.t('setup.title')).not.toBe('setup.title');
+  });
+
+  it('resolves setup.title and setup.submit to the correct translated string per locale', () => {
+    i18n.global.locale.value = 'en';
+    expect(i18n.global.t('setup.title')).toBe('System Ignition');
+    expect(i18n.global.t('setup.submit')).toBe('Complete Setup & Launch');
+
+    i18n.global.locale.value = 'es';
+    expect(i18n.global.t('setup.title')).toBe('Ignición del Sistema');
+    expect(i18n.global.t('setup.submit')).toBe('Completar Configuración y Lanzar');
+  });
 });

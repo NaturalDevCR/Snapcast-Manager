@@ -15,6 +15,8 @@ import enLayout from '../locales/en/layout.json';
 import esLayout from '../locales/es/layout.json';
 import enLogin from '../locales/en/login.json';
 import esLogin from '../locales/es/login.json';
+import enSetup from '../locales/en/setup.json';
+import esSetup from '../locales/es/setup.json';
 import { useUIStore } from '../stores/ui';
 
 // A fresh i18n instance per mount (not the app's shared singleton) so tests
@@ -27,8 +29,8 @@ function createTestI18n() {
     locale: 'en',
     fallbackLocale: 'en',
     messages: {
-      en: { common: enCommon, layout: enLayout, login: enLogin },
-      es: { common: esCommon, layout: esLayout, login: esLogin },
+      en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup },
+      es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup },
     },
   });
 }

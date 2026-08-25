@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { fetchApi } from '../utils/api';
 import { useAuthStore } from '../stores/auth';
 import { useUIStore } from '../stores/ui';
 
+const { t } = useI18n({ useScope: 'global' });
 const username = ref('');
 const password = ref('');
 const confirmPassword = ref('');
@@ -15,7 +17,7 @@ const uiStore = useUIStore();
 
 const handleSetup = async () => {
     if (password.value !== confirmPassword.value) {
-        uiStore.showToast('Passwords do not match', 'warning');
+        uiStore.showToast(t('setup.passwordMismatch'), 'warning');
         return;
     }
 
@@ -28,17 +30,17 @@ const handleSetup = async () => {
                 password: password.value,
             }),
         });
-        
+
         // Auto-login logic
         authStore.token = data.token;
         authStore.user = data.user;
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
 
-        uiStore.showToast('System initialized! Welcome aboard.', 'success');
+        uiStore.showToast(t('setup.successToast'), 'success');
         router.push('/onboarding');
     } catch (err: any) {
-        uiStore.showToast(err.message || 'Setup failed', 'error');
+        uiStore.showToast(err.message || t('setup.failureToast'), 'error');
     } finally {
         loading.value = false;
     }
@@ -56,86 +58,86 @@ const handleSetup = async () => {
         <div class="max-w-xl w-full relative group">
             <!-- Glow Effect -->
             <div class="absolute -inset-1 bg-brand-primary/20 rounded-[2.5rem] blur opacity-15 group-hover:opacity-30 transition duration-1000"></div>
-            
+
             <div class="relative bg-brand-surface/80 backdrop-blur-3xl shadow-2xl rounded-[2.5rem] p-8 md:p-14 border border-white/[0.04] animate-in fade-in zoom-in duration-1000">
                 <div class="text-center mb-12">
                      <div class="inline-flex items-center justify-center p-5 bg-brand-primary/10 rounded-3xl mb-8 border border-brand-primary/20 shadow-[inset_0_0_15px_rgba(166,13,242,0.1)]">
                         <span class="material-symbols-outlined text-[3rem] text-brand-primary drop-shadow-[0_0_15px_rgba(166,13,242,0.4)]">rocket_launch</span>
                      </div>
                      <h2 class="text-4xl font-black text-text-main tracking-tight leading-tight mb-4">
-                        System Ignition
+                        {{ t('setup.title') }}
                     </h2>
                     <p class="text-slate-400 font-medium text-lg">
-                        Let's set up your master administrator account.
+                        {{ t('setup.subtitle') }}
                     </p>
                 </div>
 
                 <form class="space-y-8" @submit.prevent="handleSetup">
                     <div class="space-y-5">
                         <div class="group/input">
-                            <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">Admin Username</label>
+                            <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.usernameLabel') }}</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                     <span class="material-symbols-outlined text-gray-400 group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">person_add</span>
                                 </div>
-                                <input 
-                                    v-model="username" 
-                                    type="text" 
+                                <input
+                                    v-model="username"
+                                    type="text"
                                     required
                                     class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
-                                    placeholder="Choose username..." 
+                                    :placeholder="t('setup.usernamePlaceholder')"
                                 />
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div class="group/input">
-                                <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">Password</label>
+                                <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.passwordLabel') }}</label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                         <span class="material-symbols-outlined text-gray-400 group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">lock</span>
                                     </div>
-                                    <input 
-                                        v-model="password" 
-                                        type="password" 
+                                    <input
+                                        v-model="password"
+                                        type="password"
                                         required
                                         class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
-                                        placeholder="Min 8 chars" 
+                                        :placeholder="t('setup.passwordPlaceholder')"
                                     />
                                 </div>
                             </div>
                             <div class="group/input">
-                                <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">Confirm</label>
+                                <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.confirmLabel') }}</label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                         <span class="material-symbols-outlined text-gray-400 group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">check_circle</span>
                                     </div>
-                                    <input 
-                                        v-model="confirmPassword" 
-                                        type="password" 
+                                    <input
+                                        v-model="confirmPassword"
+                                        type="password"
                                         required
                                         class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
-                                        placeholder="Repeat password" 
+                                        :placeholder="t('setup.confirmPlaceholder')"
                                     />
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         :disabled="loading"
                         class="w-full flex items-center justify-center py-5 px-8 bg-brand-primary hover:bg-[#8e0bc9] text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-[0_0_15px_rgba(166,13,242,0.4)] border border-brand-primary/50 hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all hover:-translate-y-1 active:scale-[0.98] disabled:opacity-50"
                     >
                         <span v-if="loading" class="flex items-center gap-2">
                             <span class="material-symbols-outlined animate-spin text-[1.2rem]">sync</span>
-                            Initializing System...
+                            {{ t('setup.initializing') }}
                         </span>
-                        <span v-else>Complete Setup & Launch</span>
+                        <span v-else>{{ t('setup.submit') }}</span>
                     </button>
-                    
+
                     <p class="text-center text-[10px] font-bold text-text-muted uppercase tracking-widest leading-relaxed px-4">
-                        By completing setup, you become the primary controller of this Snapcast infrastructure instance.
+                        {{ t('setup.footer') }}
                     </p>
                 </form>
             </div>
