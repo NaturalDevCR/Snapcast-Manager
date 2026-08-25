@@ -1,28 +1,30 @@
 <script setup lang="ts">
-// Onboarding.vue -- Task 49 (docs/superpowers/plans/2026-08-25-onboarding-wizard.md,
-// Task 3). Renders the post-setup onboarding wizard's steps 1 and 2:
+// Onboarding.vue -- Tasks 49-50 (docs/superpowers/plans/2026-08-25-onboarding-wizard.md,
+// Tasks 3-4). Renders the post-setup onboarding wizard's 3 steps:
 //   1. Install snapserver (uses the existing systemStore).
 //   2. Add a first pipe source (embeds AddEditPipeDialog.vue from Task 42,
 //      auto-opened, advancing to step 3 on its `saved` emit).
-//
-// Step 3's body below is DELIBERATELY a static placeholder for this task --
-// Task 4 (Task 50) replaces it with a live, SSE-driven "waiting for a
-// client" state and the real per-zone assignment control. This is an
-// explicit, plan-specified interim state (see plan Task 3's Interfaces
-// note), not a "no placeholders" violation -- kept as a clean drop-in swap
-// target for that follow-up task.
+//   3. Assign the first zone (reads snapcastStore.status, already
+//      SSE-driven app-wide -- no new polling/watcher; shows a live
+//      "waiting for a client" state until a group has one, then the same
+//      accessible per-zone <Select> pattern Task 34 built in Routing.vue,
+//      calling snapcastStore.setGroupStream()). Marks onboarding complete
+//      and redirects to `/` on assignment.
 import { ref, computed, onMounted, watch } from 'vue';
 import Layout from '../components/Layout.vue';
 import Button from '../components/ui/Button.vue';
+import Select from '../components/ui/Select.vue';
 import AddEditPipeDialog from '../components/pipe-sources/AddEditPipeDialog.vue';
 import { useOnboardingStore } from '../stores/onboarding';
 import { useSystemStore } from '../stores/system';
 import { usePipeSourcesStore } from '../stores/pipeSources';
+import { useSnapcastStore } from '../stores/snapcast';
 import { useRouter } from 'vue-router';
 
 const onboardingStore = useOnboardingStore();
 const systemStore = useSystemStore();
 const pipeSourcesStore = usePipeSourcesStore();
+const snapcastStore = useSnapcastStore();
 const router = useRouter();
 
 const addEditDialog = ref<InstanceType<typeof AddEditPipeDialog> | null>(null);
@@ -52,6 +54,24 @@ watch(() => onboardingStore.step, (step) => {
 const step1Done = computed(() => systemStore.installedPackages.snapserver);
 const step2Done = computed(() => pipeSourcesStore.pipes.length > 0);
 
+// Step 3: reads snapcastStore.status directly (a Pinia ref reassigned
+// wholesale by useEventSource.ts's applySnapcastUpdate() on every SSE
+// `snapcast` event -- see composables/useEventSource.ts) rather than
+// polling or watching anything new here. Because this is a plain computed
+// over that ref, it re-evaluates automatically on every SSE push, which is
+// what gives step 3 its "waiting for a client" state a live update the
+// moment one connects, with no extra watcher/poller needed.
+const firstGroupWithClient = computed(() =>
+  snapcastStore.status?.groups.find((g) => g.clients.length > 0) ?? null
+);
+
+const streamSelectOptions = computed(() =>
+  (snapcastStore.status?.streams || []).map((stream: any) => ({
+    value: stream.id,
+    label: stream.uri?.query?.name || stream.id,
+  }))
+);
+
 async function handleInstallSnapserver() {
   await systemStore.installPackage('snapserver');
 }
@@ -62,6 +82,14 @@ async function advanceTo(step: number) {
 
 async function handlePipeSaved() {
   await advanceTo(3);
+}
+
+async function handleZoneAssignment(streamId: string | number) {
+  const group = firstGroupWithClient.value;
+  if (!group) return;
+  await snapcastStore.setGroupStream(group.id, String(streamId));
+  await advanceTo(3);
+  router.push('/');
 }
 
 async function skip() {
@@ -108,14 +136,25 @@ async function skip() {
 
       <div v-else-if="onboardingStore.step === 3" class="space-y-4">
         <h2 class="text-lg font-bold text-text-main">3. Assign your first zone</h2>
-        <!-- Task 4 (Task 50) replaces this static body with a live, SSE-driven
-             "waiting for a client" state and the real per-zone <Select>
-             assignment control. -->
-        <p class="text-sm text-text-muted">
-          Connect a client (a physical snapclient device on your network, or
-          this app's own local Client mode), then come back here to assign it
-          a source.
-        </p>
+        <div v-if="!firstGroupWithClient" class="space-y-2">
+          <p class="text-sm text-text-muted">
+            Waiting for a client to connect. Connect a physical snapclient device
+            on your network, or use this app's own local Client mode -- this page
+            updates automatically once one appears.
+          </p>
+        </div>
+        <div v-else class="space-y-3">
+          <p class="text-sm text-text-muted">
+            {{ firstGroupWithClient.name || 'Zone ' + firstGroupWithClient.id.slice(0, 4) }} is ready.
+            Pick a source for it:
+          </p>
+          <Select
+            :model-value="firstGroupWithClient.stream_id"
+            :options="streamSelectOptions"
+            placeholder="Choose a source"
+            @update:model-value="handleZoneAssignment"
+          />
+        </div>
       </div>
     </div>
   </Layout>

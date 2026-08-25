@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { useSystemStore } from '../stores/system';
 import { useUIStore } from '../stores/ui';
 import { useSnapcastStore } from '../stores/snapcast';
+import { useOnboardingStore } from '../stores/onboarding';
 import { useEventSource } from '../composables/useEventSource';
 import { sseStatusBadge } from '../utils/sseStatus';
 import Layout from '../components/Layout.vue';
@@ -15,6 +16,7 @@ import { version } from '../../package.json';
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
 const snapcastStore = useSnapcastStore();
+const onboardingStore = useOnboardingStore();
 
 // Task 29: snapcast state updates now arrive via the app-wide SSE
 // connection (Task 28, connected/disconnected by App.vue) instead of this
@@ -29,6 +31,13 @@ const selectedNodeVersion = ref('20');
 onMounted(async () => {
   await systemStore.refreshAll();
   systemStore.fetchMympdInfo();
+  // Task 50: resume-onboarding banner below reads onboardingStore.step/
+  // dismissed -- Onboarding.vue also calls fetchOnboarding() on its own
+  // mount, but that's a separate visit; Dashboard needs its own fetch so
+  // the banner is correct on a fresh Dashboard load too (Pinia stores are
+  // singletons, so this doesn't double up with -- or fight -- that other
+  // call, it's just the same store being kept in sync from both views).
+  onboardingStore.fetchOnboarding();
 
   // Auto-select current installed Node.js version
   if (systemStore.packageVersions.node) {
@@ -131,6 +140,19 @@ const openMympd = () => {
           <span class="material-symbols-outlined text-[1.2rem] mr-2 transition-transform" :class="{'animate-spin': systemStore.loading, 'group-hover:rotate-180': !systemStore.loading}">refresh</span>
           SYNC ALL
         </button>
+      </div>
+
+      <!-- Resume-onboarding banner (Task 50): visible whenever the wizard
+           hasn't reached step 3 (complete) and the admin hasn't dismissed
+           it. Dismissible via the wizard's own "Skip for now"/completion
+           flow, not from here -- clicking through resumes at whatever step
+           onboardingStore.step already holds. -->
+      <div v-if="onboardingStore.step < 3 && !onboardingStore.dismissed"
+           class="flex items-center justify-between p-4 bg-brand-primary/10 border border-brand-primary/30 rounded-lg">
+        <span class="text-sm font-bold text-text-main">Finish setting up your system.</span>
+        <router-link to="/onboarding" class="text-xs font-black text-brand-primary uppercase tracking-widest hover:underline">
+          Resume Setup
+        </router-link>
       </div>
 
       <!-- Loading Overlay (more subtle now) -->

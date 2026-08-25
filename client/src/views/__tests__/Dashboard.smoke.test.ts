@@ -4,6 +4,7 @@ import Dashboard from '../Dashboard.vue';
 import { mountSmokeTest } from '../../test/mountView';
 import { useSnapcastStore } from '../../stores/snapcast';
 import { useEventSource } from '../../composables/useEventSource';
+import { useOnboardingStore } from '../../stores/onboarding';
 
 describe('Dashboard.vue', () => {
   it('mounts without throwing', async () => {
@@ -51,5 +52,31 @@ describe('Dashboard.vue', () => {
     sse.status.value = 'reconnecting';
     await nextTick();
     expect(wrapper.text()).toMatch(/reconnecting/i);
+  });
+
+  it('shows a resume-onboarding banner when incomplete and not dismissed', async () => {
+    const wrapper = await mountSmokeTest(Dashboard, '/');
+    const onboardingStore = useOnboardingStore();
+    onboardingStore.step = 2;
+    onboardingStore.dismissed = false;
+    await nextTick();
+
+    expect(wrapper.text().toLowerCase()).toContain('finish setting up');
+    const link = wrapper.findAll('a, router-link-stub').find(el => el.attributes('to') === '/onboarding' || el.attributes('href') === '/onboarding');
+    expect(link, 'expected a link/route to /onboarding').toBeTruthy();
+  });
+
+  it('hides the banner once onboarding is complete or dismissed', async () => {
+    const wrapper = await mountSmokeTest(Dashboard, '/');
+    const onboardingStore = useOnboardingStore();
+    onboardingStore.step = 3;
+    onboardingStore.dismissed = false;
+    await nextTick();
+    expect(wrapper.text().toLowerCase()).not.toContain('finish setting up');
+
+    onboardingStore.step = 1;
+    onboardingStore.dismissed = true;
+    await nextTick();
+    expect(wrapper.text().toLowerCase()).not.toContain('finish setting up');
   });
 });

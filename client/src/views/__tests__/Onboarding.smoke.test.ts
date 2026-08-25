@@ -4,6 +4,7 @@ import Onboarding from '../Onboarding.vue';
 import { useOnboardingStore } from '../../stores/onboarding';
 import { useSystemStore } from '../../stores/system';
 import { usePipeSourcesStore } from '../../stores/pipeSources';
+import { useSnapcastStore } from '../../stores/snapcast';
 import { mountSmokeTest } from '../../test/mountView';
 
 describe('Onboarding.vue', () => {
@@ -66,5 +67,54 @@ describe('Onboarding.vue', () => {
 
     expect(document.body.textContent).not.toContain('Add Pipe Source');
     expect(wrapper.text()).toContain('already have');
+  });
+
+  it('step 3 shows a waiting state when no group has a connected client', async () => {
+    const wrapper = await mountSmokeTest(Onboarding, '/onboarding');
+    const onboardingStore = useOnboardingStore();
+    const snapcastStore = useSnapcastStore();
+    onboardingStore.step = 3;
+    snapcastStore.status = { server: { version: '1.0' }, groups: [], streams: [] } as any;
+    await nextTick();
+
+    expect(wrapper.text().toLowerCase()).toContain('waiting for a client');
+  });
+
+  it('step 3 shows a zone-assignment Select once a group with a client exists, and completes onboarding on assignment', async () => {
+    const wrapper = await mountSmokeTest(Onboarding, '/onboarding');
+    const onboardingStore = useOnboardingStore();
+    const snapcastStore = useSnapcastStore();
+    const setStepSpy = vi.spyOn(onboardingStore, 'setStep').mockResolvedValue(undefined);
+    onboardingStore.step = 3;
+    snapcastStore.status = {
+      server: { version: '1.0' },
+      groups: [{ id: 'g1', name: 'Living Room', clients: [{ id: 'c1' }], stream_id: '', muted: false }],
+      streams: [{ id: 'a', status: 'idle', uri: { query: { name: 'Radio A' }, scheme: 'tcp' } }],
+    } as any;
+    const setGroupStreamSpy = vi.spyOn(snapcastStore, 'setGroupStream').mockResolvedValue(undefined);
+    await nextTick();
+
+    expect(wrapper.text().toLowerCase()).not.toContain('waiting for a client');
+
+    // Bug found in the plan's own example test (docs/superpowers/plans/
+    // 2026-08-25-onboarding-wizard.md, Task 4, Step 1): it locates the
+    // zone Select's trigger via `.find('button').find(b => b.text().length
+    // > 0)`, i.e. "the first button on the page with any text". That
+    // matches Layout.vue's nav buttons ("menu", "dns Server", "speaker
+    // Client", "apps Menu expand_more", "logout") and this view's own
+    // "Skip for now" button, all of which render before the Select in DOM
+    // order -- so it never actually clicks the Select at all, and the
+    // subsequent `[role="option"]` lookup returns nothing, throwing on
+    // `option!.trigger(...)`. Target the Select's own trigger by its
+    // placeholder text instead, which is unique on the page.
+    const selectButton = wrapper.findAll('button').find(b => b.text() === 'Choose a source');
+    expect(selectButton, 'expected the zone Select trigger to be present').toBeTruthy();
+    await selectButton!.trigger('click');
+    const option = wrapper.findAll('[role="option"]').find(o => o.text().includes('Radio A'));
+    await option!.trigger('click');
+    await nextTick();
+
+    expect(setGroupStreamSpy).toHaveBeenCalledWith('g1', 'a');
+    expect(setStepSpy).toHaveBeenCalledWith(3); // marks complete; adjust to whatever "done" sentinel Step 3 implementation actually uses
   });
 });
