@@ -320,6 +320,53 @@ router.post('/change-password', authenticateToken, loginRateLimiter, (req: Reque
   }
 });
 
+// Task 47: onboarding wizard progress, persisted server-side (no
+// localStorage fallback -- see the design spec's "Overview & trigger") on
+// the `users` table's onboarding_step/onboarding_dismissed columns (Task 47
+// migration 7). `step` tracks which of the wizard's 3 steps the user has
+// reached (0 = not started, 1-3 = in progress/done); `dismissed` records an
+// explicit skip. Both endpoints sit behind the same authenticateToken
+// middleware as every other authenticated route here.
+router.get('/onboarding', authenticateToken, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  try {
+    const row = db.prepare('SELECT onboarding_step, onboarding_dismissed FROM users WHERE id = ?').get(user.id) as
+      { onboarding_step: number; onboarding_dismissed: number } | undefined;
+    if (!row) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ step: row.onboarding_step, dismissed: row.onboarding_dismissed === 1 });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/onboarding', authenticateToken, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { step, dismissed } = req.body;
+
+  if (step !== undefined && (!Number.isInteger(step) || step < 0 || step > 3)) {
+    return res.status(400).json({ error: 'step must be an integer between 0 and 3' });
+  }
+  if (dismissed !== undefined && typeof dismissed !== 'boolean') {
+    return res.status(400).json({ error: 'dismissed must be a boolean' });
+  }
+
+  try {
+    if (step !== undefined) {
+      db.prepare('UPDATE users SET onboarding_step = ? WHERE id = ?').run(step, user.id);
+    }
+    if (dismissed !== undefined) {
+      db.prepare('UPDATE users SET onboarding_dismissed = ? WHERE id = ?').run(dismissed ? 1 : 0, user.id);
+    }
+    const row = db.prepare('SELECT onboarding_step, onboarding_dismissed FROM users WHERE id = ?').get(user.id) as
+      { onboarding_step: number; onboarding_dismissed: number };
+    res.json({ step: row.onboarding_step, dismissed: row.onboarding_dismissed === 1 });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Task 15: logging out invalidates the CURRENT token (and any other
 // outstanding token for this user) by bumping token_version -- there's no
 // separate blacklist to maintain. This is a single-admin app, so there's

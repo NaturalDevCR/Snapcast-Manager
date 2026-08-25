@@ -124,6 +124,23 @@ async function getJson(urlPath: string, token?: string) {
   return { status: res.status, json };
 }
 
+async function patchJson(urlPath: string, body: unknown, token?: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${baseUrl}${urlPath}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(body),
+  });
+  let json: any = null;
+  try {
+    json = await res.json();
+  } catch (_) {
+    // no body
+  }
+  return { status: res.status, json };
+}
+
 const ADMIN_USERNAME = 'admin';
 const PASSWORD_12_CHARS = 'SuperSecret1'; // exactly 12 chars
 const PASSWORD_11_CHARS = 'SuperSecret'; // exactly 11 chars
@@ -360,4 +377,62 @@ test('a missing tokenVersion claim is NOT a universal bypass -- it is still comp
 
   const { status } = await getJson('/api/protected', legacyToken);
   assert.equal(status, 403, 'DB version has since moved on (5), so the version-less token must be rejected, not silently accepted');
+});
+
+// ─── 7. Onboarding progress (Task 47) ──────────────────────────────────────
+
+test('GET /api/auth/onboarding requires authentication', async () => {
+  const { status } = await getJson('/api/auth/onboarding');
+  assert.equal(status, 401);
+});
+
+test('GET /api/auth/onboarding returns step:0 dismissed:false for a fresh (never-touched) user', async () => {
+  clearRateLimitTable();
+  const { json: loginJson } = await postJson('/api/auth/login', { username: ADMIN_USERNAME, password: adminPassword });
+  const token = loginJson.token;
+
+  const { status, json } = await getJson('/api/auth/onboarding', token);
+  assert.equal(status, 200);
+  assert.deepEqual(json, { step: 0, dismissed: false });
+});
+
+test('PATCH /api/auth/onboarding {step:2} updates the step and a follow-up GET reflects it', async () => {
+  const { json: loginJson } = await postJson('/api/auth/login', { username: ADMIN_USERNAME, password: adminPassword });
+  const token = loginJson.token;
+
+  const { status, json: patchJsonBody } = await patchJson('/api/auth/onboarding', { step: 2 }, token);
+  assert.equal(status, 200);
+  assert.deepEqual(patchJsonBody, { step: 2, dismissed: false });
+
+  const { json: getJsonBody } = await getJson('/api/auth/onboarding', token);
+  assert.equal(getJsonBody.step, 2);
+});
+
+test('PATCH /api/auth/onboarding {dismissed:true} updates dismissed and leaves step unchanged', async () => {
+  const { json: loginJson } = await postJson('/api/auth/login', { username: ADMIN_USERNAME, password: adminPassword });
+  const token = loginJson.token;
+
+  const { status, json: patchJsonBody } = await patchJson('/api/auth/onboarding', { dismissed: true }, token);
+  assert.equal(status, 200);
+  assert.equal(patchJsonBody.dismissed, true);
+  assert.equal(patchJsonBody.step, 2, 'step should remain the value set by the previous test');
+});
+
+test('PATCH /api/auth/onboarding rejects step:5 (out of range) with 400 and does not change the DB', async () => {
+  const { json: loginJson } = await postJson('/api/auth/login', { username: ADMIN_USERNAME, password: adminPassword });
+  const token = loginJson.token;
+
+  const { status } = await patchJson('/api/auth/onboarding', { step: 5 }, token);
+  assert.equal(status, 400);
+
+  const { json: getJsonBody } = await getJson('/api/auth/onboarding', token);
+  assert.equal(getJsonBody.step, 2, 'rejected PATCH must not have changed the stored step');
+});
+
+test('PATCH /api/auth/onboarding rejects step:-1 (out of range) with 400', async () => {
+  const { json: loginJson } = await postJson('/api/auth/login', { username: ADMIN_USERNAME, password: adminPassword });
+  const token = loginJson.token;
+
+  const { status } = await patchJson('/api/auth/onboarding', { step: -1 }, token);
+  assert.equal(status, 400);
 });

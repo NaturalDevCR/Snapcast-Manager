@@ -200,6 +200,16 @@ test('runMigrations is idempotent: a second run on an already-migrated DB is a n
   db.close();
 });
 
+// Task 47: migration 7's onboarding_step/onboarding_dismissed columns on
+// `users` have no old-code equivalent -- exactly like migration 6's `jobs`
+// table above, which is why `jobs` isn't in OLD_SCHEMA_TABLES at all. `users`
+// itself, though, IS in OLD_SCHEMA_TABLES (most of its columns DO have an
+// old-code equivalent, e.g. token_version), so this genuinely-new pair is
+// filtered out below before comparing rather than excluding the whole table.
+const COLUMNS_WITH_NO_OLD_CODE_EQUIVALENT: Record<string, string[]> = {
+  users: ['onboarding_step', 'onboarding_dismissed'],
+};
+
 test('fresh DB via the new migration system is structurally identical to one produced by the OLD code (PRAGMA table_info per table)', () => {
   const oldDb = seedOldSchemaDb();
   const newDb = new Database(':memory:');
@@ -207,7 +217,9 @@ test('fresh DB via the new migration system is structurally identical to one pro
 
   for (const table of OLD_SCHEMA_TABLES) {
     const oldInfo = oldDb.prepare(`PRAGMA table_info(${table})`).all();
-    const newInfo = newDb.prepare(`PRAGMA table_info(${table})`).all();
+    const excluded = COLUMNS_WITH_NO_OLD_CODE_EQUIVALENT[table] || [];
+    const newInfo = (newDb.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[])
+      .filter(c => !excluded.includes(c.name));
     assert.deepEqual(newInfo, oldInfo, `PRAGMA table_info mismatch for table "${table}"`);
   }
 
@@ -272,5 +284,29 @@ test('schema_migrations table has the version/applied_at shape the brief specifi
   assert.deepEqual(names, ['applied_at', 'version']);
   const versionCol = cols.find(c => c.name === 'version')!;
   assert.equal(versionCol.pk, 1, 'version must be the PRIMARY KEY');
+  db.close();
+});
+
+// ─── Task 47: migration 7 (onboarding progress columns on users) ──────────
+
+test('migration 7: adds onboarding_step and onboarding_dismissed to users, defaulting to 0', () => {
+  const db = new Database(':memory:');
+  runMigrations(db, migrations);
+
+  db.prepare("INSERT INTO users (username, password, role) VALUES ('t', 'h', 'admin')").run();
+  const inserted = db.prepare('SELECT onboarding_step, onboarding_dismissed FROM users WHERE username = ?').get('t') as any;
+  assert.equal(inserted.onboarding_step, 0);
+  assert.equal(inserted.onboarding_dismissed, 0);
+
+  db.close();
+});
+
+test('migration 7: isApplied() returns true once the columns exist, so up() is not re-run', () => {
+  const db = new Database(':memory:');
+  runMigrations(db, migrations);
+
+  const migration = migrations.find(m => m.version === 7)!;
+  assert.equal(migration.isApplied(db), true);
+
   db.close();
 });

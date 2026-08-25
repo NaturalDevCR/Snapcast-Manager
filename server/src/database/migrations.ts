@@ -244,6 +244,24 @@ export const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 7,
+    name: 'onboarding progress columns on users (Task 47)',
+    isApplied: db => columnExists(db, 'users', 'onboarding_step') && columnExists(db, 'users', 'onboarding_dismissed'),
+    // No old-code equivalent -- like the jobs table above, these columns are
+    // entirely new (the onboarding wizard, Task 47), so there is nothing to
+    // backfill/reclassify here. `onboarding_step` tracks which of the
+    // wizard's 3 steps the user has reached (0 = not started), and
+    // `onboarding_dismissed` (SQLite has no native boolean, hence INTEGER
+    // 0/1) records whether the user explicitly skipped it. See
+    // server/src/auth.ts's GET/PATCH /api/auth/onboarding.
+    up: db => {
+      db.exec(`
+        ALTER TABLE users ADD COLUMN onboarding_step INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE users ADD COLUMN onboarding_dismissed INTEGER NOT NULL DEFAULT 0;
+      `);
+    },
+  },
 ];
 
 /**
