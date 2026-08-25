@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { i18n, SUPPORTED_LOCALES, type SupportedLocale } from '../i18n';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -14,6 +15,7 @@ export const useUIStore = defineStore('ui', () => {
   const toasts = ref<Toast[]>([]);
   let nextId = 1;
   const isDark = ref(localStorage.getItem('theme') !== 'light'); // Default to true (dark)
+  const locale = ref<SupportedLocale>(i18n.global.locale.value as SupportedLocale);
 
   function toggleTheme() {
     isDark.value = !isDark.value;
@@ -23,6 +25,13 @@ export const useUIStore = defineStore('ui', () => {
       document.documentElement.classList.remove('dark');
     }
     localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
+  }
+
+  function setLocale(l: SupportedLocale) {
+    if (!SUPPORTED_LOCALES.includes(l)) return;
+    locale.value = l;
+    i18n.global.locale.value = l;
+    localStorage.setItem('locale', l);
   }
 
   function initTheme() {
@@ -51,7 +60,9 @@ export const useUIStore = defineStore('ui', () => {
   return {
     toasts,
     isDark,
+    locale,
     toggleTheme,
+    setLocale,
     initTheme,
     showToast,
     removeToast
