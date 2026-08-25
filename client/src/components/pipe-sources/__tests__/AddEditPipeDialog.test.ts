@@ -6,11 +6,15 @@
 // `needsRestart` cross-cutting flag stays in the parent -- see
 // .superpowers/sdd/task-42-brief.md).
 import { describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { DOMWrapper, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
 import AddEditPipeDialog from '../AddEditPipeDialog.vue';
 import { usePipeSourcesStore, type PipeSource } from '../../../stores/pipeSources';
+
+// @headlessui/vue's Dialog teleports its rendered markup into a real
+// `document.body` node, outside the mounted wrapper's own DOM subtree.
+const body = () => new DOMWrapper(document.body);
 
 const samplePipe: PipeSource = {
   id: 'p1',
@@ -113,7 +117,12 @@ describe('AddEditPipeDialog.vue', () => {
 
     expect(store.createPipe).toHaveBeenCalled();
     expect(wrapper.emitted('saved')).toEqual([[{ snapserverConfigChanged: true }]]);
-    // Dialog closes on successful save.
+    // Dialog closes on successful save. headlessui's Dialog unmounts its
+    // content only after its leave transition finishes -- real time (not
+    // just microtask ticks) must elapse for that to happen under jsdom
+    // (Task 46 conversion; see ConfigEditorModal.test.ts for the same wait).
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await nextTick();
     expect(document.body.textContent).not.toContain('Add Pipe Source');
   });
 
@@ -215,5 +224,31 @@ describe('AddEditPipeDialog.vue', () => {
     expect(store.createPipe).not.toHaveBeenCalled();
     expect(wrapper.emitted('saved')).toBeUndefined();
     expect(document.body.textContent).toContain('Add Pipe Source');
+  });
+
+  // Task 46: the Teleport-content div this dialog used to render with had no
+  // keyboard accessibility (no focus trap, no Escape-to-close, no focus
+  // restoration). Converting to headlessui's Dialog gives it all three "for
+  // free" -- this proves the Escape wiring specifically (headlessui's own
+  // focus-trap implementation is already well-tested; see ui/Modal.vue's
+  // comment for that posture).
+  it('closes on Escape keydown', async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+
+    const wrapper = mount(AddEditPipeDialog, { global: { plugins: [pinia] }, attachTo: document.body });
+    (wrapper.vm as any).openAdd();
+    await nextTick();
+
+    expect(document.body.textContent).toContain('Add Pipe Source');
+
+    await body().trigger('keydown', { key: 'Escape' });
+    // headlessui's Dialog unmounts its content only after its leave
+    // transition finishes -- real time (not just microtask ticks) must
+    // elapse for that to happen under jsdom.
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await nextTick();
+
+    expect(document.body.textContent).not.toContain('Add Pipe Source');
   });
 });

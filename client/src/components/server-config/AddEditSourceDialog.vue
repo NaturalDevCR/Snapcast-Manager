@@ -22,6 +22,7 @@
 // component's props in sync even if the parent later reassigns
 // `localParsedConfig.value` wholesale (e.g. in `fetchBoth()`).
 import { computed, ref } from 'vue';
+import { Dialog, DialogPanel, TransitionChild, TransitionRoot } from '@headlessui/vue';
 import { useUIStore } from '../../stores/ui';
 import EmptyState from '../ui/EmptyState.vue';
 
@@ -315,18 +316,31 @@ defineExpose({ openAdd, openEdit });
 
 <template>
   <!-- ==================== ADD SOURCE DIALOG ==================== -->
-  <Teleport to="body">
-    <Transition
-      enter-active-class="transition ease-out duration-300"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition ease-in duration-200"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div v-if="showAddSourceDialog" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="fixed inset-0 bg-black/80 backdrop-blur-md" @click="showAddSourceDialog = false"></div>
-        <div class="relative bg-brand-bg rounded-2xl shadow-[0_0_30px_rgb(var(--brand-primary-rgb)/0.3)] border border-white/5 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+  <TransitionRoot as="template" :show="showAddSourceDialog">
+    <Dialog as="div" class="relative z-50" @close="showAddSourceDialog = false">
+      <TransitionChild
+        as="template"
+        enter="transition ease-out duration-300"
+        enter-from="opacity-0"
+        enter-to="opacity-100"
+        leave="transition ease-in duration-200"
+        leave-from="opacity-100"
+        leave-to="opacity-0"
+      >
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-md" />
+      </TransitionChild>
+
+      <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
+        <TransitionChild
+          as="template"
+          enter="transition ease-out duration-300"
+          enter-from="opacity-0"
+          enter-to="opacity-100"
+          leave="transition ease-in duration-200"
+          leave-from="opacity-100"
+          leave-to="opacity-0"
+        >
+          <DialogPanel class="relative bg-brand-bg rounded-2xl shadow-[0_0_30px_rgb(var(--brand-primary-rgb)/0.3)] border border-white/5 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
 
           <!-- Header -->
           <div class="sticky top-0 bg-brand-bg/90 backdrop-blur-sm border-b border-white/5 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
@@ -579,8 +593,9 @@ defineExpose({ openAdd, openEdit });
               </div>
             </div>
           </div>
-        </div>
+          </DialogPanel>
+        </TransitionChild>
       </div>
-    </Transition>
-  </Teleport>
+    </Dialog>
+  </TransitionRoot>
 </template>

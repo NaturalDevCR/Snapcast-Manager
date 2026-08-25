@@ -3,11 +3,15 @@
 // discovery/adopt flow at all, so this is the first real assertion on
 // its behavior.
 import { describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { DOMWrapper, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
 import ImportModal from '../ImportModal.vue';
 import { usePipeSourcesStore, type DiscoveredPipe, type PipeSource } from '../../../stores/pipeSources';
+
+// @headlessui/vue's Dialog teleports its rendered markup into a real
+// `document.body` node, outside the mounted wrapper's own DOM subtree.
+const body = () => new DOMWrapper(document.body);
 
 const discoveredRadio: DiscoveredPipe = {
   name: 'Kitchen Radio',
@@ -139,5 +143,34 @@ describe('ImportModal.vue', () => {
 
     expect(store.adoptPipe).not.toHaveBeenCalled();
     expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('Stream URL is required'), 'error');
+  });
+
+  // Task 46: the Teleport-content div this modal used to render with had no
+  // keyboard accessibility (no focus trap, no Escape-to-close, no focus
+  // restoration). Converting to headlessui's Dialog gives it all three "for
+  // free" -- this proves the Escape wiring specifically (headlessui's own
+  // focus-trap implementation is already well-tested; see ui/Modal.vue's
+  // comment for that posture).
+  it('closes on Escape keydown', async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const store = usePipeSourcesStore();
+    store.discoverPipes = vi.fn().mockResolvedValue([]);
+
+    const wrapper = mount(ImportModal, { global: { plugins: [pinia] } });
+    (wrapper.vm as any).open();
+    await nextTick();
+    await nextTick();
+
+    expect(document.body.textContent).toContain('Import Existing Pipe Sources');
+
+    await body().trigger('keydown', { key: 'Escape' });
+    // headlessui's Dialog unmounts its content only after its leave
+    // transition finishes -- real time (not just microtask ticks) must
+    // elapse for that to happen under jsdom.
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await nextTick();
+
+    expect(document.body.textContent).not.toContain('Import Existing Pipe Sources');
   });
 });

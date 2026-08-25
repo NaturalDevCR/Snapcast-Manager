@@ -21,6 +21,7 @@
 // template ref, matching how the two are already separate functions/call
 // sites in the parent today.
 import { ref } from 'vue';
+import { Dialog, DialogPanel, TransitionChild, TransitionRoot } from '@headlessui/vue';
 import { usePipeSourcesStore, type PipeSource, type PipeSourceFormData } from '../../stores/pipeSources';
 import { useUIStore } from '../../stores/ui';
 
@@ -117,9 +118,31 @@ defineExpose({ openAdd, openEdit });
 </script>
 
 <template>
-  <Teleport to="body">
-    <div v-if="showDialog" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-lg w-full shadow-2xl">
+  <TransitionRoot as="template" :show="showDialog">
+    <Dialog as="div" class="relative z-50" @close="closeDialog">
+      <TransitionChild
+        as="template"
+        enter="ease-out duration-300"
+        enter-from="opacity-0"
+        enter-to="opacity-100"
+        leave="ease-in duration-200"
+        leave-from="opacity-100"
+        leave-to="opacity-0"
+      >
+        <div class="fixed inset-0 bg-black/70 backdrop-blur-sm" />
+      </TransitionChild>
+
+      <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
+        <TransitionChild
+          as="template"
+          enter="ease-out duration-300"
+          enter-from="opacity-0 scale-95"
+          enter-to="opacity-100 scale-100"
+          leave="ease-in duration-200"
+          leave-from="opacity-100 scale-100"
+          leave-to="opacity-0 scale-95"
+        >
+          <DialogPanel class="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-lg w-full shadow-2xl">
         <h3 class="text-lg font-bold text-zinc-200 mb-5">
           {{ editingId ? 'Edit Pipe Source' : 'Add Pipe Source' }}
         </h3>
@@ -241,7 +264,9 @@ defineExpose({ openAdd, openEdit });
             {{ saving ? 'Saving…' : (editingId ? 'Update' : 'Create') }}
           </button>
         </div>
+          </DialogPanel>
+        </TransitionChild>
       </div>
-    </div>
-  </Teleport>
+    </Dialog>
+  </TransitionRoot>
 </template>

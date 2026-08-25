@@ -27,10 +27,14 @@
 // prop itself), object identity is preserved and `someRef.value` reflects
 // every mutation the dialog makes.
 import { describe, expect, it } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { DOMWrapper, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick, ref } from 'vue';
 import AddEditSourceDialog from '../AddEditSourceDialog.vue';
+
+// @headlessui/vue's Dialog teleports its rendered markup into a real
+// `document.body` node, outside the mounted wrapper's own DOM subtree.
+const body = () => new DOMWrapper(document.body);
 
 // A small, realistic subset of the server's SOURCE_TEMPLATES
 // (server/src/constants/defaultConfig.ts) covering a simple template
@@ -178,7 +182,12 @@ describe('AddEditSourceDialog.vue', () => {
     expect(localParsedConfig.value.stream.source).toBe('pipe:///tmp/snapfifo?name=My%20Test%20Pipe');
     // Same for the companion `enabledProperties` ref.
     expect(enabledProperties.value.stream?.source).toBe(true);
-    // And the dialog closed itself after a successful save.
+    // And the dialog closed itself after a successful save. headlessui's
+    // Dialog unmounts its content only after its leave transition finishes
+    // -- real time (not just microtask ticks) must elapse for that to
+    // happen under jsdom (Task 46 conversion).
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await nextTick();
     expect(document.body.textContent).not.toContain('Add Audio Source');
   });
 
@@ -292,5 +301,31 @@ describe('AddEditSourceDialog.vue', () => {
 
     expect(document.body.querySelector('[aria-label="Remove Living Room"]')).toBeFalsy();
     expect(document.body.querySelector('[aria-label="Remove Kitchen"]')).toBeTruthy();
+  });
+
+  // Task 46: the Teleport-content div this dialog used to render with had no
+  // keyboard accessibility (no focus trap, no Escape-to-close, no focus
+  // restoration) -- it already had manual backdrop-click-to-close wired up,
+  // but not Escape. Converting to headlessui's Dialog gives it a real focus
+  // trap, Escape-to-close, and focus restoration all "for free" -- this
+  // proves the Escape wiring specifically (headlessui's own focus-trap
+  // implementation is already well-tested; see ui/Modal.vue's comment for
+  // that posture).
+  it('closes on Escape keydown', async () => {
+    const { wrapper } = mountDialog();
+
+    (wrapper.vm as any).openAdd();
+    await nextTick();
+
+    expect(document.body.textContent).toContain('Add Audio Source');
+
+    await body().trigger('keydown', { key: 'Escape' });
+    // headlessui's Dialog unmounts its content only after its leave
+    // transition finishes -- real time (not just microtask ticks) must
+    // elapse for that to happen under jsdom.
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await nextTick();
+
+    expect(document.body.textContent).not.toContain('Add Audio Source');
   });
 });

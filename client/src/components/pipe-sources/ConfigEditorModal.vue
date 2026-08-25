@@ -17,6 +17,7 @@
 // store) and `uiStore` (the UI/toast store) directly, no prop-drilling
 // needed for either.
 import { ref } from 'vue';
+import { Dialog, DialogPanel, TransitionChild, TransitionRoot } from '@headlessui/vue';
 import { usePipeSourcesStore, type PipeSource } from '../../stores/pipeSources';
 import { useUIStore } from '../../stores/ui';
 
@@ -67,9 +68,31 @@ defineExpose({ open });
 </script>
 
 <template>
-  <Teleport to="body">
-    <div v-if="showConfigEditor" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-3xl flex flex-col shadow-2xl" style="max-height: 85vh;">
+  <TransitionRoot as="template" :show="showConfigEditor">
+    <Dialog as="div" class="relative z-50" @close="showConfigEditor = false">
+      <TransitionChild
+        as="template"
+        enter="ease-out duration-300"
+        enter-from="opacity-0"
+        enter-to="opacity-100"
+        leave="ease-in duration-200"
+        leave-from="opacity-100"
+        leave-to="opacity-0"
+      >
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" />
+      </TransitionChild>
+
+      <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
+        <TransitionChild
+          as="template"
+          enter="ease-out duration-300"
+          enter-from="opacity-0 scale-95"
+          enter-to="opacity-100 scale-100"
+          leave="ease-in duration-200"
+          leave-from="opacity-100 scale-100"
+          leave-to="opacity-0 scale-95"
+        >
+          <DialogPanel class="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-3xl flex flex-col shadow-2xl" style="max-height: 85vh;">
         <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-800 flex-shrink-0">
           <div>
             <h3 class="text-sm font-semibold text-zinc-200 flex items-center gap-2">
@@ -112,7 +135,9 @@ defineExpose({ open });
             {{ savingConfig ? 'Saving…' : 'Save & Restart Service' }}
           </button>
         </div>
+          </DialogPanel>
+        </TransitionChild>
       </div>
-    </div>
-  </Teleport>
+    </Dialog>
+  </TransitionRoot>
 </template>

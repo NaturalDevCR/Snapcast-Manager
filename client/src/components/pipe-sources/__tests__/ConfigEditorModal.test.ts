@@ -2,11 +2,15 @@
 // PipeSources.vue's existing smoke test never exercised this modal's markup
 // at all, so this is the first real assertion on its rendered content.
 import { describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { DOMWrapper, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
 import ConfigEditorModal from '../ConfigEditorModal.vue';
 import { usePipeSourcesStore, type PipeSource } from '../../../stores/pipeSources';
+
+// @headlessui/vue's Dialog teleports its rendered markup into a real
+// `document.body` node, outside the mounted wrapper's own DOM subtree.
+const body = () => new DOMWrapper(document.body);
 
 const samplePipe: PipeSource = {
   id: 'p1',
@@ -103,6 +107,11 @@ describe('ConfigEditorModal.vue', () => {
     await nextTick();
 
     expect(toastSpy).toHaveBeenCalledWith('load boom', 'error');
+    // headlessui's Dialog unmounts its content only after its leave
+    // transition finishes -- real time (not just microtask ticks) must
+    // elapse for that to happen under jsdom (Task 46 conversion).
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await nextTick();
     expect(document.body.textContent).not.toContain('Systemd Service File');
   });
 
@@ -133,6 +142,11 @@ describe('ConfigEditorModal.vue', () => {
 
     expect(store.setConfig).toHaveBeenCalledWith('p1', 'new content');
     expect(store.fetchPipes).toHaveBeenCalled();
+    // headlessui's Dialog unmounts its content only after its leave
+    // transition finishes -- real time (not just microtask ticks) must
+    // elapse for that to happen under jsdom (Task 46 conversion).
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await nextTick();
     expect(document.body.textContent).not.toContain('Systemd Service File');
   });
 
@@ -161,5 +175,34 @@ describe('ConfigEditorModal.vue', () => {
     expect(store.fetchPipes).not.toHaveBeenCalled();
     // Still open -- the catch block does not close the modal on failure.
     expect(document.body.textContent).toContain('Systemd Service File');
+  });
+
+  // Task 46: the Teleport-content div this modal used to render with had no
+  // keyboard accessibility (no focus trap, no Escape-to-close, no focus
+  // restoration). Converting to headlessui's Dialog gives it all three "for
+  // free" -- this proves the Escape wiring specifically (headlessui's own
+  // focus-trap implementation is already well-tested; see ui/Modal.vue's
+  // comment for that posture).
+  it('closes on Escape keydown', async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const store = usePipeSourcesStore();
+    store.getConfig = vi.fn().mockResolvedValue({ content: 'x', filePath: '/etc/x' });
+
+    const wrapper = mount(ConfigEditorModal, { global: { plugins: [pinia] } });
+    (wrapper.vm as any).open(samplePipe);
+    await nextTick();
+    await nextTick();
+
+    expect(document.body.textContent).toContain('Systemd Service File');
+
+    await body().trigger('keydown', { key: 'Escape' });
+    // headlessui's Dialog unmounts its content only after its leave
+    // transition finishes -- real time (not just microtask ticks) must
+    // elapse for that to happen under jsdom.
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await nextTick();
+
+    expect(document.body.textContent).not.toContain('Systemd Service File');
   });
 });

@@ -20,6 +20,7 @@
 // store) and `uiStore` (the UI/toast store) directly, no prop-drilling
 // needed for either.
 import { ref, computed } from 'vue';
+import { Dialog, DialogPanel, TransitionChild, TransitionRoot } from '@headlessui/vue';
 import {
   usePipeSourcesStore,
   type DiscoveredPipe,
@@ -119,9 +120,31 @@ defineExpose({ open });
 </script>
 
 <template>
-  <Teleport to="body">
-    <div v-if="showImportModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-start justify-center z-50 p-4 pt-16 overflow-y-auto">
-      <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl shadow-2xl mb-8">
+  <TransitionRoot as="template" :show="showImportModal">
+    <Dialog as="div" class="relative z-50" @close="showImportModal = false">
+      <TransitionChild
+        as="template"
+        enter="ease-out duration-300"
+        enter-from="opacity-0"
+        enter-to="opacity-100"
+        leave="ease-in duration-200"
+        leave-from="opacity-100"
+        leave-to="opacity-0"
+      >
+        <div class="fixed inset-0 bg-black/75 backdrop-blur-sm" />
+      </TransitionChild>
+
+      <div class="fixed inset-0 z-10 flex items-start justify-center p-4 pt-16 overflow-y-auto">
+        <TransitionChild
+          as="template"
+          enter="ease-out duration-300"
+          enter-from="opacity-0 scale-95"
+          enter-to="opacity-100 scale-100"
+          leave="ease-in duration-200"
+          leave-from="opacity-100 scale-100"
+          leave-to="opacity-0 scale-95"
+        >
+          <DialogPanel class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl shadow-2xl mb-8">
         <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
           <div>
             <h3 class="text-base font-bold text-zinc-200">Import Existing Pipe Sources</h3>
@@ -225,12 +248,14 @@ defineExpose({ open });
           </div>
         </div>
 
-        <div class="px-6 py-4 border-t border-zinc-800 flex justify-end">
-          <button @click="showImportModal = false" class="px-4 py-2 border border-zinc-700 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 text-sm transition">
-            Close
-          </button>
-        </div>
+            <div class="px-6 py-4 border-t border-zinc-800 flex justify-end">
+              <button @click="showImportModal = false" class="px-4 py-2 border border-zinc-700 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 text-sm transition">
+                Close
+              </button>
+            </div>
+          </DialogPanel>
+        </TransitionChild>
       </div>
-    </div>
-  </Teleport>
+    </Dialog>
+  </TransitionRoot>
 </template>

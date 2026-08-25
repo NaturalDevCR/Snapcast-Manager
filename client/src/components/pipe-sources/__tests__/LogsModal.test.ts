@@ -4,11 +4,15 @@
 // `document.body.textContent`), so this is the first real assertion on
 // its rendered content.
 import { describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { DOMWrapper, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
 import LogsModal from '../LogsModal.vue';
 import { usePipeSourcesStore, type PipeSource } from '../../../stores/pipeSources';
+
+// @headlessui/vue's Dialog teleports its rendered markup into a real
+// `document.body` node, outside the mounted wrapper's own DOM subtree.
+const body = () => new DOMWrapper(document.body);
 
 const samplePipe: PipeSource = {
   id: 'p1',
@@ -92,5 +96,34 @@ describe('LogsModal.vue', () => {
     await nextTick();
 
     expect(document.body.textContent).toContain('Error loading logs: boom');
+  });
+
+  // Task 46: the Teleport-content div this modal used to render with had no
+  // keyboard accessibility (no focus trap, no Escape-to-close, no focus
+  // restoration). Converting to headlessui's Dialog gives it all three "for
+  // free" -- this proves the Escape wiring specifically (headlessui's own
+  // focus-trap implementation is already well-tested; see ui/Modal.vue's
+  // comment for that posture).
+  it('closes on Escape keydown', async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const store = usePipeSourcesStore();
+    store.getLogs = vi.fn().mockResolvedValue('some logs');
+
+    const wrapper = mount(LogsModal, { global: { plugins: [pinia] } });
+    (wrapper.vm as any).open(samplePipe);
+    await nextTick();
+    await nextTick();
+
+    expect(document.body.textContent).toContain('Logs — Radio Gym');
+
+    await body().trigger('keydown', { key: 'Escape' });
+    // headlessui's Dialog unmounts its content only after its leave
+    // transition finishes -- real time (not just microtask ticks) must
+    // elapse for that to happen under jsdom.
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await nextTick();
+
+    expect(document.body.textContent).not.toContain('Logs — Radio Gym');
   });
 });
