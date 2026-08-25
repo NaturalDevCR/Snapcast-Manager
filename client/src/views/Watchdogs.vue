@@ -195,7 +195,7 @@ function formatBytes(bytes?: number) {
             <div class="flex items-center justify-between w-full">
                <div>
                   <h2 class="text-lg font-bold text-zinc-200">{{ wd.name }}</h2>
-                  <p class="text-xs text-zinc-500">Ports: {{ wd.ports?.join(', ') || 'None' }}</p>
+                  <p class="text-xs text-zinc-400">Ports: {{ wd.ports?.join(', ') || 'None' }}</p>
                   <p v-if="wd.autoKillDuplicates" class="text-xs text-blue-400 mt-0.5">Auto-Cleanup Enabled</p>
                </div>
                <div class="flex items-center space-x-2">
@@ -212,7 +212,7 @@ function formatBytes(bytes?: number) {
 
           <!-- Stats List -->
           <div v-if="wd.enabled" class="space-y-3 mt-2">
-             <div v-if="!watchdogStore.stats[wd.id] || watchdogStore.stats[wd.id]?.length === 0" class="text-xs text-zinc-500 py-2">
+             <div v-if="!watchdogStore.stats[wd.id] || watchdogStore.stats[wd.id]?.length === 0" class="text-xs text-zinc-400 py-2">
                  No active connections ( LISTENING )
              </div>
              <div v-else class="max-h-60 overflow-y-auto space-y-2">
@@ -224,7 +224,7 @@ function formatBytes(bytes?: number) {
                              </span>
                              <span class="font-medium text-zinc-300">{{ stat.peerAddress }}:{{ stat.peerPort }}</span>
                          </div>
-                         <div class="text-xs text-zinc-500 flex space-x-3 font-mono">
+                         <div class="text-xs text-zinc-400 flex space-x-3 font-mono">
                              <span v-if="stat.rxBytes !== undefined">⬇️ Recv: {{ formatBytes(stat.rxBytes) }}</span>
                              <span v-if="stat.recvQ !== undefined">Q: {{ stat.recvQ }}</span>
                          </div>
@@ -235,7 +235,7 @@ function formatBytes(bytes?: number) {
                  </div>
              </div>
           </div>
-          <div v-else class="text-center py-4 text-xs text-zinc-600">
+          <div v-else class="text-center py-4 text-xs text-zinc-400">
              Watchdog disabled
           </div>
         </Card>
@@ -255,7 +255,7 @@ function formatBytes(bytes?: number) {
                       <div class="space-y-2 max-h-40 overflow-y-auto border border-zinc-800 rounded p-2 bg-zinc-950">
                           <div v-for="source in sources" :key="source.port" class="flex items-center space-x-2">
                               <input type="checkbox" :value="source.port" v-model="selectedPorts" class="rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-500">
-                              <span class="text-sm text-zinc-300">{{ source.name }} <span class="text-zinc-500">(:{{ source.port }})</span></span>
+                              <span class="text-sm text-zinc-300">{{ source.name }} <span class="text-zinc-400">(:{{ source.port }})</span></span>
                           </div>
                       </div>
                   </div>

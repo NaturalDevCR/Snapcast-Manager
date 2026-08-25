@@ -71,7 +71,7 @@ onUnmounted(() => {
             <div class="relative inline-flex items-center">
               <input type="checkbox" v-model="autoRefresh" class="sr-only peer">
               <div class="w-10 h-5 bg-white/10 peer-focus:outline-none peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all border-white/5 peer-checked:bg-brand-primary rounded-full"></div>
-              <span class="ml-3 text-xs font-black text-gray-500 uppercase tracking-widest group-hover:text-brand-primary transition-colors">Live Update</span>
+              <span class="ml-3 text-xs font-black text-gray-400 uppercase tracking-widest group-hover:text-brand-primary transition-colors">Live Update</span>
             </div>
           </label>
           <div class="h-6 w-px bg-white/10"></div>
@@ -87,25 +87,25 @@ onUnmounted(() => {
         <!-- Server services -->
         <button @click="switchService('snapserver')"
           :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'snapserver' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+            activeService === 'snapserver' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-400 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">router</span>
           <span>Snapserver</span>
         </button>
         <button @click="switchService('shairport-sync')"
           :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'shairport-sync' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+            activeService === 'shairport-sync' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-400 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">cast</span>
           <span>AirPlay</span>
         </button>
         <button @click="switchService('snapmanager')"
           :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'snapmanager' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+            activeService === 'snapmanager' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-400 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">dashboard_customize</span>
           <span>Manager</span>
         </button>
         <button v-if="systemStore.installedPackages['mpd']" @click="switchService('mpd')"
           :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'mpd' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+            activeService === 'mpd' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-400 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">queue_music</span>
           <span>MPD</span>
         </button>
@@ -116,7 +116,7 @@ onUnmounted(() => {
           <button v-for="inst in instanceStore.instances" :key="inst.id"
             @click="switchService('snapclient-' + inst.id)"
             :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-              activeService === 'snapclient-' + inst.id ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+              activeService === 'snapclient-' + inst.id ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-gray-400 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
             <span class="material-symbols-outlined text-[1.1rem]">speaker</span>
             <span>{{ inst.name }}</span>
             <span :class="inst.status === 'active' ? 'bg-[#00ff9d]' : 'bg-[#ff3b30]'" class="w-1.5 h-1.5 rounded-full"></span>

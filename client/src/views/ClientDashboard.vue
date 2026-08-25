@@ -232,7 +232,7 @@ onMounted(async () => {
             </div>
             <div v-if="systemStore.installedPackages.snapclient" class="flex flex-col gap-2">
               <div class="flex items-center justify-between">
-                <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Version</span>
+                <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">Version</span>
                 <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions.snapclient || '...' }}</span>
               </div>
               <div v-if="systemStore.availableVersions.snapclient && systemStore.availableVersions.snapclient !== 'unknown' && systemStore.packageVersions.snapclient !== systemStore.availableVersions.snapclient"
@@ -308,18 +308,18 @@ onMounted(async () => {
               <div class="space-y-3">
                 <!-- Status row -->
                 <div class="flex items-center justify-between">
-                  <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Status</span>
+                  <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">Status</span>
                   <span :class="inst.status === 'active' ? 'text-[#00ff9d] bg-[#00ff9d]/10 border-[#00ff9d]/20' : 'text-[#ff3b30] bg-[#ff3b30]/10 border-[#ff3b30]/20'" class="px-2 py-0.5 rounded-lg text-[9px] border font-black uppercase tracking-widest">
                     {{ inst.status ?? 'unknown' }}
                   </span>
                 </div>
                 <!-- Server + Instance number -->
                 <div class="flex items-center justify-between">
-                  <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Server</span>
+                  <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">Server</span>
                   <span class="text-xs font-mono text-gray-300">{{ inst.host }}:{{ inst.port }}</span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Instance #</span>
+                  <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">Instance #</span>
                   <span class="text-xs font-mono text-brand-primary">{{ inst.instanceNum }}</span>
                 </div>
                 <!-- Soundcard -->
@@ -354,7 +354,7 @@ onMounted(async () => {
                     leave-to-class="opacity-0 max-h-0"
                   >
                     <div v-if="alsaState[inst.id]?.expanded" class="px-3 py-3 space-y-3 border-t border-white/5 overflow-hidden">
-                      <div v-if="alsaState[inst.id]?.controls.length === 0" class="text-[11px] text-gray-600 italic text-center py-2">
+                      <div v-if="alsaState[inst.id]?.controls.length === 0" class="text-[11px] text-text-muted italic text-center py-2">
                         No playback controls found for this device.
                       </div>
                       <div v-for="ctrl in alsaState[inst.id]?.controls" :key="ctrl.name" class="space-y-1.5">
@@ -409,14 +409,14 @@ onMounted(async () => {
             <div class="p-6 space-y-4">
               <!-- Name -->
               <div>
-                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">Instance Name</label>
+                <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">Instance Name</label>
                 <input v-model="form.name" type="text" placeholder="e.g. Living Room DAC" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
               </div>
 
               <!-- Audio Device -->
               <div>
-                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">Audio Output Device</label>
-                <div v-if="instanceStore.devices.length === 0" class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] text-xs text-gray-500 italic">No ALSA devices detected. Make sure audio hardware is connected.</div>
+                <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">Audio Output Device</label>
+                <div v-if="instanceStore.devices.length === 0" class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] text-xs text-text-muted italic">No ALSA devices detected. Make sure audio hardware is connected.</div>
                 <div v-else class="space-y-2 max-h-48 overflow-y-auto pr-1">
                   <label v-for="d in availableDevices" :key="d.hwId"
                     :class="[
@@ -442,18 +442,18 @@ onMounted(async () => {
               <!-- Host + Port -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">Snapserver Host</label>
+                  <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">Snapserver Host</label>
                   <input v-model="form.host" type="text" placeholder="192.168.1.10" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
                 </div>
                 <div>
-                  <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">Port</label>
+                  <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">Port</label>
                   <input v-model.number="form.port" type="number" placeholder="1704" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
                 </div>
               </div>
 
               <!-- Host ID -->
               <div>
-                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">Host ID <span class="text-gray-600 normal-case font-normal">(optional — for stable ID across reboots)</span></label>
+                <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">Host ID <span class="text-text-muted normal-case font-normal">(optional — for stable ID across reboots)</span></label>
                 <input v-model="form.hostId" type="text" placeholder="e.g. living-room-dac" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
               </div>
             </div>

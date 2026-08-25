@@ -770,7 +770,7 @@ const handleSave = () => {
                 @click="activeSection = sKey"
                 :class="[
                     'relative flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-200 flex-shrink-0',
-                    activeSection === sKey ? 'text-brand-primary' : 'text-gray-500 hover:text-gray-300'
+                    activeSection === sKey ? 'text-brand-primary' : 'text-text-muted hover:text-gray-300'
                 ]"
               >
                   <span
@@ -794,7 +794,7 @@ const handleSave = () => {
                     <span class="material-symbols-outlined text-[20px] text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.5)]">{{ sectionIcons[activeSection] || 'tune' }}</span>
                     <div>
                       <span class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">{{ currentSectionMeta.label }}</span>
-                      <p class="text-[10px] font-semibold text-gray-500 mt-0.5">{{ currentSectionMeta.description }}</p>
+                      <p class="text-[10px] font-semibold text-text-muted mt-0.5">{{ currentSectionMeta.description }}</p>
                     </div>
                   </div>
               </template>
@@ -917,7 +917,7 @@ const handleSave = () => {
                               {{ getMetaForKey('stream', key)?.label || key }}
                             </label>
                             <span v-if="getMetaForKey('stream', key)?.description" 
-                              class="text-[10px] text-slate-400 dark:text-slate-500 leading-snug mt-0.5">
+                              class="text-[10px] text-slate-400 leading-snug mt-0.5">
                               {{ getMetaForKey('stream', key)?.description }}
                             </span>
                             <span v-if="getMetaForKey('stream', key)?.default !== undefined" 
@@ -1008,7 +1008,7 @@ const handleSave = () => {
               <!-- ==== NON-STREAM SECTIONS: Standard property loop ==== -->
               <div v-else class="space-y-1">
                   <div v-if="allPropertyKeys.length === 0" class="text-center py-12 border border-dashed border-white/10 rounded-xl bg-black/20">
-                      <p class="text-xs font-black text-gray-500 uppercase tracking-widest">No properties available for this section</p>
+                      <p class="text-xs font-black text-text-muted uppercase tracking-widest">No properties available for this section</p>
                   </div>
                   
                   <div v-for="key in allPropertyKeys" :key="key" 
@@ -1041,7 +1041,7 @@ const handleSave = () => {
                               {{ getMetaForKey(activeSection, key)?.label || key }}
                             </label>
                             <span v-if="getMetaForKey(activeSection, key)?.description" 
-                              class="text-[10px] text-gray-500 leading-snug mt-0.5">
+                              class="text-[10px] text-text-muted leading-snug mt-0.5">
                               {{ getMetaForKey(activeSection, key)?.description }}
                             </span>
                             <span v-if="getMetaForKey(activeSection, key)?.default !== undefined" 
@@ -1055,7 +1055,7 @@ const handleSave = () => {
                       <div class="md:col-span-8">
                           <!-- DISABLED property: show default as read-only -->
                           <div v-if="!isPropertyEnabled(activeSection, key)" class="py-1">
-                            <span class="text-xs text-gray-500 font-mono">
+                            <span class="text-xs text-text-muted font-mono">
                               {{ getMetaForKey(activeSection, key)?.default ?? '(empty)' }}
                             </span>
                           </div>
@@ -1116,7 +1116,7 @@ const handleSave = () => {
 
           <!-- Bottom Actions -->
           <div class="mt-8 mb-24 flex justify-center">
-              <button @click="showConfirmReset = true" class="py-3 px-6 border border-white/5 rounded-xl text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 hover:border-[#ff3b30]/20 transition-all flex items-center space-x-2">
+              <button @click="showConfirmReset = true" class="py-3 px-6 border border-white/5 rounded-xl text-text-muted hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 hover:border-[#ff3b30]/20 transition-all flex items-center space-x-2">
                   <span class="material-symbols-outlined text-[16px]">restart_alt</span>
                   <span class="text-[10px] font-black uppercase tracking-widest">Reset Configuration to Default</span>
               </button>
@@ -1131,7 +1131,7 @@ const handleSave = () => {
           <div class="flex items-center justify-between">
               <div>
                   <h2 class="text-xl font-black text-white uppercase tracking-wider drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Raw Editor</h2>
-                  <p class="text-[11px] font-bold text-gray-500 uppercase tracking-widest mt-1">
+                  <p class="text-[11px] font-bold text-text-muted uppercase tracking-widest mt-1">
                       Directly modify the <code class="bg-brand-primary/20 px-1.5 py-0.5 rounded text-brand-primary text-[10px] font-mono border border-brand-primary/10">snapserver.conf</code> for advanced control.
                   </p>
               </div>
@@ -1150,7 +1150,7 @@ const handleSave = () => {
           <!-- Editor Wrapper -->
           <div class="rounded-2xl border border-white/5 bg-[#140b1b]/80 backdrop-blur-md overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
               <!-- Frame Header -->
-              <div class="bg-black/30 px-6 py-2.5 flex items-center justify-between text-[10px] font-mono text-gray-500 border-b border-white/5">
+              <div class="bg-black/30 px-6 py-2.5 flex items-center justify-between text-[10px] font-mono text-gray-400 border-b border-white/5">
                   <div class="flex items-center space-x-2">
                       <span class="material-symbols-outlined text-[14px]">description</span>
                       <span>/etc/snapserver.conf</span>
@@ -1190,12 +1190,12 @@ const handleSave = () => {
                       </template>
                       <div class="space-y-5">
                           <div>
-                              <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Identifier</label>
+                              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">Identifier</label>
                               <input v-model="snapshotName" type="text" placeholder="e.g. Pre-optimization" 
                                 class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600">
                           </div>
                           <div>
-                              <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Notes</label>
+                              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">Notes</label>
                               <textarea v-model="snapshotDescription" placeholder="Briefly describe why this checkpoint is being made..." 
                                 class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600 h-32 resize-none"></textarea>
                           </div>
@@ -1226,7 +1226,7 @@ const handleSave = () => {
                           </div>
                       </div>
                       <div v-else-if="snapshotStore.snapshots.length === 0" class="text-center py-24 bg-black/20 rounded-2xl border border-dashed border-white/10">
-                          <p class="text-xs font-black text-gray-500 uppercase tracking-[0.2em]">No snapshots archived</p>
+                          <p class="text-xs font-black text-text-muted uppercase tracking-[0.2em]">No snapshots archived</p>
                       </div>
                       <div v-else class="space-y-4">
                           <div v-for="snapshot in snapshotStore.snapshots" :key="snapshot.id" 
@@ -1274,7 +1274,7 @@ const handleSave = () => {
               <div class="sticky top-0 bg-brand-bg/90 backdrop-blur-sm border-b border-white/5 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
                 <div>
                   <h3 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">{{ isEditingSource ? 'Edit Audio Source' : 'Add Audio Source' }}</h3>
-                  <p class="text-[10px] text-gray-500 mt-0.5">{{ isEditingSource ? 'Modify the source parameters' : 'Select a source type and configure its parameters' }}</p>
+                  <p class="text-[10px] text-text-muted mt-0.5">{{ isEditingSource ? 'Modify the source parameters' : 'Select a source type and configure its parameters' }}</p>
                 </div>
                 <button @click="showAddSourceDialog = false" class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all" aria-label="Close">
                   <span class="material-symbols-outlined text-[20px]">close</span>
@@ -1295,7 +1295,7 @@ const handleSave = () => {
                         <span class="material-symbols-outlined text-[24px] text-gray-400 group-hover:text-brand-primary transition-colors drop-shadow-[0_0_5px_currentColor]">queue_music</span>
                       </div>
                       <span class="text-xs font-black uppercase tracking-wider text-gray-200 group-hover:text-white">{{ tmpl.label }}</span>
-                      <span class="text-[9px] text-gray-500 mt-1 leading-tight group-hover:text-gray-400">{{ tmpl.description.split('.')[0] }}</span>
+                      <span class="text-[9px] text-text-muted mt-1 leading-tight group-hover:text-gray-400">{{ tmpl.description.split('.')[0] }}</span>
                     </button>
                   </div>
                 </div>
@@ -1323,7 +1323,7 @@ const handleSave = () => {
                   <div class="space-y-4">
                     <!-- Path (non-meta only) -->
                     <div v-if="!selectedTemplate.isMeta">
-                      <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">
+                      <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">
                         Path / Host
                       </label>
                       <input
@@ -1337,7 +1337,7 @@ const handleSave = () => {
                     <div v-if="selectedTemplate.isMeta" class="space-y-4">
                       <!-- Available Sources -->
                       <div>
-                        <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">
+                        <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">
                           <span class="material-symbols-outlined text-[12px] align-middle mr-1">library_music</span>
                           Available Sources
                         </label>
@@ -1372,14 +1372,14 @@ const handleSave = () => {
 
                       <!-- Selected Sources (priority order) -->
                       <div>
-                        <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">
+                        <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">
                           <span class="material-symbols-outlined text-[12px] align-middle mr-1">sort</span>
                           Priority Chain
-                          <span class="text-[9px] text-gray-600 font-semibold normal-case tracking-normal ml-1">— first = highest priority (active), last = fallback</span>
+                          <span class="text-[9px] text-text-muted font-semibold normal-case tracking-normal ml-1">— first = highest priority (active), last = fallback</span>
                         </label>
                         <div v-if="metaSelectedSources.length === 0" class="text-center py-6 border border-dashed border-white/10 rounded-xl bg-black/20">
                           <span class="material-symbols-outlined text-[24px] text-gray-600">playlist_add</span>
-                          <p class="text-[10px] text-gray-500 mt-1 font-bold uppercase tracking-widest">Click sources above to add them</p>
+                          <p class="text-[10px] text-text-muted mt-1 font-bold uppercase tracking-widest">Click sources above to add them</p>
                         </div>
                         <div v-else class="space-y-2">
                           <div
@@ -1394,7 +1394,7 @@ const handleSave = () => {
                                 'flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-black',
                                 idx === 0
                                   ? 'bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/30'
-                                  : 'bg-white/5 text-gray-500 border border-white/5'
+                                  : 'bg-white/5 text-text-muted border border-white/5'
                               ]"
                             >
                               {{ idx + 1 }}
@@ -1448,11 +1448,11 @@ const handleSave = () => {
 
                     <!-- Parameters -->
                     <div v-for="param in selectedTemplate.params" :key="param.key">
-                      <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1.5">
+                      <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">
                         {{ param.label }}
                         <span v-if="param.required" class="text-[#ff2a5f] ml-0.5 drop-shadow-[0_0_2px_rgba(255,42,95,0.8)]">*</span>
                       </label>
-                      <span class="text-[9px] text-gray-500 block mb-2">{{ param.description }}</span>
+                      <span class="text-[9px] text-text-muted block mb-2">{{ param.description }}</span>
                       
                       <!-- Boolean param -->
                       <div v-if="param.type === 'boolean'" class="flex items-center">
@@ -1503,13 +1503,13 @@ const handleSave = () => {
 
                   <!-- URI Preview -->
                   <div class="mt-6 p-4 bg-black/50 rounded-xl border border-white/5">
-                    <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest block mb-2">Generated URI</label>
+                    <label class="text-[9px] font-black text-text-muted uppercase tracking-widest block mb-2">Generated URI</label>
                     <code class="text-[11px] text-[#00d4ff] font-mono break-all leading-relaxed">{{ buildSourceUri() }}</code>
                   </div>
 
                   <!-- Actions -->
                   <div class="flex justify-end space-x-3 mt-6">
-                    <button @click="showAddSourceDialog = false" class="px-5 py-2.5 text-xs font-black text-gray-500 uppercase tracking-widest hover:text-white transition-colors">
+                    <button @click="showAddSourceDialog = false" class="px-5 py-2.5 text-xs font-black text-text-muted uppercase tracking-widest hover:text-white transition-colors">
                       Cancel
                     </button>
                     <button 

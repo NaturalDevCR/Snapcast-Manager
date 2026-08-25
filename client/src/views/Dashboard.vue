@@ -309,7 +309,7 @@ const openMympd = () => {
             </div>
             <div class="flex flex-col" v-if="systemStore.installedPackages.snapserver">
                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Version</span>
+                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">Version</span>
                     <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions.snapserver || '...' }}</span>
                  </div>
                  <div v-if="systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' && systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver" 
@@ -360,12 +360,12 @@ const openMympd = () => {
             </div>
             <div class="flex flex-col">
                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Engine Version</span>
+                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">Engine Version</span>
                     <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions.node || '...' }}</span>
                  </div>
                  
                  <div class="mt-4 space-y-3">
-                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest block border-b border-white/5 pb-2">Select LTS Release</span>
+                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest block border-b border-white/5 pb-2">Select LTS Release</span>
                     <div class="grid grid-cols-3 gap-3">
                         <button v-for="v in ['18', '20', '22']" :key="v"
                                 @click="selectedNodeVersion = v"
@@ -402,7 +402,7 @@ const openMympd = () => {
                 <p class="text-[10px] font-bold text-brand-primary leading-relaxed text-center tracking-widest uppercase">Everything is synced and running smoothly on version v{{ version }}.</p>
             </div>
             <div class="pt-4 border-t border-white/5">
-                 <button disabled class="w-full px-4 py-3 bg-black/40 text-gray-500 rounded-xl font-black text-xs uppercase tracking-widest cursor-default border border-white/5">
+                 <button disabled class="w-full px-4 py-3 bg-black/40 text-text-muted rounded-xl font-black text-xs uppercase tracking-widest cursor-default border border-white/5">
                     UI Up to Date
                  </button>
             </div>
@@ -431,7 +431,7 @@ const openMympd = () => {
             </div>
             <div class="flex flex-col">
                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Version</span>
+                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">Version</span>
                     <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions['snap-ctrl'] || '...' }}</span>
                  </div>
                  <div v-if="systemStore.availableVersions['snap-ctrl'] && systemStore.availableVersions['snap-ctrl'] !== 'unknown' && systemStore.packageVersions['snap-ctrl'] !== systemStore.availableVersions['snap-ctrl']" 
@@ -440,13 +440,13 @@ const openMympd = () => {
                      <span class="w-2 h-2 rounded-full bg-[#ffcc00] animate-pulse"></span>
                  </div>
             </div>
-            <p class="text-[11px] font-medium text-gray-500 leading-relaxed">The ultimate modern web controller for your Snapcast server infrastructure.</p>
+            <p class="text-[11px] font-medium text-text-muted leading-relaxed">The ultimate modern web controller for your Snapcast server infrastructure.</p>
             <div class="pt-3 border-t border-white/5">
                  <button @click="handleUpdate('snap-ctrl')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     {{ systemStore.installedPackages['snap-ctrl'] ? 'Update Interface' : 'Install Interface' }}
                  </button>
             </div>
-            <p v-if="systemStore.installedPackages['snap-ctrl']" class="text-[10px] font-black text-center text-gray-600 uppercase tracking-widest">
+            <p v-if="systemStore.installedPackages['snap-ctrl']" class="text-[10px] font-black text-center text-text-muted uppercase tracking-widest">
                 Port 1780
             </p>
         </div>
@@ -465,7 +465,7 @@ const openMympd = () => {
             </div>
             <div class="flex flex-col" v-if="systemStore.installedPackages.ffmpeg">
                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Version Info</span>
+                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">Version Info</span>
                     <span class="text-xs font-mono font-bold text-gray-300 truncate max-w-[150px]">{{ systemStore.packageVersions.ffmpeg || '...' }}</span>
                  </div>
             </div>

@@ -213,7 +213,7 @@ function handleClickOutside(e: MouseEvent) {
                     ></div>
                     <p
                       class="px-4 pt-1 pb-1 text-[10px] font-black uppercase tracking-widest"
-                      :class="isGroupActive(group) ? 'text-brand-primary/80' : 'text-gray-500'"
+                      :class="isGroupActive(group) ? 'text-brand-primary/80' : 'text-text-muted'"
                     >{{ group.label }}</p>
                     <router-link
                       v-for="item in group.items"
@@ -233,7 +233,7 @@ function handleClickOutside(e: MouseEvent) {
                       >{{ item.icon }}</span>
                       <div>
                         <p class="text-xs font-black uppercase tracking-wide leading-tight">{{ item.name }}</p>
-                        <p class="text-[10px] text-gray-500 font-medium mt-0.5">{{ item.description }}</p>
+                        <p class="text-[10px] text-text-muted font-medium mt-0.5">{{ item.description }}</p>
                       </div>
                       <span v-if="isItemActive(item)" class="ml-auto w-1.5 h-1.5 rounded-full bg-brand-primary shadow-md shadow-brand-primary/80"></span>
                     </router-link>
@@ -377,7 +377,7 @@ function handleClickOutside(e: MouseEvent) {
                     <div v-for="group in serverMenuGroups" :key="group.key" class="flex flex-col gap-1">
                       <p
                         class="text-[10px] font-black uppercase tracking-widest"
-                        :class="isGroupActive(group) ? 'text-brand-primary/80' : 'text-gray-500'"
+                        :class="isGroupActive(group) ? 'text-brand-primary/80' : 'text-text-muted'"
                       >{{ group.label }}</p>
                       <router-link
                         v-for="item in group.items"
@@ -387,7 +387,7 @@ function handleClickOutside(e: MouseEvent) {
                         :class="[
                           isItemActive(item)
                             ? 'text-text-main'
-                            : 'text-gray-500 hover:text-gray-300',
+                            : 'text-text-muted hover:text-gray-300',
                           'py-1 text-sm font-bold transition-all duration-200 flex items-center gap-2.5'
                         ]"
                       >
@@ -428,7 +428,7 @@ function handleClickOutside(e: MouseEvent) {
 
     <!-- Footer -->
     <footer class="bg-brand-bg/80 backdrop-blur-xl border-t border-white/5 py-6 mt-12 z-10 relative">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-500">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-text-muted">
         <div class="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
           <span class="font-black tracking-widest uppercase text-[10px]">&copy; 2026 Snapcast Manager Ecosystem</span>
           <span class="hidden sm:inline-block text-text-muted/40">&bull;</span>

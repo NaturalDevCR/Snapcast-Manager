@@ -423,7 +423,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
       </div>
 
       <!-- Zombie healthy -->
-      <div v-else-if="store.zombieCount !== null && !isZombieWarning" class="flex items-center gap-2 text-xs text-zinc-500">
+      <div v-else-if="store.zombieCount !== null && !isZombieWarning" class="flex items-center gap-2 text-xs text-zinc-400">
         <span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
         {{ store.zombieCount }} zombie processes — system healthy
       </div>
@@ -485,10 +485,10 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                     {{ statusLabel(pipe.status) }}
                   </span>
                 </div>
-                <p v-if="pipe.type === 'radio'" class="text-xs text-zinc-500 font-mono mt-1 truncate" :title="pipe.url">
+                <p v-if="pipe.type === 'radio'" class="text-xs text-zinc-400 font-mono mt-1 truncate" :title="pipe.url">
                   {{ truncateUrl(pipe.url) }}
                 </p>
-                <p v-else class="text-xs text-zinc-500 mt-1">MPD audio output → <span class="font-mono">{{ pipe.fifoPath }}</span></p>
+                <p v-else class="text-xs text-zinc-400 mt-1">MPD audio output → <span class="font-mono">{{ pipe.fifoPath }}</span></p>
               </div>
 
               <!-- Controls -->
@@ -525,7 +525,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
           </template>
 
           <!-- Details -->
-          <div class="mt-3 space-y-2 text-xs text-zinc-500">
+          <div class="mt-3 space-y-2 text-xs text-zinc-400">
             <div class="flex flex-wrap gap-x-4 gap-y-1">
               <span class="font-mono">FIFO: <span class="text-zinc-400">{{ pipe.fifoPath }}</span></span>
               <span class="font-mono">Service: <span class="text-zinc-400">{{ pipe.serviceName }}</span></span>
@@ -595,9 +595,9 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                   MPD Output
                 </button>
               </div>
-              <p v-if="editingId" class="text-xs text-zinc-600 mt-1">Type cannot be changed after creation.</p>
-              <p v-else-if="form.type === 'radio'" class="text-xs text-zinc-600 mt-1">ffmpeg pulls from an HTTP stream URL and writes to the FIFO.</p>
-              <p v-else class="text-xs text-zinc-600 mt-1">MPD writes audio to the FIFO via an audio_output block in mpd.conf.</p>
+              <p v-if="editingId" class="text-xs text-zinc-400 mt-1">Type cannot be changed after creation.</p>
+              <p v-else-if="form.type === 'radio'" class="text-xs text-zinc-400 mt-1">ffmpeg pulls from an HTTP stream URL and writes to the FIFO.</p>
+              <p v-else class="text-xs text-zinc-400 mt-1">MPD writes audio to the FIFO via an audio_output block in mpd.conf.</p>
             </div>
 
             <!-- Name -->
@@ -609,7 +609,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                 placeholder="e.g. Radio Gym"
                 class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:border-purple-500 focus:outline-none"
               />
-              <p v-if="editingId" class="text-xs text-zinc-600 mt-1">Renaming will migrate the FIFO path and recreate the service file automatically.</p>
+              <p v-if="editingId" class="text-xs text-zinc-400 mt-1">Renaming will migrate the FIFO path and recreate the service file automatically.</p>
             </div>
 
             <!-- Radio-only fields -->
@@ -665,7 +665,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
               <label class="block text-xs text-zinc-400 mb-1">Idle Threshold (ms)</label>
               <input v-model.number="form.idleThreshold" type="number" min="1000" max="60000"
                 class="w-32 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:border-purple-500 focus:outline-none" />
-              <p class="text-xs text-zinc-600 mt-1">How long silence before snapserver marks the source idle.</p>
+              <p class="text-xs text-zinc-400 mt-1">How long silence before snapserver marks the source idle.</p>
             </div>
 
             <!-- Enabled toggle -->
@@ -708,7 +708,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
             </button>
           </div>
           <div class="flex-1 overflow-y-auto p-4">
-            <div v-if="loadingLogs" class="text-zinc-500 text-sm text-center py-8">Loading logs…</div>
+            <div v-if="loadingLogs" class="text-zinc-400 text-sm text-center py-8">Loading logs…</div>
             <pre v-else class="text-xs text-zinc-300 font-mono whitespace-pre-wrap leading-5">{{ logsContent || 'No log output.' }}</pre>
           </div>
         </div>
@@ -722,7 +722,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
           <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
             <div>
               <h3 class="text-base font-bold text-zinc-200">Import Existing Pipe Sources</h3>
-              <p class="text-xs text-zinc-500 mt-0.5">Discovers unmanaged <code class="bg-zinc-800 px-1 rounded">pipe://</code> sources in snapserver.conf and adopts them.</p>
+              <p class="text-xs text-zinc-400 mt-0.5">Discovers unmanaged <code class="bg-zinc-800 px-1 rounded">pipe://</code> sources in snapserver.conf and adopts them.</p>
             </div>
             <button @click="showImportModal = false" class="text-zinc-500 hover:text-zinc-300 transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close import dialog">
               <span class="material-symbols-outlined">close</span>
@@ -730,14 +730,14 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
           </div>
 
           <div class="p-6 space-y-4">
-            <div v-if="discovering" class="text-center py-8 text-zinc-500 text-sm">
+            <div v-if="discovering" class="text-center py-8 text-zinc-400 text-sm">
               <span class="material-symbols-outlined animate-spin inline-block mr-2 text-[1.2rem]">refresh</span>
               Scanning snapserver config…
             </div>
             <div v-else-if="discovered.length === 0" class="text-sm">
               <EmptyState icon="check_circle" title="No unmanaged pipe:// sources found" />
             </div>
-            <div v-else-if="pendingDiscovered.length === 0" class="text-center py-8 text-zinc-500 text-sm">
+            <div v-else-if="pendingDiscovered.length === 0" class="text-center py-8 text-zinc-400 text-sm">
               <span class="material-symbols-outlined text-3xl block mb-2 text-green-600">check_circle</span>
               All discovered sources have been imported.
             </div>
@@ -753,11 +753,11 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                     </span>
                     <span v-if="f.adopted" class="text-xs text-green-400 font-medium">Imported</span>
                   </div>
-                  <span class="text-xs font-mono text-zinc-500">{{ d.fifoPath }}</span>
+                  <span class="text-xs font-mono text-zinc-400">{{ d.fifoPath }}</span>
                 </div>
                 <div v-if="d.existingService" class="text-right">
-                  <span class="text-xs text-zinc-500">{{ d.existingService.name }}</span>
-                  <span :class="['ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold', d.existingService.isActive ? 'bg-green-500/20 text-green-400' : 'bg-zinc-700 text-zinc-400']">
+                  <span class="text-xs text-zinc-400">{{ d.existingService.name }}</span>
+                  <span :class="['ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold', d.existingService.isActive ? 'bg-green-500/20 text-green-400' : 'bg-zinc-700 text-zinc-300']">
                     {{ d.existingService.isActive ? 'active' : 'inactive' }}
                   </span>
                 </div>
@@ -768,11 +768,11 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                 <!-- Type override -->
                 <div class="flex gap-2">
                   <button @click="f.type = 'radio'"
-                    :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'radio' ? 'border-purple-500 bg-purple-500/20 text-purple-300' : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:border-zinc-600']">
+                    :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'radio' ? 'border-purple-500 bg-purple-500/20 text-purple-300' : 'border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600']">
                     Radio
                   </button>
                   <button @click="f.type = 'mpd'"
-                    :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'mpd' ? 'border-blue-500 bg-blue-500/20 text-blue-300' : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:border-zinc-600']">
+                    :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'mpd' ? 'border-blue-500 bg-blue-500/20 text-blue-300' : 'border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600']">
                     MPD
                   </button>
                 </div>
@@ -783,7 +783,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                     <label class="block text-xs text-zinc-400 mb-1">Stream URL <span class="text-red-400">*</span></label>
                     <input v-model="f.url" type="url" placeholder="https://…/radio.mp3"
                       class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 font-mono focus:border-purple-500 focus:outline-none" />
-                    <p v-if="d.existingService?.url" class="text-[10px] text-zinc-600 mt-1">Auto-detected from existing service.</p>
+                    <p v-if="d.existingService?.url" class="text-[10px] text-zinc-400 mt-1">Auto-detected from existing service.</p>
                   </div>
                   <div class="flex flex-wrap gap-x-4 gap-y-2 items-center">
                     <label class="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-300">
@@ -842,7 +842,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                 {{ configEditorPipe?.type === 'mpd' ? 'MPD audio_output block' : 'Systemd Service File' }}
                 — {{ configEditorPipe?.name }}
               </h3>
-              <p class="text-xs text-zinc-500 mt-0.5 font-mono">{{ configFilePath }}</p>
+              <p class="text-xs text-zinc-400 mt-0.5 font-mono">{{ configFilePath }}</p>
             </div>
             <button @click="showConfigEditor = false" class="text-zinc-500 hover:text-zinc-300 transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close config editor">
               <span class="material-symbols-outlined text-[1.2rem]">close</span>
@@ -850,7 +850,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
           </div>
 
           <div class="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
-            <div v-if="loadingConfig" class="text-zinc-500 text-sm text-center py-8">Loading…</div>
+            <div v-if="loadingConfig" class="text-zinc-400 text-sm text-center py-8">Loading…</div>
             <template v-else>
               <p v-if="configEditorPipe?.type === 'mpd'" class="text-xs text-blue-300 bg-blue-500/5 border border-blue-500/20 rounded px-3 py-2">
                 Editing only the <code>audio_output</code> block managed by Snapcast Manager. Other mpd.conf content is preserved.

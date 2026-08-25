@@ -103,17 +103,17 @@ const handleExportBackup = async () => {
           </template>
           <div class="space-y-5">
             <div>
-              <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Current Password</label>
+              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">Current Password</label>
               <input v-model="currentPassword" type="password" placeholder="Enter current password"
                 class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
             </div>
             <div>
-              <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">New Password</label>
+              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">New Password</label>
               <input v-model="newPassword" type="password" placeholder="Enter new password"
                 class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
             </div>
             <div>
-              <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Confirm New Password</label>
+              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">Confirm New Password</label>
               <input v-model="confirmPassword" type="password" placeholder="Re-enter new password"
                 class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
             </div>

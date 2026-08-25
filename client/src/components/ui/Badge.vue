@@ -36,7 +36,7 @@ const variantClasses: Record<NonNullable<BadgeProps['variant']>, string> = {
   warning: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
   danger: 'text-red-400 bg-red-400/10 border-red-400/20',
   neutral: 'text-text-muted bg-brand-surface border-brand-primary/10',
-  brand: 'text-brand-primary bg-brand-primary/10 border-brand-primary/20',
+  brand: 'text-purple-400 bg-brand-primary/10 border-brand-primary/20',
 };
 
 const sizeClasses: Record<NonNullable<BadgeProps['size']>, string> = {

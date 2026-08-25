@@ -298,7 +298,7 @@ onMounted(() => {
           :class="['flex items-center space-x-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
             activeTab === 'crontab'
               ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]'
-              : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+              : 'bg-black/40 text-gray-400 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">schedule</span>
           <span>Crontab</span>
         </button>
@@ -306,7 +306,7 @@ onMounted(() => {
           :class="['flex items-center space-x-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
             activeTab === 'scripts'
               ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]'
-              : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+              : 'bg-black/40 text-gray-400 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">code</span>
           <span>Scripts</span>
         </button>
@@ -314,7 +314,7 @@ onMounted(() => {
           :class="['flex items-center space-x-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
             activeTab === 'mpd-config'
               ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]'
-              : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+              : 'bg-black/40 text-gray-400 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">queue_music</span>
           <span>MPD Config</span>
         </button>
@@ -322,7 +322,7 @@ onMounted(() => {
           :class="['flex items-center space-x-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
             activeTab === 'backups'
               ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]'
-              : 'bg-black/40 text-gray-500 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+              : 'bg-black/40 text-gray-400 border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">settings_backup_restore</span>
           <span>Backups</span>
         </button>
@@ -350,7 +350,7 @@ onMounted(() => {
             </div>
           </div>
           <div class="p-4">
-            <p class="text-[10px] font-mono text-gray-500 mb-3 leading-relaxed">
+            <p class="text-[10px] font-mono text-gray-400 mb-3 leading-relaxed">
               Format: <span class="text-gray-400">min hour day month weekday command</span>&nbsp;&nbsp;
               Example: <span class="text-gray-400">*/5 * * * * /path/to/script.sh</span>
             </p>
@@ -394,7 +394,7 @@ onMounted(() => {
 
             <!-- Script Items -->
             <div class="divide-y divide-white/5">
-              <div v-if="scriptPaths.length === 0" class="px-5 py-8 text-center text-gray-600 text-xs font-bold uppercase tracking-widest">
+              <div v-if="scriptPaths.length === 0" class="px-5 py-8 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">
                 No scripts added yet
               </div>
               <div v-for="script in scriptPaths" :key="script.id"
@@ -403,7 +403,7 @@ onMounted(() => {
                   selectedScript?.id === script.id ? 'bg-brand-primary/10 border-l-2 border-brand-primary' : 'hover:bg-white/5']">
                 <div class="min-w-0 mr-2">
                   <p class="text-xs font-black text-white truncate">{{ script.label }}</p>
-                  <p class="text-[10px] font-mono text-gray-500 truncate mt-0.5">{{ script.path }}</p>
+                  <p class="text-[10px] font-mono text-gray-400 truncate mt-0.5">{{ script.path }}</p>
                 </div>
                 <button @click.stop="confirmRemoveScript(script.id)"
                   class="opacity-0 group-hover:opacity-100 p-1 min-w-[40px] min-h-[40px] flex items-center justify-center text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-all flex-shrink-0"
@@ -422,7 +422,7 @@ onMounted(() => {
                 <span class="text-sm font-black text-white uppercase tracking-widest">
                   {{ selectedScript ? selectedScript.label : 'Select a script' }}
                 </span>
-                <span v-if="selectedScript" class="text-[10px] font-mono text-gray-500 truncate max-w-[200px]">{{ selectedScript.path }}</span>
+                <span v-if="selectedScript" class="text-[10px] font-mono text-gray-400 truncate max-w-[200px]">{{ selectedScript.path }}</span>
               </div>
               <button v-if="selectedScript" @click="saveScript" :disabled="scriptLoading"
                 class="inline-flex items-center px-4 py-1.5 text-xs font-black bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl transition-all active:scale-95 uppercase tracking-widest border border-brand-primary/50 disabled:opacity-50">
@@ -431,11 +431,11 @@ onMounted(() => {
               </button>
             </div>
             <div class="p-4">
-              <div v-if="!selectedScript" class="flex flex-col items-center justify-center py-20 text-gray-600">
+              <div v-if="!selectedScript" class="flex flex-col items-center justify-center py-20 text-gray-400">
                 <span class="material-symbols-outlined text-4xl mb-3">code_off</span>
                 <p class="text-xs font-black uppercase tracking-widest">Select a script from the list</p>
               </div>
-              <div v-else-if="scriptLoading" class="flex items-center justify-center py-20 text-gray-500">
+              <div v-else-if="scriptLoading" class="flex items-center justify-center py-20 text-gray-400">
                 <span class="material-symbols-outlined animate-spin mr-2">sync</span>
                 <span class="text-xs font-black uppercase tracking-widest">Loading...</span>
               </div>
@@ -459,7 +459,7 @@ onMounted(() => {
             <div class="flex items-center space-x-3">
               <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">queue_music</span>
               <span class="text-sm font-black text-white uppercase tracking-widest">MPD Config</span>
-              <span class="text-[10px] font-mono text-gray-500">/etc/mpd.conf</span>
+              <span class="text-[10px] font-mono text-gray-400">/etc/mpd.conf</span>
             </div>
             <div class="flex items-center gap-3">
               <button v-if="systemStore.installedPackages['mympd'] && systemStore.mympdRunning" @click="openMympd"
@@ -516,10 +516,10 @@ onMounted(() => {
             </button>
           </div>
           <div class="p-4">
-            <p class="text-[10px] font-mono text-gray-500 mb-3 leading-relaxed">
+            <p class="text-[10px] font-mono text-gray-400 mb-3 leading-relaxed">
               Automatic backups of snapserver/snapclient configuration, created before each install or update. The 15 most recent are kept.
             </p>
-            <div v-if="backups.length === 0 && !backupsLoading" class="px-5 py-10 text-center text-gray-600 text-xs font-bold uppercase tracking-widest">
+            <div v-if="backups.length === 0 && !backupsLoading" class="px-5 py-10 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">
               No backups yet — they are created automatically before installs and updates
             </div>
             <div v-else class="divide-y divide-white/5">
@@ -527,7 +527,7 @@ onMounted(() => {
                 class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 hover:bg-white/5 transition-all rounded-xl">
                 <div class="min-w-0">
                   <p class="text-xs font-black text-white truncate font-mono">{{ backup.name }}</p>
-                  <p class="text-[10px] font-mono text-gray-500 mt-0.5">
+                  <p class="text-[10px] font-mono text-gray-400 mt-0.5">
                     {{ formatDate(backup.mtime) }} · {{ formatSize(backup.size) }}
                     <span v-if="backup.components.length"> · {{ backup.components.join(', ') }}</span>
                   </p>

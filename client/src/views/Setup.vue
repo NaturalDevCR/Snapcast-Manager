@@ -73,7 +73,7 @@ const handleSetup = async () => {
                 <form class="space-y-8" @submit.prevent="handleSetup">
                     <div class="space-y-5">
                         <div class="group/input">
-                            <label class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">Admin Username</label>
+                            <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">Admin Username</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                     <span class="material-symbols-outlined text-gray-400 group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">person_add</span>
@@ -90,7 +90,7 @@ const handleSetup = async () => {
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div class="group/input">
-                                <label class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">Password</label>
+                                <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">Password</label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                         <span class="material-symbols-outlined text-gray-400 group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">lock</span>
@@ -105,7 +105,7 @@ const handleSetup = async () => {
                                 </div>
                             </div>
                             <div class="group/input">
-                                <label class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">Confirm</label>
+                                <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">Confirm</label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                         <span class="material-symbols-outlined text-gray-400 group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">check_circle</span>
@@ -134,7 +134,7 @@ const handleSetup = async () => {
                         <span v-else>Complete Setup & Launch</span>
                     </button>
                     
-                    <p class="text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-relaxed px-4">
+                    <p class="text-center text-[10px] font-bold text-text-muted uppercase tracking-widest leading-relaxed px-4">
                         By completing setup, you become the primary controller of this Snapcast infrastructure instance.
                     </p>
                 </form>
