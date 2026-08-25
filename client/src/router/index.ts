@@ -10,6 +10,7 @@ import Watchdogs from '../views/Watchdogs.vue'
 import Routing from '../views/Routing.vue'
 import Tools from '../views/Tools.vue'
 import PipeSources from '../views/PipeSources.vue'
+import Onboarding from '../views/Onboarding.vue'
 import UiKit from '../views/dev/UiKit.vue'
 
 import { fetchApi } from '../utils/api'
@@ -84,6 +85,12 @@ const router = createRouter({
     {
       path: '/radio-streams',
       redirect: '/pipe-sources',
+    },
+    {
+      path: '/onboarding',
+      name: 'onboarding',
+      component: Onboarding,
+      meta: { requiresAuth: true }
     },
     {
       // Dev-only visual showcase for client/src/components/ui/* primitives

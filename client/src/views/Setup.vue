@@ -36,7 +36,7 @@ const handleSetup = async () => {
         localStorage.setItem('user', JSON.stringify(data.user));
 
         uiStore.showToast('System initialized! Welcome aboard.', 'success');
-        router.push('/');
+        router.push('/onboarding');
     } catch (err: any) {
         uiStore.showToast(err.message || 'Setup failed', 'error');
     } finally {
