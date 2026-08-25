@@ -9,6 +9,7 @@
 // Stubbed once here, reset between tests so no state leaks across files.
 import { afterEach, beforeEach, vi } from 'vitest';
 import { enableAutoUnmount } from '@vue/test-utils';
+import { i18n } from '../i18n';
 
 // Auto-unmount every mounted wrapper after each test. This was a no-op
 // omission for Task 21's primitives (none of them render outside their own
@@ -79,4 +80,19 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   localStorage.clear();
+
+  // `useUIStore().setLocale()` (`stores/ui.ts`) mutates the REAL, app-wide
+  // `i18n.global.locale` singleton exported by `client/src/i18n.ts` -- not
+  // any test-local i18n instance. Vitest isolates modules per FILE, not per
+  // test, so without this reset a `setLocale('es')` call in one test leaves
+  // that singleton polluted at 'es' for every later test in the same file.
+  // `useUIStore()`'s `locale` ref is seeded from that same singleton at
+  // store-creation time, and `mountSmokeTest()`'s (`client/src/test/mountView.ts`)
+  // locale-mirroring watcher then faithfully mirrors the polluted value onto
+  // every subsequently-mounted component -- silently rendering Spanish for
+  // otherwise-unrelated, later tests that never touch locale at all. See
+  // Task 53 review (`.superpowers/sdd/task-53-review.md`, Finding 1, HIGH)
+  // for the full repro; regression test in
+  // `client/src/test/__tests__/mountView.test.ts`.
+  i18n.global.locale.value = 'en';
 });
