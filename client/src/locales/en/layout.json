@@ -1,0 +1,15 @@
+{
+  "openMenu": "Open menu",
+  "closeMenu": "Close menu",
+  "menu": "Menu",
+  "dashboard": "Dashboard",
+  "audioMatrix": "Audio Matrix",
+  "logs": "Logs",
+  "server": "Server",
+  "client": "Client",
+  "serverMode": "Server Mode",
+  "clientMode": "Client Mode",
+  "admin": "Admin",
+  "sessionActive": "Session Active",
+  "signOut": "Sign out"
+}

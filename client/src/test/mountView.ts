@@ -11,6 +11,8 @@ import { createI18n } from 'vue-i18n';
 import type { Component } from 'vue';
 import enCommon from '../locales/en/common.json';
 import esCommon from '../locales/es/common.json';
+import enLayout from '../locales/en/layout.json';
+import esLayout from '../locales/es/layout.json';
 
 // A fresh i18n instance per mount (not the app's shared singleton) so tests
 // never leak locale state between each other; always defaults to 'en' so
@@ -21,7 +23,10 @@ function createTestI18n() {
     legacy: false,
     locale: 'en',
     fallbackLocale: 'en',
-    messages: { en: { common: enCommon }, es: { common: esCommon } },
+    messages: {
+      en: { common: enCommon, layout: enLayout },
+      es: { common: esCommon, layout: esLayout },
+    },
   });
 }
 

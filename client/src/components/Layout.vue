@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 import { useSystemStore } from '../stores/system';
+import { useUIStore } from '../stores/ui';
 import { useRoute, useRouter } from 'vue-router';
 import ToastNotification from './ToastNotification.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
@@ -14,8 +16,10 @@ import {
   isAnyServerNavGroupActive,
 } from '../utils/serverNav';
 
+const { t } = useI18n({ useScope: 'global' });
 const authStore = useAuthStore();
 const systemStore = useSystemStore();
+const uiStore = useUIStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -47,10 +51,10 @@ const isClientMode = computed(() =>
 );
 
 // Primary nav links (always visible)
-const serverPrimaryNav = [
-  { name: 'Dashboard', href: '/', icon: 'dashboard' },
-  { name: 'Audio Matrix', href: '/routing', icon: 'grid_view' },
-];
+const serverPrimaryNav = computed(() => [
+  { name: t('layout.dashboard'), href: '/', icon: 'dashboard' },
+  { name: t('layout.audioMatrix'), href: '/routing', icon: 'grid_view' },
+]);
 
 // Task 30: the previously-flat 6-item "System" dropdown is now four
 // task-based groups (Audio, Sistema, Configuración, Seguridad) -- see
@@ -59,12 +63,12 @@ const serverPrimaryNav = [
 // component).
 const serverMenuGroups = serverNavGroups;
 
-const clientNavigation = [
-  { name: 'Dashboard', href: '/client', icon: 'speaker' },
-  { name: 'Logs', href: '/logs', icon: 'terminal', to: { path: '/logs', query: { filter: 'snapclient' } } },
-];
+const clientNavigation = computed(() => [
+  { name: t('layout.dashboard'), href: '/client', icon: 'speaker' },
+  { name: t('layout.logs'), href: '/logs', icon: 'terminal', to: { path: '/logs', query: { filter: 'snapclient' } } },
+]);
 
-const navigation = computed(() => isClientMode.value ? clientNavigation : serverPrimaryNav);
+const navigation = computed(() => isClientMode.value ? clientNavigation.value : serverPrimaryNav.value);
 
 const isItemActive = (item: { href: string }) => isServerNavItemActive(item, route.path);
 
@@ -112,8 +116,8 @@ function handleClickOutside(e: MouseEvent) {
           <button
             @click="isMobileMenuOpen = !isMobileMenuOpen"
             class="p-2 min-w-[40px] min-h-[40px] mr-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-text-main rounded-xl border border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center"
-            title="Open Menu"
-            :aria-label="isMobileMenuOpen ? 'Close menu' : 'Open menu'"
+            :title="isMobileMenuOpen ? t('layout.closeMenu') : t('layout.openMenu')"
+            :aria-label="isMobileMenuOpen ? t('layout.closeMenu') : t('layout.openMenu')"
           >
             <span class="material-symbols-outlined text-[1.2rem]">menu</span>
           </button>
@@ -136,20 +140,20 @@ function handleClickOutside(e: MouseEvent) {
                 :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
               >
                 <span class="material-symbols-outlined text-[0.85rem]">dns</span>
-                Server
+                {{ t('layout.server') }}
               </button>
               <button
                 @click="switchMode('client')"
                 :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
               >
                 <span class="material-symbols-outlined text-[0.85rem]">speaker</span>
-                Client
+                {{ t('layout.client') }}
               </button>
             </div>
             <!-- Single-mode label when not in 'both' mode -->
             <div v-else class="flex items-center bg-brand-primary/10 border border-brand-primary/20 rounded-lg px-2.5 py-1 mr-3">
               <span class="material-symbols-outlined text-[0.85rem] text-brand-primary mr-1">{{ systemStore.snapcastMode === 'client' ? 'speaker' : 'dns' }}</span>
-              <span class="text-[11px] font-black uppercase tracking-wider text-brand-primary">{{ systemStore.snapcastMode === 'client' ? 'Client Mode' : 'Server Mode' }}</span>
+              <span class="text-[11px] font-black uppercase tracking-wider text-brand-primary">{{ systemStore.snapcastMode === 'client' ? t('layout.clientMode') : t('layout.serverMode') }}</span>
             </div>
 
             <!-- Divider -->
@@ -185,7 +189,7 @@ function handleClickOutside(e: MouseEvent) {
                 ]"
               >
                 <span class="material-symbols-outlined text-[1rem]" :class="isSystemActive ? 'text-brand-primary' : ''">apps</span>
-                Menu
+                {{ t('layout.menu') }}
                 <span
                   class="material-symbols-outlined text-[0.85rem] transition-transform duration-200 opacity-60"
                   :class="isSystemMenuOpen ? 'rotate-180' : ''"
@@ -243,18 +247,34 @@ function handleClickOutside(e: MouseEvent) {
             </div>
           </div>
 
-          <!-- Right: User + Logout -->
+          <!-- Right: Language Switcher + User + Logout -->
           <div class="flex items-center gap-2">
+            <!-- Language Switcher: small, always-visible EN/ES toggle -->
+            <div class="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest">
+              <button
+                type="button"
+                @click="uiStore.setLocale('en')"
+                :class="uiStore.locale === 'en' ? 'text-brand-primary' : 'text-text-muted hover:text-text-main'"
+                class="px-1.5 py-1 rounded transition-colors"
+              >EN</button>
+              <span class="text-text-muted">/</span>
+              <button
+                type="button"
+                @click="uiStore.setLocale('es')"
+                :class="uiStore.locale === 'es' ? 'text-brand-primary' : 'text-text-muted hover:text-text-main'"
+                class="px-1.5 py-1 rounded transition-colors"
+              >ES</button>
+            </div>
             <div class="flex items-center gap-2.5 sm:pl-3 sm:border-l sm:border-white/10">
                 <div class="text-right hidden sm:block">
-                    <p class="text-xs font-bold text-text-main leading-tight">Admin</p>
-                    <p class="text-[10px] text-brand-primary font-medium">Session Active</p>
+                    <p class="text-xs font-bold text-text-main leading-tight">{{ t('layout.admin') }}</p>
+                    <p class="text-[10px] text-brand-primary font-medium">{{ t('layout.sessionActive') }}</p>
                 </div>
                 <button
                   @click="authStore.logout()"
                   class="p-2 min-w-[40px] min-h-[40px] bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300 group flex items-center justify-center"
-                  title="Sign out"
-                  aria-label="Sign out"
+                  :title="t('layout.signOut')"
+                  :aria-label="t('layout.signOut')"
                 >
                     <span class="material-symbols-outlined text-[1.1rem] group-hover:scale-110 transition-transform">logout</span>
                 </button>
@@ -295,7 +315,7 @@ function handleClickOutside(e: MouseEvent) {
                 </div>
                 <span class="text-lg font-black text-text-main">Snapcast <span class="text-brand-primary">Manager</span></span>
               </div>
-              <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl text-gray-400 hover:text-text-main hover:bg-white/5" aria-label="Close menu">
+              <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl text-gray-400 hover:text-text-main hover:bg-white/5" :aria-label="t('layout.closeMenu')">
                 <span class="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -307,20 +327,20 @@ function handleClickOutside(e: MouseEvent) {
                 :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
               >
                 <span class="material-symbols-outlined text-[0.9rem]">dns</span>
-                Server
+                {{ t('layout.server') }}
               </button>
               <button
                 @click="switchMode('client')"
                 :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
               >
                 <span class="material-symbols-outlined text-[0.9rem]">speaker</span>
-                Client
+                {{ t('layout.client') }}
               </button>
             </div>
             <!-- Single-mode label (Mobile) -->
             <div v-else class="flex items-center justify-center bg-brand-primary/10 border border-brand-primary/20 rounded-xl px-3 py-2 mt-5 gap-2">
               <span class="material-symbols-outlined text-[1rem] text-brand-primary">{{ systemStore.snapcastMode === 'client' ? 'speaker' : 'dns' }}</span>
-              <span class="text-xs font-black uppercase tracking-wider text-brand-primary">{{ systemStore.snapcastMode === 'client' ? 'Client Mode' : 'Server Mode' }}</span>
+              <span class="text-xs font-black uppercase tracking-wider text-brand-primary">{{ systemStore.snapcastMode === 'client' ? t('layout.clientMode') : t('layout.serverMode') }}</span>
             </div>
 
             <!-- Navigation Links -->
@@ -357,7 +377,7 @@ function handleClickOutside(e: MouseEvent) {
                   ]"
                 >
                   <span class="material-symbols-outlined text-[1.2rem]" :class="isSystemActive ? 'text-brand-primary' : ''">apps</span>
-                  <span class="flex-1">Menu</span>
+                  <span class="flex-1">{{ t('layout.menu') }}</span>
                   <span
                     class="material-symbols-outlined text-[1rem] opacity-50 transition-transform duration-200"
                     :class="isMobileSystemOpen || isSystemActive ? 'rotate-180' : ''"
@@ -403,13 +423,13 @@ function handleClickOutside(e: MouseEvent) {
             <!-- User Info (Bottom) -->
             <div class="mt-auto pt-5 border-t border-white/5 flex items-center justify-between">
               <div>
-                <p class="text-sm font-bold text-text-main">Admin</p>
-                <p class="text-xs text-brand-primary font-medium">Session Active</p>
+                <p class="text-sm font-bold text-text-main">{{ t('layout.admin') }}</p>
+                <p class="text-xs text-brand-primary font-medium">{{ t('layout.sessionActive') }}</p>
               </div>
               <button
                 @click="authStore.logout(); isMobileMenuOpen = false"
                 class="p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300"
-                aria-label="Sign out"
+                :aria-label="t('layout.signOut')"
               >
                 <span class="material-symbols-outlined text-[1.2rem]">logout</span>
               </button>
