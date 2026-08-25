@@ -5,6 +5,7 @@ import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import Button from '../components/ui/Button.vue';
+import Skeleton from '../components/ui/Skeleton.vue';
 import { usePipeSourcesStore, type PipeSource, type PipeSourceFormData, type PipeSourceType, type DiscoveredPipe, type AdoptInput } from '../stores/pipeSources';
 import { useUIStore } from '../stores/ui';
 import { fetchApi } from '../utils/api';
@@ -427,8 +428,33 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
         {{ store.zombieCount }} zombie processes — system healthy
       </div>
 
+      <!-- Loading state (Task 35): initial fetchPipes() still in flight and
+           nothing to show yet -- shaped like a couple of the Card-based
+           pipe-source rows below (same grid, a title-width text bar + two
+           badge-width bars in the header, a couple of detail-line bars
+           underneath) so it reads as "source cards about to appear"
+           instead of a generic block. Must never show at the same time as
+           EmptyState below (that's for a CONFIRMED empty list, not "still
+           loading") -- v-else-if on the empty-state branch guarantees
+           that. -->
+      <div v-if="store.loading && store.pipes.length === 0"
+        class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div v-for="n in 2" :key="n" class="bg-brand-surface/80 border border-white/[0.04] rounded-[2rem] p-6 sm:p-8 space-y-4">
+          <div class="flex items-center gap-2">
+            <Skeleton variant="text" width="40%" height="20px" />
+            <Skeleton variant="text" width="15%" height="18px" />
+            <Skeleton variant="text" width="15%" height="18px" />
+          </div>
+          <Skeleton variant="text" width="60%" height="12px" />
+          <div class="flex gap-4">
+            <Skeleton variant="text" width="30%" height="10px" />
+            <Skeleton variant="text" width="30%" height="10px" />
+          </div>
+        </div>
+      </div>
+
       <!-- Empty state -->
-      <div v-if="!store.loading && store.pipes.length === 0"
+      <div v-else-if="store.pipes.length === 0"
         class="border border-dashed border-zinc-800 rounded-lg">
         <EmptyState
           icon="sensors"

@@ -77,4 +77,39 @@ describe('PipeSources.vue', () => {
     // (not "edit") heading, proving this is the real handler, not a stub.
     expect(document.body.textContent).toContain('Add Pipe Source');
   });
+
+  // Task 35: while store.loading is true and store.pipes is still empty
+  // (initial page load, before the first fetchPipes() resolves), a
+  // Skeleton.vue-based loading branch must render in place of the list --
+  // and neither the real card list nor EmptyState (the Task 33 "no pipe
+  // sources configured" state) may render at the same time, since loading
+  // and "confirmed empty" are different states.
+  it('renders a loading skeleton (and not EmptyState or the real list) when store.loading is true and pipes is empty', async () => {
+    const wrapper = await mountSmokeTest(PipeSources, '/pipe-sources');
+    const store = usePipeSourcesStore();
+
+    store.pipes = [];
+    store.loading = true;
+    await nextTick();
+
+    // Skeleton.vue's root marks itself role="presentation" -- nothing else
+    // in this view uses that role, so its presence proves the skeleton
+    // branch rendered.
+    const skeletons = wrapper.findAll('[role="presentation"]');
+    expect(skeletons.length).toBeGreaterThan(0);
+
+    // EmptyState's copy must NOT show while we're still loading.
+    expect(wrapper.text()).not.toContain('No pipe sources configured');
+
+    // No real pipe-source Card rendered either (no pipes yet).
+    expect(wrapper.text()).not.toContain('Radio Gym');
+
+    // Once loading finishes with an empty list, the skeleton goes away and
+    // EmptyState takes over -- proving the two conditions are mutually
+    // exclusive, not just independently true.
+    store.loading = false;
+    await nextTick();
+    expect(wrapper.findAll('[role="presentation"]').length).toBe(0);
+    expect(wrapper.text()).toContain('No pipe sources configured');
+  });
 });

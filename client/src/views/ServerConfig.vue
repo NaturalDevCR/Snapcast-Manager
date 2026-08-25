@@ -16,6 +16,7 @@ import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import PromptDialog from '../components/PromptDialog.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
+import Skeleton from '../components/ui/Skeleton.vue';
 
 
 
@@ -1213,8 +1214,16 @@ const handleSave = () => {
                       <template #icon>
                         <span class="material-symbols-outlined text-[20px] text-[#00d4ff] drop-shadow-[0_0_5px_rgba(0,212,255,0.5)]">history</span>
                       </template>
-                      <div v-if="snapshotStore.loading && snapshotStore.snapshots.length === 0" class="flex justify-center py-12">
-                          <span class="material-symbols-outlined text-[32px] text-brand-primary animate-spin">sync</span>
+                      <!-- Task 35: shaped like the real snapshot rows in
+                           the v-else branch below (same p-5/rounded-2xl
+                           card, a title-width bar, a shorter timestamp
+                           chip) instead of a bare spinner icon, so it
+                           reads as "list rows about to appear". -->
+                      <div v-if="snapshotStore.loading && snapshotStore.snapshots.length === 0" class="space-y-4">
+                          <div v-for="n in 3" :key="n" class="p-5 border border-white/5 rounded-2xl bg-black/30 space-y-2">
+                              <Skeleton variant="text" width="45%" height="14px" />
+                              <Skeleton variant="text" width="20%" height="10px" />
+                          </div>
                       </div>
                       <div v-else-if="snapshotStore.snapshots.length === 0" class="text-center py-24 bg-black/20 rounded-2xl border border-dashed border-white/10">
                           <p class="text-xs font-black text-gray-500 uppercase tracking-[0.2em]">No snapshots archived</p>

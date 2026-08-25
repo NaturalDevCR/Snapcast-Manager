@@ -6,6 +6,7 @@ import { useUIStore } from '../stores/ui';
 import { useSnapclientInstancesStore } from '../stores/snapclientInstances';
 
 import Layout from '../components/Layout.vue';
+import Skeleton from '../components/ui/Skeleton.vue';
 
 const route = useRoute();
 const systemStore = useSystemStore();
@@ -134,9 +135,13 @@ onUnmounted(() => {
         <div class="relative group">
           <div class="absolute -inset-0.5 bg-brand-primary/20 blur-xl opacity-0 group-hover:opacity-40 transition duration-1000"></div>
           <div class="relative bg-[#020617]/80 rounded-b-2xl font-mono text-[11px] h-[650px] overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-            <div v-if="!logs" class="flex flex-col items-center justify-center h-full space-y-4">
-              <span class="material-symbols-outlined text-gray-600 animate-spin text-[3rem]">sync</span>
-              <p class="text-gray-500 font-black uppercase tracking-[0.2em]">Intercepting Logs...</p>
+            <!-- Task 35: shaped like several lines of log output rather
+                 than a generic block -- a handful of text skeletons with
+                 varying widths, since real log lines aren't uniform
+                 width, so this reads as "text about to appear" here in
+                 the console-output panel rather than a loading blob. -->
+            <div v-if="!logs" class="space-y-2">
+              <Skeleton v-for="(w, i) in ['85%', '60%', '92%', '45%', '70%', '55%', '80%']" :key="i" variant="text" :width="w" height="11px" />
             </div>
             <div v-else class="space-y-1">
               <div v-for="(line, i) in logs.split('\n')" :key="i" class="flex group/line">

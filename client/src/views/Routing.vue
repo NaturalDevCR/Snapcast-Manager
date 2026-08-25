@@ -2,6 +2,7 @@
 import Layout from '../components/Layout.vue';
 import Badge from '../components/ui/Badge.vue';
 import Select from '../components/ui/Select.vue';
+import Skeleton from '../components/ui/Skeleton.vue';
 import { useSnapcastStore } from '../stores/snapcast';
 import { useEventSource } from '../composables/useEventSource';
 import { sseStatusBadge } from '../utils/sseStatus';
@@ -378,9 +379,21 @@ const updateVolume = (client: any, event: Event) => {
       </div>
 
       <!-- Loading / Empty States -->
-      <div v-if="snapcastStore.loading && !snapcastStore.status" class="flex flex-col items-center justify-center py-24 text-white/20">
-        <div class="w-12 h-12 border-4 border-brand-primary/20 border-t-brand-primary rounded-full animate-spin mb-4"></div>
-        <span class="text-xs font-black uppercase tracking-[0.3em]">Querying Network Infrastructure...</span>
+      <!-- Task 35: shaped like the two-column Sources/Zones matrix it's
+           about to replace (same flex-col lg:flex-row split as the real
+           matrix below, same 76px-tall source-card / 72px-tall
+           zone-card-header proportions) rather than a generic spinner, so
+           the page doesn't visually "jump" from an unrelated loading
+           shape into the real layout once data arrives. -->
+      <div v-if="snapcastStore.loading && !snapcastStore.status" class="flex flex-col lg:flex-row gap-8 lg:gap-16 xl:gap-24 w-full px-2 sm:px-4">
+        <div class="w-full lg:w-1/2 flex flex-col gap-4">
+          <Skeleton variant="text" width="140px" height="12px" />
+          <Skeleton v-for="n in 3" :key="n" variant="rect" height="76px" />
+        </div>
+        <div class="w-full lg:w-1/2 flex flex-col gap-4 mt-8 lg:mt-0">
+          <Skeleton variant="text" width="140px" height="12px" />
+          <Skeleton v-for="n in 2" :key="n" variant="rect" height="96px" />
+        </div>
       </div>
       <div v-else-if="!snapcastStore.loading && (!snapcastStore.status || snapcastStore.status.groups.length === 0)" class="flex flex-col items-center justify-center py-24 text-white/10 glass rounded-[3rem]">
         <span class="material-symbols-outlined text-6xl mb-4">settings_input_component</span>
