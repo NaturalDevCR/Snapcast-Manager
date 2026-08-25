@@ -846,10 +846,10 @@ const handleSave = () => {
                             </span>
                           </div>
                           <div class="flex items-center space-x-1">
-                            <button @click="openEditSourceDialog(idx as number)" class="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors border border-transparent hover:border-brand-primary/20" title="Edit source" :aria-label="`Edit ${extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'source'}`">
+                            <button @click="openEditSourceDialog(idx as number)" class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors border border-transparent hover:border-brand-primary/20" title="Edit source" :aria-label="`Edit ${extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'source'}`">
                               <span class="material-symbols-outlined text-[16px]">edit</span>
                             </button>
-                            <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 text-gray-400 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors border border-transparent hover:border-[#ff3b30]/20" title="Remove source" :aria-label="`Remove ${extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'source'}`">
+                            <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-400 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors border border-transparent hover:border-[#ff3b30]/20" title="Remove source" :aria-label="`Remove ${extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'source'}`">
                               <span class="material-symbols-outlined text-[16px]">delete</span>
                             </button>
                           </div>
@@ -1244,7 +1244,7 @@ const handleSave = () => {
                                       Restore
                                   </button>
                                   <button @click="triggerDeleteSnapshot(snapshot.id)"
-                                    class="p-2 text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 border border-transparent hover:border-[#ff3b30]/20 rounded-lg transition-all group-hover:opacity-100 md:opacity-0 active:scale-95"
+                                    class="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 border border-transparent hover:border-[#ff3b30]/20 rounded-lg transition-all group-hover:opacity-100 md:opacity-0 active:scale-95"
                                     :aria-label="`Delete snapshot ${snapshot.name}`">
                                       <span class="material-symbols-outlined text-[18px]">delete</span>
                                   </button>
@@ -1276,7 +1276,7 @@ const handleSave = () => {
                   <h3 class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">{{ isEditingSource ? 'Edit Audio Source' : 'Add Audio Source' }}</h3>
                   <p class="text-[10px] text-gray-500 mt-0.5">{{ isEditingSource ? 'Modify the source parameters' : 'Select a source type and configure its parameters' }}</p>
                 </div>
-                <button @click="showAddSourceDialog = false" class="p-2 text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all" aria-label="Close">
+                <button @click="showAddSourceDialog = false" class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all" aria-label="Close">
                   <span class="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
@@ -1408,7 +1408,7 @@ const handleSave = () => {
                             <button
                               @click="moveMetaSource(idx, 'up')"
                               :disabled="idx === 0"
-                              class="p-1 rounded-lg transition-colors"
+                              class="p-1 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg transition-colors"
                               :class="idx === 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-white/10'"
                               :aria-label="`Move ${srcName} up`"
                             >
@@ -1417,7 +1417,7 @@ const handleSave = () => {
                             <button
                               @click="moveMetaSource(idx, 'down')"
                               :disabled="idx === metaSelectedSources.length - 1"
-                              class="p-1 rounded-lg transition-colors"
+                              class="p-1 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg transition-colors"
                               :class="idx === metaSelectedSources.length - 1 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-white/10'"
                               :aria-label="`Move ${srcName} down`"
                             >
@@ -1426,7 +1426,7 @@ const handleSave = () => {
                             <!-- Remove -->
                             <button
                               @click="removeMetaSource(idx)"
-                              class="p-1 text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors"
+                              class="p-1 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors"
                               :aria-label="`Remove ${srcName}`"
                             >
                               <span class="material-symbols-outlined text-[16px]">close</span>

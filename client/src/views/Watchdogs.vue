@@ -203,7 +203,7 @@ function formatBytes(bytes?: number) {
                   <button @click="toggleEnabled(wd)" :class="[wd.enabled ? 'bg-green-600' : 'bg-zinc-700']" class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out" :aria-label="`${wd.enabled ? 'Disable' : 'Enable'} ${wd.name}`">
                     <span :class="[wd.enabled ? 'translate-x-5' : 'translate-x-0']" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
                   </button>
-                  <button @click="confirmDelete(wd.id)" class="text-zinc-500 hover:text-red-400 transition" :aria-label="`Delete ${wd.name}`">
+                  <button @click="confirmDelete(wd.id)" class="text-zinc-500 hover:text-red-400 transition min-w-[40px] min-h-[40px] flex items-center justify-center" :aria-label="`Delete ${wd.name}`">
                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6M1 7h22M10 11H1h18M8 4h8" /></svg>
                   </button>
                </div>

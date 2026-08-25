@@ -495,28 +495,28 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
               <div class="flex items-center gap-1 flex-shrink-0">
                 <button v-if="pipe.status !== 'active'" @click="control(pipe.id, 'start')"
                   :disabled="controllingId === pipe.id"
-                  class="p-1.5 rounded bg-green-600/20 hover:bg-green-600/40 text-green-400 transition disabled:opacity-40" title="Start"
+                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-green-600/20 hover:bg-green-600/40 text-green-400 transition disabled:opacity-40" title="Start"
                   :aria-label="`Start ${pipe.name}`">
                   <span class="material-symbols-outlined text-[1rem]">play_arrow</span>
                 </button>
                 <button v-if="pipe.status === 'active'" @click="control(pipe.id, 'stop')"
                   :disabled="controllingId === pipe.id"
-                  class="p-1.5 rounded bg-red-600/20 hover:bg-red-600/40 text-red-400 transition disabled:opacity-40" title="Stop"
+                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-red-600/20 hover:bg-red-600/40 text-red-400 transition disabled:opacity-40" title="Stop"
                   :aria-label="`Stop ${pipe.name}`">
                   <span class="material-symbols-outlined text-[1rem]">stop</span>
                 </button>
                 <button @click="control(pipe.id, 'restart')" :disabled="controllingId === pipe.id"
-                  class="p-1.5 rounded bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 transition disabled:opacity-40" title="Restart"
+                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 transition disabled:opacity-40" title="Restart"
                   :aria-label="`Restart ${pipe.name}`">
                   <span class="material-symbols-outlined text-[1rem]">restart_alt</span>
                 </button>
                 <button @click="viewLogs(pipe)"
-                  class="p-1.5 rounded bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 transition" title="View Logs"
+                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 transition" title="View Logs"
                   :aria-label="`View logs for ${pipe.name}`">
                   <span class="material-symbols-outlined text-[1rem]">terminal</span>
                 </button>
                 <button @click="confirmDelete(pipe.id)"
-                  class="p-1.5 rounded bg-zinc-700/50 hover:bg-red-600/30 text-zinc-500 hover:text-red-400 transition" title="Delete"
+                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-zinc-700/50 hover:bg-red-600/30 text-zinc-500 hover:text-red-400 transition" title="Delete"
                   :aria-label="`Delete ${pipe.name}`">
                   <span class="material-symbols-outlined text-[1rem]">delete</span>
                 </button>
@@ -703,7 +703,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
               <span class="material-symbols-outlined text-[1rem] mr-1 align-middle">terminal</span>
               Logs — {{ logsTitle }}
             </h3>
-            <button @click="showLogs = false" class="text-zinc-500 hover:text-zinc-300 transition" aria-label="Close logs">
+            <button @click="showLogs = false" class="text-zinc-500 hover:text-zinc-300 transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close logs">
               <span class="material-symbols-outlined text-[1.2rem]">close</span>
             </button>
           </div>
@@ -724,7 +724,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
               <h3 class="text-base font-bold text-zinc-200">Import Existing Pipe Sources</h3>
               <p class="text-xs text-zinc-500 mt-0.5">Discovers unmanaged <code class="bg-zinc-800 px-1 rounded">pipe://</code> sources in snapserver.conf and adopts them.</p>
             </div>
-            <button @click="showImportModal = false" class="text-zinc-500 hover:text-zinc-300 transition" aria-label="Close import dialog">
+            <button @click="showImportModal = false" class="text-zinc-500 hover:text-zinc-300 transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close import dialog">
               <span class="material-symbols-outlined">close</span>
             </button>
           </div>
@@ -844,7 +844,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
               </h3>
               <p class="text-xs text-zinc-500 mt-0.5 font-mono">{{ configFilePath }}</p>
             </div>
-            <button @click="showConfigEditor = false" class="text-zinc-500 hover:text-zinc-300 transition" aria-label="Close config editor">
+            <button @click="showConfigEditor = false" class="text-zinc-500 hover:text-zinc-300 transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close config editor">
               <span class="material-symbols-outlined text-[1.2rem]">close</span>
             </button>
           </div>

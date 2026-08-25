@@ -401,7 +401,7 @@ onMounted(async () => {
           <div class="relative bg-brand-bg border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 duration-200">
             <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
               <h3 class="text-sm font-black text-white uppercase tracking-widest">{{ editingInstance ? 'Edit Instance' : 'New Instance' }}</h3>
-              <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors" aria-label="Close">
+              <button @click="closeModal" class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors" aria-label="Close">
                 <span class="material-symbols-outlined text-[1.1rem]">close</span>
               </button>
             </div>

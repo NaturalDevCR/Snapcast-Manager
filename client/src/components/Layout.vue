@@ -111,7 +111,7 @@ function handleClickOutside(e: MouseEvent) {
           <!-- Burger Button (Mobile) -->
           <button
             @click="isMobileMenuOpen = !isMobileMenuOpen"
-            class="p-2 mr-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-text-main rounded-xl border border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center"
+            class="p-2 min-w-[40px] min-h-[40px] mr-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-text-main rounded-xl border border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center"
             title="Open Menu"
             :aria-label="isMobileMenuOpen ? 'Close menu' : 'Open menu'"
           >
@@ -252,7 +252,7 @@ function handleClickOutside(e: MouseEvent) {
                 </div>
                 <button
                   @click="authStore.logout()"
-                  class="p-2 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300 group flex items-center justify-center"
+                  class="p-2 min-w-[40px] min-h-[40px] bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300 group flex items-center justify-center"
                   title="Sign out"
                   aria-label="Sign out"
                 >
@@ -408,7 +408,7 @@ function handleClickOutside(e: MouseEvent) {
               </div>
               <button
                 @click="authStore.logout(); isMobileMenuOpen = false"
-                class="p-2.5 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300"
+                class="p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-white/5 transition-all duration-300"
                 aria-label="Sign out"
               >
                 <span class="material-symbols-outlined text-[1.2rem]">logout</span>

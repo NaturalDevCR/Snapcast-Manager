@@ -86,7 +86,7 @@ const panelClasses = computed(() => [
                 </DialogTitle>
                 <button
                   type="button"
-                  class="ml-auto flex-shrink-0 rounded-lg p-1 text-text-muted hover:text-text-main hover:bg-brand-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/50"
+                  class="ml-auto flex-shrink-0 rounded-lg p-1 min-w-[40px] min-h-[40px] flex items-center justify-center text-text-muted hover:text-text-main hover:bg-brand-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/50"
                   aria-label="Close"
                   @click="close"
                 >
