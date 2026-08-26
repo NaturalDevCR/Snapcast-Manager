@@ -59,6 +59,14 @@ fail() {
   systemctl status "${SERVICE_NAME}" --no-pager -l 2>&1 | tail -n 40 >&2 || true
   echo "--- journalctl -u ${SERVICE_NAME} (last 100 lines) ---" >&2
   journalctl -u "${SERVICE_NAME}" -n 100 --no-pager 2>&1 >&2 || true
+  # `ExecError`'s own `.message` is deliberately just "<bin> exited with
+  # code <n>" (see server/src/platform/exec.ts) -- never the real
+  # stdout/stderr, so a sudo-related failure surfaced through an API
+  # response body alone is otherwise a dead end to debug from CI logs.
+  # sudo logs its own PAM/audit messages under the "sudo" syslog identifier
+  # regardless of which unit invoked it, independent of -u snapmanager.
+  echo "--- journalctl -t sudo (last 50 lines) ---" >&2
+  journalctl -t sudo -n 50 --no-pager 2>&1 >&2 || true
   echo "--- last API response body (${API_BODY_FILE}) ---" >&2
   cat "${API_BODY_FILE}" 2>&1 >&2 || true
   echo >&2

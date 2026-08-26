@@ -672,7 +672,24 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     # $SNAPMANAGER_USER) so the app can write into an EXISTING,
     # already-owned path even on a brand-new host where the corresponding
     # package (snapserver/mpd/snapclient) hasn't been installed yet.
-    for p in /etc/snapserver.conf /etc/snapserver.conf.base /etc/default/snapclient; do
+    # Task 65: /etc/snapserver.conf.bak added to this loop (and to
+    # ReadWritePaths= below). config.ts's writeServerConfigCore() --
+    # the ONE place every write to /etc/snapserver.conf funnels through
+    # (addStreamSource, saveSegment, deleteSegment, rebuildMasterConfig,
+    # removeStreamSourceByFifo, ...) -- calls rotateMasterBak() before every
+    # single write, which does installPrivilegedFile(SNAPSERVER_CONFIG_BAK,
+    # ...) UNCONDITIONALLY whenever /etc/snapserver.conf already exists (even
+    # empty, which it always does post-install.sh's own touch above) -- it
+    # is not a rare/edge-case path, it runs on literally every config
+    # mutation. ReadWritePaths= never included this path at all, so
+    # ProtectSystem=strict made EVERY snapserver.conf write fail under the
+    # hardened sandbox (confirmed for real: this task's own container test
+    # hit `{"error":"sudo exited with code 1"}` on the very first POST
+    # /api/pipe-sources -- `sudo cp` into a path outside every
+    # ReadWritePaths= exception fails with a read-only-filesystem error,
+    # same root cause class as the ReadWritePaths existence gaps above, just
+    # a missing ENTRY rather than a missing pre-created target).
+    for p in /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.bak /etc/default/snapclient; do
         if [ ! -e "$p" ]; then
             $SUDO touch "$p"
         fi
@@ -848,7 +865,7 @@ NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=$INSTALL_BASE_DIR/data $INSTALL_BASE_DIR/server/snapshots /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /etc/snapcast-manager /run/snapcast-manager /var/lib/snapcast-manager/scripts /var/backups/snapmanager /etc/mpd.conf /var/lib/mpd /etc/systemd/system /etc/default/snapclient /etc/snapclient-manager /var/lib/snapserver /etc/apt/keyrings /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl /var/lib/dpkg /var/cache/apt /var/lib/apt/lists /usr/local/bin /usr/bin /etc/passwd /etc/group /etc/shadow /etc/gshadow
+ReadWritePaths=$INSTALL_BASE_DIR/data $INSTALL_BASE_DIR/server/snapshots /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.bak /etc/snapserver.conf.d /etc/snapcast-manager /run/snapcast-manager /var/lib/snapcast-manager/scripts /var/backups/snapmanager /etc/mpd.conf /var/lib/mpd /etc/systemd/system /etc/default/snapclient /etc/snapclient-manager /var/lib/snapserver /etc/apt/keyrings /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl /var/lib/dpkg /var/cache/apt /var/lib/apt/lists /usr/local/bin /usr/bin /etc/passwd /etc/group /etc/shadow /etc/gshadow
 
 [Install]
 WantedBy=multi-user.target
