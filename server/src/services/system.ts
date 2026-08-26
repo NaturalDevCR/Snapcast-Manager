@@ -704,21 +704,6 @@ export class SystemService {
   }
 
   /**
-   * The core `.deb` download+install pipeline shared by
-   * `updateSnapserverFromGitHub()`/`updateSnapclientFromGitHub()`. Formerly
-   * a single giant `&&`-chained shell command string executed via
-   * `runCommand()`/`exec()`; broken here into individual `platform`-layer
-   * calls in the exact same order, with the exact same failure-tolerance
-   * (`.catch(() => {})` where the original had `|| true`) -- see
-   * docs/superpowers/sdd/task-12-brief.md section 3 for the full mapping.
-   *
-   * The downloaded `.deb` now lives in a fresh, unpredictable
-   * `fs.mkdtemp()` directory instead of the original's fixed, predictable
-   * `/tmp/${fileName}` path -- closing the same symlink-race class of issue
-   * design-spec finding #5 already closed for privileged file writes
-   * (`platform/files.ts`'s `installPrivilegedFile()`).
-   */
-  /**
    * Task 61 (Stage 5, item 5.4): verifies a downloaded asset against
    * GitHub's OWN reported metadata for it before it's ever handed to
    * `dpkg -i` (root). GitHub's Releases API returns both `size` (bytes)
@@ -766,6 +751,21 @@ export class SystemService {
     }
   }
 
+  /**
+   * The core `.deb` download+install pipeline shared by
+   * `updateSnapserverFromGitHub()`/`updateSnapclientFromGitHub()`. Formerly
+   * a single giant `&&`-chained shell command string executed via
+   * `runCommand()`/`exec()`; broken here into individual `platform`-layer
+   * calls in the exact same order, with the exact same failure-tolerance
+   * (`.catch(() => {})` where the original had `|| true`) -- see
+   * docs/superpowers/sdd/task-12-brief.md section 3 for the full mapping.
+   *
+   * The downloaded `.deb` now lives in a fresh, unpredictable
+   * `fs.mkdtemp()` directory instead of the original's fixed, predictable
+   * `/tmp/${fileName}` path -- closing the same symlink-race class of issue
+   * design-spec finding #5 already closed for privileged file writes
+   * (`platform/files.ts`'s `installPrivilegedFile()`).
+   */
   private async executeDebUpdate(downloadUrl: string, fileName: string, clean: boolean = false, pkg: 'snapserver' | 'snapclient' = 'snapserver', expectedSize?: number, expectedDigest?: string): Promise<string> {
     log.info(`Downloading ${pkg} from ${downloadUrl}... (Clean: ${clean})`);
 
