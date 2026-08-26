@@ -7,6 +7,7 @@ import { useEventSource } from '../../composables/useEventSource';
 import { useOnboardingStore } from '../../stores/onboarding';
 import { useSystemStore } from '../../stores/system';
 import { useUIStore } from '../../stores/ui';
+import { useHealthStore } from '../../stores/health';
 
 describe('Dashboard.vue', () => {
   it('mounts without throwing', async () => {
@@ -134,5 +135,81 @@ describe('Dashboard.vue', () => {
     useUIStore().setLocale('es');
     await nextTick();
     expect(wrapper.text()).toContain('NUEVA VERSIÓN: 1.2.3');
+  });
+
+  // --- Health panel (Task 58) --------------------------------------------
+  // Task 58 adds a compact panel reading GET /api/health/detail (Task 57)
+  // via the new `health` Pinia store. These tests mock `healthStore.detail`
+  // directly (following this file's own established pattern of mutating
+  // store state post-mount, e.g. the snapcastStore.status test above)
+  // rather than the network layer, since the store's own fetch plumbing is
+  // exercised separately by the refresh-button test below.
+  it('renders the health panel reflecting a fully healthy detail response', async () => {
+    const wrapper = await mountSmokeTest(Dashboard, '/');
+    const healthStore = useHealthStore();
+    healthStore.detail = {
+      snapserver: { systemdActive: true, rpcConnected: true },
+      config: { parseable: true },
+      disk: { freeBytes: 5_000_000_000, freePercent: 42 },
+      permissions: { snapshotsDirWritable: true },
+    };
+    await nextTick();
+
+    expect(wrapper.text()).toContain('System Health');
+    expect(wrapper.text()).toContain('Active');
+    expect(wrapper.text()).toContain('Connected');
+    expect(wrapper.text()).toContain('Parseable');
+    expect(wrapper.text()).toContain('42% free');
+    expect(wrapper.text()).toContain('Yes');
+  });
+
+  it('shows a degraded health state, including the config error message, when checks fail', async () => {
+    const wrapper = await mountSmokeTest(Dashboard, '/');
+    const healthStore = useHealthStore();
+    healthStore.detail = {
+      snapserver: { systemdActive: false, rpcConnected: false },
+      config: { parseable: false, error: 'Unexpected token in snapserver.conf' },
+      disk: { freeBytes: 100, freePercent: 1 },
+      permissions: { snapshotsDirWritable: false },
+    };
+    await nextTick();
+
+    expect(wrapper.text()).toContain('Inactive');
+    expect(wrapper.text()).toContain('Disconnected');
+    expect(wrapper.text()).toContain('Unexpected token in snapserver.conf');
+    expect(wrapper.text()).toContain('No');
+  });
+
+  it('re-fetches health detail when the manual refresh button is clicked', async () => {
+    const wrapper = await mountSmokeTest(Dashboard, '/');
+    const healthStore = useHealthStore();
+    const spy = vi.spyOn(healthStore, 'fetchHealthDetail').mockResolvedValue();
+
+    const refreshButton = wrapper
+      .findAll('button')
+      .find((b) => b.attributes('aria-label') === 'Refresh health status');
+    expect(refreshButton, 'expected a health-panel refresh button with an aria-label').toBeTruthy();
+
+    await refreshButton!.trigger('click');
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders Spanish copy for the health panel when locale is "es" (i18n)', async () => {
+    const wrapper = await mountSmokeTest(Dashboard, '/');
+    const healthStore = useHealthStore();
+    healthStore.detail = {
+      snapserver: { systemdActive: true, rpcConnected: false },
+      config: { parseable: false, error: 'boom' },
+      disk: { freeBytes: 100, freePercent: 7 },
+      permissions: { snapshotsDirWritable: false },
+    };
+    useUIStore().setLocale('es');
+    await nextTick();
+
+    expect(wrapper.text()).toContain('Salud del Sistema');
+    expect(wrapper.text()).toContain('Activo');
+    expect(wrapper.text()).toContain('Desconectado');
+    expect(wrapper.text()).toContain('7% libre');
+    expect(wrapper.text()).toContain('No');
   });
 });

@@ -93,5 +93,22 @@
   "packageUninstalledSuccess": "{pkg} uninstalled successfully!",
   "packageUninstallFailed": "Failed to uninstall {pkg}: ",
   "nodeUpdateInitiatedSuccess": "Node.js {version} update initiated successfully!",
-  "nodeUpdateFailed": "Failed to update Node.js: "
+  "nodeUpdateFailed": "Failed to update Node.js: ",
+  "healthPanelTitle": "System Health",
+  "healthRefreshAria": "Refresh health status",
+  "healthSystemdLabel": "Snapserver (systemd)",
+  "healthRpcLabel": "Snapserver (RPC)",
+  "healthActiveStatus": "Active",
+  "healthInactiveStatus": "Inactive",
+  "healthConnectedStatus": "Connected",
+  "healthDisconnectedStatus": "Disconnected",
+  "healthConfigLabel": "Config",
+  "healthConfigParseableStatus": "Parseable",
+  "healthConfigErrorStatus": "Error",
+  "healthDiskLabel": "Disk Free",
+  "healthDiskFreeValue": "{percent}% free",
+  "healthDiskUnknownStatus": "Unknown",
+  "healthPermissionsLabel": "Snapshots Writable",
+  "healthWritableYes": "Yes",
+  "healthWritableNo": "No"
 }

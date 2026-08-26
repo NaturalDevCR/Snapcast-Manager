@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSystemStore } from '../stores/system';
 import { useUIStore } from '../stores/ui';
 import { useSnapcastStore } from '../stores/snapcast';
 import { useOnboardingStore } from '../stores/onboarding';
+import { useHealthStore } from '../stores/health';
 import { useEventSource } from '../composables/useEventSource';
 import { sseStatusBadge } from '../utils/sseStatus';
 import Layout from '../components/Layout.vue';
@@ -19,6 +20,7 @@ const systemStore = useSystemStore();
 const uiStore = useUIStore();
 const snapcastStore = useSnapcastStore();
 const onboardingStore = useOnboardingStore();
+const healthStore = useHealthStore();
 
 // Task 29: snapcast state updates now arrive via the app-wide SSE
 // connection (Task 28, connected/disconnected by App.vue) instead of this
@@ -54,6 +56,24 @@ onMounted(async () => {
   // connected and have fresh data by the time this view mounts, but this
   // explicit fetch is a safety net for that initial window.
   snapcastStore.fetchStatus();
+
+  // Task 58: compact health panel below reads healthStore.detail, backed
+  // by the authenticated GET /api/health/detail (Task 57). No polling --
+  // fetched once on mount plus whenever the panel's own refresh button is
+  // clicked (handleHealthRefresh below).
+  healthStore.fetchHealthDetail();
+});
+
+const handleHealthRefresh = () => {
+  healthStore.fetchHealthDetail();
+};
+
+// Task 58: disk.freePercent is only present on the success branch of the
+// backend's discriminated union (disk.error on the failure branch) -- this
+// mirrors that shape rather than assuming the success fields are always set.
+const diskFreePercent = computed(() => {
+  const disk = healthStore.detail?.disk;
+  return disk && 'freePercent' in disk ? disk.freePercent : null;
 });
 
 type UpdatablePackage = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'mpd' | 'mympd';
@@ -168,6 +188,65 @@ const openMympd = () => {
           {{ t('dashboard.resumeBannerLink') }}
         </router-link>
       </div>
+
+      <!-- Health Panel (Task 58): compact, always-visible summary of the
+           5 checks GET /api/health/detail (Task 57) reports. systemd
+           active-state and RPC-connected-state are deliberately shown as
+           two distinct signals per the backend's own design -- a service
+           can be systemd-active but not yet RPC-connected (or vice versa)
+           during a restart. -->
+      <Card :title="t('dashboard.healthPanelTitle')">
+        <template #icon>
+          <span class="material-symbols-outlined text-xl">monitor_heart</span>
+        </template>
+        <template #action>
+          <button
+            @click="handleHealthRefresh"
+            :disabled="healthStore.loading"
+            :aria-label="t('dashboard.healthRefreshAria')"
+            class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] text-text-muted hover:text-text-main border border-white/[0.05] transition-all active:scale-95 disabled:opacity-50"
+          >
+            <span class="material-symbols-outlined text-[1rem]" :class="{ 'animate-spin': healthStore.loading }">refresh</span>
+          </button>
+        </template>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col space-y-1">
+            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthSystemdLabel') }}</span>
+            <span :class="healthStore.detail?.snapserver?.systemdActive ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-xs font-black uppercase tracking-wide">
+              {{ healthStore.detail?.snapserver?.systemdActive ? t('dashboard.healthActiveStatus') : t('dashboard.healthInactiveStatus') }}
+            </span>
+          </div>
+          <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col space-y-1">
+            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthRpcLabel') }}</span>
+            <span :class="healthStore.detail?.snapserver?.rpcConnected ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-xs font-black uppercase tracking-wide">
+              {{ healthStore.detail?.snapserver?.rpcConnected ? t('dashboard.healthConnectedStatus') : t('dashboard.healthDisconnectedStatus') }}
+            </span>
+          </div>
+          <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col space-y-1">
+            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthDiskLabel') }}</span>
+            <span :class="diskFreePercent !== null && diskFreePercent < 10 ? 'text-[#ff3b30]' : 'text-emerald-400'" class="text-xs font-black uppercase tracking-wide">
+              {{ diskFreePercent !== null ? t('dashboard.healthDiskFreeValue', { percent: diskFreePercent }) : t('dashboard.healthDiskUnknownStatus') }}
+            </span>
+          </div>
+          <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col space-y-1">
+            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthPermissionsLabel') }}</span>
+            <span :class="healthStore.detail?.permissions?.snapshotsDirWritable ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-xs font-black uppercase tracking-wide">
+              {{ healthStore.detail?.permissions?.snapshotsDirWritable ? t('dashboard.healthWritableYes') : t('dashboard.healthWritableNo') }}
+            </span>
+          </div>
+          <div class="col-span-2 sm:col-span-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthConfigLabel') }}</span>
+              <span :class="healthStore.detail?.config?.parseable ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-xs font-black uppercase tracking-wide">
+                {{ healthStore.detail?.config?.parseable ? t('dashboard.healthConfigParseableStatus') : t('dashboard.healthConfigErrorStatus') }}
+              </span>
+            </div>
+            <p v-if="healthStore.detail?.config && !healthStore.detail.config.parseable" class="text-[10px] font-mono text-[#ff3b30]/80">
+              {{ healthStore.detail.config.error }}
+            </p>
+          </div>
+        </div>
+      </Card>
 
       <!-- Loading Overlay (more subtle now) -->
       <div v-if="systemStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-brand-bg/40 backdrop-blur-sm pointer-events-none">

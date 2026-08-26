@@ -93,5 +93,22 @@
   "packageUninstalledSuccess": "¡{pkg} desinstalado correctamente!",
   "packageUninstallFailed": "Error al desinstalar {pkg}: ",
   "nodeUpdateInitiatedSuccess": "¡Actualización de Node.js {version} iniciada correctamente!",
-  "nodeUpdateFailed": "Error al actualizar Node.js: "
+  "nodeUpdateFailed": "Error al actualizar Node.js: ",
+  "healthPanelTitle": "Salud del Sistema",
+  "healthRefreshAria": "Actualizar estado de salud",
+  "healthSystemdLabel": "Snapserver (systemd)",
+  "healthRpcLabel": "Snapserver (RPC)",
+  "healthActiveStatus": "Activo",
+  "healthInactiveStatus": "Inactivo",
+  "healthConnectedStatus": "Conectado",
+  "healthDisconnectedStatus": "Desconectado",
+  "healthConfigLabel": "Configuración",
+  "healthConfigParseableStatus": "Válida",
+  "healthConfigErrorStatus": "Error",
+  "healthDiskLabel": "Espacio Libre en Disco",
+  "healthDiskFreeValue": "{percent}% libre",
+  "healthDiskUnknownStatus": "Desconocido",
+  "healthPermissionsLabel": "Carpeta de Instantáneas Escribible",
+  "healthWritableYes": "Sí",
+  "healthWritableNo": "No"
 }
