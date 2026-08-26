@@ -15,6 +15,7 @@ import toolsRouter from './routes/tools';
 import pipeSourcesRouter from './routes/pipeSources';
 import eventsRouter from './routes/events';
 import healthRouter from './routes/health';
+import diagnosticsRouter from './routes/diagnostics';
 import { pipeSourceService } from './services/pipeSources';
 import { snapcastLive } from './services/snapcastLive';
 import { errorHandler } from './middleware/errorHandler';
@@ -87,6 +88,7 @@ app.use('/api/pipe-sources', pipeSourcesRouter);
 app.use('/api/radio-pipes', pipeSourcesRouter); // backwards compat alias
 app.use('/api/events', eventsRouter);
 app.use('/api', healthRouter); // health.ts defines its own /health and /health/detail paths
+app.use('/api', diagnosticsRouter); // diagnostics.ts defines its own /diagnostics path
 
 // Basic status route
 app.get('/api/status', (req, res) => {
