@@ -7,6 +7,7 @@ import Security from '../views/Security.vue'
 import Setup from '../views/Setup.vue'
 import Logs from '../views/Logs.vue'
 import Watchdogs from '../views/Watchdogs.vue'
+import Diagnostics from '../views/Diagnostics.vue'
 import Routing from '../views/Routing.vue'
 import Tools from '../views/Tools.vue'
 import PipeSources from '../views/PipeSources.vue'
@@ -56,6 +57,15 @@ const router = createRouter({
       path: '/logs',
       name: 'logs',
       component: Logs,
+      meta: { requiresAuth: true }
+    },
+    {
+      // Task 63: self-diagnostics UI (Stage 5, item 5.5, part 2/2), consuming
+      // GET /api/diagnostics (Task 62). Authenticated server-mode page, same
+      // guard shape as /watchdogs/-tools -- no special guard beyond that.
+      path: '/diagnostics',
+      name: 'diagnostics',
+      component: Diagnostics,
       meta: { requiresAuth: true }
     },
     {

@@ -38,6 +38,9 @@ export const serverNavGroups: ServerNavGroup[] = [
     items: [
       { name: 'Logs', href: '/logs', icon: 'terminal', description: 'Service logs' },
       { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart', description: 'Service monitors' },
+      // Task 63: self-diagnostics UI (Stage 5, item 5.5, part 2/2), consuming
+      // GET /api/diagnostics (Task 62).
+      { name: 'Diagnostics', href: '/diagnostics', icon: 'health_and_safety', description: 'Self-diagnostics & repairs' },
     ],
   },
   {

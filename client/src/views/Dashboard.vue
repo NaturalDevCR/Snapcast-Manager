@@ -6,6 +6,7 @@ import { useUIStore } from '../stores/ui';
 import { useSnapcastStore } from '../stores/snapcast';
 import { useOnboardingStore } from '../stores/onboarding';
 import { useHealthStore } from '../stores/health';
+import { useDiagnosticsStore } from '../stores/diagnostics';
 import { useEventSource } from '../composables/useEventSource';
 import { sseStatusBadge } from '../utils/sseStatus';
 import Layout from '../components/Layout.vue';
@@ -21,6 +22,7 @@ const uiStore = useUIStore();
 const snapcastStore = useSnapcastStore();
 const onboardingStore = useOnboardingStore();
 const healthStore = useHealthStore();
+const diagnosticsStore = useDiagnosticsStore();
 
 // Task 29: snapcast state updates now arrive via the app-wide SSE
 // connection (Task 28, connected/disconnected by App.vue) instead of this
@@ -62,6 +64,13 @@ onMounted(async () => {
   // fetched once on mount plus whenever the panel's own refresh button is
   // clicked (handleHealthRefresh below).
   healthStore.fetchHealthDetail();
+
+  // Task 63: self-diagnostics summary badge below the Health Panel, backed
+  // by the authenticated GET /api/diagnostics (Task 62). Same no-polling
+  // discipline as the health panel above -- fetched once on mount, no
+  // refresh control here (the full list + manual refresh lives on
+  // Diagnostics.vue, which this badge links to).
+  diagnosticsStore.fetchDiagnostics();
 });
 
 const handleHealthRefresh = () => {
@@ -245,6 +254,23 @@ const openMympd = () => {
               {{ healthStore.detail.config.error }}
             </p>
           </div>
+        </div>
+
+        <!-- Diagnostics summary badge (Task 63): honest indicator linking to
+             the full self-diagnostics view, not a duplicate list here. -->
+        <div class="mt-3 pt-3 border-t border-white/5">
+          <router-link
+            v-if="diagnosticsStore.findings.length > 0"
+            to="/diagnostics"
+            class="inline-flex items-center gap-1.5 text-xs font-bold text-[#ffcc00] hover:text-[#ffcc00]/80 transition-colors"
+          >
+            <span class="material-symbols-outlined text-[1rem]">warning</span>
+            {{ t('dashboard.diagnosticsIssuesFound', { count: diagnosticsStore.findings.length }) }}
+          </router-link>
+          <span v-else class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+            <span class="material-symbols-outlined text-[1rem]">check_circle</span>
+            {{ t('dashboard.diagnosticsAllClear') }}
+          </span>
         </div>
       </Card>
 

@@ -17,6 +17,7 @@ describe('serverNavGroups', () => {
   it('preserves every pre-existing route path exactly, with no additions or removals', () => {
     const hrefs = serverNavItems.map(item => item.href).sort();
     expect(hrefs).toEqual([
+      '/diagnostics',
       '/logs',
       '/pipe-sources',
       '/security',
@@ -29,9 +30,23 @@ describe('serverNavGroups', () => {
   it('groups items by task area', () => {
     const byKey = Object.fromEntries(serverNavGroups.map(g => [g.key, g.items.map(i => i.href)]));
     expect(byKey.audio).toEqual(['/pipe-sources']);
-    expect(byKey.sistema).toEqual(['/logs', '/watchdogs']);
+    expect(byKey.sistema).toEqual(['/logs', '/watchdogs', '/diagnostics']);
     expect(byKey.configuracion).toEqual(['/server', '/tools']);
     expect(byKey.seguridad).toEqual(['/security']);
+  });
+
+  // Task 63: the new self-diagnostics nav entry, added to the `sistema`
+  // group alongside Logs/Watchdogs.
+  it('includes a Diagnostics item in the sistema group with a non-empty icon and active-route matching', () => {
+    const diagnosticsItem = serverNavItems.find(i => i.href === '/diagnostics');
+    expect(diagnosticsItem).toBeTruthy();
+    expect(diagnosticsItem!.name).toBe('Diagnostics');
+    expect(diagnosticsItem!.icon).toBeTruthy();
+    expect(isServerNavItemActive(diagnosticsItem!, '/diagnostics')).toBe(true);
+    expect(isServerNavItemActive(diagnosticsItem!, '/logs')).toBe(false);
+
+    const sistemaGroup = serverNavGroups.find(g => g.key === 'sistema')!;
+    expect(isServerNavGroupActive(sistemaGroup, '/diagnostics')).toBe(true);
   });
 
   it('has no duplicate items across groups', () => {

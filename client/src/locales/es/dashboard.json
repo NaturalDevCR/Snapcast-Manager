@@ -110,5 +110,7 @@
   "healthDiskUnknownStatus": "Desconocido",
   "healthPermissionsLabel": "Carpeta de Instantáneas Escribible",
   "healthWritableYes": "Sí",
-  "healthWritableNo": "No"
+  "healthWritableNo": "No",
+  "diagnosticsIssuesFound": "{count} problemas encontrados — revisar en Diagnóstico",
+  "diagnosticsAllClear": "Todo en orden — no se encontraron problemas"
 }

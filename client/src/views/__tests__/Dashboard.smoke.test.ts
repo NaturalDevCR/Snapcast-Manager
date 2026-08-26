@@ -8,6 +8,7 @@ import { useOnboardingStore } from '../../stores/onboarding';
 import { useSystemStore } from '../../stores/system';
 import { useUIStore } from '../../stores/ui';
 import { useHealthStore } from '../../stores/health';
+import { useDiagnosticsStore } from '../../stores/diagnostics';
 
 describe('Dashboard.vue', () => {
   it('mounts without throwing', async () => {
@@ -211,5 +212,55 @@ describe('Dashboard.vue', () => {
     expect(wrapper.text()).toContain('Desconectado');
     expect(wrapper.text()).toContain('7% libre');
     expect(wrapper.text()).toContain('No');
+  });
+
+  // --- Diagnostics summary badge (Task 63) --------------------------------
+  // Task 63 adds a small, honest indicator next to the Health panel, backed
+  // by GET /api/diagnostics (Task 62) via the new `diagnostics` Pinia
+  // store. Mocks store.findings directly post-mount, following this file's
+  // own established pattern (e.g. the health panel tests above) rather than
+  // the network layer.
+  describe('diagnostics summary badge (Task 63)', () => {
+    it('shows a calm "all clear" state and no /diagnostics link when there are no findings', async () => {
+      const wrapper = await mountSmokeTest(Dashboard, '/');
+      const diagnosticsStore = useDiagnosticsStore();
+      diagnosticsStore.findings = [];
+      await nextTick();
+
+      expect(wrapper.text()).toContain('All clear');
+      const link = wrapper
+        .findAll('a, router-link-stub')
+        .find((el) => el.attributes('to') === '/diagnostics' || el.attributes('href') === '/diagnostics');
+      expect(link).toBeFalsy();
+    });
+
+    it('renders the issue count linking to /diagnostics when findings are present', async () => {
+      const wrapper = await mountSmokeTest(Dashboard, '/');
+      const diagnosticsStore = useDiagnosticsStore();
+      diagnosticsStore.findings = [
+        { id: 'a', category: 'snapserver-down', severity: 'error', message: 'down' },
+        { id: 'b', category: 'port-occupied', severity: 'warning', message: 'occupied' },
+        { id: 'c', category: 'fifo-no-producer', severity: 'warning', message: 'no producer' },
+      ];
+      await nextTick();
+
+      expect(wrapper.text()).toContain('3 issues found');
+      const link = wrapper
+        .findAll('a, router-link-stub')
+        .find((el) => el.attributes('to') === '/diagnostics' || el.attributes('href') === '/diagnostics');
+      expect(link, 'expected a link to /diagnostics').toBeTruthy();
+    });
+
+    it('renders Spanish copy for the diagnostics badge when locale is "es" (i18n)', async () => {
+      const wrapper = await mountSmokeTest(Dashboard, '/');
+      const diagnosticsStore = useDiagnosticsStore();
+      diagnosticsStore.findings = [
+        { id: 'a', category: 'snapserver-down', severity: 'error', message: 'down' },
+      ];
+      useUIStore().setLocale('es');
+      await nextTick();
+
+      expect(wrapper.text()).toContain('1 problemas encontrados');
+    });
   });
 });

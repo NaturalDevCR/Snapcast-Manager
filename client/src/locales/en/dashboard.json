@@ -110,5 +110,7 @@
   "healthDiskUnknownStatus": "Unknown",
   "healthPermissionsLabel": "Snapshots Writable",
   "healthWritableYes": "Yes",
-  "healthWritableNo": "No"
+  "healthWritableNo": "No",
+  "diagnosticsIssuesFound": "{count} issues found — review in Diagnostics",
+  "diagnosticsAllClear": "All clear — no issues found"
 }
