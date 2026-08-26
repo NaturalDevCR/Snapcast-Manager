@@ -222,24 +222,56 @@ export class DiagnosticsService {
       };
     }
 
+    if (d.detectedType === 'mpd') {
+      // mpd-type pipe sources never carry a stream URL (createPipeSourceBodySchema
+      // only requires `url` for type 'radio') -- this suggested body is genuinely
+      // complete and submittable as-is.
+      return {
+        id,
+        category: 'unmanaged-config',
+        severity: 'warning',
+        message:
+          `Pipe source "${d.name}" (${d.fifoPath}) is present in snapserver.conf but not tracked by this app, ` +
+          'and no matching systemd unit was found on disk. Adoption is not possible -- creating a NEW pipe ' +
+          'source with a matching name/FIFO is the path to bring it under management.',
+        repairAction: {
+          label: 'Create a matching pipe source',
+          kind: 'endpoint',
+          method: 'POST',
+          endpoint: '/api/pipe-sources',
+          body: {
+            name: d.name,
+            type: d.detectedType,
+            idleThreshold: d.idleThreshold,
+          },
+        },
+      };
+    }
+
+    // detectedType === 'radio' with no existingService: createPipeSourceBodySchema
+    // REQUIRES a real http(s) stream `url` for radio sources (see
+    // schemas/pipeSources.ts's createPipeSourceBodySchema), and `d.sourceUri` is
+    // the raw `pipe://...` FIFO URI from snapserver.conf, not a stream URL -- there
+    // is no value this service can honestly fill in. Suggesting an `endpoint` repair
+    // with an incomplete body here would silently fail if a frontend submitted it
+    // as-is, so this is genuinely `manual`: an admin has to know and supply the real
+    // stream URL themselves.
     return {
       id,
       category: 'unmanaged-config',
       severity: 'warning',
       message:
         `Pipe source "${d.name}" (${d.fifoPath}) is present in snapserver.conf but not tracked by this app, ` +
-        'and no matching systemd unit was found on disk. Adoption is not possible -- creating a NEW pipe ' +
-        'source with a matching name/FIFO is the path to bring it under management.',
+        'and no matching systemd unit was found on disk. This looks like a radio-type source, which needs a ' +
+        'real stream URL this service has no way to recover automatically -- creating a NEW pipe source ' +
+        'requires manual input.',
       repairAction: {
-        label: 'Create a matching pipe source',
-        kind: 'endpoint',
-        method: 'POST',
-        endpoint: '/api/pipe-sources',
-        body: {
-          name: d.name,
-          type: d.detectedType,
-          idleThreshold: d.idleThreshold,
-        },
+        label: 'Create manually with the correct stream URL',
+        kind: 'manual',
+        instructions:
+          `Open Pipe Sources and create a new radio source named "${d.name}" pointing at the correct ` +
+          `http(s) stream URL, with idle threshold ${d.idleThreshold}ms. This app has no way to recover ` +
+          `the original stream URL from the raw FIFO entry ("${d.sourceUri}") alone.`,
       },
     };
   }
@@ -370,6 +402,15 @@ export class DiagnosticsService {
       if (!Number.isInteger(port) || port < 1 || port > 65535) continue;
 
       const listeners = await this.getPortListeners(port);
+      if (listeners === null) {
+        // Couldn't determine who (if anyone) is listening -- `ss` isn't
+        // installed/reachable (and, off-macOS, there's no `lsof` fallback
+        // to try). This is genuinely different from "confirmed nobody is
+        // listening": treating it as empty would turn "we couldn't check"
+        // into an active, wrong "stale config" finding whenever snapserver
+        // happens to be active. Skip this port silently rather than guess.
+        continue;
+      }
 
       if (listeners.length === 0) {
         if (snapserverActive) {
@@ -433,8 +474,16 @@ export class DiagnosticsService {
    * calls only, never a shelled string. Restricted to LISTEN-state sockets
    * (`-l`) since this check only cares about who, if anyone, is bound to
    * the port -- not established connections through it.
+   *
+   * Returns `null`, NOT `[]`, when the check itself couldn't run (e.g. `ss`
+   * missing, and off-macOS no fallback to try) -- `[]` is reserved for a
+   * GENUINE "queried successfully, confirmed nobody is listening" result.
+   * Collapsing "couldn't check" into "confirmed empty" would let a missing
+   * tool masquerade as a real port-occupied finding whenever snapserver
+   * happens to be active; checkPortOccupied() relies on this distinction
+   * to skip a port it couldn't actually inspect, rather than guess.
    */
-  private async getPortListeners(port: number): Promise<PortListener[]> {
+  private async getPortListeners(port: number): Promise<PortListener[] | null> {
     try {
       const { stdout } = await run('ss', ['-t', '-l', '-n', '-p', `( sport = :${port} )`]);
       return parseSsListenLines(stdout);
@@ -444,10 +493,10 @@ export class DiagnosticsService {
           const { stdout } = await run('lsof', ['-i', `:${port}`, '-n', '-P']);
           return parseLsofListenLines(stdout);
         } catch {
-          return [];
+          return null;
         }
       }
-      return [];
+      return null;
     }
   }
 }

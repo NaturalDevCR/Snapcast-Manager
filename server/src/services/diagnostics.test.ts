@@ -160,6 +160,35 @@ test('unmanaged-config: discover() entry with no existingService points at creat
   }
 });
 
+test('unmanaged-config: radio-type entry with no existingService is manual, not a non-submittable endpoint body', async () => {
+  // Fix (post-Task-62-review): createPipeSourceBodySchema REQUIRES a real
+  // http(s) `url` for type 'radio' (schemas/pipeSources.ts). d.sourceUri is
+  // the raw pipe:// FIFO URI, not a stream URL -- there's nothing honest to
+  // auto-fill, so this case must be `manual`, unlike the mpd case above.
+  const restore = stubHealthyBaseline();
+  const restoreDiscover = stubModuleFn(pipeSourceService, 'discover', async () => [
+    {
+      name: 'Mystery Radio',
+      fifoPath: '/run/snapcast-manager/snapfifo_mystery_radio',
+      sourceUri: 'pipe:///run/snapcast-manager/snapfifo_mystery_radio?name=Mystery%20Radio',
+      idleThreshold: 15000,
+      detectedType: 'radio',
+      existingService: null,
+    },
+  ]);
+  try {
+    const findings = await diagnosticsService.runDiagnostics();
+    const unmanaged = findings.filter(f => f.category === 'unmanaged-config');
+    assert.equal(unmanaged.length, 1);
+    assert.equal(unmanaged[0].repairAction.kind, 'manual');
+    assert.equal(unmanaged[0].repairAction.body, undefined);
+    assert.ok(unmanaged[0].repairAction.instructions.includes('Mystery Radio'));
+  } finally {
+    restoreDiscover();
+    restore();
+  }
+});
+
 test('unmanaged-config: discover() returning [] produces no findings', async () => {
   const restore = stubHealthyBaseline();
   try {
@@ -413,6 +442,31 @@ test('port-occupied: reads live-configured ports, not hardcoded defaults', async
   } finally {
     restores();
     restore();
+  }
+});
+
+test('port-occupied: ss unavailable (Linux, no fallback) -> no finding, not treated as confirmed empty', async () => {
+  // Fix (post-Task-62-review): getPortListeners() returning [] on a genuine
+  // "ss isn't installed" failure used to be indistinguishable from a real
+  // "queried successfully, nobody's listening" result -- which produced a
+  // false-positive "stale config" finding whenever snapserver was active.
+  // getPortListeners() now returns null for "couldn't check" instead, and
+  // checkPortOccupied() must skip (not finding-ify) that case.
+  const originalPlatform = process.platform;
+  Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+  const restore = stubHealthyBaseline();
+  const restores = stubMany([
+    stubModuleFn(systemdModule, 'isActive', async () => true),
+    stubModuleFn(configModule.configService, 'readServerConfigParsed', async () => ({})),
+    stubModuleFn(execModule, 'run', async () => { throw new Error('ss: command not found'); }),
+  ]);
+  try {
+    const findings = await diagnosticsService.runDiagnostics();
+    assert.equal(findings.filter(f => f.category === 'port-occupied').length, 0);
+  } finally {
+    restores();
+    restore();
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
   }
 });
 
