@@ -114,7 +114,6 @@ kernel mount-namespace level, independent of and in addition to `sudo`.
 ### The systemd sandbox (`snapmanager.service`'s own unit)
 
 ```
-NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
@@ -125,6 +124,32 @@ The last three groups above (`/var/lib/dpkg /var/cache/apt /var/lib/apt/lists`,
 `/usr/local/bin /usr/bin`, `/etc/passwd /etc/group /etc/shadow /etc/gshadow`)
 were added in a post-Task-16 fix pass -- see "Fix-pass additions (post-Task-16
 review)" below for the reasoning behind each.
+
+**`NoNewPrivileges=yes` was REMOVED from this unit by Task 65** (container
+integration tests) after being confirmed, for real, to make this entire
+sudo-based privilege model non-functional: `NoNewPrivileges=yes` disables
+the effect of the setuid bit (and file capabilities) for every process in
+the unit's tree, which prevents `sudo` itself from escalating at all --
+`runuser -u snapmanager -- sudo -n true` returned exit code 1 from inside a
+real running instance of the (then-)hardened unit, regardless of what
+`/etc/sudoers.d/snapcast-manager` grants. Since literally every privileged
+operation this app performs (package install/update/uninstall, systemd
+unit control, every `installPrivilegedFile()` config write) goes through
+`sudo`, this was not an extra hardening layer stacked on top of the
+privilege model below -- it silently broke it entirely. This had never
+been caught before Task 65 because the "real-hardware validation
+checklist" a few paragraphs below (added by Task 16, and explicitly
+flagged there as REQUIRED before production use) had never actually been
+run until Task 65's real, systemd-PID-1 container verification.
+`NoNewPrivileges=yes` and sudo-based elevation are fundamentally
+incompatible -- there is no narrower flag that keeps one while allowing
+the other. The only way to reintroduce it would be replacing `sudo`
+entirely with a non-setuid elevation mechanism (e.g. a small root-owned
+helper process reached over a Unix socket, or systemd's own
+`AmbientCapabilities=`/`CapabilityBoundingSet=` in place of full root
+escalation) -- a materially larger architectural change, left as a
+disclosed, explicit follow-up rather than attempted as part of that task.
+See `.superpowers/sdd/task-65-report.md` for the full account.
 
 `ProtectSystem=strict` makes the ENTIRE filesystem read-only to this
 process except `/dev`, `/proc`, `/sys`, and the paths explicitly listed in
@@ -240,6 +265,19 @@ against. It compiles, its unit tests pass, `bash -n` and `visudo -c` both
 pass, but **none of that proves it works end-to-end on a real target
 host.** The following MUST be manually verified on real Debian/Raspberry Pi
 OS hardware before this is considered production-ready:
+
+**Update (Task 65):** item 1 below (fresh install completes, service runs
+as `snapmanager` not root) and the general "does sudo escalation actually
+work under this unit's sandbox" question are now covered by a real,
+automated, systemd-PID-1 container test on every push and nightly (see
+`.github/workflows/container-integration.yml`,
+`scripts/test-container-integration.sh`) -- that test is what caught the
+`NoNewPrivileges=yes` bug documented above. Items 2-13 below still exercise
+real package installs (mpd, mympd, snapserver/snapclient .deb releases,
+shairport-sync build-from-source, snap-ctrl, ALSA hardware) that remain
+genuinely real-hardware-only (no audio hardware, and deliberately no real
+upstream package installs attempted in CI -- see task-65-report.md) and
+are NOT yet automated -- this checklist still applies to those.
 
 1. A fresh install completes end-to-end and the resulting service is
    confirmed running as `snapmanager`, not root

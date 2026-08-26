@@ -174,20 +174,23 @@ step_1_installation() {
   wait_for_active "$SERVICE_NAME" 30 || fail "Step 1: systemctl is-active $SERVICE_NAME did not become active within 30s"
   ok "systemctl is-active ${SERVICE_NAME}: active"
 
-  # DIAGNOSTIC (non-fatal): every privileged action the running app takes
+  # Regression guard: every privileged action the running app takes
   # (server/src/platform/exec.ts's needsSudo()-gated calls) depends on
   # `sudo` actually being able to escalate snapmanager -> root from INSIDE
-  # this unit's own sandbox. `NoNewPrivileges=yes` (in the unit's own
-  # [Service] section) is well documented to break setuid-based escalation
-  # -- including `sudo` itself -- for a process tree, which would make sudo
-  # fail cleanly at its own startup check rather than during any specific
-  # app operation. Printed here, isolated from any single API call, so a
-  # later privileged-operation failure (e.g. in step 3) has an unambiguous,
-  # early data point to correlate against instead of guessing from an
-  # opaque "sudo exited with code 1" alone.
-  echo "    [diagnostic] runuser -u snapmanager -- sudo -n true:"
-  runuser -u snapmanager -- sudo -n true
-  echo "    [diagnostic] exit code: $?"
+  # this unit's own sandbox. This is what actually caught this task's
+  # single biggest finding -- `NoNewPrivileges=yes` (previously in the
+  # unit's own [Service] section) breaks setuid-based escalation, including
+  # `sudo` itself, for the whole unit's process tree; confirmed for real via
+  # this exact command returning exit 1 before that line was removed from
+  # install.sh (see task-65-report.md). Asserted as a real, isolated
+  # failure here (not just step 3's later, opaque "sudo exited with code 1"
+  # from inside a specific API call) so any future regression is caught at
+  # the earliest, clearest possible point.
+  runuser -u snapmanager -- sudo -n true || fail "Step 1: 'sudo -n true' as snapmanager failed -- sudo cannot escalate from inside this unit's sandbox (check for a reintroduced NoNewPrivileges=yes, or a sudoers.d installation problem)"
+  ok "sudo escalation works from inside the running unit (runuser -u snapmanager -- sudo -n true)"
+
+  [ "$(systemctl show "$SERVICE_NAME" -p User --value)" = "snapmanager" ] || fail "Step 1: systemctl show $SERVICE_NAME -p User did not report 'snapmanager' -- SECURITY.md's real-hardware checklist item 1"
+  ok "systemctl show ${SERVICE_NAME} -p User: snapmanager (not root) -- SECURITY.md checklist item 1"
 
   [ -f "${REPO_DIR}/server/dist/index.js" ] || fail "Step 1: server/dist/index.js was not built"
   [ -f "${REPO_DIR}/client/dist/index.html" ] || fail "Step 1: client/dist/index.html was not built"

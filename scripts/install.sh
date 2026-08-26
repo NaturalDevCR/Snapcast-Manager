@@ -849,6 +849,40 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     #     reasoning already applied to apt-get/dpkg/make above, not a new,
     #     separate risk category -- see SECURITY.md's "Privilege model"
     #     section for the full writeup.
+    #
+    # Task 65 (container-integration-tests): `NoNewPrivileges=yes` REMOVED
+    # from this unit -- this is the single most significant finding of that
+    # task, confirmed for real, not guessed: `NoNewPrivileges=yes` sets the
+    # kernel's `PR_SET_NO_NEW_PRIVS` flag for the unit's ENTIRE process tree,
+    # which disables the effect of the setuid bit (and file capabilities) on
+    # every subsequently exec'd binary -- including `sudo` itself. With it
+    # set, `sudo` cannot escalate AT ALL from this unit, for ANY command,
+    # regardless of what `/etc/sudoers.d/snapcast-manager` grants: confirmed
+    # directly via `runuser -u snapmanager -- sudo -n true` returning exit
+    # code 1 from inside a real running instance of this exact unit. Every
+    # single sudo-gated privileged operation this app performs --
+    # installing/updating/uninstalling any package, starting/stopping/
+    # enabling ANY systemd unit (snapserver/snapclient/mpd/its own generated
+    # pipe-source units), and every `installPrivilegedFile()` config write
+    # (server/src/platform/files.ts, server/src/services/config.ts, etc.) --
+    # goes through `needsSudo()`-gated `sudo` calls (server/src/platform/
+    # exec.ts). This means `NoNewPrivileges=yes` did not add a hardening
+    # LAYER on top of this app's Task-16 sudo-based privilege model -- it
+    # silently made that entire model non-functional. This had never been
+    # caught before because SECURITY.md's own "real-hardware validation
+    # checklist" (added by Task 16, explicitly flagged there as REQUIRED
+    # before production use) had never actually been run until this task's
+    # real, systemd-PID-1 container verification. `NoNewPrivileges=yes` and
+    # a sudo-based elevation architecture are fundamentally incompatible --
+    # there is no narrower flag or carve-out that keeps one while allowing
+    # the other; the only way to keep it would be to replace `sudo` entirely
+    # with a non-setuid elevation mechanism (e.g. a small root-owned helper
+    # invoked via a Unix socket, or systemd's own
+    # AmbientCapabilities=/CapabilityBoundingSet= in place of full root
+    # escalation), which is a materially larger architectural change than
+    # this task's "small contained fix" scope -- left as a disclosed,
+    # explicit follow-up rather than attempted here. See task-65-report.md
+    # for the full account.
     NEW_UNIT_CONTENT=$(cat <<EOF
 [Unit]
 Description=Snapcast Manager Service
@@ -861,7 +895,6 @@ WorkingDirectory=$INSTALL_DIR/server
 ExecStart=$(command -v node) dist/index.js
 Restart=always
 EnvironmentFile=$INSTALL_DIR/server/.env
-NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
