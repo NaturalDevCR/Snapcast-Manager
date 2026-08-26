@@ -90,6 +90,16 @@ function openRepairConfirm(finding: DiagnosticFinding) {
 }
 
 async function handleConfirmRepair() {
+  // Re-entrance guard: ConfirmDialog emits `confirm` then closes itself
+  // (`update:modelValue`, false) synchronously, while its leave transition
+  // still animates for ~200ms -- a rapid double-click on the Confirm button
+  // during that window could otherwise fire this twice. `applying` is also
+  // bound in the template to disable both the Confirm button and the
+  // triggering Repair button while a repair is in flight (see below) --
+  // this check is the second, code-level half of that same protection, not
+  // just cosmetic disabling.
+  if (applying.value) return;
+
   const finding = pendingFinding.value;
   const repairAction = finding?.repairAction;
   if (!finding || !repairAction || repairAction.kind !== 'endpoint') return;
@@ -132,10 +142,28 @@ async function handleConfirmRepair() {
         </button>
       </div>
 
-      <!-- Empty state (calm, positive -- NOT an error style): confirmed
-           empty (not still loading) is the only branch that renders this. -->
+      <!-- Fetch failure: MUST be visually distinct from "confirmed healthy" --
+           a diagnostics tool that goes quiet on a network/auth error and
+           renders the same calm empty state as "genuinely 0 findings" is a
+           real safety gap, not a UX nit (see Task 63 review). Checked before
+           the empty-state branch so a failed fetch never falls through to
+           looking like an all-clear result. -->
       <div
-        v-if="!store.loading && sortedFindings.length === 0"
+        v-if="!store.loading && store.error && sortedFindings.length === 0"
+        class="border border-dashed border-red-800/40 rounded-lg"
+      >
+        <EmptyState
+          icon="error"
+          title="Couldn't run diagnostics"
+          :description="`${store.error} -- click refresh to try again. This is NOT a confirmation that the system is healthy.`"
+        />
+      </div>
+
+      <!-- Empty state (calm, positive -- NOT an error style): confirmed
+           empty (not still loading, not a failed fetch) is the only branch
+           that renders this. -->
+      <div
+        v-else-if="!store.loading && sortedFindings.length === 0"
         class="border border-dashed border-emerald-800/40 rounded-lg"
       >
         <EmptyState
@@ -180,7 +208,8 @@ async function handleConfirmRepair() {
             <button
               v-if="finding.repairAction?.kind === 'endpoint'"
               @click="openRepairConfirm(finding)"
-              class="px-3 py-1.5 rounded bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 text-xs font-medium transition flex items-center gap-1.5"
+              :disabled="applying"
+              class="px-3 py-1.5 rounded bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 text-xs font-medium transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span class="material-symbols-outlined text-[1rem]">build</span>
               Repair

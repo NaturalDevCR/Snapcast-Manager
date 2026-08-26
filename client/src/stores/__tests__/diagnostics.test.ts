@@ -13,6 +13,7 @@ describe('useDiagnosticsStore', () => {
     const store = useDiagnosticsStore();
     expect(store.findings).toEqual([]);
     expect(store.loading).toBe(false);
+    expect(store.error).toBe(null);
   });
 
   it('fetchDiagnostics() populates findings from GET /diagnostics on success', async () => {
@@ -40,7 +41,13 @@ describe('useDiagnosticsStore', () => {
     expect(store.loading).toBe(false);
   });
 
-  it('fetchDiagnostics() leaves findings at their last-known value and logs on failure', async () => {
+  it('fetchDiagnostics() leaves findings at their last-known value, logs, and sets `error` on failure', async () => {
+    // A failed fetch MUST be distinguishable from "confirmed 0 findings" --
+    // an admin diagnostics tool going quiet on a network/auth error and
+    // looking identical to a genuinely healthy system is a real safety gap
+    // (caught in Task 63's review). `error` is what Diagnostics.vue/
+    // Dashboard.vue key off of to render a distinct "couldn't check" state
+    // instead of silently reusing the all-clear one.
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(api, 'fetchApi').mockRejectedValue(new Error('network down'));
 
@@ -59,7 +66,19 @@ describe('useDiagnosticsStore', () => {
       { id: 'x', category: 'port-occupied', severity: 'warning', message: 'stale' },
     ]);
     expect(store.loading).toBe(false);
+    expect(store.error).toBe('network down');
     expect(consoleSpy).toHaveBeenCalled();
+  });
+
+  it('fetchDiagnostics() clears a stale `error` on a subsequent successful fetch', async () => {
+    const store = useDiagnosticsStore();
+    const spy = vi.spyOn(api, 'fetchApi').mockRejectedValueOnce(new Error('network down'));
+    await store.fetchDiagnostics();
+    expect(store.error).toBe('network down');
+
+    spy.mockResolvedValueOnce({ findings: [] });
+    await store.fetchDiagnostics();
+    expect(store.error).toBe(null);
   });
 
   it('applyRepair() calls fetchApi with the repair action\'s method/endpoint (stripping the /api prefix) and JSON body when present', async () => {

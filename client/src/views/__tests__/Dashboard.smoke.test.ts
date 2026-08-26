@@ -234,6 +234,26 @@ describe('Dashboard.vue', () => {
       expect(link).toBeFalsy();
     });
 
+    it('shows a distinct "couldn\'t check" state (NOT all clear) when the diagnostics fetch failed', async () => {
+      // Regression test for the Task 63 review finding: a failed
+      // diagnostics fetch used to be indistinguishable from a genuine
+      // 0-findings result on this dashboard badge too (both leave
+      // `findings` at []) -- silently reassuring an admin during exactly
+      // the kind of connectivity/auth problem this badge exists to catch.
+      const wrapper = await mountSmokeTest(Dashboard, '/');
+      const diagnosticsStore = useDiagnosticsStore();
+      diagnosticsStore.findings = [];
+      diagnosticsStore.error = 'network down';
+      await nextTick();
+
+      expect(wrapper.text()).not.toContain('All clear');
+      expect(wrapper.text()).toContain("Couldn't check");
+      const link = wrapper
+        .findAll('a, router-link-stub')
+        .find((el) => el.attributes('to') === '/diagnostics' || el.attributes('href') === '/diagnostics');
+      expect(link, 'the "couldn\'t check" state should still link to /diagnostics').toBeTruthy();
+    });
+
     it('renders the issue count linking to /diagnostics when findings are present', async () => {
       const wrapper = await mountSmokeTest(Dashboard, '/');
       const diagnosticsStore = useDiagnosticsStore();

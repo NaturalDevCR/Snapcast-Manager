@@ -112,5 +112,6 @@
   "healthWritableYes": "Yes",
   "healthWritableNo": "No",
   "diagnosticsIssuesFound": "{count} issues found — review in Diagnostics",
-  "diagnosticsAllClear": "All clear — no issues found"
+  "diagnosticsAllClear": "All clear — no issues found",
+  "diagnosticsUnknown": "Couldn't check — see Diagnostics"
 }

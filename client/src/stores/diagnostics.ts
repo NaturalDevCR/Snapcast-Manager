@@ -62,14 +62,23 @@ function stripApiPrefix(endpoint: string): string {
 export const useDiagnosticsStore = defineStore('diagnostics', () => {
   const loading = ref(false);
   const findings = ref<DiagnosticFinding[]>([]);
+  // Distinguishes "confirmed 0 findings" from "couldn't check" -- a fetch
+  // failure MUST NOT be silently indistinguishable from a genuinely healthy
+  // system (an admin diagnostics tool going quiet on a network/auth error
+  // is a real safety gap, not just a UX nit -- see Task 63's review). Reset
+  // to null at the start of every fetch so a stale error doesn't linger
+  // after a subsequent successful refresh.
+  const error = ref<string | null>(null);
 
   async function fetchDiagnostics() {
     loading.value = true;
+    error.value = null;
     try {
       const data = await fetchApi<{ findings: DiagnosticFinding[] }>('/diagnostics');
       findings.value = data.findings ?? [];
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch diagnostics:', err);
+      error.value = err?.message || 'Failed to fetch diagnostics';
     } finally {
       loading.value = false;
     }
@@ -88,6 +97,7 @@ export const useDiagnosticsStore = defineStore('diagnostics', () => {
   return {
     loading,
     findings,
+    error,
     fetchDiagnostics,
     applyRepair,
   };

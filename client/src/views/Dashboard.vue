@@ -257,10 +257,23 @@ const openMympd = () => {
         </div>
 
         <!-- Diagnostics summary badge (Task 63): honest indicator linking to
-             the full self-diagnostics view, not a duplicate list here. -->
+             the full self-diagnostics view, not a duplicate list here. A
+             failed fetch (diagnosticsStore.error set) must NOT collapse into
+             the same "all clear" state a genuine 0-findings result shows --
+             that would silently reassure an admin during exactly the kind of
+             connectivity/auth problem this panel exists to surface (see
+             Task 63 review). -->
         <div class="mt-3 pt-3 border-t border-white/5">
           <router-link
-            v-if="diagnosticsStore.findings.length > 0"
+            v-if="diagnosticsStore.error"
+            to="/diagnostics"
+            class="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-zinc-300 transition-colors"
+          >
+            <span class="material-symbols-outlined text-[1rem]">help</span>
+            {{ t('dashboard.diagnosticsUnknown') }}
+          </router-link>
+          <router-link
+            v-else-if="diagnosticsStore.findings.length > 0"
             to="/diagnostics"
             class="inline-flex items-center gap-1.5 text-xs font-bold text-[#ffcc00] hover:text-[#ffcc00]/80 transition-colors"
           >

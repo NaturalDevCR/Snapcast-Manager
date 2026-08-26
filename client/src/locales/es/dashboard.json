@@ -112,5 +112,6 @@
   "healthWritableYes": "Sí",
   "healthWritableNo": "No",
   "diagnosticsIssuesFound": "{count} problemas encontrados — revisar en Diagnóstico",
-  "diagnosticsAllClear": "Todo en orden — no se encontraron problemas"
+  "diagnosticsAllClear": "Todo en orden — no se encontraron problemas",
+  "diagnosticsUnknown": "No se pudo verificar — ver Diagnóstico"
 }

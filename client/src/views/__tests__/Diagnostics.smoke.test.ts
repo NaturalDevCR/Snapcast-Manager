@@ -47,6 +47,22 @@ describe('Diagnostics.vue', () => {
     expect(wrapper.text()).toContain('No issues found');
   });
 
+  it('renders a distinct "couldn\'t check" state on a fetch failure, NOT the same empty state as confirmed-healthy', async () => {
+    // Regression test for the Task 63 review finding: a failed fetch used to
+    // be indistinguishable from "genuinely 0 findings" (both left `findings`
+    // at [] and rendered the calm "No issues found" empty state). `error`
+    // must now produce a visibly different message, and the reassuring
+    // "No issues found" copy must NOT appear.
+    const wrapper = await mountSmokeTest(Diagnostics, '/diagnostics');
+    const store = useDiagnosticsStore();
+    store.findings = [];
+    store.error = 'network down';
+    await nextTick();
+
+    expect(wrapper.text()).not.toContain('No issues found');
+    expect(wrapper.text()).toContain('network down');
+  });
+
   it('renders a Repair button for an endpoint-kind finding, and no button for a manual-kind finding', async () => {
     const wrapper = await mountSmokeTest(Diagnostics, '/diagnostics');
     const store = useDiagnosticsStore();
@@ -110,6 +126,40 @@ describe('Diagnostics.vue', () => {
       expect(applySpy).toHaveBeenCalledWith(endpointFinding.repairAction);
       expect(fetchSpy).toHaveBeenCalled();
       expect(uiStore.toasts.some((t) => t.type === 'success')).toBe(true);
+    });
+
+    it('ignores a second confirm fired while a repair is already in flight (double-submit guard)', async () => {
+      // Regression test for the Task 63 review finding: `applying` used to
+      // be tracked but never actually checked before running the repair,
+      // so a rapid double-click on the dialog's Confirm button (still
+      // clickable during ConfirmDialog's ~200ms leave transition) could
+      // fire applyRepair() twice.
+      const wrapper = await setUpWithEndpointFinding();
+      const store = useDiagnosticsStore();
+      let resolveApply!: () => void;
+      const applySpy = vi.spyOn(store, 'applyRepair').mockReturnValue(
+        new Promise<void>((resolve) => { resolveApply = resolve; }),
+      );
+      const fetchSpy = vi.spyOn(store, 'fetchDiagnostics').mockResolvedValue();
+
+      await findRepairTrigger(wrapper)!.trigger('click');
+      await nextTick();
+
+      const confirmButton = findDialogConfirmButton()!;
+      // Two rapid clicks, neither awaited in between -- simulates a
+      // double-click landing before the first call's `applying` guard has
+      // had a chance to matter via disabled state alone.
+      await confirmButton.trigger('click');
+      await confirmButton.trigger('click');
+      await nextTick();
+
+      expect(applySpy).toHaveBeenCalledTimes(1);
+
+      resolveApply();
+      await nextTick();
+      await Promise.resolve();
+      await nextTick();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
     it('on failure, shows an error toast with the error message and does not crash', async () => {
