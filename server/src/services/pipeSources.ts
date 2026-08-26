@@ -418,7 +418,11 @@ function extractMpdOutputBlock(content: string, fifoPath: string): string {
 }
 
 // ---- MPD: audio_output block management ----
-const MPD_CONF_PATHS = ['/etc/mpd.conf', '/var/lib/mpd/mpd.conf'];
+// Exported (Task 60) so services/backup.ts can reuse this exact
+// primary-path-plus-fallback list as mpd's backup sources instead of
+// hardcoding a second, potentially-drifting literal -- same reuse
+// precedent as services/snapshot.ts's SNAPSHOTS_DIR (Task 57).
+export const MPD_CONF_PATHS = ['/etc/mpd.conf', '/var/lib/mpd/mpd.conf'];
 
 async function findMpdConf(): Promise<string | null> {
   for (const p of MPD_CONF_PATHS) {

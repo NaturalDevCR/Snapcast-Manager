@@ -2,7 +2,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import { run, needsSudo } from '../platform/exec';
 
-const WATCHDOGS_CONFIG_DIR = '/etc/snapcast-manager';
+// Exported (Task 60) so services/backup.ts can reuse this exact directory
+// as one of its cross-cutting backup sources instead of hardcoding a
+// second, potentially-drifting literal path -- same reuse precedent as
+// services/snapshot.ts's SNAPSHOTS_DIR (Task 57).
+export const WATCHDOGS_CONFIG_DIR = '/etc/snapcast-manager';
 const WATCHDOGS_CONFIG_PATH = path.join(WATCHDOGS_CONFIG_DIR, 'watchdogs.json');
 
 export interface Watchdog {

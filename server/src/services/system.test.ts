@@ -2463,48 +2463,89 @@ test('installPackage("mpd") succeeds and does NOT attempt a rollback when mpd.se
 });
 
 // ------------------------------------------------------------------------
-// Review fix pass (Task 59, Finding 1): backup.ts's collectSources() only
-// ever backs up snapserver/snapclient-related files, REGARDLESS of
+// Review fix pass (Task 59, Finding 1) originally introduced
+// NO_COMPONENT_SPECIFIC_BACKUP_PKGS because backup.ts's collectSources()
+// only ever backed up snapserver/snapclient-related files, REGARDLESS of
 // `component` -- so for mpd/mympd/shairport-sync, any pre-install backup
-// never contains anything specific to those packages. Restoring it after a
-// failed install would be a no-op for whatever actually broke the package,
-// so verifyServiceOrRollback() now treats these 3 packages the same as "no
-// prior backup exists" -- it skips restoreBackup() entirely and says so
-// honestly, rather than logging a misleading "rolled back successfully".
+// never contained anything specific to those packages, and
+// verifyServiceOrRollback() had to treat them the same as "no prior backup
+// exists" rather than risk a misleadingly-labeled rollback.
+//
+// Task 60 fixed collectSources() itself to be genuinely component-aware
+// (mpd/mympd/shairport-sync each now get real, package-relevant backup
+// sources -- see backup.ts's collectSources()), so NO_COMPONENT_SPECIFIC_
+// BACKUP_PKGS is now EMPTY and all 5 known-service packages genuinely roll
+// back. The tests below replace the old "mpd does NOT roll back" test
+// (which asserted the now-fixed bug) with proof that it DOES.
 // ------------------------------------------------------------------------
 
-test('installPackage("mpd") does NOT call restoreBackup() when mpd.service never comes up, even though a backup exists -- mpd has no package-specific backup coverage (Finding 1)', async () => {
-  const restoreSudo = stubNeedsSudo(false);
-  const restoreRun = stubRunRecording([]);
-  const restoreBackup = stubCreatePreUpdateBackup(async () => REAL_BACKUP_RESULT);
-  const { calls: restoreCalls, restore: restoreRestoreBackup } = stubRestoreBackup(
-    async () => 'Restored from /var/backups/snapmanager/pre-mpd-20260825-120000.tar.gz',
-  );
-  const { restore: restoreIsActive } = stubIsActive(() => false);
-  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+test('NO_COMPONENT_SPECIFIC_BACKUP_PKGS is empty -- Task 60 gave mpd/mympd/shairport-sync real, package-specific backup coverage, closing the loop Task 59 Finding 1 opened', () => {
+  const skipSet = (SystemService as any).NO_COMPONENT_SPECIFIC_BACKUP_PKGS as ReadonlySet<string>;
+  assert.equal(skipSet.size, 0, `expected the skip-list to be empty now that collectSources() is component-aware, got: ${JSON.stringify([...skipSet])}`);
+});
+
+test("mapToComponent('mympd') returns the dedicated 'mympd' BackupComponent, not the 'general' fallback (Task 60: mympd gets its own genuine backup coverage)", async () => {
+  const seenComponents: string[] = [];
+  const restoreBackup = stubCreatePreUpdateBackup(async (component: any) => {
+    seenComponents.push(component);
+    return EMPTY_BACKUP_RESULT;
+  });
+  const restoreIsActive = stubIsActive(() => true).restore;
+  const service = freshService();
+  (service as any).installMympd = async () => 'myMPD installed successfully.';
   try {
+    await service.installPackage('mympd');
+    assert.deepEqual(seenComponents, ['mympd'], `expected safeBackupOrAbort() to call createPreUpdateBackup() with component 'mympd', got: ${JSON.stringify(seenComponents)}`);
+  } finally {
+    restoreBackup();
+    restoreIsActive();
+  }
+});
+
+test('installPackage() genuinely calls restoreBackup() and logs a real rollback for ALL 5 known-service packages when their service never comes up (mpd/mympd/shairport-sync now have real coverage too, not just snapserver/snapclient)', async () => {
+  const cases: { pkg: string; installerMethod: string }[] = [
+    { pkg: 'snapserver', installerMethod: 'updateSnapserverFromGitHub' },
+    { pkg: 'snapclient', installerMethod: 'updateSnapclientFromGitHub' },
+    { pkg: 'mpd', installerMethod: 'installMpd' },
+    { pkg: 'mympd', installerMethod: 'installMympd' },
+    { pkg: 'shairport-sync', installerMethod: 'installShairportSync' },
+  ];
+
+  for (const { pkg, installerMethod } of cases) {
+    const fileName = `pre-${pkg}-20260825-120000.tar.gz`;
+    const restoreBackup = stubCreatePreUpdateBackup(async () => ({
+      path: `/var/backups/snapmanager/${fileName}`,
+      fileName,
+      size: 1234,
+      timestamp: '20260825-120000',
+      components: [`${pkg}-config`],
+      files: ['/some/relevant/file'],
+    }));
+    const { calls: restoreCalls, restore: restoreRestoreBackup } = stubRestoreBackup(
+      async () => `Restored from /var/backups/snapmanager/${fileName}`,
+    );
+    const { restore: restoreIsActive } = stubIsActive(() => false);
+    const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
     const service = freshService();
     withInstantPostInstallRetries(service);
-    await assert.rejects(() => service.installPackage('mpd'), /did not become active/i);
-    assert.equal(
-      restoreCalls.length, 0,
-      'restoreBackup() must NOT be called for mpd -- the backup it would restore never contains mpd-specific files',
-    );
-    assert.ok(
-      logCalls.some(l => /no rollback was attempted/i.test(l) && /mpd-specific/i.test(l)),
-      `expected an honest job-log message explaining the backup is not mpd-specific and no rollback was attempted, got: ${JSON.stringify(logCalls)}`,
-    );
-    assert.ok(
-      !logCalls.some(l => /rolled back automatically/i.test(l)),
-      `must NOT claim a successful rollback occurred for mpd, got: ${JSON.stringify(logCalls)}`,
-    );
-  } finally {
-    restoreRun();
-    restoreSudo();
-    restoreBackup();
-    restoreRestoreBackup();
-    restoreIsActive();
-    restoreJobLog();
+    (service as any)[installerMethod] = async () => `${pkg} installed successfully.`;
+    try {
+      await assert.rejects(() => service.installPackage(pkg), /did not become active/i, `expected installPackage(${JSON.stringify(pkg)}) to reject`);
+      assert.deepEqual(restoreCalls, [fileName], `expected restoreBackup() to be called with ${fileName} for ${pkg}, got: ${JSON.stringify(restoreCalls)}`);
+      assert.ok(
+        logCalls.some(l => /rolled back automatically/i.test(l) && l.includes(fileName)),
+        `expected a job-log message about the genuine rollback for ${pkg}, got: ${JSON.stringify(logCalls)}`,
+      );
+      assert.ok(
+        !logCalls.some(l => /no rollback was attempted/i.test(l)),
+        `must NOT claim no rollback was attempted for ${pkg} (it now has real coverage), got: ${JSON.stringify(logCalls)}`,
+      );
+    } finally {
+      restoreBackup();
+      restoreRestoreBackup();
+      restoreIsActive();
+      restoreJobLog();
+    }
   }
 });
 
@@ -2537,7 +2578,7 @@ test('installPackage("mpd") skips the rollback (never calls restoreBackup) when 
   }
 });
 
-test('installPackage("snapclient") DOES call restoreBackup() when snapclient.service never comes up -- snapclient has genuine package-specific backup coverage, unlike mpd/mympd/shairport-sync', async () => {
+test('installPackage("snapclient") DOES call restoreBackup() when snapclient.service never comes up -- snapclient has genuine package-specific backup coverage (as do mpd/mympd/shairport-sync since Task 60)', async () => {
   const restoreBackup = stubCreatePreUpdateBackup(async () => ({
     path: '/var/backups/snapmanager/pre-snapclient-20260825-120000.tar.gz',
     fileName: 'pre-snapclient-20260825-120000.tar.gz',

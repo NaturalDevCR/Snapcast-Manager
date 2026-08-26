@@ -4,7 +4,17 @@ import fs from 'fs';
 import { runMigrations } from './database/migrations';
 
 const isDev = process.env.NODE_ENV !== 'production';
-const dbDir = isDev
+// Exported (Task 60) so services/backup.ts can reuse this exact resolved
+// directory as one of its cross-cutting backup sources instead of
+// hardcoding a second, potentially-drifting literal path -- same reuse
+// precedent as services/snapshot.ts's SNAPSHOTS_DIR (Task 57) and
+// services/watchdog.ts's WATCHDOGS_CONFIG_DIR. Resolves to
+// `/opt/snapcast-manager/data` in production (dist/../../data, since the
+// app is installed at /opt/snapcast-manager and its compiled server lives
+// at /opt/snapcast-manager/server/dist -- confirmed against
+// scripts/install.sh's INSTALL_BASE_DIR and routes/system.ts's own
+// separate `/export` endpoint, which hardcodes that same literal).
+export const dbDir = isDev
   ? path.join(__dirname, '../data')
   : path.join(__dirname, '../../data');
 

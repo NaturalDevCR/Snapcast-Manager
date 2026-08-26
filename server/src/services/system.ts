@@ -158,32 +158,34 @@ export class SystemService {
     'shairport-sync': 'shairport-sync.service',
   };
 
-  /** Review fix pass (Task 59, Finding 1): `backup.ts`'s `collectSources()`
-   * (unchanged/out of scope for this task -- see task-59-brief.md and
-   * plan item 5.3 "real snapshots") builds its `sources` array the SAME way
-   * regardless of `component`, aside from one `snap-ctrl`-only branch: every
-   * backup it ever creates only ever contains `/etc/snapserver.conf*` and
-   * `/etc/snapclient-manager`. For `mpd`, `shairport-sync`, and `mympd`
-   * (which `mapToComponent()` maps to `'mpd'`, `'shairport-sync'`, and
-   * `'general'` respectively), that means the pre-install backup taken
-   * before installing THOSE packages never contains anything specific to
+  /** Review fix pass (Task 59, Finding 1) introduced this set because
+   * `backup.ts`'s `collectSources()` used to build its `sources` array the
+   * SAME way regardless of `component`, aside from one `snap-ctrl`-only
+   * branch: every backup it ever created only ever contained
+   * `/etc/snapserver.conf*` and `/etc/snapclient-manager`. For `mpd`,
+   * `shairport-sync`, and `mympd`, that meant the pre-install backup taken
+   * before installing THOSE packages never contained anything specific to
    * them -- restoring it after a failed install would extract only
-   * snapserver/snapclient files, which is not a meaningful rollback of
-   * whatever actually broke mpd/mympd/shairport-sync. `snapserver` and
-   * `snapclient` are NOT in this set: `collectSources()` genuinely backs up
-   * files relevant to those two.
+   * snapserver/snapclient files, not a meaningful rollback of whatever
+   * actually broke mpd/mympd/shairport-sync.
    *
-   * `verifyServiceOrRollback()` below treats a package in this set the same
-   * as "no prior backup exists" -- it skips the `restoreBackup()` call
-   * entirely and says so honestly, rather than calling `restoreBackup()`
-   * anyway and logging a "rolled back successfully" message that would be
-   * true (the tar extraction genuinely succeeds) but actively misleading
-   * (nothing package-specific was ever backed up or restored). */
-  private static readonly NO_COMPONENT_SPECIFIC_BACKUP_PKGS: ReadonlySet<string> = new Set([
-    'mpd',
-    'mympd',
-    'shairport-sync',
-  ]);
+   * Task 60 (`.superpowers/sdd/task-60-brief.md`, plan item 5.3 "real
+   * snapshots") is the structural fix this comment predicted: it made
+   * `collectSources()` genuinely component-aware (`mpd` now backs up
+   * `MPD_CONF_PATHS`, `mympd` a real, new `BackupComponent` member backs
+   * up `/var/lib/mympd/config`, `shairport-sync` backs up
+   * `/etc/shairport-sync.conf` -- see backup.ts's `collectSources()` for
+   * the full mapping and the investigation confirming each path is real,
+   * not invented). All three packages now have genuine, package-relevant
+   * backup coverage, so this set is EMPTY -- there is currently nothing to
+   * skip. It stays as a live mechanism (not deleted) in case a future
+   * package genuinely has no identifiable config this app can back up;
+   * `verifyServiceOrRollback()` below still treats any package placed in
+   * it the same as "no prior backup exists" (skips `restoreBackup()`
+   * entirely and says so honestly, rather than logging a misleading
+   * "rolled back successfully" for a backup that holds nothing relevant to
+   * that package). */
+  private static readonly NO_COMPONENT_SPECIFIC_BACKUP_PKGS: ReadonlySet<string> = new Set([]);
 
   // Post-install service-verification grace window: systemd services can
   // take a brief moment to come up after a restart, so a single
@@ -354,9 +356,14 @@ export class SystemService {
     return msg;
   }
 
+  /** Task 60: `mympd` now maps to its OWN `BackupComponent` (`'mympd'`)
+   * instead of silently falling through to the `'general'` fallback --
+   * `backup.ts`'s `collectSources()` gives it real, mympd-specific backup
+   * coverage (`/var/lib/mympd/config`), so it deserves its own accurate
+   * label rather than being lumped in with truly-unrecognized packages. */
   private mapToComponent(pkg: string): BackupComponent {
     if (pkg === 'snapserver' || pkg === 'snapclient' || pkg === 'snap-ctrl') return pkg;
-    if (pkg === 'shairport-sync' || pkg === 'mpd' || pkg === 'ffmpeg' || pkg === 'node') return pkg;
+    if (pkg === 'shairport-sync' || pkg === 'mpd' || pkg === 'mympd' || pkg === 'ffmpeg' || pkg === 'node') return pkg;
     return 'general';
   }
 
