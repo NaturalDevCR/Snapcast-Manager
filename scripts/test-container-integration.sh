@@ -181,13 +181,23 @@ step_1_installation() {
   # single biggest finding -- `NoNewPrivileges=yes` (previously in the
   # unit's own [Service] section) breaks setuid-based escalation, including
   # `sudo` itself, for the whole unit's process tree; confirmed for real via
-  # this exact command returning exit 1 before that line was removed from
-  # install.sh (see task-65-report.md). Asserted as a real, isolated
-  # failure here (not just step 3's later, opaque "sudo exited with code 1"
-  # from inside a specific API call) so any future regression is caught at
-  # the earliest, clearest possible point.
-  runuser -u snapmanager -- sudo -n true || fail "Step 1: 'sudo -n true' as snapmanager failed -- sudo cannot escalate from inside this unit's sandbox (check for a reintroduced NoNewPrivileges=yes, or a sudoers.d installation problem)"
-  ok "sudo escalation works from inside the running unit (runuser -u snapmanager -- sudo -n true)"
+  # this exact command class returning exit 1 with NO stderr at all before
+  # that line was removed from install.sh (see task-65-report.md).
+  #
+  # Uses `systemctl daemon-reload` (not e.g. `sudo -n true`) deliberately:
+  # `/etc/sudoers.d/snapcast-manager` scopes its NOPASSWD grants to
+  # specific, literal commands (never a blanket "any command" rule -- see
+  # SECURITY.md's "Privilege model"), so this must probe with a command
+  # that is ACTUALLY granted (matching exactly what daemonReload() itself
+  # calls in server/src/platform/systemd.ts) to distinguish "NoNewPrivileges
+  # breaks sudo entirely" (silent exit 1, no stderr) from "this specific
+  # command isn't in the sudoers grant" ("sudo: a password is required",
+  # a completely different and unrelated failure this probe must NOT
+  # conflate with the NoNewPrivileges regression it exists to catch --
+  # `true` is not in the grant list, and correctly reproduced this exact
+  # confusion during this task's own iteration).
+  runuser -u snapmanager -- sudo -n systemctl daemon-reload || fail "Step 1: 'sudo -n systemctl daemon-reload' as snapmanager failed -- either sudo cannot escalate from inside this unit's sandbox (check for a reintroduced NoNewPrivileges=yes) or the sudoers.d grant for it is missing/broken"
+  ok "sudo escalation works from inside the running unit (runuser -u snapmanager -- sudo -n systemctl daemon-reload)"
 
   [ "$(systemctl show "$SERVICE_NAME" -p User --value)" = "snapmanager" ] || fail "Step 1: systemctl show $SERVICE_NAME -p User did not report 'snapmanager' -- SECURITY.md's real-hardware checklist item 1"
   ok "systemctl show ${SERVICE_NAME} -p User: snapmanager (not root) -- SECURITY.md checklist item 1"
