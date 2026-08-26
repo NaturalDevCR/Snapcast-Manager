@@ -683,6 +683,34 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
         $SUDO chown -R "$SNAPMANAGER_USER:$SNAPMANAGER_USER" "$d"
     done
 
+    # Task 65 (container-integration-tests): /etc/mpd.conf and /var/lib/mpd
+    # are both listed in the hardened unit's ReadWritePaths= below (mpd-type
+    # pipe sources write to whichever of them findMpdConf() finds -- see
+    # services/pipeSources.ts's MPD_CONF_PATHS/writeMpdOutput(), which always
+    # goes through installPrivilegedFile()'s sudo elevation, NOT a direct,
+    # unprivileged fs write -- so unlike the /etc/snapserver.conf-family loop
+    # just above, these do NOT need $SNAPMANAGER_USER ownership). But
+    # systemd's own ReadWritePaths= mount-namespace setup for a FILE entry
+    # (as opposed to a directory) hard-fails at unit start if that file does
+    # not already exist on disk -- confirmed for real by this task's own
+    # container integration test, on a fresh host where mpd has never been
+    # installed: `Failed to set up mount namespacing: .../etc/mpd.conf: No
+    # such file or directory`, `Failed at step NAMESPACE`. On most real
+    # deployments this was masked by mpd already being installed (its own
+    # package creates /etc/mpd.conf) before or shortly after this installer
+    # runs; a brand-new host with mpd never installed hit it every time.
+    # Pre-creating an EMPTY placeholder (root-owned, matching what an
+    # uninstalled-mpd host would otherwise have) is sufficient -- it only
+    # needs to exist for the mount-namespace setup to succeed; mpd's own
+    # package install later is free to manage/own it however it normally
+    # would. /var/lib/mpd (a directory) is mkdir'd defensively alongside it
+    # for the same reason, since findMpdConf()'s fallback path is
+    # /var/lib/mpd/mpd.conf.
+    if [ ! -e /etc/mpd.conf ]; then
+        $SUDO touch /etc/mpd.conf
+    fi
+    $SUDO mkdir -p /var/lib/mpd
+
     # --- 6c. sudoers.d, validated via `visudo -c` BEFORE it is ever installed
     # live -- a syntactically broken sudoers file can lock out ALL sudo on
     # this host, so this check is not optional. A validation failure does
