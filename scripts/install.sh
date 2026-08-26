@@ -672,7 +672,24 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     # $SNAPMANAGER_USER) so the app can write into an EXISTING,
     # already-owned path even on a brand-new host where the corresponding
     # package (snapserver/mpd/snapclient) hasn't been installed yet.
-    for p in /etc/snapserver.conf /etc/snapserver.conf.base /etc/default/snapclient; do
+    # Task 65: /etc/snapserver.conf.bak added to this loop (and to
+    # ReadWritePaths= below). config.ts's writeServerConfigCore() --
+    # the ONE place every write to /etc/snapserver.conf funnels through
+    # (addStreamSource, saveSegment, deleteSegment, rebuildMasterConfig,
+    # removeStreamSourceByFifo, ...) -- calls rotateMasterBak() before every
+    # single write, which does installPrivilegedFile(SNAPSERVER_CONFIG_BAK,
+    # ...) UNCONDITIONALLY whenever /etc/snapserver.conf already exists (even
+    # empty, which it always does post-install.sh's own touch above) -- it
+    # is not a rare/edge-case path, it runs on literally every config
+    # mutation. ReadWritePaths= never included this path at all, so
+    # ProtectSystem=strict made EVERY snapserver.conf write fail under the
+    # hardened sandbox (confirmed for real: this task's own container test
+    # hit `{"error":"sudo exited with code 1"}` on the very first POST
+    # /api/pipe-sources -- `sudo cp` into a path outside every
+    # ReadWritePaths= exception fails with a read-only-filesystem error,
+    # same root cause class as the ReadWritePaths existence gaps above, just
+    # a missing ENTRY rather than a missing pre-created target).
+    for p in /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.bak /etc/default/snapclient; do
         if [ ! -e "$p" ]; then
             $SUDO touch "$p"
         fi
@@ -682,6 +699,92 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
         $SUDO mkdir -p "$d"
         $SUDO chown -R "$SNAPMANAGER_USER:$SNAPMANAGER_USER" "$d"
     done
+
+    # Task 65 (container-integration-tests): EVERY path listed in the
+    # hardened unit's ReadWritePaths= below must already exist on disk by
+    # the time this unit first starts -- systemd's own mount-namespace setup
+    # for a ReadWritePaths entry (file OR directory) hard-fails the unit
+    # (`Failed to set up mount namespacing: ...: No such file or directory`,
+    # `Failed at step NAMESPACE`) if the target is missing; it does NOT
+    # auto-create it. This was never noticed before because this codebase
+    # had never actually been run through a genuine fresh install with
+    # NOTHING pre-existing (no mpd/snapserver/snap-ctrl ever installed, no
+    # prior data/ dir from a restore) until this task's real, systemd-PID-1
+    # container test -- confirmed for real, one path at a time, via actual
+    # failed runs (see task-65-report.md for the full account). This is a
+    # genuine pre-existing installer bug this task's real verification
+    # uncovered, not a container-only quirk: the same missing-path failure
+    # would happen identically on a real bare-metal fresh install.
+    #
+    # Two paths are written to DIRECTLY by the Node process (never through
+    # sudo), so they need real $SNAPMANAGER_USER ownership, not just
+    # existence -- server/src/database.ts's own dbDir (better-sqlite3 opens
+    # the .db file directly) and server/src/services/snapshot.ts's
+    # SNAPSHOTS_DIR (plain fs.copyFile/fs.mkdir, no installPrivilegedFile
+    # call at all).
+    for d in "$INSTALL_BASE_DIR/data" "$INSTALL_BASE_DIR/server/snapshots"; do
+        $SUDO mkdir -p "$d"
+        $SUDO chown -R "$SNAPMANAGER_USER:$SNAPMANAGER_USER" "$d"
+    done
+
+    # Every other gap: these are all written to exclusively through sudo
+    # elevation (installPrivilegedFile()/runPrivileged(), confirmed by
+    # grepping each real call site below), so root ownership is fine --
+    # they only need to EXIST for ReadWritePaths' mount-namespace setup to
+    # succeed. Each is created empty/root-owned here, matching exactly what
+    # an uninstalled/never-touched host would otherwise have; whatever
+    # actually manages each path later (mpd's own package, this app's own
+    # runtime code, an admin action) is free to populate/re-own it normally
+    # from that point on -- this only unblocks the FIRST unit start.
+    #
+    #   /etc/mpd.conf (file) + /var/lib/mpd (dir): services/pipeSources.ts's
+    #     MPD_CONF_PATHS/writeMpdOutput() -- the original failure this task
+    #     found first.
+    #   /etc/snapclient-manager: services/snapclientInstances.ts's ENV_DIR.
+    #   /var/lib/snapcast-manager/scripts: services/tools.ts's
+    #     MANAGED_SCRIPTS_DIR (that file's own header comment already
+    #     documents "nothing in this codebase or the installer ever creates"
+    #     this directory as a known, disclosed gap -- this closes it at the
+    #     one point that actually matters for NAMESPACE setup; the app's own
+    #     lazy ensureManagedScriptsDir() remains as defense in depth for any
+    #     future install path that skips this installer).
+    #   /var/backups/snapmanager: services/backup.ts's BACKUP_DIR.
+    #   /var/lib/snapserver: created by the snapserver PACKAGE itself once
+    #     actually installed (services/system.ts's executeDebUpdate()); a
+    #     host that has never installed snapserver doesn't have it yet.
+    #   /etc/apt/keyrings: services/system.ts's mympd/nodesource GPG-key
+    #     setup (`runPrivileged(['mkdir','-p','/etc/apt/keyrings'])`) --
+    #     NOT guaranteed present on a minimal Debian bookworm base image
+    #     (it's a Debian-wide convention, not something every base install
+    #     ships by default).
+    #   /etc/apt/sources.list.d: normally ships with every Debian apt
+    #     install already; mkdir -p'd here too regardless, since it's free
+    #     and this whole block's purpose is to stop assuming instead of
+    #     verifying.
+    #   /usr/share/snapserver/snap-ctrl (dir, confirmed by
+    #     services/system.ts's `fs.promises.readdir(...)` call against this
+    #     exact path): created by the dedicated snap-ctrl install action;
+    #     absent on a host that has never run it.
+    for d in /var/lib/mpd /etc/snapclient-manager /var/lib/snapcast-manager/scripts \
+             /var/backups/snapmanager /var/lib/snapserver /etc/apt/keyrings \
+             /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl; do
+        $SUDO mkdir -p "$d"
+    done
+    if [ ! -e /etc/mpd.conf ]; then
+        $SUDO touch /etc/mpd.conf
+    fi
+
+    # /run/snapcast-manager: services/pipeSources.ts's RUNTIME_DIR (the FIFO
+    # directory) -- ephemeral by nature (lives on tmpfs-backed /run, so it
+    # never survives a reboot regardless of this installer), normally
+    # re-created on demand by ensureRuntimeDir()/a radio unit's own
+    # ExecStartPre the first time ANY pipe source is created or started.
+    # But snapmanager.service's own ReadWritePaths= needs it to exist
+    # already at snapmanager.service's OWN first start, which can happen
+    # before any pipe source ever has -- mode 0770 + group audio matches
+    # ensureRuntimeDir()'s own convention exactly.
+    $SUDO mkdir -p -m 0770 /run/snapcast-manager
+    $SUDO chgrp audio /run/snapcast-manager 2>/dev/null || true
 
     # --- 6c. sudoers.d, validated via `visudo -c` BEFORE it is ever installed
     # live -- a syntactically broken sudoers file can lock out ALL sudo on
@@ -746,6 +849,40 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     #     reasoning already applied to apt-get/dpkg/make above, not a new,
     #     separate risk category -- see SECURITY.md's "Privilege model"
     #     section for the full writeup.
+    #
+    # Task 65 (container-integration-tests): `NoNewPrivileges=yes` REMOVED
+    # from this unit -- this is the single most significant finding of that
+    # task, confirmed for real, not guessed: `NoNewPrivileges=yes` sets the
+    # kernel's `PR_SET_NO_NEW_PRIVS` flag for the unit's ENTIRE process tree,
+    # which disables the effect of the setuid bit (and file capabilities) on
+    # every subsequently exec'd binary -- including `sudo` itself. With it
+    # set, `sudo` cannot escalate AT ALL from this unit, for ANY command,
+    # regardless of what `/etc/sudoers.d/snapcast-manager` grants: confirmed
+    # directly via `runuser -u snapmanager -- sudo -n true` returning exit
+    # code 1 from inside a real running instance of this exact unit. Every
+    # single sudo-gated privileged operation this app performs --
+    # installing/updating/uninstalling any package, starting/stopping/
+    # enabling ANY systemd unit (snapserver/snapclient/mpd/its own generated
+    # pipe-source units), and every `installPrivilegedFile()` config write
+    # (server/src/platform/files.ts, server/src/services/config.ts, etc.) --
+    # goes through `needsSudo()`-gated `sudo` calls (server/src/platform/
+    # exec.ts). This means `NoNewPrivileges=yes` did not add a hardening
+    # LAYER on top of this app's Task-16 sudo-based privilege model -- it
+    # silently made that entire model non-functional. This had never been
+    # caught before because SECURITY.md's own "real-hardware validation
+    # checklist" (added by Task 16, explicitly flagged there as REQUIRED
+    # before production use) had never actually been run until this task's
+    # real, systemd-PID-1 container verification. `NoNewPrivileges=yes` and
+    # a sudo-based elevation architecture are fundamentally incompatible --
+    # there is no narrower flag or carve-out that keeps one while allowing
+    # the other; the only way to keep it would be to replace `sudo` entirely
+    # with a non-setuid elevation mechanism (e.g. a small root-owned helper
+    # invoked via a Unix socket, or systemd's own
+    # AmbientCapabilities=/CapabilityBoundingSet= in place of full root
+    # escalation), which is a materially larger architectural change than
+    # this task's "small contained fix" scope -- left as a disclosed,
+    # explicit follow-up rather than attempted here. See task-65-report.md
+    # for the full account.
     NEW_UNIT_CONTENT=$(cat <<EOF
 [Unit]
 Description=Snapcast Manager Service
@@ -758,11 +895,10 @@ WorkingDirectory=$INSTALL_DIR/server
 ExecStart=$(command -v node) dist/index.js
 Restart=always
 EnvironmentFile=$INSTALL_DIR/server/.env
-NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=$INSTALL_BASE_DIR/data $INSTALL_BASE_DIR/server/snapshots /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.d /etc/snapcast-manager /run/snapcast-manager /var/lib/snapcast-manager/scripts /var/backups/snapmanager /etc/mpd.conf /var/lib/mpd /etc/systemd/system /etc/default/snapclient /etc/snapclient-manager /var/lib/snapserver /etc/apt/keyrings /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl /var/lib/dpkg /var/cache/apt /var/lib/apt/lists /usr/local/bin /usr/bin /etc/passwd /etc/group /etc/shadow /etc/gshadow
+ReadWritePaths=$INSTALL_BASE_DIR/data $INSTALL_BASE_DIR/server/snapshots /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.bak /etc/snapserver.conf.d /etc/snapcast-manager /run/snapcast-manager /var/lib/snapcast-manager/scripts /var/backups/snapmanager /etc/mpd.conf /var/lib/mpd /etc/systemd/system /etc/default/snapclient /etc/snapclient-manager /var/lib/snapserver /etc/apt/keyrings /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl /var/lib/dpkg /var/cache/apt /var/lib/apt/lists /usr/local/bin /usr/bin /etc/passwd /etc/group /etc/shadow /etc/gshadow
 
 [Install]
 WantedBy=multi-user.target

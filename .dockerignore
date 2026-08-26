@@ -1,0 +1,21 @@
+# Task 65: keeps docker/Dockerfile.integration-test's `COPY . /opt/snapcast-manager`
+# build context small and, more importantly, genuinely FRESH -- this must
+# never ship a stale local build artifact or a machine-specific
+# node_modules/ into the image; install.sh's own `npm install`/`npm run
+# build` steps (run for real inside the container) are what should produce
+# these, exercising the real build path this task is meant to verify.
+#
+# Deliberately at the REPO ROOT, not next to docker/Dockerfile.integration-test:
+# `.dockerignore` is resolved relative to the build CONTEXT directory, not
+# the Dockerfile's own location, regardless of which `-f <path>` a build
+# uses -- see the build step in .github/workflows/container-integration.yml,
+# which runs `docker build -f docker/Dockerfile.integration-test .` with
+# repo root (`.`) as the context.
+.git
+.github
+node_modules
+server/node_modules
+server/dist
+client/node_modules
+client/dist
+**/*.log
