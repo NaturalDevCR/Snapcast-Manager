@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { logger } from '../logger';
 import { configService } from './config';
 import { snapclientInstanceService } from './snapclientInstances';
@@ -625,10 +626,10 @@ export class SystemService {
       if (!fallbackAsset) {
         throw new Error(`Could not find a .deb asset for architecture ${archTrimmed} (Distro: ${codename}) in Snapcast release ${release.tag_name}`);
       }
-      return this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name, clean);
+      return this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name, clean, 'snapserver', fallbackAsset.size, fallbackAsset.digest);
     }
 
-    return this.executeDebUpdate(asset.browser_download_url, asset.name, clean);
+    return this.executeDebUpdate(asset.browser_download_url, asset.name, clean, 'snapserver', asset.size, asset.digest);
   }
 
   private async updateSnapclientFromGitHub(clean: boolean = false): Promise<string> {
@@ -652,12 +653,12 @@ export class SystemService {
       if (!fallbackAsset) {
         throw new Error(`Could not find a snapclient .deb asset for architecture ${archTrimmed} (Distro: ${codename}) in Snapcast release ${release.tag_name}`);
       }
-      const result = await this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name, clean, 'snapclient');
+      const result = await this.executeDebUpdate(fallbackAsset.browser_download_url, fallbackAsset.name, clean, 'snapclient', fallbackAsset.size, fallbackAsset.digest);
       await this.postSnapclientInstall();
       return result;
     }
 
-    const result = await this.executeDebUpdate(asset.browser_download_url, asset.name, clean, 'snapclient');
+    const result = await this.executeDebUpdate(asset.browser_download_url, asset.name, clean, 'snapclient', asset.size, asset.digest);
     await this.postSnapclientInstall();
     return result;
   }
@@ -717,7 +718,55 @@ export class SystemService {
    * design-spec finding #5 already closed for privileged file writes
    * (`platform/files.ts`'s `installPrivilegedFile()`).
    */
-  private async executeDebUpdate(downloadUrl: string, fileName: string, clean: boolean = false, pkg: 'snapserver' | 'snapclient' = 'snapserver'): Promise<string> {
+  /**
+   * Task 61 (Stage 5, item 5.4): verifies a downloaded asset against
+   * GitHub's OWN reported metadata for it before it's ever handed to
+   * `dpkg -i` (root). GitHub's Releases API returns both `size` (bytes)
+   * and, for assets uploaded since GitHub added the feature, a `digest`
+   * field shaped `sha256:<hex>` -- a first-party checksum computed by
+   * GitHub itself at upload time, confirmed present on badaix/snapcast's
+   * real, current release assets (fetched directly from the API while
+   * investigating this task, not assumed). No project-published
+   * checksums file needed; this is real hash verification, not merely
+   * logged-for-audit.
+   *
+   * Streams the file through `crypto.createHash('sha256')` rather than
+   * reading it fully into memory first (these .deb files are only
+   * hundreds of KB to a few MB, but streaming costs nothing and matches
+   * how a much larger asset would need to be handled).
+   */
+  private async verifyDownloadedAsset(filePath: string, expectedSize?: number, expectedDigest?: string): Promise<void> {
+    const stat = await fs.promises.stat(filePath);
+    if (typeof expectedSize === 'number' && stat.size !== expectedSize) {
+      throw new Error(`Downloaded file size mismatch: GitHub reported ${expectedSize} bytes, got ${stat.size} bytes for ${filePath}`);
+    }
+
+    const hash = crypto.createHash('sha256');
+    await new Promise<void>((resolve, reject) => {
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', (chunk) => hash.update(chunk));
+      stream.on('end', () => resolve());
+      stream.on('error', reject);
+    });
+    const actualDigest = `sha256:${hash.digest('hex')}`;
+
+    if (expectedDigest) {
+      if (actualDigest !== expectedDigest) {
+        throw new Error(`Downloaded file hash mismatch: GitHub reported ${expectedDigest}, computed ${actualDigest} for ${filePath}`);
+      }
+      jobService.log(`Verified download: size and hash (${actualDigest}) match GitHub's reported asset metadata.`);
+    } else {
+      // No digest field on this asset (older GitHub API responses, or an
+      // asset uploaded before GitHub started computing one) -- nothing to
+      // verify the hash AGAINST, but log the computed hash anyway as an
+      // audit trail: an admin can compare it by hand against whatever the
+      // GitHub release page itself displays, even though this code has no
+      // upstream value to check it against automatically.
+      jobService.log(`Verified download size. No GitHub-provided hash available for this asset; computed hash for reference: ${actualDigest}`);
+    }
+  }
+
+  private async executeDebUpdate(downloadUrl: string, fileName: string, clean: boolean = false, pkg: 'snapserver' | 'snapclient' = 'snapserver', expectedSize?: number, expectedDigest?: string): Promise<string> {
     log.info(`Downloading ${pkg} from ${downloadUrl}... (Clean: ${clean})`);
 
     if (clean) {
@@ -741,6 +790,9 @@ export class SystemService {
       const debFile = path.join(tmpDir, fileName);
       jobService.log(`Downloading ${fileName}...`);
       await run('wget', ['-qO', debFile, downloadUrl], { timeoutMs: 5 * 60 * 1000 });
+
+      jobService.log('Verifying downloaded file...');
+      await this.verifyDownloadedAsset(debFile, expectedSize, expectedDigest);
 
       jobService.log(`Installing ${fileName}...`);
       try {

@@ -79,6 +79,14 @@ function stubNeedsSudo(value: boolean): () => void {
 function stubRunRecording(calls: Call[]): () => void {
   return stubRun(async (bin: string, args: string[], opts?: unknown) => {
     calls.push({ bin, args, opts });
+    // Task 61: executeDebUpdate() now stat()s + hashes the downloaded file
+    // before dpkg -i, so a real (dummy) file must exist at wget's `-qO`
+    // destination for any test that reaches that far -- write one here so
+    // every caller of this shared helper keeps working without each test
+    // needing its own file-write logic.
+    if (bin === 'wget') {
+      fs.writeFileSync(args[1], 'stub-deb-content-for-tests');
+    }
     return { stdout: '', stderr: '' };
   });
 }
@@ -1625,7 +1633,7 @@ test('getDistroCodename() caches the result across calls', async () => {
 test('updateSnapserverFromGitHub() runs `dpkg --print-architecture` via argv and delegates to executeDebUpdate() with the matched asset', async () => {
   const restoreFetch = stubFetch(async () => jsonResponse(200, {
     tag_name: 'v0.29.0',
-    assets: [{ name: 'snapserver_0.29.0-1_amd64_bookworm.deb', browser_download_url: 'https://example.com/snapserver.deb' }],
+    assets: [{ name: 'snapserver_0.29.0-1_amd64_bookworm.deb', browser_download_url: 'https://example.com/snapserver.deb', size: 12345, digest: 'sha256:abc123' }],
   }));
   const calls: Call[] = [];
   const restoreRun = stubRun(async (bin: string, args: string[]) => {
@@ -1644,7 +1652,10 @@ test('updateSnapserverFromGitHub() runs `dpkg --print-architecture` via argv and
     const result = await (service as any).updateSnapserverFromGitHub(false);
     assert.equal(result, 'snapserver updated successfully.');
     assert.ok(calls.some(c => c.bin === 'dpkg' && c.args.join(' ') === '--print-architecture'));
-    assert.deepEqual(executeDebUpdateCalls, [['https://example.com/snapserver.deb', 'snapserver_0.29.0-1_amd64_bookworm.deb', false]]);
+    // Task 61: GitHub's own reported size/digest for the matched asset must
+    // thread through to executeDebUpdate() so it can verify the download
+    // against them before dpkg -i.
+    assert.deepEqual(executeDebUpdateCalls, [['https://example.com/snapserver.deb', 'snapserver_0.29.0-1_amd64_bookworm.deb', false, 'snapserver', 12345, 'sha256:abc123']]);
   } finally {
     restoreFetch();
     restoreRun();
@@ -1654,7 +1665,7 @@ test('updateSnapserverFromGitHub() runs `dpkg --print-architecture` via argv and
 test('updateSnapclientFromGitHub() runs `dpkg --print-architecture` via argv, delegates to executeDebUpdate(), then postSnapclientInstall()', async () => {
   const restoreFetch = stubFetch(async () => jsonResponse(200, {
     tag_name: 'v0.29.0',
-    assets: [{ name: 'snapclient_0.29.0-1_amd64_bookworm.deb', browser_download_url: 'https://example.com/snapclient.deb' }],
+    assets: [{ name: 'snapclient_0.29.0-1_amd64_bookworm.deb', browser_download_url: 'https://example.com/snapclient.deb', size: 54321, digest: 'sha256:def456' }],
   }));
   const restoreRun = stubRun(async (bin: string, args: string[]) => {
     if (bin === 'dpkg' && args[0] === '--print-architecture') return { stdout: 'amd64\n', stderr: '' };
@@ -1672,7 +1683,7 @@ test('updateSnapclientFromGitHub() runs `dpkg --print-architecture` via argv, de
   try {
     const result = await (service as any).updateSnapclientFromGitHub(true);
     assert.equal(result, 'snapclient updated successfully.');
-    assert.deepEqual(executeDebUpdateCalls, [['https://example.com/snapclient.deb', 'snapclient_0.29.0-1_amd64_bookworm.deb', true, 'snapclient']]);
+    assert.deepEqual(executeDebUpdateCalls, [['https://example.com/snapclient.deb', 'snapclient_0.29.0-1_amd64_bookworm.deb', true, 'snapclient', 54321, 'sha256:def456']]);
     assert.equal(postInstallCalled, true);
   } finally {
     restoreFetch();
@@ -1693,6 +1704,7 @@ test('executeDebUpdate() happy path (dpkg succeeds): apt update, download to a p
     calls.push({ bin, args });
     if (bin === 'wget') {
       wgetDestDir = path.dirname(args[1]);
+      fs.writeFileSync(args[1], 'stub-deb-content-for-tests');
     }
     return { stdout: '', stderr: '' };
   });
@@ -1746,6 +1758,7 @@ test('executeDebUpdate() sudo-gates every privileged call via argv (not string c
   const restoreSudo = stubNeedsSudo(true);
   const restoreRun = stubRun(async (bin: string, args: string[]) => {
     calls.push({ bin, args });
+    if (bin === 'wget') fs.writeFileSync(args[1], 'stub-deb-content-for-tests');
     return { stdout: '', stderr: '' };
   });
   try {
@@ -1768,6 +1781,7 @@ test('executeDebUpdate() fallback path: dpkg -i failing triggers `apt-get instal
   const restoreSudo = stubNeedsSudo(false);
   const restoreRun = stubRun(async (bin: string, args: string[], opts?: unknown) => {
     calls.push({ bin, args, opts });
+    if (bin === 'wget') fs.writeFileSync(args[1], 'stub-deb-content-for-tests');
     if (bin === 'dpkg') throw new Error('dpkg: dependency problems prevent configuration');
     return { stdout: '', stderr: '' };
   });
@@ -1790,6 +1804,7 @@ test('executeDebUpdate() fallback path when needsSudo() is true: DEBIAN_FRONTEND
   const restoreSudo = stubNeedsSudo(true);
   const restoreRun = stubRun(async (bin: string, args: string[], opts?: unknown) => {
     calls.push({ bin, args, opts });
+    if (bin === 'wget') fs.writeFileSync(args[1], 'stub-deb-content-for-tests');
     if (bin === 'sudo' && args[0] === 'dpkg') throw new Error('dpkg: dependency problems');
     return { stdout: '', stderr: '' };
   });
@@ -1810,7 +1825,8 @@ test('executeDebUpdate() fallback path when needsSudo() is true: DEBIAN_FRONTEND
 
 test('executeDebUpdate() rethrows when BOTH dpkg -i and the apt-get install -f fallback fail', async () => {
   const restoreSudo = stubNeedsSudo(false);
-  const restoreRun = stubRun(async (bin: string) => {
+  const restoreRun = stubRun(async (bin: string, args: string[]) => {
+    if (bin === 'wget') fs.writeFileSync(args[1], 'stub-deb-content-for-tests');
     if (bin === 'dpkg' || bin === 'apt-get') throw new Error('both failed');
     return { stdout: '', stderr: '' };
   });
@@ -1846,6 +1862,7 @@ test('executeDebUpdate() clean=true (snapclient): stops the service and purges v
 test('executeDebUpdate() clean=true (snapclient) tolerates the stop/purge steps failing (mirrors the original `|| true`)', async () => {
   const restoreSudo = stubNeedsSudo(false);
   const restoreRun = stubRun(async (bin: string, args: string[]) => {
+    if (bin === 'wget') fs.writeFileSync(args[1], 'stub-deb-content-for-tests');
     if ((bin === 'systemctl' && args[0] === 'stop') || (bin === 'dpkg' && args[0] === '--purge')) {
       throw new Error('unit/package not found');
     }
@@ -1897,6 +1914,136 @@ test('executeDebUpdate() logs progress at multiple distinguishable steps, not ju
     restoreRun();
     restoreSudo();
     restoreJobLog();
+  }
+});
+
+// ============================================================
+// TASK 61 (Stage 5, item 5.4) -- verifyDownloadedAsset()/executeDebUpdate()
+// size+hash verification against GitHub's own reported asset metadata,
+// BEFORE dpkg -i ever runs.
+// ============================================================
+
+const STUB_DEB_CONTENT = 'stub-deb-content-for-tests';
+// Real, independently-computed SHA256 of STUB_DEB_CONTENT (`printf
+// '%s' "$STUB_DEB_CONTENT" | shasum -a 256`) -- used to prove the hash
+// check is REAL comparison logic, not a stub that always "passes".
+const STUB_DEB_SHA256 = 'sha256:77e8bce48df02f439d45e3da78988096aa5a18ca8967c260489380e1f3ac204c';
+
+test('executeDebUpdate() proceeds to dpkg -i when the downloaded file size matches GitHub-reported size', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording(calls);
+  try {
+    const service = freshService();
+    const result = await (service as any).executeDebUpdate(
+      'https://example.com/snapserver.deb', 'snapserver.deb', false, 'snapserver',
+      STUB_DEB_CONTENT.length, undefined,
+    );
+    assert.match(result, /snapserver updated successfully/);
+    assert.ok(calls.some(c => c.bin === 'dpkg' && c.args[0] === '-i'), 'expected dpkg -i to run on a size match');
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() aborts BEFORE dpkg -i when the downloaded file size does NOT match GitHub-reported size', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording(calls);
+  try {
+    const service = freshService();
+    await assert.rejects(
+      () => (service as any).executeDebUpdate(
+        'https://example.com/snapserver.deb', 'snapserver.deb', false, 'snapserver',
+        STUB_DEB_CONTENT.length + 999, undefined, // wrong expected size
+      ),
+      /size mismatch/,
+    );
+    assert.ok(!calls.some(c => c.bin === 'dpkg'), 'dpkg must never be called after a size-verification failure');
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() proceeds to dpkg -i when the downloaded file hash matches GitHub-reported digest', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording(calls);
+  try {
+    const service = freshService();
+    const result = await (service as any).executeDebUpdate(
+      'https://example.com/snapserver.deb', 'snapserver.deb', false, 'snapserver',
+      undefined, STUB_DEB_SHA256,
+    );
+    assert.match(result, /snapserver updated successfully/);
+    assert.ok(calls.some(c => c.bin === 'dpkg' && c.args[0] === '-i'), 'expected dpkg -i to run on a hash match');
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() aborts BEFORE dpkg -i when the downloaded file hash does NOT match GitHub-reported digest', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording(calls);
+  try {
+    const service = freshService();
+    await assert.rejects(
+      () => (service as any).executeDebUpdate(
+        'https://example.com/snapserver.deb', 'snapserver.deb', false, 'snapserver',
+        undefined, 'sha256:0000000000000000000000000000000000000000000000000000000000000000', // wrong digest
+      ),
+      /hash mismatch/,
+    );
+    assert.ok(!calls.some(c => c.bin === 'dpkg'), 'dpkg must never be called after a hash-verification failure');
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('executeDebUpdate() proceeds (and logs the computed hash for reference) when GitHub reports no digest for the asset', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording(calls);
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    const result = await (service as any).executeDebUpdate(
+      'https://example.com/snapserver.deb', 'snapserver.deb', false, 'snapserver',
+      undefined, undefined, // no expected size or digest available (older asset)
+    );
+    assert.match(result, /snapserver updated successfully/);
+    assert.ok(calls.some(c => c.bin === 'dpkg' && c.args[0] === '-i'), 'expected dpkg -i to still run when there is nothing to verify against');
+    assert.ok(
+      logCalls.some(l => l.includes('No GitHub-provided hash available') && l.includes(STUB_DEB_SHA256)),
+      `expected a log line disclosing the computed-but-unverified hash, got: ${JSON.stringify(logCalls)}`,
+    );
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreJobLog();
+  }
+});
+
+test('executeDebUpdate() checks size before hash: a size mismatch is reported even when a digest is ALSO supplied', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  try {
+    const service = freshService();
+    await assert.rejects(
+      () => (service as any).executeDebUpdate(
+        'https://example.com/snapserver.deb', 'snapserver.deb', false, 'snapserver',
+        STUB_DEB_CONTENT.length + 999, STUB_DEB_SHA256, // size wrong, hash actually correct
+      ),
+      /size mismatch/,
+    );
+  } finally {
+    restoreRun();
+    restoreSudo();
   }
 });
 
