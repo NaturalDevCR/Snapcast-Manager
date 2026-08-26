@@ -14,13 +14,27 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'http';
 import jwt from 'jsonwebtoken';
+import * as path from 'path';
+import * as os from 'os';
 
-// Matches auth.test.ts's exact pattern: this MUST run before `./health` is
-// imported below (which transitively imports `../auth`, whose module-level
-// resolveJwtSecret() reads process.env.JWT_SECRET exactly once, at import
+// Matches auth.test.ts's and services/pipeSources.test.ts's exact pattern:
+// this MUST run before `./health` is imported below (which transitively
+// imports `../auth` and `../database`, whose module-level side effects --
+// resolveJwtSecret() reading process.env.JWT_SECRET, and the better-sqlite3
+// singleton reading process.env.DB_PATH -- run exactly once, at import
 // time) -- these test files compile to CommonJS with position-preserving
-// require()s (not hoisted like true ESM imports), so this line genuinely
-// executes before the import statement that follows it.
+// require()s (not hoisted like true ESM imports), so these lines genuinely
+// execute before the import statements that follow them.
+//
+// DB_PATH: fixed during Task 57's review (Task 58 review, Finding 1). This
+// file previously imported the real, shared `../database` singleton without
+// isolating it to a fresh file (unlike auth.test.ts / pipeSources.test.ts),
+// so it ran against whatever dev DB happened to be on disk -- which is also
+// why the id:1 bug below went unnoticed: a leftover user row from manual
+// testing/other runs happened to satisfy it. `node --test` runs each test
+// file in its own process, so a fresh temp file here never collides with
+// the real app DB or with other test files.
+process.env.DB_PATH = path.join(os.tmpdir(), `health-test-${process.pid}-${Date.now()}.db`);
 process.env.JWT_SECRET = 'test-only-fixed-secret-for-health-test-ts';
 
 import healthRouter from './health';
@@ -29,6 +43,21 @@ import { configService } from '../services/config';
 import { snapcastLive } from '../services/snapcastLive';
 
 const JWT_SECRET = process.env.JWT_SECRET;
+
+// Fixed during Task 57's review (Task 58 review, Finding 1): makeToken()
+// below signs a JWT for this id, and authenticateToken (server/src/auth.ts)
+// looks that id up in the REAL `users` table, returning 403 if no row
+// matches. Previously the id (1) was hardcoded and no matching row was ever
+// inserted -- it only "worked" by accident when a shared/leftover DB
+// happened to already contain a user with id 1. Seeding a real row here
+// (against the fresh, isolated DB_PATH above) and using its real,
+// database-assigned id makes this file self-contained and correct
+// regardless of execution order or shared DB state.
+const ADMIN_ID = Number(
+  db
+    .prepare('INSERT INTO users (username, password, role, token_version) VALUES (?, ?, ?, 0)')
+    .run('admin', 'unused-test-password-hash', 'admin').lastInsertRowid,
+);
 
 const app = express();
 app.use(express.json());
@@ -61,7 +90,7 @@ async function getJson(urlPath: string, token?: string) {
 }
 
 function makeToken() {
-  return jwt.sign({ id: 1, username: 'admin', role: 'admin', tokenVersion: 0 }, JWT_SECRET!, { expiresIn: '1h' });
+  return jwt.sign({ id: ADMIN_ID, username: 'admin', role: 'admin', tokenVersion: 0 }, JWT_SECRET!, { expiresIn: '1h' });
 }
 
 test('GET /api/health returns 200 {status: ok} when the DB is reachable', async () => {
