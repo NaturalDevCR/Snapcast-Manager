@@ -32,7 +32,7 @@ import { runMigrations } from '../database/migrations';
 process.env.DB_PATH = path.join(os.tmpdir(), `metrics-test-${process.pid}-${Date.now()}.db`);
 process.env.JWT_SECRET = 'test-only-fixed-secret-for-metrics-test-ts';
 
-import { getUptimeSeconds, getJobsExecuted, ErrorMetricsTracker, trackEndpointErrors, errorMetrics } from './metrics';
+import { getUptimeSeconds, getJobsExecuted, ErrorMetricsTracker, trackEndpointErrors, errorMetrics, UNMATCHED_ROUTE_BUCKET } from './metrics';
 import pipeSourcesRouter from '../routes/pipeSources';
 import db from '../database';
 
@@ -138,9 +138,16 @@ app.use(express.json());
 app.use(trackEndpointErrors);
 app.use('/api/pipe-sources', pipeSourcesRouter);
 // A plain, unmatched-route path -- exercises the req.route === undefined
-// fallback branch (req.path) in trackEndpointErrors.
+// fallback branch (UNMATCHED_ROUTE_BUCKET) in trackEndpointErrors.
 app.use('/api/unknown-thing', (_req, res) => {
   res.status(404).json({ error: 'not found' });
+});
+// Mirrors index.ts's real `/api` catch-all EXACTLY (app.use('/api', fn), a
+// plain middleware, not a router.METHOD route) -- this is the actual
+// unbounded-growth vector the review caught: req.route is undefined here,
+// and the tail after `/api` is attacker-controlled.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `Unknown API route: ${req.method} ${req.originalUrl}` });
 });
 
 let server: http.Server;
@@ -186,12 +193,19 @@ test('trackEndpointErrors: a 2xx response is not counted', async () => {
 });
 
 test('trackEndpointErrors: an unauthenticated request (401) IS counted -- not just errorHandler-routed failures', async () => {
+  // A 401 from router.use(authenticateToken) (routes/pipeSources.ts:22)
+  // short-circuits BEFORE Express reaches the specific router.get('/')
+  // layer, so req.route is undefined here too -- but req.baseUrl
+  // ('/api/pipe-sources') is still real, fixed, and bounded, so it's
+  // tracked on its own (see trackEndpointErrors' own doc comment for why
+  // this must NOT collapse into one indistinct bucket the way a genuinely
+  // unmatched `/api/<random>` request does).
   errorMetrics.reset();
   const res = await fetch(`${baseUrl}/api/pipe-sources`);
   assert.equal(res.status, 401);
 
   const snapshot = errorMetrics.snapshot();
-  const entry = snapshot.find((e: any) => e.method === 'GET' && e.path === '/api/pipe-sources/');
+  const entry = snapshot.find((e: any) => e.method === 'GET' && e.path === '/api/pipe-sources');
   assert.ok(
     entry,
     'a 401 handled entirely by local middleware (authenticateToken), never reaching errorHandler.ts, must still be counted',
@@ -229,18 +243,75 @@ test('trackEndpointErrors: TWO different resource ids hitting the SAME parameter
   assert.equal(entry.count, 2, 'both requests (different ids, same route) counted against the one entry');
 });
 
-test('trackEndpointErrors: an unmatched route (no req.route) still gets tracked, falling back to req.path', async () => {
+test('trackEndpointErrors: an unmatched route (no req.route) still gets tracked, under its real (bounded) req.baseUrl', async () => {
   errorMetrics.reset();
   const res = await fetch(`${baseUrl}/api/unknown-thing`);
   assert.equal(res.status, 404);
 
   const snapshot = errorMetrics.snapshot();
   // req.route is undefined here (this is a plain app.use() middleware, not
-  // a router.get()/post() route), so the fallback to req.path applies --
-  // confirmed via a throwaway probe script (see task-64-report.md) that for
-  // `app.use('/api/unknown-thing', handler)`, req.baseUrl is
-  // '/api/unknown-thing' and req.path is '/', giving '/api/unknown-thing/'.
-  const entry = snapshot.find((e: any) => e.method === 'GET' && e.path === '/api/unknown-thing/');
-  assert.ok(entry, 'a request that never matches a router-registered route (req.route undefined) is still tracked via req.path');
+  // a router.get()/post() route) -- falls back to req.baseUrl alone
+  // ('/api/unknown-thing', the FIXED mount prefix, never the
+  // attacker-controlled tail after it -- see the fix below).
+  const entry = snapshot.find((e: any) => e.method === 'GET' && e.path === '/api/unknown-thing');
+  assert.ok(entry, 'a request that never matches a router-registered route (req.route undefined) is still tracked, under its bounded baseUrl');
   assert.equal(entry.count, 1);
+});
+
+test('trackEndpointErrors: unmatched requests with DIFFERENT attacker-controlled paths collapse into ONE bounded bucket, not one entry per path', async () => {
+  // Regression test for a real gap the Task 64 review caught: the original
+  // fallback used `req.baseUrl + req.path`, which for index.ts's real `/api`
+  // catch-all (app.use('/api', fn), not a router route) is `'/api' +
+  // <attacker-controlled tail>` -- an unauthenticated caller hitting many
+  // distinct nonexistent /api/<random> paths could grow the in-memory Map
+  // without bound. `req.path` is now never concatenated at all -- the whole
+  // unmatched-route key space must stay bounded to exactly ONE entry (keyed
+  // by the catch-all's own fixed baseUrl, '/api'), regardless of how many
+  // distinct nonexistent paths are requested.
+  errorMetrics.reset();
+  const junkPaths = ['/api/scanner-probe-aaaa', '/api/totally-different-bbbb', '/api/yet-another-one-cccc'];
+  for (const p of junkPaths) {
+    const res = await fetch(`${baseUrl}${p}`);
+    assert.equal(res.status, 404);
+  }
+
+  const snapshot = errorMetrics.snapshot();
+  const unmatchedEntries = snapshot.filter((e: any) => e.path === '/api' && e.method === 'GET');
+  assert.equal(unmatchedEntries.length, 1, 'exactly one collapsed entry, not one per distinct attacker path');
+  assert.equal(unmatchedEntries[0].count, junkPaths.length);
+  // None of the raw attacker-supplied paths leaked into the Map as their
+  // own key -- the bounded-bucket fix, not just a coincidentally-low count.
+  for (const p of junkPaths) {
+    assert.ok(!snapshot.some((e: any) => e.path === p), `raw attacker path "${p}" must not appear as its own tracked entry`);
+  }
+});
+
+test('trackEndpointErrors: a path-less app.use() middleware (empty req.baseUrl) falls back to the fixed UNMATCHED_ROUTE_BUCKET, never an empty-string key', async () => {
+  // Mirrors index.ts's SPA-fallback middleware shape (`app.use((req, res)
+  // => ...)`, no mount path at all) -- req.baseUrl is '' there, so the
+  // req.baseUrl-alone fallback would otherwise track an empty-string key.
+  const spaApp = express();
+  spaApp.use(trackEndpointErrors);
+  spaApp.use((_req, res) => {
+    res.status(500).send('simulated failure with no matched route or baseUrl');
+  });
+  const spaServer = spaApp.listen(0, '127.0.0.1');
+  try {
+    await new Promise<void>((resolve) => spaServer.once('listening', resolve));
+    const addr = spaServer.address();
+    const port = typeof addr === 'object' && addr ? addr.port : 0;
+
+    errorMetrics.reset();
+    const res = await fetch(`http://127.0.0.1:${port}/whatever/path-here`);
+    assert.equal(res.status, 500);
+
+    const snapshot = errorMetrics.snapshot();
+    assert.ok(
+      snapshot.some((e: any) => e.path === UNMATCHED_ROUTE_BUCKET),
+      'an empty req.baseUrl must fall back to the fixed bucket constant, not an empty-string or attacker-controlled key',
+    );
+    assert.ok(!snapshot.some((e: any) => e.path === ''), 'must never track an empty-string path key');
+  } finally {
+    spaServer.close();
+  }
 });

@@ -98,19 +98,52 @@ export const errorMetrics = new ErrorMetricsTracker();
  * (even though this middleware function itself runs BEFORE routing, at
  * registration order).
  *
- * Path normalization: `req.baseUrl + (req.route?.path ?? req.path)`
- * collapses a parameterized route (e.g. POST /api/pipe-sources/:id/control)
- * into ONE tracked entry regardless of which real `:id` was used, instead
- * of exploding into one entry per distinct resource id. `req.route` is only
- * populated once Express has matched a router-registered route; for a
- * request that never matches one (e.g. index.ts's catch-all
- * `/api` 404 middleware), it falls back to the raw `req.path`, which is
- * the best available "normalized" path in that case.
+ * Path normalization: `req.baseUrl + req.route.path` collapses a
+ * parameterized route (e.g. POST /api/pipe-sources/:id/control) into ONE
+ * tracked entry regardless of which real `:id` was used, instead of
+ * exploding into one entry per distinct resource id.
+ *
+ * `req.route` is only populated once Express has matched the SPECIFIC
+ * `router.METHOD()` route pattern -- which does NOT happen for a request
+ * rejected earlier in a router's own middleware chain, most commonly
+ * `router.use(authenticateToken)` (see e.g. routes/pipeSources.ts:22)
+ * short-circuiting a 401 before Express ever reaches the route.get()/post()
+ * layer below it. This is a very common, everyday case (every unauthorized
+ * request to every authenticated router), so it must NOT collapse into one
+ * indistinct bucket -- that would defeat most of "errores por endpoint"'s
+ * usefulness. For that case, `req.baseUrl` ALONE is still real, fixed, and
+ * bounded (it's one of this app's own fixed router mount points, e.g.
+ * '/api/pipe-sources' -- never influenced by the request's path beyond the
+ * mount prefix), so it's used as the tracked path on its own.
+ *
+ * `req.path` (the portion AFTER `req.baseUrl`) is deliberately NEVER
+ * concatenated onto the fallback path, unlike this task's original
+ * approach (`req.baseUrl + req.path`), which turned out to be a real bug
+ * caught in review: for index.ts's final catch-all `app.use('/api',
+ * notFoundHandler)` -- which matches literally any unmatched `/api/*`
+ * request -- `req.path` there is the ATTACKER-CONTROLLED tail of whatever
+ * nonexistent path was requested (`app.use('/api', ...)` strips only the
+ * literal `/api` prefix into `req.baseUrl`, leaving everything else as
+ * `req.path`). A scanner hitting many distinct `/api/<random>` paths could
+ * grow this in-memory Map without bound. Dropping `req.path` entirely
+ * closes that: for the `/api` catch-all, `req.baseUrl` is ALWAYS the fixed
+ * literal `'/api'` regardless of what unmatched suffix was requested, so
+ * the whole Map's key space stays bounded by this app's real, fixed set of
+ * router mount points plus that one catch-all bucket -- never by anything
+ * an unauthenticated caller controls. The one further edge case --
+ * `req.baseUrl` itself empty (a path-less `app.use((req, res) => ...)`,
+ * e.g. index.ts's SPA-fallback middleware) -- falls back to the fixed
+ * `UNMATCHED_ROUTE_BUCKET` constant so the tracked key is never an empty
+ * string.
  */
+export const UNMATCHED_ROUTE_BUCKET = '(unmatched route)';
+
 export function trackEndpointErrors(req: Request, res: Response, next: NextFunction): void {
   res.on('finish', () => {
     if (res.statusCode >= 400) {
-      const path = req.baseUrl + (req.route?.path ?? req.path);
+      const path = req.route?.path
+        ? req.baseUrl + req.route.path
+        : req.baseUrl || UNMATCHED_ROUTE_BUCKET;
       errorMetrics.record(req.method, path);
     }
   });
