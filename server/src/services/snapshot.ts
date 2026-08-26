@@ -3,7 +3,10 @@ import path from 'path';
 import db from '../database';
 
 const SNAPSERVER_CONFIG_PATH = '/etc/snapserver.conf';
-const SNAPSHOTS_DIR = path.join(__dirname, '../../snapshots');
+// Exported (Task 57) so routes/health.ts can reuse this exact managed
+// directory for its disk-space and writability checks instead of
+// hardcoding a second, potentially-drifting literal path.
+export const SNAPSHOTS_DIR = path.join(__dirname, '../../snapshots');
 
 export interface Snapshot {
     id: number;

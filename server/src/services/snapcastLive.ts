@@ -183,6 +183,16 @@ export class SnapcastLiveClient extends EventEmitter {
   private reconnectAttempts = 0;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private stopped = true;
+  // Task 57: tracks whether the WS is genuinely OPEN right now, for the
+  // health-check endpoint's `snapserver.rpcConnected` field. Deliberately
+  // NOT derived from `this.ws !== null` -- `connect()` below assigns
+  // `this.ws` the moment the socket is constructed, before its 'open'
+  // event fires, so a bare null-check would report "connected" during the
+  // in-flight connection attempt too. `WsLike` (this module's minimal
+  // injectable WebSocket surface -- see its interface above) exposes no
+  // `readyState`, so an own flag, flipped exactly on 'open'/'close', is the
+  // correct and simplest signal here.
+  private connected = false;
 
   constructor(deps: Partial<SnapcastLiveDeps> = {}) {
     super();
@@ -220,6 +230,11 @@ export class SnapcastLiveClient extends EventEmitter {
     return this.cache;
   }
 
+  /** Task 57: whether the WebSocket to snapserver's JSON-RPC endpoint is currently OPEN (see the `connected` field's comment above for why this isn't a bare `this.ws !== null` check). Read-only -- used by GET /api/health/detail. */
+  get isConnected(): boolean {
+    return this.connected;
+  }
+
   private connect(): void {
     if (this.stopped) return;
 
@@ -234,6 +249,7 @@ export class SnapcastLiveClient extends EventEmitter {
     this.ws = ws;
 
     ws.on('open', () => {
+      this.connected = true;
       this.reconnectAttempts = 0;
       this.refreshFullStatus('initial connect');
     });
@@ -248,6 +264,7 @@ export class SnapcastLiveClient extends EventEmitter {
 
     ws.on('close', () => {
       this.ws = null;
+      this.connected = false;
       if (!this.stopped) this.scheduleReconnect();
     });
   }
