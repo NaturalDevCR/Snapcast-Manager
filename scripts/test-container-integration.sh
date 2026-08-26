@@ -174,6 +174,21 @@ step_1_installation() {
   wait_for_active "$SERVICE_NAME" 30 || fail "Step 1: systemctl is-active $SERVICE_NAME did not become active within 30s"
   ok "systemctl is-active ${SERVICE_NAME}: active"
 
+  # DIAGNOSTIC (non-fatal): every privileged action the running app takes
+  # (server/src/platform/exec.ts's needsSudo()-gated calls) depends on
+  # `sudo` actually being able to escalate snapmanager -> root from INSIDE
+  # this unit's own sandbox. `NoNewPrivileges=yes` (in the unit's own
+  # [Service] section) is well documented to break setuid-based escalation
+  # -- including `sudo` itself -- for a process tree, which would make sudo
+  # fail cleanly at its own startup check rather than during any specific
+  # app operation. Printed here, isolated from any single API call, so a
+  # later privileged-operation failure (e.g. in step 3) has an unambiguous,
+  # early data point to correlate against instead of guessing from an
+  # opaque "sudo exited with code 1" alone.
+  echo "    [diagnostic] runuser -u snapmanager -- sudo -n true:"
+  runuser -u snapmanager -- sudo -n true
+  echo "    [diagnostic] exit code: $?"
+
   [ -f "${REPO_DIR}/server/dist/index.js" ] || fail "Step 1: server/dist/index.js was not built"
   [ -f "${REPO_DIR}/client/dist/index.html" ] || fail "Step 1: client/dist/index.html was not built"
   ok "server and client build output present on disk"
