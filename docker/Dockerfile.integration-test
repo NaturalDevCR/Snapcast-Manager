@@ -1,0 +1,145 @@
+# Task 65 (Stage 5, item 5.6): container-based integration test image.
+#
+# TEST INFRASTRUCTURE ONLY -- this is deliberately NOT a production image
+# (no production Docker image exists for this project; see README.md's
+# "bare-metal Debian/Ubuntu/Raspberry Pi OS" install model). This image's
+# only job is to give scripts/test-container-integration.sh a real,
+# systemd-PID-1 Debian host to run scripts/install.sh's LOCAL-source flow
+# against, inside GitHub Actions (see .github/workflows/container-
+# integration.yml), because Docker is not available in this repo's normal
+# local dev environment.
+#
+# ---- Base image ----
+# debian:bookworm -- this repo doesn't pin an explicit Debian release
+# anywhere (README.md only says "Debian, Ubuntu, Raspberry Pi OS"), so this
+# targets the current Debian stable release as of this task.
+FROM debian:bookworm
+
+# Every RUN below uses bash with pipefail so a failure in the middle of a
+# pipeline (e.g. `curl ... | bash -`) fails the build instead of being
+# masked by the pipeline's last command succeeding.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# ---- systemd-in-Docker: install + mask known-noisy/known-broken units ----
+#
+# This is the current (2023+), still-accurate "systemd in Docker" pattern --
+# NOT the older post-2015 "rm -f every *.wants/* symlink" recipe that
+# circulated widely (that predates cgroup v2 and unified hierarchy changes,
+# and rips out units this app's own tests actually need, like
+# systemd-journald). The units masked below are the ones systemd's own
+# upstream container docs / widely-reproduced current guidance call out as
+# either meaningless or actively failing inside an unprivileged-kernel
+# container (no real hugepages, no fuse connections node, no real kernel
+# module loading, no test/rescue-mode need):
+#   - dev-hugepages.mount, sys-fs-fuse-connections.mount: exactly the two
+#     examples this task's own brief names -- containers have no hugepages
+#     or fuse-connections kernel interfaces to mount.
+#   - systemd-modules-load.service: containers cannot load kernel modules;
+#     this unit fails loudly (and pointlessly) on every boot otherwise.
+#   - systemd-udevd.service / systemd-udev-trigger.service: udev manages
+#     REAL kernel device nodes, which a container doesn't have to manage
+#     (they're inherited read-only from the host); running it inside the
+#     container is both impossible (needs real netlink/uevent access most
+#     container runtimes don't grant) and unnecessary.
+#   - systemd-firstboot.service, systemd-random-seed.service: first-boot/
+#     seed provisioning that doesn't apply to an ephemeral CI container
+#     rebuilt from scratch on every run.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      systemd \
+      systemd-sysv \
+      dbus \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    systemctl mask \
+      dev-hugepages.mount \
+      sys-fs-fuse-connections.mount \
+      systemd-modules-load.service \
+      systemd-udevd.service \
+      systemd-udev-trigger.service \
+      systemd-firstboot.service \
+      systemd-random-seed.service
+
+# ---- install.sh's own prerequisites ----
+#
+# Read straight out of scripts/install.sh (not guessed):
+#   - curl, ffmpeg, lsb-release: Step 1's PREREQS check (installed here so
+#     install.sh's own `apt-get install` for them is a no-op at test time).
+#   - build-essential: Step 2.5, "for native modules like better-sqlite3".
+#   - sudo: install.sh SUDO-prefixes every privileged command when not
+#     already running as root; also required at runtime by the app's own
+#     `needsSudo()`-gated calls once it runs as the unprivileged
+#     `snapmanager` user (see server/src/platform/exec.ts).
+#   - ca-certificates, gnupg: needed to add the NodeSource apt repo below
+#     (and by install.sh's own `curl -fsSL https://deb.nodesource.com/...`
+#     step, pre-empted here since Node is pre-installed).
+#   - git: not strictly required by install.sh itself, but useful for the
+#     test script to introspect the checked-out source if needed.
+#   - jq, sqlite3, procps, iproute2: NOT required by install.sh -- these are
+#     for scripts/test-container-integration.sh itself (JSON parsing of API
+#     responses, direct inspection/mutation of the sqlite DB for the
+#     old-style-DB fixture, `ps`/`ss` for diagnostics on a failure).
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      curl \
+      ffmpeg \
+      lsb-release \
+      build-essential \
+      python3 \
+      sudo \
+      ca-certificates \
+      gnupg \
+      git \
+      jq \
+      sqlite3 \
+      procps \
+      iproute2 \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# ---- Node.js ----
+#
+# install.sh's own Step 3 offers "Install Node.js 22?" and its remote-
+# install re-exec path pins NODE_VERSION="22" -- pre-installing Node 22 here
+# (via the same NodeSource setup script install.sh itself would run) means
+# install.sh's own Node-detection step finds it already present and skips
+# straight past its own install offer, matching a real "Node already there"
+# Debian host.
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# ---- checked-out repo ----
+#
+# Copied to /opt/snapcast-manager -- scripts/install.sh's own
+# INSTALL_BASE_DIR constant -- so that when the test script runs
+# `bash scripts/install.sh -y` FROM this directory, install.sh's Step 0
+# "already in a directory with server/client subdirectories" LOCAL-source
+# detection takes the local-source branch (this branch's actual checked-out
+# code, not a downloaded GitHub release), AND every subsequent step that
+# assumes cwd == $INSTALL_BASE_DIR (writing server/.env, the systemd unit's
+# WorkingDirectory=, etc. -- see install.sh Step 5/6) resolves to the same
+# directory the source was already unpacked into. This is exactly the
+# "copy/mount the actual checked-out repo into the container and run
+# install.sh from within it" the task brief calls for.
+#
+# The repo-root .dockerignore excludes node_modules/, dist/, and .git/ from
+# the build context this COPY draws from, so this always copies genuinely
+# fresh source, not a stale local build artifact.
+COPY . /opt/snapcast-manager
+WORKDIR /opt/snapcast-manager
+
+# systemd requires SIGRTMIN+3 to shut down cleanly (its own documented
+# stop-signal contract), not SIGTERM -- `docker stop` sends SIGTERM by
+# default, which the container test workflow avoids relying on anyway (it
+# uses `docker rm -f`), but this is the correct, standard declaration
+# regardless.
+STOPSIGNAL SIGRTMIN+3
+
+# systemd needs to be PID 1 to manage cgroups/units correctly inside the
+# container. This is the standard, documented entrypoint for both of the
+# "systemd running as PID 1 inside Docker" invocation styles named in the
+# task brief (`/sbin/init` and `/lib/systemd/systemd` are the same binary on
+# Debian -- `/sbin/init` is a symlink to it).
+CMD ["/sbin/init"]

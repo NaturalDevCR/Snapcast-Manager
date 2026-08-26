@@ -1,0 +1,108 @@
+name: Container Integration Tests
+
+# Task 65 (Stage 5, item 5.6): "Tests de integracion en contenedor. Imagen
+# Debian con systemd donde se prueban instalacion, creacion de pipe source,
+# adopcion y restauracion. Job de CI nocturno." (Container integration
+# tests. A Debian image with systemd, testing installation, pipe source
+# creation, adoption, and restoration. Nightly CI job.)
+#
+# Deliberately NOT matrixed like ci.yml's server/client jobs (single
+# Debian+systemd container job, per the plan item's own wording) and
+# deliberately separate from ci.yml itself -- this exercises a completely
+# different thing (a real systemd-PID-1 container, `--privileged`, tens of
+# seconds of real install/service work) than ci.yml's fast per-push
+# unit/build checks, and shouldn't slow down or flake out every normal
+# push/PR. Runs nightly via `schedule:`, plus `workflow_dispatch:` so it can
+# be triggered on demand (used for this task's own verification, and for
+# future debugging).
+on:
+  schedule:
+    # 03:00 UTC nightly.
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  container-integration:
+    runs-on: ubuntu-latest
+    # Generous but bounded: real apt installs (systemd, Node.js, build-essential),
+    # a real `npm install`/`npm run build` for both server and client, then 6
+    # real API/systemd/filesystem round-trips. 30 minutes is comfortably above
+    # normal runtime with real room for a slow apt mirror.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build the systemd-in-Docker integration test image
+        run: |
+          docker build -f docker/Dockerfile.integration-test -t snapcast-manager-integration-test:latest .
+
+      # ---- systemd-in-Docker: cgroup v2 requirements ----
+      #
+      # `--privileged` alone is not sufficient on a modern (cgroup v2,
+      # unified hierarchy) host -- GitHub's ubuntu-latest runners are cgroup
+      # v2 by default. `--cgroupns=host` plus a read-write bind-mount of the
+      # host's /sys/fs/cgroup is the current, still-accurate fix for running
+      # systemd as PID 1 inside Docker on such a host (systemd needs to see
+      # and manage the REAL host cgroup namespace/hierarchy, not a private,
+      # empty one Docker would otherwise hand it). This combination is
+      # standard practice for this exact use case, per the task brief's own
+      # guidance -- documented if this ever needs to change, see this step's
+      # own troubleshooting notes below if a future systemd/Docker/runner
+      # version breaks this.
+      - name: Start the systemd container
+        run: |
+          docker run -d \
+            --name snapcast-integration-test \
+            --privileged \
+            --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+            --tmpfs /run \
+            --tmpfs /run/lock \
+            snapcast-manager-integration-test:latest
+
+      - name: Wait for systemd to finish booting
+        run: |
+          echo "Waiting for systemd (PID 1) to reach a settled boot state..."
+          for i in $(seq 1 60); do
+            state="$(docker exec snapcast-integration-test systemctl is-system-running 2>/dev/null || true)"
+            echo "  [$i/60] systemctl is-system-running: ${state:-<no response yet>}"
+            # "running" is the fully-healthy state; "degraded" is acceptable
+            # here (a container has no real hardware for some units this
+            # base image still ships, e.g. certain timers/mounts unrelated
+            # to anything this test exercises) -- what this loop actually
+            # guards against is systemd never reaching a stable multi-user
+            # state at all (still "starting", or the container exiting).
+            if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
+              echo "systemd reached a settled state: $state"
+              break
+            fi
+            if [ "$i" = "60" ]; then
+              echo "::error::systemd did not reach a settled state within 60s (last state: ${state:-unknown})"
+              docker exec snapcast-integration-test systemctl list-units --state=failed --no-pager || true
+              docker logs snapcast-integration-test || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Run the container integration test script
+        run: |
+          docker exec snapcast-integration-test bash /opt/snapcast-manager/scripts/test-container-integration.sh
+
+      - name: Dump diagnostics on failure
+        if: failure()
+        run: |
+          echo "---- docker logs (container stdout/stderr, i.e. systemd's own boot log) ----"
+          docker logs snapcast-integration-test || true
+          echo "---- systemctl status snapmanager ----"
+          docker exec snapcast-integration-test systemctl status snapmanager --no-pager -l || true
+          echo "---- journalctl -u snapmanager (last 200 lines) ----"
+          docker exec snapcast-integration-test journalctl -u snapmanager -n 200 --no-pager || true
+          echo "---- systemctl list-units --state=failed ----"
+          docker exec snapcast-integration-test systemctl list-units --state=failed --no-pager || true
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm -f snapcast-integration-test || true
