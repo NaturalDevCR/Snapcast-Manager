@@ -24,6 +24,7 @@ import { isActive } from '../platform/systemd';
 import { snapcastLive } from '../services/snapcastLive';
 import { configService } from '../services/config';
 import { SNAPSHOTS_DIR } from '../services/snapshot';
+import { getUptimeSeconds, getJobsExecuted, errorMetrics } from '../services/metrics';
 
 const router = Router();
 
@@ -51,27 +52,51 @@ router.get('/health', async (_req: Request, res: Response) => {
 });
 
 router.get('/health/detail', authenticateToken, async (_req: Request, res: Response) => {
-  const [snapserverSystemdActive, snapserverRpcConnected, configResult, disk, snapshotsDirWritable] =
-    await Promise.all([
-      isActive('snapserver.service').catch(() => false),
-      Promise.resolve().then(() => safeIsConnected()),
-      configService
-        .readServerConfigParsed()
-        .then(() => ({ parseable: true as const }))
-        .catch((err: any) => ({ parseable: false as const, error: err.message || 'Config parse failed' })),
-      fs.promises
-        .statfs(SNAPSHOTS_DIR)
-        .then((s) => {
-          const freeBytes = s.bavail * s.bsize;
-          const totalBytes = s.blocks * s.bsize;
-          return { freeBytes, freePercent: totalBytes > 0 ? Math.round((freeBytes / totalBytes) * 100) : 0 };
-        })
-        .catch((err: any) => ({ error: err.message || 'Disk check failed' })),
-      fs.promises
-        .access(SNAPSHOTS_DIR, fs.constants.W_OK)
-        .then(() => true)
-        .catch(() => false),
-    ]);
+  const [
+    snapserverSystemdActive,
+    snapserverRpcConnected,
+    configResult,
+    disk,
+    snapshotsDirWritable,
+    uptimeSeconds,
+    jobsResult,
+    errorsByEndpoint,
+  ] = await Promise.all([
+    isActive('snapserver.service').catch(() => false),
+    Promise.resolve().then(() => safeIsConnected()),
+    configService
+      .readServerConfigParsed()
+      .then(() => ({ parseable: true as const }))
+      .catch((err: any) => ({ parseable: false as const, error: err.message || 'Config parse failed' })),
+    fs.promises
+      .statfs(SNAPSHOTS_DIR)
+      .then((s) => {
+        const freeBytes = s.bavail * s.bsize;
+        const totalBytes = s.blocks * s.bsize;
+        return { freeBytes, freePercent: totalBytes > 0 ? Math.round((freeBytes / totalBytes) * 100) : 0 };
+      })
+      .catch((err: any) => ({ error: err.message || 'Disk check failed' })),
+    fs.promises
+      .access(SNAPSHOTS_DIR, fs.constants.W_OK)
+      .then(() => true)
+      .catch(() => false),
+    // Task 64 (Stage 5, item 5.7): "local metrics" -- each of the 3 new
+    // pieces is independently try/caught, same discipline as the 5 checks
+    // above: a failure computing one (e.g. a DB error counting jobs) must
+    // not take down uptime, error-counts, or any of the pre-existing checks.
+    Promise.resolve()
+      .then(() => getUptimeSeconds())
+      .catch(() => 0),
+    Promise.resolve()
+      .then(() => ({ jobsExecuted: getJobsExecuted() as number | null }))
+      .catch((err: any) => ({
+        jobsExecuted: null as number | null,
+        jobsExecutedError: err.message || 'Jobs count failed',
+      })),
+    Promise.resolve()
+      .then(() => errorMetrics.snapshot())
+      .catch(() => [] as ReturnType<typeof errorMetrics.snapshot>),
+  ]);
 
   res.json({
     snapserver: {
@@ -82,6 +107,11 @@ router.get('/health/detail', authenticateToken, async (_req: Request, res: Respo
     disk,
     permissions: {
       snapshotsDirWritable,
+    },
+    metrics: {
+      uptimeSeconds,
+      ...jobsResult,
+      errorsByEndpoint,
     },
   });
 });

@@ -41,6 +41,7 @@ import healthRouter from './health';
 import db from '../database';
 import { configService } from '../services/config';
 import { snapcastLive } from '../services/snapcastLive';
+import * as metrics from '../services/metrics';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -126,6 +127,48 @@ test('GET /api/health/detail with a valid token returns 200 with all 5 checks pr
   assert.ok('config' in body);
   assert.ok('disk' in body);
   assert.equal(typeof body.permissions.snapshotsDirWritable, 'boolean');
+});
+
+// Task 64 (Stage 5, item 5.7): local metrics -- uptime, jobs executed,
+// errors per endpoint, added to /health/detail's response.
+test('GET /api/health/detail: metrics field is present with the right shape', async () => {
+  const { status, body } = await getJson('/api/health/detail', makeToken());
+  assert.equal(status, 200);
+  assert.ok('metrics' in body);
+  assert.equal(typeof body.metrics.uptimeSeconds, 'number');
+  assert.ok(body.metrics.uptimeSeconds >= 0);
+  assert.equal(typeof body.metrics.jobsExecuted, 'number');
+  assert.ok(Array.isArray(body.metrics.errorsByEndpoint));
+});
+
+test('GET /api/health/detail: a failure computing jobsExecuted degrades gracefully without breaking uptime, errorsByEndpoint, or the 4 pre-existing checks', async () => {
+  // Mirrors this file's own configService.readServerConfigParsed mocking
+  // pattern above -- getJobsExecuted is a plain exported function called as
+  // `metrics_1.getJobsExecuted()` under this project's CommonJS test
+  // compilation, so reassigning it on the same required module object
+  // affects health.ts's call site exactly like reassigning
+  // configService's method affects its own call site.
+  const original = metrics.getJobsExecuted;
+  metrics.getJobsExecuted = () => {
+    throw new Error('simulated jobs count failure');
+  };
+  try {
+    const { status, body } = await getJson('/api/health/detail', makeToken());
+    assert.equal(status, 200);
+    assert.equal(body.metrics.jobsExecuted, null);
+    assert.ok(body.metrics.jobsExecutedError);
+
+    // The OTHER new metrics, and all 4 pre-existing checks, still reported
+    // real values -- one failing computation didn't take the rest down.
+    assert.equal(typeof body.metrics.uptimeSeconds, 'number');
+    assert.ok(Array.isArray(body.metrics.errorsByEndpoint));
+    assert.equal(typeof body.snapserver.systemdActive, 'boolean');
+    assert.ok('config' in body);
+    assert.ok('disk' in body);
+    assert.equal(typeof body.permissions.snapshotsDirWritable, 'boolean');
+  } finally {
+    metrics.getJobsExecuted = original;
+  }
 });
 
 test('GET /api/health/detail: one failing check does not prevent the others from reporting', async () => {

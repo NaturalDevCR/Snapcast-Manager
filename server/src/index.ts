@@ -19,6 +19,7 @@ import diagnosticsRouter from './routes/diagnostics';
 import { pipeSourceService } from './services/pipeSources';
 import { snapcastLive } from './services/snapcastLive';
 import { errorHandler } from './middleware/errorHandler';
+import { trackEndpointErrors } from './services/metrics';
 import { logger } from './logger';
 import { gracefulShutdown } from './shutdown';
 import db from './database';
@@ -75,6 +76,15 @@ if (process.env.NODE_ENV !== 'production') {
 // Task 15: bound the JSON body size (was unbounded express.json()) so a
 // client can't force the process to buffer an arbitrarily large request body.
 app.use(express.json({ limit: '1mb' }));
+
+// Task 64 (Stage 5, item 5.7): per-endpoint error-count metrics, backing
+// GET /api/health/detail's new `metrics.errorsByEndpoint` field. Registered
+// AFTER express.json() but BEFORE every router below, so it wraps every
+// request -- see services/metrics.ts's header comment for why this counts
+// via `res.on('finish')` instead of piggybacking on errorHandler below
+// (which only sees genuinely unhandled errors, undercounting badly since
+// most routes handle their own errors locally).
+app.use(trackEndpointErrors);
 
 app.use('/api/auth', authRouter);
 app.use('/api/system', systemRouter);
