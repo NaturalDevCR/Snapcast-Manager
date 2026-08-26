@@ -4,13 +4,14 @@ import * as path from 'path';
 import { logger } from '../logger';
 import { configService } from './config';
 import { snapclientInstanceService } from './snapclientInstances';
-import { backupService, BackupComponent } from './backup';
+import { backupService, BackupComponent, BackupResult } from './backup';
 import { jobService } from './jobs';
 import { run, needsSudo } from '../platform/exec';
 import type { RunOptions } from '../platform/exec';
 import {
   control as systemdControl,
   activeState as systemdActiveState,
+  isActive as systemdIsActive,
   logs as systemdLogs,
   daemonReload as systemdDaemonReload,
 } from '../platform/systemd';
@@ -109,18 +110,142 @@ export class SystemService {
     this.pkgCache = null;
   }
 
-  private async safeBackup(component: BackupComponent): Promise<string> {
-    try {
-      const result = await backupService.createPreUpdateBackup(component);
-      if (result.path) {
-        log.info(`Pre-${component} backup: ${result.path}`);
-        return result.path;
+  /**
+   * Task 59: the pre-install/pre-update backup step. Distinguishes the two
+   * outcomes that used to be silently collapsed into the same bare `''`
+   * return value:
+   *
+   *   - `createPreUpdateBackup()` genuinely SUCCEEDS but finds nothing to
+   *     back up (`result.path === ''`, e.g. this is the very first install
+   *     of `component` -- there's nothing pre-existing to snapshot). This
+   *     is a legitimate, non-error outcome: install should proceed, but
+   *     there is nothing to roll back TO later. Signalled by returning
+   *     `null`.
+   *   - `createPreUpdateBackup()` genuinely FAILS (throws -- disk full,
+   *     permission denied, `tar` failed, ...). This is the literal
+   *     "silently ignored" bug this task exists to fix: the error is NO
+   *     LONGER swallowed here -- it propagates to the caller, which must
+   *     abort the install/update before touching the system.
+   *   - `createPreUpdateBackup()` genuinely SUCCEEDS with a real backup
+   *     (`result.path` non-empty). The full `BackupResult` (not just the
+   *     path) is returned so a caller that needs to roll back later has
+   *     the exact `fileName` `backupService.restoreBackup()` expects (see
+   *     that function's signature -- it takes the file NAME, not the full
+   *     path).
+   */
+  private async safeBackup(component: BackupComponent): Promise<BackupResult | null> {
+    const result = await backupService.createPreUpdateBackup(component);
+    if (result.path) {
+      log.info(`Pre-${component} backup: ${result.path}`);
+      return result;
+    }
+    log.info(`No files to back up for ${component}`);
+    return null;
+  }
+
+  /** Every installable package this task's post-install verification +
+   * auto-rollback logic applies to, mapped to the exact systemd unit name
+   * `system.ts` already uses for it elsewhere in this file. Deliberately
+   * does NOT include a generic fallback -- the plain `apt install [pkg]`
+   * tail of installPackage() covers any package not listed here, and there
+   * is no single, reliably-known service unit to verify for an arbitrary
+   * package (per task-59-brief.md's current-state analysis). */
+  private static readonly KNOWN_SERVICE_UNITS: Partial<Record<string, string>> = {
+    snapserver: 'snapserver.service',
+    snapclient: 'snapclient.service',
+    mpd: 'mpd.service',
+    mympd: 'mympd.service',
+    'shairport-sync': 'shairport-sync.service',
+  };
+
+  // Post-install service-verification grace window: systemd services can
+  // take a brief moment to come up after a restart, so a single
+  // instantaneous `isActive()` check right after the install could
+  // false-positive-fail a slow-but-healthy start. 5 checks, 1 second apart
+  // (4 seconds of actual waiting in the worst case, plus the immediate
+  // first check) gives a real service a fair chance without risking an
+  // open-ended hang -- bounded, on the order of a few seconds total, per
+  // task-59-brief.md's guidance. Non-readonly (unlike KNOWN_SERVICE_UNITS
+  // above) specifically so tests can zero out the interval and make the
+  // retry loop instant without needing to mock timers.
+  private postInstallCheckAttempts = 5;
+  private postInstallCheckIntervalMs = 1000;
+
+  private async sleep(ms: number): Promise<void> {
+    if (ms <= 0) return;
+    await new Promise<void>(resolve => setTimeout(resolve, ms));
+  }
+
+  /** Polls `isActive(unit)` up to `postInstallCheckAttempts` times,
+   * `postInstallCheckIntervalMs` apart, returning true as soon as it comes
+   * up (or false if it never does within the window). */
+  private async waitForServiceActive(unit: string): Promise<boolean> {
+    for (let attempt = 0; attempt < this.postInstallCheckAttempts; attempt++) {
+      if (await systemdIsActive(unit)) return true;
+      if (attempt < this.postInstallCheckAttempts - 1) {
+        await this.sleep(this.postInstallCheckIntervalMs);
       }
-      log.info(`No files to back up for ${component}`);
-      return '';
+    }
+    return false;
+  }
+
+  /**
+   * Runs AFTER one of the 5 known-service install branches completes
+   * successfully, BEFORE installPackage() returns to its caller -- the
+   * "servicio no arranca tras la operación" (service doesn't start after
+   * the operation) check the plan item names.
+   *
+   * - Service comes up within the grace window: resolves normally, no
+   *   behavior change from before this task (the happy path).
+   * - Service never comes up AND a real pre-install backup exists (`backup`
+   *   is non-null): calls `backupService.restoreBackup(backup.fileName)`
+   *   (the file NAME, not the full path -- see `BackupResult`/
+   *   `restoreBackup()`'s signature), logs the rollback via
+   *   `jobService.log()`, then throws describing both the original
+   *   failure and the rollback outcome.
+   * - Service never comes up but there was NO prior backup (`backup` is
+   *   null -- e.g. this package's first-ever install): there is nothing to
+   *   roll back to. Skips the restore call entirely (never attempts to
+   *   restore a backup that never existed) and just throws describing the
+   *   failure.
+   * - If the restore itself also fails: both failures are reported in a
+   *   single thrown error, since this now needs real manual intervention.
+   */
+  private async verifyServiceOrRollback(pkg: string, unit: string, backup: BackupResult | null): Promise<void> {
+    const cameUp = await this.waitForServiceActive(unit);
+    if (cameUp) return;
+
+    if (!backup) {
+      const msg = `${pkg} was installed but ${unit} did not become active afterward. No pre-install backup existed for ${pkg} (likely its first install), so no rollback was attempted. Check the service logs for details.`;
+      jobService.log(msg);
+      throw new Error(msg);
+    }
+
+    jobService.log(`${unit} did not become active after installing ${pkg}; rolling back using pre-install backup ${backup.fileName}...`);
+    let restoreOutcome: string;
+    try {
+      restoreOutcome = await backupService.restoreBackup(backup.fileName);
+    } catch (restoreErr: any) {
+      const msg = `${pkg} was installed but ${unit} did not become active afterward, and the automatic rollback to backup ${backup.fileName} ALSO failed: ${restoreErr?.message || restoreErr}. Manual intervention is required.`;
+      jobService.log(msg);
+      throw new Error(msg);
+    }
+    const msg = `${pkg} was installed but ${unit} did not become active afterward. Rolled back automatically using backup ${backup.fileName} (${restoreOutcome}).`;
+    jobService.log(msg);
+    throw new Error(msg);
+  }
+
+  /** Wraps `safeBackup()` so a genuine backup failure aborts the caller
+   * BEFORE any installer/updater logic runs (requirement 1-2 of
+   * task-59-brief.md), logging a clear job-log message explaining why.
+   * `verb` distinguishes "install"/"update" wording in the log line. */
+  private async safeBackupOrAbort(pkg: string, verb: 'install' | 'update'): Promise<BackupResult | null> {
+    try {
+      return await this.safeBackup(this.mapToComponent(pkg));
     } catch (err: any) {
-      log.error({ err }, `Backup before ${component} failed`);
-      return '';
+      const msg = `Pre-${verb} backup for ${pkg} failed; aborting the ${verb} before touching the system: ${err?.message || err}`;
+      jobService.log(msg);
+      throw new Error(msg);
     }
   }
 
@@ -147,22 +272,38 @@ export class SystemService {
 
   async installPackage(pkg: string): Promise<string> {
     this.invalidatePackageCache();
-    await this.safeBackup(this.mapToComponent(pkg));
+    const backup = await this.safeBackupOrAbort(pkg, 'install');
+    const knownUnit = SystemService.KNOWN_SERVICE_UNITS[pkg];
+
     if (pkg === 'shairport-sync') {
-      return this.installShairportSync();
+      const result = await this.installShairportSync();
+      await this.verifyServiceOrRollback(pkg, knownUnit!, backup);
+      return result;
     }
     if (pkg === 'snapclient') {
-      return this.updateSnapclientFromGitHub(false);
+      const result = await this.updateSnapclientFromGitHub(false);
+      await this.verifyServiceOrRollback(pkg, knownUnit!, backup);
+      return result;
     }
     if (pkg === 'snapserver') {
-      return this.updateSnapserverFromGitHub(false);
+      const result = await this.updateSnapserverFromGitHub(false);
+      await this.verifyServiceOrRollback(pkg, knownUnit!, backup);
+      return result;
     }
     if (pkg === 'mpd') {
-      return this.installMpd();
+      const result = await this.installMpd();
+      await this.verifyServiceOrRollback(pkg, knownUnit!, backup);
+      return result;
     }
     if (pkg === 'mympd') {
-      return this.installMympd();
+      const result = await this.installMympd();
+      await this.verifyServiceOrRollback(pkg, knownUnit!, backup);
+      return result;
     }
+    // Generic `apt install [pkg]` fallback: no reliably-known service unit
+    // to verify for an arbitrary package, so no post-install check here --
+    // unaffected by this task beyond the backup-failure-aborts-install fix
+    // above (see task-59-brief.md's "current state" analysis).
     jobService.log('Updating package lists...');
     await apt.update();
     jobService.log(`Installing ${pkg} package...`);
@@ -283,7 +424,10 @@ export class SystemService {
   async updatePackage(pkg: PackageName, clean: boolean = false): Promise<string> {
     this.invalidatePackageCache();
     if (pkg !== 'snap-ctrl') {
-      await this.safeBackup(this.mapToComponent(pkg));
+      // 'snap-ctrl' takes its own safeBackupOrAbort-equivalent path via
+      // installSnapCtrl() below, which already calls safeBackup() itself --
+      // calling it again here would double-backup for that one package.
+      await this.safeBackupOrAbort(pkg, 'update');
     }
     if (pkg === 'snap-ctrl') {
       return this.installSnapCtrl();

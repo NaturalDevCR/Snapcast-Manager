@@ -50,6 +50,7 @@ import * as execModule from '../platform/exec';
 import * as aptModule from '../platform/apt';
 import * as filesModule from '../platform/files';
 import * as backupModule from './backup';
+import * as systemdModule from '../platform/systemd';
 import * as snapclientInstancesModule from './snapclientInstances';
 import * as jobsModule from './jobs';
 import * as configModule from './config';
@@ -89,6 +90,18 @@ function stubNoBackup(): () => void {
   return stubModuleFn(backupModule.backupService, 'createPreUpdateBackup', async () => ({
     path: '', fileName: '', size: 0, timestamp: '', components: [], files: [],
   }));
+}
+
+/** Task 59: installPackage()'s new post-install verification (see
+ * verifyServiceOrRollback() in system.ts) polls platform/systemd.ts's
+ * isActive() after the 5 known-service install branches. Stubbing it
+ * directly here (rather than making the generic run()/stubRunRecording()
+ * stub return "active" for a `systemctl is-active` call) keeps this file's
+ * many pre-existing exact-argv assertions unaffected -- those tests are
+ * about the install COMMAND SEQUENCE, not this task's rollback logic
+ * (covered by its own dedicated tests further below). */
+function stubServiceUp(): () => void {
+  return stubModuleFn(systemdModule, 'isActive', async () => true);
 }
 
 /**
@@ -820,6 +833,7 @@ test('installMpd() runs apt install then the systemctl chain (stop/disable socke
   const restoreSudo = stubNeedsSudo(false);
   const restoreRun = stubRunRecording(calls);
   const restoreBackup = stubNoBackup();
+  const restoreServiceUp = stubServiceUp();
   try {
     const service = freshService();
     const result = await service.installPackage('mpd');
@@ -839,6 +853,7 @@ test('installMpd() runs apt install then the systemctl chain (stop/disable socke
     restoreRun();
     restoreSudo();
     restoreBackup();
+    restoreServiceUp();
   }
 });
 
@@ -847,6 +862,7 @@ test('installMpd() prefixes every mutating call with sudo via argv when needsSud
   const restoreSudo = stubNeedsSudo(true);
   const restoreRun = stubRunRecording(calls);
   const restoreBackup = stubNoBackup();
+  const restoreServiceUp = stubServiceUp();
   try {
     const service = freshService();
     await service.installPackage('mpd');
@@ -867,6 +883,7 @@ test('installMpd() prefixes every mutating call with sudo via argv when needsSud
     restoreRun();
     restoreSudo();
     restoreBackup();
+    restoreServiceUp();
   }
 });
 
@@ -879,6 +896,7 @@ test('installMpd() tolerates the socket stop/disable/unmask steps failing (mirro
     return { stdout: '', stderr: '' };
   });
   const restoreBackup = stubNoBackup();
+  const restoreServiceUp = stubServiceUp();
   try {
     const service = freshService();
     const result = await service.installPackage('mpd');
@@ -887,6 +905,7 @@ test('installMpd() tolerates the socket stop/disable/unmask steps failing (mirro
     restoreRun();
     restoreSudo();
     restoreBackup();
+    restoreServiceUp();
   }
 });
 
@@ -930,6 +949,7 @@ test('installMympd() reads /etc/os-release directly via fs.readFile (no `cat` sh
   const restoreRun = stubGpgDearmor(Buffer.from([0x99, 0x01, 0x02]))(calls);
   const restoreFetch = stubFetch(async () => textResponse(200, '-----BEGIN PGP PUBLIC KEY BLOCK-----\nfake\n-----END PGP PUBLIC KEY BLOCK-----\n'));
   const restoreBackup = stubNoBackup();
+  const restoreServiceUp = stubServiceUp();
   try {
     const service = freshService();
     await service.installPackage('mympd');
@@ -940,6 +960,7 @@ test('installMympd() reads /etc/os-release directly via fs.readFile (no `cat` sh
     restoreSudo();
     restoreFetch();
     restoreBackup();
+    restoreServiceUp();
   }
 });
 
@@ -976,6 +997,7 @@ test('installMympd() fetches the OBS repo GPG key over HTTPS (no `curl` shell-ou
   const calls: Call[] = [];
   const restoreRun = stubGpgDearmor(dearmoredBytes)(calls);
   const restoreBackup = stubNoBackup();
+  const restoreServiceUp = stubServiceUp();
   const installedFiles: { destPath: string; content: any; opts: any }[] = [];
   // installPrivilegedFile is real here (not stubbed) EXCEPT its internal
   // run() calls (cp/chmod) are captured by the same stubbed run() above --
@@ -1025,6 +1047,7 @@ test('installMympd() fetches the OBS repo GPG key over HTTPS (no `curl` shell-ou
     restoreFs();
     restoreFetch();
     restoreBackup();
+    restoreServiceUp();
   }
 });
 
@@ -1053,6 +1076,7 @@ test('installMympd() creates /etc/apt/keyrings and finishes with the apt/systemd
   const calls: Call[] = [];
   const restoreRun = stubGpgDearmor(Buffer.from([1, 2, 3]))(calls);
   const restoreBackup = stubNoBackup();
+  const restoreServiceUp = stubServiceUp();
   try {
     const service = freshService();
     await service.installPackage('mympd');
@@ -1070,6 +1094,7 @@ test('installMympd() creates /etc/apt/keyrings and finishes with the apt/systemd
     restoreFs();
     restoreFetch();
     restoreBackup();
+    restoreServiceUp();
   }
 });
 
@@ -1216,6 +1241,7 @@ test('installMpd() (via installPackage) logs progress at every step, not just on
   const restoreSudo = stubNeedsSudo(false);
   const restoreRun = stubRunRecording([]);
   const restoreBackup = stubNoBackup();
+  const restoreServiceUp = stubServiceUp();
   const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
   try {
     const service = freshService();
@@ -1232,6 +1258,7 @@ test('installMpd() (via installPackage) logs progress at every step, not just on
     restoreRun();
     restoreSudo();
     restoreBackup();
+    restoreServiceUp();
     restoreJobLog();
   }
 });
@@ -1243,6 +1270,7 @@ test('installMympd() (via installPackage) logs progress at every step, not just 
   const calls: Call[] = [];
   const restoreRun = stubGpgDearmor(Buffer.from([0x99, 0x01, 0x02]))(calls);
   const restoreBackup = stubNoBackup();
+  const restoreServiceUp = stubServiceUp();
   const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
   try {
     const service = freshService();
@@ -1258,6 +1286,7 @@ test('installMympd() (via installPackage) logs progress at every step, not just 
     restoreFs();
     restoreFetch();
     restoreBackup();
+    restoreServiceUp();
     restoreJobLog();
   }
 });
@@ -2279,5 +2308,231 @@ test('sanity: Task-12 functions are still present', () => {
     'getDistroCodename',
   ]) {
     assert.equal(typeof (service as any)[name], 'function', `expected ${name} to still exist`);
+  }
+});
+
+// ============================================================
+// TASK 59 -- safeBackup() genuinely distinguishes "nothing to back up" (a
+// legitimate outcome, e.g. a package's first-ever install) from a REAL
+// backup failure (previously both collapsed to a silently-swallowed '' --
+// this is the literal bug this task exists to fix). installPackage() and
+// updatePackage() now abort BEFORE touching the system when the pre-install
+// backup genuinely fails. For the 5 known-service packages
+// (snapserver/snapclient/mpd/mympd/shairport-sync), installPackage() also
+// verifies the service actually comes up within a short grace window
+// afterward and auto-rolls-back to the pre-install backup if it doesn't.
+// ============================================================
+
+function stubCreatePreUpdateBackup(impl: (component: any) => Promise<any>): () => void {
+  return stubModuleFn(backupModule.backupService, 'createPreUpdateBackup', impl);
+}
+
+function stubRestoreBackup(impl: (fileName: string) => Promise<string>): { calls: string[]; restore: () => void } {
+  const calls: string[] = [];
+  const restore = stubModuleFn(backupModule.backupService, 'restoreBackup', async (fileName: string) => {
+    calls.push(fileName);
+    return impl(fileName);
+  });
+  return { calls, restore };
+}
+
+function stubIsActive(impl: (unit: string) => boolean | Promise<boolean>): { calls: string[]; restore: () => void } {
+  const calls: string[] = [];
+  const restore = stubModuleFn(systemdModule, 'isActive', async (unit: string) => {
+    calls.push(unit);
+    return impl(unit);
+  });
+  return { calls, restore };
+}
+
+/** Makes the post-install grace-window retry loop instant in tests --
+ * production keeps its own real ~1s-per-attempt timing (see system.ts'
+ * postInstallCheckIntervalMs). */
+function withInstantPostInstallRetries(service: SystemService): void {
+  (service as any).postInstallCheckIntervalMs = 0;
+}
+
+const REAL_BACKUP_RESULT = {
+  path: '/var/backups/snapmanager/pre-mpd-20260825-120000.tar.gz',
+  fileName: 'pre-mpd-20260825-120000.tar.gz',
+  size: 1234,
+  timestamp: '20260825-120000',
+  components: ['mpd'],
+  files: ['/etc/snapserver.conf'],
+};
+
+const EMPTY_BACKUP_RESULT = {
+  path: '', fileName: '', size: 0, timestamp: '20260825-120000', components: ['mpd'], files: [],
+};
+
+test('safeBackup() returns null when createPreUpdateBackup() genuinely succeeds but finds nothing to back up', async () => {
+  const restoreBackup = stubCreatePreUpdateBackup(async () => EMPTY_BACKUP_RESULT);
+  try {
+    const service = freshService();
+    const result = await (service as any).safeBackup('mpd');
+    assert.equal(result, null);
+  } finally {
+    restoreBackup();
+  }
+});
+
+test('safeBackup() returns the full BackupResult when a real backup was created', async () => {
+  const restoreBackup = stubCreatePreUpdateBackup(async () => REAL_BACKUP_RESULT);
+  try {
+    const service = freshService();
+    const result = await (service as any).safeBackup('mpd');
+    assert.deepEqual(result, REAL_BACKUP_RESULT);
+  } finally {
+    restoreBackup();
+  }
+});
+
+test('safeBackup() propagates (does not swallow) a genuine backup failure', async () => {
+  const restoreBackup = stubCreatePreUpdateBackup(async () => { throw new Error('tar: disk full'); });
+  try {
+    const service = freshService();
+    await assert.rejects(() => (service as any).safeBackup('mpd'), /disk full/);
+  } finally {
+    restoreBackup();
+  }
+});
+
+test('installPackage() aborts BEFORE calling the installer logic when the pre-install backup genuinely fails (generic apt branch)', async () => {
+  const restoreBackup = stubCreatePreUpdateBackup(async () => { throw new Error('tar: permission denied'); });
+  const calls: Call[] = [];
+  const restoreAptInstall = stubModuleFn(aptModule, 'install', async (pkgs: string[]) => { calls.push({ bin: 'apt.install', args: pkgs }); });
+  const restoreAptUpdate = stubModuleFn(aptModule, 'update', async () => { calls.push({ bin: 'apt.update', args: [] }); });
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await assert.rejects(() => service.installPackage('ffmpeg'), /permission denied/);
+    assert.equal(calls.length, 0, 'apt.update/apt.install must never be called when the backup failed');
+    assert.ok(
+      logCalls.some(l => l.toLowerCase().includes('backup') && l.toLowerCase().includes('abort')),
+      `expected a job-log message about the aborted install, got: ${JSON.stringify(logCalls)}`,
+    );
+  } finally {
+    restoreBackup();
+    restoreAptInstall();
+    restoreAptUpdate();
+    restoreJobLog();
+  }
+});
+
+test('updatePackage() aborts BEFORE calling the installer logic when the pre-update backup genuinely fails (generic apt branch)', async () => {
+  const restoreBackup = stubCreatePreUpdateBackup(async () => { throw new Error('tar: permission denied'); });
+  const calls: Call[] = [];
+  const restoreAptUpgrade = stubModuleFn(aptModule, 'upgrade', async (pkgs: string[]) => { calls.push({ bin: 'apt.upgrade', args: pkgs }); });
+  const restoreAptUpdate = stubModuleFn(aptModule, 'update', async () => { calls.push({ bin: 'apt.update', args: [] }); });
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    await assert.rejects(() => service.updatePackage('ffmpeg' as any, false), /permission denied/);
+    assert.equal(calls.length, 0, 'apt.update/apt.upgrade must never be called when the backup failed');
+    assert.ok(
+      logCalls.some(l => l.toLowerCase().includes('backup') && l.toLowerCase().includes('abort')),
+      `expected a job-log message about the aborted update, got: ${JSON.stringify(logCalls)}`,
+    );
+  } finally {
+    restoreBackup();
+    restoreAptUpgrade();
+    restoreAptUpdate();
+    restoreJobLog();
+  }
+});
+
+test('installPackage("mpd") succeeds and does NOT attempt a rollback when mpd.service comes up after the install', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubCreatePreUpdateBackup(async () => REAL_BACKUP_RESULT);
+  const { calls: restoreCalls, restore: restoreRestoreBackup } = stubRestoreBackup(async () => 'restored');
+  const { restore: restoreIsActive } = stubIsActive(() => true);
+  try {
+    const service = freshService();
+    withInstantPostInstallRetries(service);
+    const result = await service.installPackage('mpd');
+    assert.match(result, /MPD installed and started successfully/);
+    assert.equal(restoreCalls.length, 0, 'restoreBackup() must not be called when the service came up');
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreRestoreBackup();
+    restoreIsActive();
+  }
+});
+
+test('installPackage("mpd") rolls back to the prior backup (using the exact fileName) when mpd.service never comes up', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubCreatePreUpdateBackup(async () => REAL_BACKUP_RESULT);
+  const { calls: restoreCalls, restore: restoreRestoreBackup } = stubRestoreBackup(
+    async () => 'Restored from /var/backups/snapmanager/pre-mpd-20260825-120000.tar.gz',
+  );
+  const { restore: restoreIsActive } = stubIsActive(() => false);
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    withInstantPostInstallRetries(service);
+    await assert.rejects(() => service.installPackage('mpd'), /did not become active/i);
+    assert.deepEqual(restoreCalls, ['pre-mpd-20260825-120000.tar.gz']);
+    assert.ok(
+      logCalls.some(l => l.toLowerCase().includes('roll') && l.includes('pre-mpd-20260825-120000.tar.gz')),
+      `expected a job-log message about the rollback, got: ${JSON.stringify(logCalls)}`,
+    );
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreRestoreBackup();
+    restoreIsActive();
+    restoreJobLog();
+  }
+});
+
+test('installPackage("mpd") skips the rollback (never calls restoreBackup) when mpd.service never comes up and there was no prior backup', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubCreatePreUpdateBackup(async () => EMPTY_BACKUP_RESULT);
+  const { calls: restoreCalls, restore: restoreRestoreBackup } = stubRestoreBackup(async () => 'restored');
+  const { restore: restoreIsActive } = stubIsActive(() => false);
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  try {
+    const service = freshService();
+    withInstantPostInstallRetries(service);
+    await assert.rejects(() => service.installPackage('mpd'), /did not become active/i);
+    assert.equal(restoreCalls.length, 0, 'restoreBackup() must not be attempted when there was nothing to roll back to');
+    assert.ok(
+      logCalls.some(l => l.toLowerCase().includes('no') && l.toLowerCase().includes('backup')),
+      `expected a job-log message noting there was no backup to roll back to, got: ${JSON.stringify(logCalls)}`,
+    );
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreRestoreBackup();
+    restoreIsActive();
+    restoreJobLog();
+  }
+});
+
+test('installPackage() generic apt branch (ffmpeg) performs no post-install service check and never calls restoreBackup', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubCreatePreUpdateBackup(async () => REAL_BACKUP_RESULT);
+  const { calls: restoreCalls, restore: restoreRestoreBackup } = stubRestoreBackup(async () => 'restored');
+  const { calls: isActiveCalls, restore: restoreIsActive } = stubIsActive(() => false);
+  try {
+    const service = freshService();
+    const result = await service.installPackage('ffmpeg');
+    assert.match(result, /ffmpeg installed successfully/);
+    assert.equal(isActiveCalls.length, 0, 'no post-install service check for the generic apt fallback path');
+    assert.equal(restoreCalls.length, 0);
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreRestoreBackup();
+    restoreIsActive();
   }
 });
