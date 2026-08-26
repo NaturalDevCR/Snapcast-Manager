@@ -683,33 +683,91 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
         $SUDO chown -R "$SNAPMANAGER_USER:$SNAPMANAGER_USER" "$d"
     done
 
-    # Task 65 (container-integration-tests): /etc/mpd.conf and /var/lib/mpd
-    # are both listed in the hardened unit's ReadWritePaths= below (mpd-type
-    # pipe sources write to whichever of them findMpdConf() finds -- see
-    # services/pipeSources.ts's MPD_CONF_PATHS/writeMpdOutput(), which always
-    # goes through installPrivilegedFile()'s sudo elevation, NOT a direct,
-    # unprivileged fs write -- so unlike the /etc/snapserver.conf-family loop
-    # just above, these do NOT need $SNAPMANAGER_USER ownership). But
-    # systemd's own ReadWritePaths= mount-namespace setup for a FILE entry
-    # (as opposed to a directory) hard-fails at unit start if that file does
-    # not already exist on disk -- confirmed for real by this task's own
-    # container integration test, on a fresh host where mpd has never been
-    # installed: `Failed to set up mount namespacing: .../etc/mpd.conf: No
-    # such file or directory`, `Failed at step NAMESPACE`. On most real
-    # deployments this was masked by mpd already being installed (its own
-    # package creates /etc/mpd.conf) before or shortly after this installer
-    # runs; a brand-new host with mpd never installed hit it every time.
-    # Pre-creating an EMPTY placeholder (root-owned, matching what an
-    # uninstalled-mpd host would otherwise have) is sufficient -- it only
-    # needs to exist for the mount-namespace setup to succeed; mpd's own
-    # package install later is free to manage/own it however it normally
-    # would. /var/lib/mpd (a directory) is mkdir'd defensively alongside it
-    # for the same reason, since findMpdConf()'s fallback path is
-    # /var/lib/mpd/mpd.conf.
+    # Task 65 (container-integration-tests): EVERY path listed in the
+    # hardened unit's ReadWritePaths= below must already exist on disk by
+    # the time this unit first starts -- systemd's own mount-namespace setup
+    # for a ReadWritePaths entry (file OR directory) hard-fails the unit
+    # (`Failed to set up mount namespacing: ...: No such file or directory`,
+    # `Failed at step NAMESPACE`) if the target is missing; it does NOT
+    # auto-create it. This was never noticed before because this codebase
+    # had never actually been run through a genuine fresh install with
+    # NOTHING pre-existing (no mpd/snapserver/snap-ctrl ever installed, no
+    # prior data/ dir from a restore) until this task's real, systemd-PID-1
+    # container test -- confirmed for real, one path at a time, via actual
+    # failed runs (see task-65-report.md for the full account). This is a
+    # genuine pre-existing installer bug this task's real verification
+    # uncovered, not a container-only quirk: the same missing-path failure
+    # would happen identically on a real bare-metal fresh install.
+    #
+    # Two paths are written to DIRECTLY by the Node process (never through
+    # sudo), so they need real $SNAPMANAGER_USER ownership, not just
+    # existence -- server/src/database.ts's own dbDir (better-sqlite3 opens
+    # the .db file directly) and server/src/services/snapshot.ts's
+    # SNAPSHOTS_DIR (plain fs.copyFile/fs.mkdir, no installPrivilegedFile
+    # call at all).
+    for d in "$INSTALL_BASE_DIR/data" "$INSTALL_BASE_DIR/server/snapshots"; do
+        $SUDO mkdir -p "$d"
+        $SUDO chown -R "$SNAPMANAGER_USER:$SNAPMANAGER_USER" "$d"
+    done
+
+    # Every other gap: these are all written to exclusively through sudo
+    # elevation (installPrivilegedFile()/runPrivileged(), confirmed by
+    # grepping each real call site below), so root ownership is fine --
+    # they only need to EXIST for ReadWritePaths' mount-namespace setup to
+    # succeed. Each is created empty/root-owned here, matching exactly what
+    # an uninstalled/never-touched host would otherwise have; whatever
+    # actually manages each path later (mpd's own package, this app's own
+    # runtime code, an admin action) is free to populate/re-own it normally
+    # from that point on -- this only unblocks the FIRST unit start.
+    #
+    #   /etc/mpd.conf (file) + /var/lib/mpd (dir): services/pipeSources.ts's
+    #     MPD_CONF_PATHS/writeMpdOutput() -- the original failure this task
+    #     found first.
+    #   /etc/snapclient-manager: services/snapclientInstances.ts's ENV_DIR.
+    #   /var/lib/snapcast-manager/scripts: services/tools.ts's
+    #     MANAGED_SCRIPTS_DIR (that file's own header comment already
+    #     documents "nothing in this codebase or the installer ever creates"
+    #     this directory as a known, disclosed gap -- this closes it at the
+    #     one point that actually matters for NAMESPACE setup; the app's own
+    #     lazy ensureManagedScriptsDir() remains as defense in depth for any
+    #     future install path that skips this installer).
+    #   /var/backups/snapmanager: services/backup.ts's BACKUP_DIR.
+    #   /var/lib/snapserver: created by the snapserver PACKAGE itself once
+    #     actually installed (services/system.ts's executeDebUpdate()); a
+    #     host that has never installed snapserver doesn't have it yet.
+    #   /etc/apt/keyrings: services/system.ts's mympd/nodesource GPG-key
+    #     setup (`runPrivileged(['mkdir','-p','/etc/apt/keyrings'])`) --
+    #     NOT guaranteed present on a minimal Debian bookworm base image
+    #     (it's a Debian-wide convention, not something every base install
+    #     ships by default).
+    #   /etc/apt/sources.list.d: normally ships with every Debian apt
+    #     install already; mkdir -p'd here too regardless, since it's free
+    #     and this whole block's purpose is to stop assuming instead of
+    #     verifying.
+    #   /usr/share/snapserver/snap-ctrl (dir, confirmed by
+    #     services/system.ts's `fs.promises.readdir(...)` call against this
+    #     exact path): created by the dedicated snap-ctrl install action;
+    #     absent on a host that has never run it.
+    for d in /var/lib/mpd /etc/snapclient-manager /var/lib/snapcast-manager/scripts \
+             /var/backups/snapmanager /var/lib/snapserver /etc/apt/keyrings \
+             /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl; do
+        $SUDO mkdir -p "$d"
+    done
     if [ ! -e /etc/mpd.conf ]; then
         $SUDO touch /etc/mpd.conf
     fi
-    $SUDO mkdir -p /var/lib/mpd
+
+    # /run/snapcast-manager: services/pipeSources.ts's RUNTIME_DIR (the FIFO
+    # directory) -- ephemeral by nature (lives on tmpfs-backed /run, so it
+    # never survives a reboot regardless of this installer), normally
+    # re-created on demand by ensureRuntimeDir()/a radio unit's own
+    # ExecStartPre the first time ANY pipe source is created or started.
+    # But snapmanager.service's own ReadWritePaths= needs it to exist
+    # already at snapmanager.service's OWN first start, which can happen
+    # before any pipe source ever has -- mode 0770 + group audio matches
+    # ensureRuntimeDir()'s own convention exactly.
+    $SUDO mkdir -p -m 0770 /run/snapcast-manager
+    $SUDO chgrp audio /run/snapcast-manager 2>/dev/null || true
 
     # --- 6c. sudoers.d, validated via `visudo -c` BEFORE it is ever installed
     # live -- a syntactically broken sudoers file can lock out ALL sudo on
