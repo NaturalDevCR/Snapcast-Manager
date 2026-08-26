@@ -158,6 +158,33 @@ export class SystemService {
     'shairport-sync': 'shairport-sync.service',
   };
 
+  /** Review fix pass (Task 59, Finding 1): `backup.ts`'s `collectSources()`
+   * (unchanged/out of scope for this task -- see task-59-brief.md and
+   * plan item 5.3 "real snapshots") builds its `sources` array the SAME way
+   * regardless of `component`, aside from one `snap-ctrl`-only branch: every
+   * backup it ever creates only ever contains `/etc/snapserver.conf*` and
+   * `/etc/snapclient-manager`. For `mpd`, `shairport-sync`, and `mympd`
+   * (which `mapToComponent()` maps to `'mpd'`, `'shairport-sync'`, and
+   * `'general'` respectively), that means the pre-install backup taken
+   * before installing THOSE packages never contains anything specific to
+   * them -- restoring it after a failed install would extract only
+   * snapserver/snapclient files, which is not a meaningful rollback of
+   * whatever actually broke mpd/mympd/shairport-sync. `snapserver` and
+   * `snapclient` are NOT in this set: `collectSources()` genuinely backs up
+   * files relevant to those two.
+   *
+   * `verifyServiceOrRollback()` below treats a package in this set the same
+   * as "no prior backup exists" -- it skips the `restoreBackup()` call
+   * entirely and says so honestly, rather than calling `restoreBackup()`
+   * anyway and logging a "rolled back successfully" message that would be
+   * true (the tar extraction genuinely succeeds) but actively misleading
+   * (nothing package-specific was ever backed up or restored). */
+  private static readonly NO_COMPONENT_SPECIFIC_BACKUP_PKGS: ReadonlySet<string> = new Set([
+    'mpd',
+    'mympd',
+    'shairport-sync',
+  ]);
+
   // Post-install service-verification grace window: systemd services can
   // take a brief moment to come up after a restart, so a single
   // instantaneous `isActive()` check right after the install could
@@ -197,17 +224,25 @@ export class SystemService {
    *
    * - Service comes up within the grace window: resolves normally, no
    *   behavior change from before this task (the happy path).
-   * - Service never comes up AND a real pre-install backup exists (`backup`
-   *   is non-null): calls `backupService.restoreBackup(backup.fileName)`
-   *   (the file NAME, not the full path -- see `BackupResult`/
-   *   `restoreBackup()`'s signature), logs the rollback via
-   *   `jobService.log()`, then throws describing both the original
-   *   failure and the rollback outcome.
    * - Service never comes up but there was NO prior backup (`backup` is
    *   null -- e.g. this package's first-ever install): there is nothing to
    *   roll back to. Skips the restore call entirely (never attempts to
    *   restore a backup that never existed) and just throws describing the
    *   failure.
+   * - Service never comes up and `pkg` is in `NO_COMPONENT_SPECIFIC_BACKUP_PKGS`
+   *   (`mpd`/`mympd`/`shairport-sync` -- see that constant's comment for why,
+   *   Finding 1 of the Task 59 review): even if a backup exists, it never
+   *   contains anything specific to `pkg`, so restoring it would not undo
+   *   whatever broke `pkg`. Treated the same as "no prior backup" -- the
+   *   restore call is skipped and the thrown/logged message says so
+   *   honestly, rather than claiming a misleading "rolled back
+   *   successfully".
+   * - Service never comes up AND a real, package-relevant pre-install
+   *   backup exists: calls `backupService.restoreBackup(backup.fileName)`
+   *   (the file NAME, not the full path -- see `BackupResult`/
+   *   `restoreBackup()`'s signature), logs the rollback via
+   *   `jobService.log()`, then throws describing both the original
+   *   failure and the rollback outcome.
    * - If the restore itself also fails: both failures are reported in a
    *   single thrown error, since this now needs real manual intervention.
    */
@@ -217,6 +252,12 @@ export class SystemService {
 
     if (!backup) {
       const msg = `${pkg} was installed but ${unit} did not become active afterward. No pre-install backup existed for ${pkg} (likely its first install), so no rollback was attempted. Check the service logs for details.`;
+      jobService.log(msg);
+      throw new Error(msg);
+    }
+
+    if (SystemService.NO_COMPONENT_SPECIFIC_BACKUP_PKGS.has(pkg)) {
+      const msg = `${pkg} was installed but ${unit} did not become active afterward. A pre-install backup exists (${backup.fileName}), but it does not contain any ${pkg}-specific files -- only snapserver/snapclient configuration is currently captured by the backup service for this package -- so restoring it would not undo whatever broke ${pkg}. No rollback was attempted; check the service logs and revert ${pkg}'s configuration manually if needed.`;
       jobService.log(msg);
       throw new Error(msg);
     }

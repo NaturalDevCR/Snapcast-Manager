@@ -2462,7 +2462,18 @@ test('installPackage("mpd") succeeds and does NOT attempt a rollback when mpd.se
   }
 });
 
-test('installPackage("mpd") rolls back to the prior backup (using the exact fileName) when mpd.service never comes up', async () => {
+// ------------------------------------------------------------------------
+// Review fix pass (Task 59, Finding 1): backup.ts's collectSources() only
+// ever backs up snapserver/snapclient-related files, REGARDLESS of
+// `component` -- so for mpd/mympd/shairport-sync, any pre-install backup
+// never contains anything specific to those packages. Restoring it after a
+// failed install would be a no-op for whatever actually broke the package,
+// so verifyServiceOrRollback() now treats these 3 packages the same as "no
+// prior backup exists" -- it skips restoreBackup() entirely and says so
+// honestly, rather than logging a misleading "rolled back successfully".
+// ------------------------------------------------------------------------
+
+test('installPackage("mpd") does NOT call restoreBackup() when mpd.service never comes up, even though a backup exists -- mpd has no package-specific backup coverage (Finding 1)', async () => {
   const restoreSudo = stubNeedsSudo(false);
   const restoreRun = stubRunRecording([]);
   const restoreBackup = stubCreatePreUpdateBackup(async () => REAL_BACKUP_RESULT);
@@ -2475,10 +2486,17 @@ test('installPackage("mpd") rolls back to the prior backup (using the exact file
     const service = freshService();
     withInstantPostInstallRetries(service);
     await assert.rejects(() => service.installPackage('mpd'), /did not become active/i);
-    assert.deepEqual(restoreCalls, ['pre-mpd-20260825-120000.tar.gz']);
+    assert.equal(
+      restoreCalls.length, 0,
+      'restoreBackup() must NOT be called for mpd -- the backup it would restore never contains mpd-specific files',
+    );
     assert.ok(
-      logCalls.some(l => l.toLowerCase().includes('roll') && l.includes('pre-mpd-20260825-120000.tar.gz')),
-      `expected a job-log message about the rollback, got: ${JSON.stringify(logCalls)}`,
+      logCalls.some(l => /no rollback was attempted/i.test(l) && /mpd-specific/i.test(l)),
+      `expected an honest job-log message explaining the backup is not mpd-specific and no rollback was attempted, got: ${JSON.stringify(logCalls)}`,
+    );
+    assert.ok(
+      !logCalls.some(l => /rolled back automatically/i.test(l)),
+      `must NOT claim a successful rollback occurred for mpd, got: ${JSON.stringify(logCalls)}`,
     );
   } finally {
     restoreRun();
@@ -2495,7 +2513,7 @@ test('installPackage("mpd") skips the rollback (never calls restoreBackup) when 
   const restoreRun = stubRunRecording([]);
   const restoreBackup = stubCreatePreUpdateBackup(async () => EMPTY_BACKUP_RESULT);
   const { calls: restoreCalls, restore: restoreRestoreBackup } = stubRestoreBackup(async () => 'restored');
-  const { restore: restoreIsActive } = stubIsActive(() => false);
+  const { calls: isActiveCalls, restore: restoreIsActive } = stubIsActive(() => false);
   const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
   try {
     const service = freshService();
@@ -2506,6 +2524,9 @@ test('installPackage("mpd") skips the rollback (never calls restoreBackup) when 
       logCalls.some(l => l.toLowerCase().includes('no') && l.toLowerCase().includes('backup')),
       `expected a job-log message noting there was no backup to roll back to, got: ${JSON.stringify(logCalls)}`,
     );
+    // Finding 3: proves the retry loop genuinely polled all 5 attempts
+    // (real multi-attempt polling) before giving up, not a single check.
+    assert.equal(isActiveCalls.length, 5, 'expected all 5 poll attempts before giving up');
   } finally {
     restoreRun();
     restoreSudo();
@@ -2513,6 +2534,113 @@ test('installPackage("mpd") skips the rollback (never calls restoreBackup) when 
     restoreRestoreBackup();
     restoreIsActive();
     restoreJobLog();
+  }
+});
+
+test('installPackage("snapclient") DOES call restoreBackup() when snapclient.service never comes up -- snapclient has genuine package-specific backup coverage, unlike mpd/mympd/shairport-sync', async () => {
+  const restoreBackup = stubCreatePreUpdateBackup(async () => ({
+    path: '/var/backups/snapmanager/pre-snapclient-20260825-120000.tar.gz',
+    fileName: 'pre-snapclient-20260825-120000.tar.gz',
+    size: 1234,
+    timestamp: '20260825-120000',
+    components: ['snapclient-config'],
+    files: ['/etc/snapclient-manager'],
+  }));
+  const { calls: restoreCalls, restore: restoreRestoreBackup } = stubRestoreBackup(
+    async () => 'Restored from /var/backups/snapmanager/pre-snapclient-20260825-120000.tar.gz',
+  );
+  const { restore: restoreIsActive } = stubIsActive(() => false);
+  const { calls: logCalls, restore: restoreJobLog } = stubJobLog();
+  const service = freshService();
+  withInstantPostInstallRetries(service);
+  (service as any).updateSnapclientFromGitHub = async () => 'snapclient updated successfully.';
+  try {
+    await assert.rejects(() => service.installPackage('snapclient'), /did not become active/i);
+    assert.deepEqual(restoreCalls, ['pre-snapclient-20260825-120000.tar.gz']);
+    assert.ok(
+      logCalls.some(l => /rolled back automatically/i.test(l) && l.includes('pre-snapclient-20260825-120000.tar.gz')),
+      `expected a job-log message about the genuine rollback, got: ${JSON.stringify(logCalls)}`,
+    );
+  } finally {
+    restoreBackup();
+    restoreRestoreBackup();
+    restoreIsActive();
+    restoreJobLog();
+  }
+});
+
+// ------------------------------------------------------------------------
+// Review fix pass (Task 59, Finding 2): no existing test independently
+// verified isActive() was polled with the CORRECT, package-specific systemd
+// unit name -- a regression that swapped two entries in KNOWN_SERVICE_UNITS
+// would have passed every prior test. This exercises the real
+// installPackage(pkg) call path for all 5 known-service packages (the only
+// package-specific logic stubbed out is each package's OWN installer body,
+// which is already covered by its own dedicated tests elsewhere in this
+// file) and asserts the exact unit isActive() was called with, using
+// hardcoded literal expectations (not read from KNOWN_SERVICE_UNITS itself)
+// so a real swap in the map would be caught.
+// ------------------------------------------------------------------------
+
+test('installPackage() polls isActive() with the correct, package-specific systemd unit for each of the 5 known-service packages', async () => {
+  const cases: { pkg: string; installerMethod: string; expectedUnit: string }[] = [
+    { pkg: 'snapserver', installerMethod: 'updateSnapserverFromGitHub', expectedUnit: 'snapserver.service' },
+    { pkg: 'snapclient', installerMethod: 'updateSnapclientFromGitHub', expectedUnit: 'snapclient.service' },
+    { pkg: 'mpd', installerMethod: 'installMpd', expectedUnit: 'mpd.service' },
+    { pkg: 'mympd', installerMethod: 'installMympd', expectedUnit: 'mympd.service' },
+    { pkg: 'shairport-sync', installerMethod: 'installShairportSync', expectedUnit: 'shairport-sync.service' },
+  ];
+
+  for (const { pkg, installerMethod, expectedUnit } of cases) {
+    const restoreBackup = stubNoBackup();
+    const { calls: isActiveCalls, restore: restoreIsActive } = stubIsActive(() => true);
+    const service = freshService();
+    (service as any)[installerMethod] = async () => `${pkg} installed successfully.`;
+    try {
+      await service.installPackage(pkg);
+      assert.deepEqual(
+        isActiveCalls, [expectedUnit],
+        `installPackage(${JSON.stringify(pkg)}) polled isActive() with the wrong unit: got ${JSON.stringify(isActiveCalls)}, expected [${JSON.stringify(expectedUnit)}]`,
+      );
+    } finally {
+      restoreBackup();
+      restoreIsActive();
+    }
+  }
+});
+
+// ------------------------------------------------------------------------
+// Review fix pass (Task 59, Finding 3): no existing test exercised a
+// service that comes up on a LATER poll attempt (not the first, not never)
+// -- proving the retry loop genuinely treats "became active partway through
+// the window" as success, not just "active immediately" or "never active".
+// ------------------------------------------------------------------------
+
+test('installPackage("mpd") succeeds with NO rollback when mpd.service only becomes active on a later poll attempt (attempt 3 of 5)', async () => {
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreRun = stubRunRecording([]);
+  const restoreBackup = stubCreatePreUpdateBackup(async () => REAL_BACKUP_RESULT);
+  const { calls: restoreCalls, restore: restoreRestoreBackup } = stubRestoreBackup(async () => 'restored');
+  let attempt = 0;
+  // false, false, true -- becomes active on the 3rd call, well within the
+  // 5-attempt window.
+  const { calls: isActiveCalls, restore: restoreIsActive } = stubIsActive(() => {
+    attempt++;
+    return attempt >= 3;
+  });
+  try {
+    const service = freshService();
+    withInstantPostInstallRetries(service);
+    const result = await service.installPackage('mpd');
+    assert.match(result, /MPD installed and started successfully/);
+    assert.equal(isActiveCalls.length, 3, 'expected exactly 3 polls -- 2 failures then success on the 3rd, not a single check');
+    assert.equal(restoreCalls.length, 0, 'a service that came up within the retry window must NOT trigger a rollback');
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreBackup();
+    restoreRestoreBackup();
+    restoreIsActive();
   }
 });
 
