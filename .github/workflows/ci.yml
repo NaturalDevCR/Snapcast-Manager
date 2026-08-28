@@ -84,13 +84,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Warning-only for now: this repo currently builds shell commands via
-      # template-literal string interpolation throughout server/src (see
-      # docs/superpowers/plans/2026-08-18-professional-hardening.md Stage 1),
-      # so the check is expected to find matches today. Stage 1 migrates
-      # those call sites into server/src/platform/ (using spawn() with an
-      # argv array instead of a shell string) and, once that's done, this
-      # step should be changed to fail the build instead of only warning.
-      - name: Check for shell-injection-prone patterns (warning only)
-        run: |
-          ./scripts/check-no-shell-injection.sh || echo "::warning::Shell injection pattern found — see docs/superpowers/plans/2026-08-18-professional-hardening.md Stage 1"
+      # Stage 1 of docs/superpowers/plans/2026-08-18-professional-hardening.md
+      # migrated server/src's shelled-out commands into server/src/platform/
+      # (argv-array spawn(), no shell strings), so this is now a real gate.
+      - name: Check for shell-injection-prone patterns
+        run: ./scripts/check-no-shell-injection.sh
