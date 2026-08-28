@@ -4,6 +4,7 @@ import PipeSources from '../PipeSources.vue';
 import { mountSmokeTest } from '../../test/mountView';
 import { usePipeSourcesStore } from '../../stores/pipeSources';
 import { findIconOnlyButtons } from '../../test/iconOnlyButtons';
+import { useUIStore } from '../../stores/ui';
 
 describe('PipeSources.vue', () => {
   it('mounts without throwing', async () => {
@@ -111,5 +112,18 @@ describe('PipeSources.vue', () => {
     await nextTick();
     expect(wrapper.findAll('[role="presentation"]').length).toBe(0);
     expect(wrapper.text()).toContain('No pipe sources configured');
+  });
+
+  it('renders Spanish copy when locale is switched to "es"', async () => {
+    const wrapper = await mountSmokeTest(PipeSources, '/pipe-sources');
+    const store = usePipeSourcesStore();
+    store.pipes = [];
+    useUIStore().setLocale('es');
+    await nextTick();
+
+    expect(wrapper.text()).toContain('Pipe Sources');
+    expect(wrapper.text()).toContain('No hay fuentes de pipe configuradas');
+    expect(wrapper.text()).toContain('Agrega una fuente de Radio o MPD para reemplazar tus entradas process://.');
+    expect(wrapper.text()).toContain('Agregar Fuente');
   });
 });

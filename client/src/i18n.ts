@@ -19,6 +19,10 @@ import enDiagnostics from './locales/en/diagnostics.json';
 import esDiagnostics from './locales/es/diagnostics.json';
 import enWatchdogs from './locales/en/watchdogs.json';
 import esWatchdogs from './locales/es/watchdogs.json';
+import enServerConfig from './locales/en/serverConfig.json';
+import esServerConfig from './locales/es/serverConfig.json';
+import enPipeSources from './locales/en/pipeSources.json';
+import esPipeSources from './locales/es/pipeSources.json';
 
 export type SupportedLocale = 'en' | 'es';
 export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'es'];
@@ -38,8 +42,8 @@ export const i18n = createI18n({
   locale: initialLocale,
   fallbackLocale: 'en',
   messages: {
-    en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard, logs: enLogs, security: enSecurity, diagnostics: enDiagnostics, watchdogs: enWatchdogs },
-    es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard, logs: esLogs, security: esSecurity, diagnostics: esDiagnostics, watchdogs: esWatchdogs },
+    en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard, logs: enLogs, security: enSecurity, diagnostics: enDiagnostics, watchdogs: enWatchdogs, serverConfig: enServerConfig, pipeSources: enPipeSources },
+    es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard, logs: esLogs, security: esSecurity, diagnostics: esDiagnostics, watchdogs: esWatchdogs, serverConfig: esServerConfig, pipeSources: esPipeSources },
   },
 });
 

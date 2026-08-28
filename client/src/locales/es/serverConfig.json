@@ -1,0 +1,21 @@
+{
+  "tabStandard": "Estándar",
+  "tabStandardSub": "Editor visual",
+  "tabExpert": "Experto",
+  "tabExpertSub": "Archivo INI en bruto",
+  "tabSnapshots": "Instantáneas",
+  "tabSnapshotsSub": "Historial de versiones",
+  "saveConfiguration": "Guardar configuración",
+  "restartDialogTitle": "¿Reiniciar Snapserver?",
+  "restartDialogMessage": "¡Configuración guardada! ¿Reiniciar ahora para aplicar los cambios?",
+  "restartDialogConfirm": "Reiniciar ahora",
+  "resetDialogTitle": "¿Restablecer a los valores predeterminados?",
+  "resetDialogMessage": "Esto borrará tu base de configuración actual y la restaurará a los valores predeterminados de Snapserver. ¡Úsalo con precaución!",
+  "resetDialogConfirm": "Restablecer configuración",
+  "saveFailedToast": "Error al guardar la configuración: {message}",
+  "restartSuccessToast": "Servidor reiniciado correctamente",
+  "restartFailedToast": "Error al reiniciar: {message}",
+  "resetSuccessToast": "Configuración restablecida a los valores predeterminados",
+  "resetFailedToast": "Error al restablecer la configuración: {message}",
+  "resetError": "Error al restablecer"
+}

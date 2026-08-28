@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useConfigStore } from '../stores/config';
 import { useSnapshotStore } from '../stores/snapshots';
 import { useSystemStore } from '../stores/system';
@@ -18,6 +19,7 @@ const route = useRoute();
 const configStore = useConfigStore();
 const systemStore = useSystemStore();
 const uiStore = useUIStore();
+const { t } = useI18n({ useScope: 'global' });
 
 
 
@@ -116,7 +118,7 @@ const saveParsed = async () => {
         await fetchBoth();
         showConfirmRestart.value = true;
     } catch (e: any) {
-        uiStore.showToast('Failed to save configuration: ' + e.message, 'error');
+        uiStore.showToast(t('serverConfig.saveFailedToast', { message: e.message }), 'error');
     }
 };
 
@@ -126,16 +128,16 @@ const saveRaw = async () => {
         await fetchBoth();
         showConfirmRestart.value = true;
     } catch (e: any) {
-        uiStore.showToast('Failed to save configuration: ' + e.message, 'error');
+        uiStore.showToast(t('serverConfig.saveFailedToast', { message: e.message }), 'error');
     }
 };
 
 const handleRestartConfirm = async () => {
   try {
     await systemStore.controlService('restart', 'snapserver');
-    uiStore.showToast('Server restarted successfully', 'success');
+    uiStore.showToast(t('serverConfig.restartSuccessToast'), 'success');
   } catch (e: any) {
-    uiStore.showToast('Failed to restart: ' + e.message, 'error');
+    uiStore.showToast(t('serverConfig.restartFailedToast', { message: e.message }), 'error');
   }
 };
 
@@ -157,13 +159,13 @@ const handleResetToDefault = async () => {
         });
         if (response.ok) {
           await fetchBoth();
-          uiStore.showToast('Configuration reset to defaults', 'success');
+          uiStore.showToast(t('serverConfig.resetSuccessToast'), 'success');
           showConfirmRestart.value = true;
         } else {
-          throw new Error('Failed to reset');
+          throw new Error(t('serverConfig.resetError'));
         }
     } catch (e: any) {
-        uiStore.showToast('Failed to reset configuration: ' + e.message, 'error');
+        uiStore.showToast(t('serverConfig.resetFailedToast', { message: e.message }), 'error');
     }
 };
 
@@ -192,8 +194,8 @@ const handleSave = () => {
               >
                   <span class="material-symbols-outlined text-[18px]">tune</span>
                   <div class="flex flex-col items-start">
-                    <span>Standard</span>
-                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">Visual editor</span>
+                    <span>{{ t('serverConfig.tabStandard') }}</span>
+                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">{{ t('serverConfig.tabStandardSub') }}</span>
                   </div>
               </button>
               <button
@@ -207,8 +209,8 @@ const handleSave = () => {
               >
                   <span class="material-symbols-outlined text-[18px]">code</span>
                   <div class="flex flex-col items-start">
-                    <span>Expert</span>
-                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">Raw INI file</span>
+                    <span>{{ t('serverConfig.tabExpert') }}</span>
+                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">{{ t('serverConfig.tabExpertSub') }}</span>
                   </div>
               </button>
               <button
@@ -222,8 +224,8 @@ const handleSave = () => {
               >
                   <span class="material-symbols-outlined text-[18px]">history</span>
                   <div class="flex flex-col items-start">
-                    <span>Snapshots</span>
-                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">Version history</span>
+                    <span>{{ t('serverConfig.tabSnapshots') }}</span>
+                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">{{ t('serverConfig.tabSnapshotsSub') }}</span>
                   </div>
               </button>
           </div>
@@ -237,7 +239,7 @@ const handleSave = () => {
               >
                   <span v-if="configStore.loading" class="material-symbols-outlined text-[18px] animate-spin">sync</span>
                   <span v-else class="material-symbols-outlined text-[18px]">save</span>
-                  <span>Save Configuration</span>
+                  <span>{{ t('serverConfig.saveConfiguration') }}</span>
               </button>
           </div>
       </div>
@@ -271,18 +273,18 @@ const handleSave = () => {
       <!-- ==================== DIALOGS ==================== -->
       <ConfirmDialog
         v-model="showConfirmRestart"
-        title="Restart Snapserver?"
-        message="Configuration saved! Restart now to apply changes?"
-        confirmText="Restart Now"
+        :title="t('serverConfig.restartDialogTitle')"
+        :message="t('serverConfig.restartDialogMessage')"
+        :confirmText="t('serverConfig.restartDialogConfirm')"
         @confirm="handleRestartConfirm"
       />
 
       <ConfirmDialog
         v-model="showConfirmReset"
-        title="Reset to Defaults?"
-        message="This will wipe your current configuration base and restore it to the default Snapserver values. Use with caution!"
+        :title="t('serverConfig.resetDialogTitle')"
+        :message="t('serverConfig.resetDialogMessage')"
         type="danger"
-        confirmText="Reset Configuration"
+        :confirmText="t('serverConfig.resetDialogConfirm')"
         @confirm="handleResetToDefault"
       />
   </Layout>

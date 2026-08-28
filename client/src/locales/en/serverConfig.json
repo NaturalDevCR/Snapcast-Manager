@@ -1,0 +1,21 @@
+{
+  "tabStandard": "Standard",
+  "tabStandardSub": "Visual editor",
+  "tabExpert": "Expert",
+  "tabExpertSub": "Raw INI file",
+  "tabSnapshots": "Snapshots",
+  "tabSnapshotsSub": "Version history",
+  "saveConfiguration": "Save Configuration",
+  "restartDialogTitle": "Restart Snapserver?",
+  "restartDialogMessage": "Configuration saved! Restart now to apply changes?",
+  "restartDialogConfirm": "Restart Now",
+  "resetDialogTitle": "Reset to Defaults?",
+  "resetDialogMessage": "This will wipe your current configuration base and restore it to the default Snapserver values. Use with caution!",
+  "resetDialogConfirm": "Reset Configuration",
+  "saveFailedToast": "Failed to save configuration: {message}",
+  "restartSuccessToast": "Server restarted successfully",
+  "restartFailedToast": "Failed to restart: {message}",
+  "resetSuccessToast": "Configuration reset to defaults",
+  "resetFailedToast": "Failed to reset configuration: {message}",
+  "resetError": "Failed to reset"
+}
