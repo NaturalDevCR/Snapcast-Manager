@@ -25,7 +25,7 @@ jobs:
   container-integration:
     runs-on: ubuntu-latest
     # Generous but bounded: real apt installs (systemd, Node.js, build-essential),
-    # a real `npm install`/`npm run build` for both server and client, then 6
+    # a real `npm install`/`npm run build` for both server and client, then 7
     # real API/systemd/filesystem round-trips. 30 minutes is comfortably above
     # normal runtime with real room for a slow apt mirror.
     timeout-minutes: 30
