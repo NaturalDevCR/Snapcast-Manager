@@ -269,7 +269,8 @@ OS hardware before this is considered production-ready:
 **Update (Task 65):** item 1 below (fresh install completes, service runs
 as `snapmanager` not root) and the general "does sudo escalation actually
 work under this unit's sandbox" question are now covered by a real,
-automated, systemd-PID-1 container test on every push and nightly (see
+automated, systemd-PID-1 container test that runs nightly (and can be
+triggered on demand) -- see
 `.github/workflows/container-integration.yml`,
 `scripts/test-container-integration.sh`) -- that test is what caught the
 `NoNewPrivileges=yes` bug documented above. Items 2-13 below still exercise
