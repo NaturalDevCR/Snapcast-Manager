@@ -138,8 +138,8 @@ the journal explains why because `sudo` fails before it even logs.
 
 ```bash
 # 1. Is the service actually running as the unprivileged 'snapmanager' user?
-systemctl show snapmanager -p User
-#   expect:  User=snapmanager   (anything else = pre-Task-16 install, see below)
+systemctl show snapmanager -p User --value
+#   expect:  snapmanager   (anything else = pre-Task-16 install, see below)
 
 # 2. Can 'snapmanager' actually escalate via sudo from inside the unit's sandbox?
 #    This is the exact probe this repo's own regression-guard test uses.
