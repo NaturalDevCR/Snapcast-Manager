@@ -19,7 +19,7 @@
   "addDialogTitle": "Agregar TCP Watchdog",
   "nameLabel": "Nombre",
   "namePlaceholder": "p. ej. PC Stream Source",
-  "targetSourcesLabel": "Fuentes TCP Server Destino",
+  "targetSourcesLabel": "Fuentes TCP de Destino",
   "autoKillDuplicatesLabel": "Eliminar Duplicados Automáticamente (Gana la Última Conexión)",
   "cancel": "Cancelar",
   "create": "Crear",
