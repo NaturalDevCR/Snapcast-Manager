@@ -1,0 +1,12 @@
+{
+  "title": "Registros del Sistema",
+  "subtitle": "Supervisión en tiempo real de tus servicios.",
+  "liveUpdate": "Actualización en Vivo",
+  "syncNow": "Sincronizar Ahora",
+  "snapserver": "Snapserver",
+  "airplay": "AirPlay",
+  "manager": "Administrador",
+  "mpd": "MPD",
+  "consoleOutput": "Salida de Consola",
+  "fetchFailed": "Error al obtener los registros"
+}

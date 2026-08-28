@@ -1,0 +1,12 @@
+{
+  "title": "System Logs",
+  "subtitle": "Real-time surveillance of your services.",
+  "liveUpdate": "Live Update",
+  "syncNow": "Sync Now",
+  "snapserver": "Snapserver",
+  "airplay": "AirPlay",
+  "manager": "Manager",
+  "mpd": "MPD",
+  "consoleOutput": "Console Output",
+  "fetchFailed": "Failed to fetch logs"
+}

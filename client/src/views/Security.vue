@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useUIStore } from '../stores/ui';
 import { fetchApi } from '../utils/api';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
 
+const { t } = useI18n({ useScope: 'global' });
 const uiStore = useUIStore();
 
 const currentPassword = ref('');
@@ -15,11 +17,11 @@ const isExporting = ref(false);
 
 const handleChangePassword = async () => {
   if (newPassword.value !== confirmPassword.value) {
-    uiStore.showToast('Passwords do not match', 'error');
+    uiStore.showToast(t('security.passwordsMismatch'), 'error');
     return;
   }
   if (!currentPassword.value || !newPassword.value) {
-    uiStore.showToast('Current and new passwords are required', 'error');
+    uiStore.showToast(t('security.passwordRequired'), 'error');
     return;
   }
   isSavingPassword.value = true;
@@ -31,12 +33,12 @@ const handleChangePassword = async () => {
         newPassword: newPassword.value
       })
     });
-    uiStore.showToast('Password changed successfully', 'success');
+    uiStore.showToast(t('security.passwordChanged'), 'success');
     currentPassword.value = '';
     newPassword.value = '';
     confirmPassword.value = '';
   } catch (err: any) {
-    uiStore.showToast(err.message || 'Failed to change password', 'error');
+    uiStore.showToast(err.message || t('security.changePasswordFailed'), 'error');
   } finally {
     isSavingPassword.value = false;
   }
@@ -53,7 +55,7 @@ const handleExportBackup = async () => {
         });
 
         if (!response.ok) {
-            throw new Error(`Export failed: ${response.statusText}`);
+            throw new Error(t('security.exportFailed', { status: response.statusText }));
         }
 
         const blob = await response.blob();
@@ -77,9 +79,9 @@ const handleExportBackup = async () => {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
 
-        uiStore.showToast('Backup downloaded successfully', 'success');
+        uiStore.showToast(t('security.backupDownloaded'), 'success');
     } catch (e: any) {
-        uiStore.showToast(e.message || 'Failed to download backup', 'error');
+        uiStore.showToast(e.message || t('security.downloadBackupFailed'), 'error');
     } finally {
         isExporting.value = false;
     }
@@ -91,30 +93,30 @@ const handleExportBackup = async () => {
     <div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <!-- Header -->
       <div>
-        <h1 class="text-3xl font-black text-white tracking-tight drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">Security</h1>
-        <p class="text-gray-400 font-medium mt-1">Admin access and server backup.</p>
+        <h1 class="text-3xl font-black text-white tracking-tight drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">{{ t('security.title') }}</h1>
+        <p class="text-gray-400 font-medium mt-1">{{ t('security.subtitle') }}</p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <!-- Change Password -->
-        <Card title="Change Administrator Password">
+        <Card :title="t('security.changePasswordTitle')">
           <template #icon>
             <span class="material-symbols-outlined text-[20px] text-[#ff2a5f] drop-shadow-[0_0_5px_rgba(255,42,95,0.5)]">lock</span>
           </template>
           <div class="space-y-5">
             <div>
-              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">Current Password</label>
-              <input v-model="currentPassword" type="password" placeholder="Enter current password"
+              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.currentPasswordLabel') }}</label>
+              <input v-model="currentPassword" type="password" :placeholder="t('security.currentPasswordPlaceholder')"
                 class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
             </div>
             <div>
-              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">New Password</label>
-              <input v-model="newPassword" type="password" placeholder="Enter new password"
+              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.newPasswordLabel') }}</label>
+              <input v-model="newPassword" type="password" :placeholder="t('security.newPasswordPlaceholder')"
                 class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
             </div>
             <div>
-              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">Confirm New Password</label>
-              <input v-model="confirmPassword" type="password" placeholder="Re-enter new password"
+              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.confirmPasswordLabel') }}</label>
+              <input v-model="confirmPassword" type="password" :placeholder="t('security.confirmPasswordPlaceholder')"
                 class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
             </div>
             <button
@@ -123,30 +125,35 @@ const handleExportBackup = async () => {
               class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-[#ff2a5f] text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#ff154d] border border-[#ff2a5f] shadow-[0_0_15px_rgba(255,42,95,0.4)] hover:shadow-[0_0_20px_rgba(255,42,95,0.6)] disabled:opacity-50 transition-all active:scale-95"
             >
               <span v-if="isSavingPassword" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
-              <span>Update Password</span>
+              <span>{{ t('security.updatePassword') }}</span>
             </button>
           </div>
         </Card>
 
         <!-- Export Backup -->
-        <Card title="Export Server Backup">
+        <Card :title="t('security.exportTitle')">
           <template #icon>
             <span class="material-symbols-outlined text-[20px] text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">download</span>
           </template>
           <div class="space-y-5">
             <p class="text-sm font-medium text-gray-400 leading-relaxed">
-              Download a complete backup of your Snapcast Manager configuration.
-              This <span class="text-[#00ff9d] font-bold drop-shadow-[0_0_5px_rgba(0,255,157,0.2)]">.tar.gz</span> archive includes:
+              <i18n-t keypath="security.exportDescription">
+                <template #archive><span class="text-[#00ff9d] font-bold drop-shadow-[0_0_5px_rgba(0,255,157,0.2)]">.tar.gz</span></template>
+              </i18n-t>
             </p>
             <ul class="text-xs font-semibold text-gray-300 space-y-3 mb-6">
-              <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-brand-primary">security</span> Administrator Account</li>
-              <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-[#00d4ff]">history</span> Saved Snapshots</li>
-              <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-[#ff2a5f]">tune</span> Snapserver Configuration</li>
+              <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-brand-primary">security</span> {{ t('security.administratorAccount') }}</li>
+              <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-[#00d4ff]">history</span> {{ t('security.savedSnapshots') }}</li>
+              <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-[#ff2a5f]">tune</span> {{ t('security.snapserverConfig') }}</li>
             </ul>
 
             <div class="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl">
-              <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest">Restore Instructions</p>
-              <p class="text-xs text-amber-400/80 mt-1">Keep this file safe. When reinstalling Snapcast Manager on a new device, you can use the flag <code class="bg-black/40 px-1 py-0.5 rounded text-amber-300 font-mono border border-amber-500/10">--restore /path/to/backup.tar.gz</code> during setup to restore everything magically.</p>
+              <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest">{{ t('security.restoreInstructions') }}</p>
+              <p class="text-xs text-amber-400/80 mt-1">
+                <i18n-t keypath="security.restoreInstructionsBody">
+                  <template #flag><code class="bg-black/40 px-1 py-0.5 rounded text-amber-300 font-mono border border-amber-500/10">--restore /path/to/backup.tar.gz</code></template>
+                </i18n-t>
+              </p>
             </div>
 
             <button
@@ -156,7 +163,7 @@ const handleExportBackup = async () => {
             >
               <span v-if="isExporting" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
               <span v-else class="material-symbols-outlined text-[16px]">download</span>
-              <span>Download Backup</span>
+              <span>{{ t('security.downloadBackup') }}</span>
             </button>
           </div>
         </Card>

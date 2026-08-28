@@ -21,6 +21,10 @@ import enOnboarding from '../locales/en/onboarding.json';
 import esOnboarding from '../locales/es/onboarding.json';
 import enDashboard from '../locales/en/dashboard.json';
 import esDashboard from '../locales/es/dashboard.json';
+import enLogs from '../locales/en/logs.json';
+import esLogs from '../locales/es/logs.json';
+import enSecurity from '../locales/en/security.json';
+import esSecurity from '../locales/es/security.json';
 import { useUIStore } from '../stores/ui';
 
 // A fresh i18n instance per mount (not the app's shared singleton) so tests
@@ -33,8 +37,8 @@ function createTestI18n() {
     locale: 'en',
     fallbackLocale: 'en',
     messages: {
-      en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard },
-      es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard },
+      en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard, logs: enLogs, security: enSecurity },
+      es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard, logs: esLogs, security: esSecurity },
     },
   });
 }
