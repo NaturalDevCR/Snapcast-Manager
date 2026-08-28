@@ -1,0 +1,21 @@
+{
+  "title": "Matriz de Audio",
+  "subtitle": "Enrutamiento de Infraestructura y Control de Zonas",
+  "resync": "RESINCRONIZAR INFRAESTRUCTURA",
+  "noClusters": "No se identificaron clústeres de Snapserver",
+  "virtualSources": "Fuentes Virtuales",
+  "outputZones": "Zonas de Salida",
+  "dragToConnect": "Arrastra para conectar a una zona",
+  "zoneFallback": "Zona {id}",
+  "destinationsCount": "{count} DESTINACIONES",
+  "source": "Fuente",
+  "noSourceAssigned": "Sin fuente asignada",
+  "unnamedClient": "Cliente sin nombre",
+  "unknownStream": "Flujo desconocido",
+  "muted": "MUTE",
+  "muteZone": "Silenciar {name}",
+  "unmuteZone": "Reactivar sonido de {name}",
+  "muteClient": "Silenciar {name}",
+  "unmuteClient": "Reactivar sonido de {name}",
+  "client": "cliente"
+}

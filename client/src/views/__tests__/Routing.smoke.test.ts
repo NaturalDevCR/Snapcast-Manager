@@ -4,6 +4,7 @@ import Routing from '../Routing.vue';
 import { mountSmokeTest } from '../../test/mountView';
 import { useSnapcastStore } from '../../stores/snapcast';
 import { useEventSource } from '../../composables/useEventSource';
+import { useUIStore } from '../../stores/ui';
 import { findIconOnlyButtons } from '../../test/iconOnlyButtons';
 
 describe('Routing.vue', () => {
@@ -145,5 +146,29 @@ describe('Routing.vue', () => {
     await nextTick();
 
     expect(setGroupStreamSpy).toHaveBeenCalledWith('g1', 'b');
+  });
+
+  it('renders Spanish copy when locale is switched to "es"', async () => {
+    const wrapper = await mountSmokeTest(Routing, '/routing');
+    useUIStore().setLocale('es');
+
+    // The matrix column headers only render once snapcast data is present,
+    // so seed status the way the "redraws the audio-matrix connections" test
+    // does, then assert on both the always-visible header copy and the
+    // data-dependent column headings.
+    const snapcastStore = useSnapcastStore();
+    snapcastStore.status = {
+      server: { version: '1.2.3' },
+      groups: [{ id: 'g1', name: 'Sala', clients: [], stream_id: 's1', muted: false }],
+      streams: [{ id: 's1', status: 'playing', uri: { query: { name: 'Radio' }, scheme: 'tcp' } }],
+    };
+    await nextTick();
+    await nextTick();
+
+    expect(wrapper.text()).toContain('Matriz de Audio');
+    expect(wrapper.text()).toContain('Enrutamiento de Infraestructura y Control de Zonas');
+    expect(wrapper.text()).toContain('RESINCRONIZAR INFRAESTRUCTURA');
+    expect(wrapper.text()).toContain('Fuentes Virtuales');
+    expect(wrapper.text()).toContain('Zonas de Salida');
   });
 });

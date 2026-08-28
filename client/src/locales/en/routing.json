@@ -1,0 +1,21 @@
+{
+  "title": "Audio Matrix",
+  "subtitle": "Infrastructure Routing & Zone Control",
+  "resync": "RE-SYNC INFRASTRUCTURE",
+  "noClusters": "No Snapserver Clusters Identified",
+  "virtualSources": "Virtual Sources",
+  "outputZones": "Output Zones",
+  "dragToConnect": "Drag to connect to a zone",
+  "zoneFallback": "Zone {id}",
+  "destinationsCount": "{count} DESTINATIONS",
+  "source": "Source",
+  "noSourceAssigned": "No source assigned",
+  "unnamedClient": "Unnamed Client",
+  "unknownStream": "Unknown Stream",
+  "muted": "MUTED",
+  "muteZone": "Mute {name}",
+  "unmuteZone": "Unmute {name}",
+  "muteClient": "Mute {name}",
+  "unmuteClient": "Unmute {name}",
+  "client": "client"
+}

@@ -27,6 +27,8 @@ import enClientDashboard from './locales/en/clientDashboard.json';
 import esClientDashboard from './locales/es/clientDashboard.json';
 import enTools from './locales/en/tools.json';
 import esTools from './locales/es/tools.json';
+import enRouting from './locales/en/routing.json';
+import esRouting from './locales/es/routing.json';
 
 export type SupportedLocale = 'en' | 'es';
 export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'es'];
@@ -46,8 +48,8 @@ export const i18n = createI18n({
   locale: initialLocale,
   fallbackLocale: 'en',
   messages: {
-    en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard, logs: enLogs, security: enSecurity, diagnostics: enDiagnostics, watchdogs: enWatchdogs, serverConfig: enServerConfig, pipeSources: enPipeSources, clientDashboard: enClientDashboard, tools: enTools },
-    es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard, logs: esLogs, security: esSecurity, diagnostics: esDiagnostics, watchdogs: esWatchdogs, serverConfig: esServerConfig, pipeSources: esPipeSources, clientDashboard: esClientDashboard, tools: esTools },
+    en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard, logs: enLogs, security: enSecurity, diagnostics: enDiagnostics, watchdogs: enWatchdogs, serverConfig: enServerConfig, pipeSources: enPipeSources, clientDashboard: enClientDashboard, tools: enTools, routing: enRouting },
+    es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard, logs: esLogs, security: esSecurity, diagnostics: esDiagnostics, watchdogs: esWatchdogs, serverConfig: esServerConfig, pipeSources: esPipeSources, clientDashboard: esClientDashboard, tools: esTools, routing: esRouting },
   },
 });
 

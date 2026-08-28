@@ -7,6 +7,9 @@ import { useSnapcastStore } from '../stores/snapcast';
 import { useEventSource } from '../composables/useEventSource';
 import { sseStatusBadge } from '../utils/sseStatus';
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n({ useScope: 'global' });
 
 const vFocus = {
   mounted: (el: HTMLElement) => el.focus()
@@ -286,7 +289,13 @@ const handleMouseUp = async () => {
 
 const getStreamLabel = (stream: any) => {
     if (stream.uri?.query?.name) return stream.uri.query.name;
-    return stream.id || 'Unknown Stream';
+    return stream.id || t('routing.unknownStream');
+};
+
+const getZoneLabel = (group: any) => {
+    const name = group?.name;
+    if (name) return name;
+    return t('routing.zoneFallback', { id: (group?.id || '').slice(0, 4) });
 };
 
 // Task 34: keyboard/screen-reader-usable alternative to the mouse/touch
@@ -365,16 +374,16 @@ const updateVolume = (client: any, event: Event) => {
             </div>
             <div>
                 <div class="flex items-center gap-3">
-                    <h1 class="text-3xl font-black text-text-main tracking-tight">Audio Matrix</h1>
+                    <h1 class="text-3xl font-black text-text-main tracking-tight">{{ t('routing.title') }}</h1>
                     <Badge :variant="sseStatusBadge(sse.status.value).variant" size="sm">{{ sseStatusBadge(sse.status.value).label }}</Badge>
                 </div>
-                <p class="text-[10px] text-white/40 font-black uppercase tracking-[0.3em] mt-1">Infrastructure Routing & Zone Control</p>
+                <p class="text-[10px] text-white/40 font-black uppercase tracking-[0.3em] mt-1">{{ t('routing.subtitle') }}</p>
             </div>
         </div>
         <button @click="snapcastStore.fetchStatus()" :disabled="snapcastStore.loading" 
                 class="px-6 py-3 bg-white/[0.03] hover:bg-white/[0.08] text-white rounded-2xl text-xs font-black border border-white/[0.05] backdrop-blur-xl transition-all active:scale-95 flex items-center gap-3 group/btn shadow-xl z-20">
             <span class="material-symbols-outlined text-sm group-hover/btn:rotate-180 transition-transform duration-700" :class="{'animate-spin': snapcastStore.loading}">refresh</span>
-            RE-SYNC INFRASTRUCTURE
+            {{ t('routing.resync') }}
         </button>
       </div>
 
@@ -397,7 +406,7 @@ const updateVolume = (client: any, event: Event) => {
       </div>
       <div v-else-if="!snapcastStore.loading && (!snapcastStore.status || snapcastStore.status.groups.length === 0)" class="flex flex-col items-center justify-center py-24 text-white/10 glass rounded-[3rem]">
         <span class="material-symbols-outlined text-6xl mb-4">settings_input_component</span>
-        <span class="text-xs font-black uppercase tracking-[0.3em]">No Snapserver Clusters Identified</span>
+        <span class="text-xs font-black uppercase tracking-[0.3em]">{{ t('routing.noClusters') }}</span>
       </div>
 
       <!-- Interactive Matrix -->
@@ -436,7 +445,7 @@ const updateVolume = (client: any, event: Event) => {
              <!-- SOURCES COLUMN (Left) -->
              <div class="w-full lg:w-1/2 flex flex-col gap-4">
                  <h2 class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 flex items-center gap-2 px-2">
-                    <span class="material-symbols-outlined text-sm">input</span> Virtual Sources
+                    <span class="material-symbols-outlined text-sm">input</span> {{ t('routing.virtualSources') }}
                  </h2>
                  <div v-for="stream in snapcastStore.status?.streams || []" :key="stream.id"
                       class="bg-brand-surface/80 backdrop-blur-xl border rounded-[1.5rem] p-4 flex items-center justify-between shadow-lg transition-all duration-300 relative group/source"
@@ -470,7 +479,7 @@ const updateVolume = (client: any, event: Event) => {
                            @touchstart.prevent="startDrag(stream.id, $event)"
                            class="hidden lg:flex w-8 h-8 rounded-full bg-brand-surface border-[3px] items-center justify-center cursor-grab active:cursor-grabbing hover:scale-110 transition-transform shadow-[0_0_15px_rgba(0,0,0,0.5)] z-30 shrink-0 right-[-16px] absolute lg:right-[-16px]"
                            :style="{ borderColor: getStreamColor(stream.id) }"
-                           title="Drag to connect to a zone"
+                           :title="t('routing.dragToConnect')"
                            aria-hidden="true">
                            <div class="w-3 h-3 rounded-full transition-all duration-300" 
                                 :class="{'animate-ping opacity-50': isDragging && draggedStreamId === stream.id}"
@@ -483,7 +492,7 @@ const updateVolume = (client: any, event: Event) => {
              <!-- ZONES COLUMN (Right) -->
              <div class="w-full lg:w-1/2 flex flex-col gap-4 mt-8 lg:mt-0">
                  <h2 class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 flex items-center gap-2 px-2">
-                    <span class="material-symbols-outlined text-sm">speaker_group</span> Output Zones
+                    <span class="material-symbols-outlined text-sm">speaker_group</span> {{ t('routing.outputZones') }}
                  </h2>
                  
                  <div v-for="group in snapcastStore.status?.groups || []" :key="group.id"
@@ -528,15 +537,19 @@ const updateVolume = (client: any, event: Event) => {
                                           v-focus
                                         />
                                     </div>
-                                    <div v-else class="flex items-center gap-2 group/zonename cursor-pointer" @click.stop="startGroupRename(group.id, group.name || 'Zone ' + group.id.slice(0,4), $event)">
-                                        <span class="truncate">{{ group.name || 'Zone ' + group.id.slice(0,4) }}</span>
+                                    <div v-else class="flex items-center gap-2 group/zonename cursor-pointer" @click.stop="startGroupRename(group.id, getZoneLabel(group), $event)">
+                                        <span class="truncate">{{ getZoneLabel(group) }}</span>
                                         <span class="material-symbols-outlined text-[13px] text-text-muted opacity-0 group-hover/zonename:opacity-100 transition-all">edit</span>
                                     </div>
                                     <span v-if="group.stream_id" class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-white/10 shrink-0" :style="{ color: getStreamColor(group.stream_id) }">
                                         {{ getStreamLabel(snapcastStore.status?.streams?.find(s => s.id === group.stream_id) || {}) }}
                                     </span>
                                   </h3>
-                                  <p class="text-[9px] font-black text-text-muted mt-0.5 uppercase tracking-[0.1em]">{{ group.clients.length }} DESTINATIONS</p>
+                                  <p class="text-[9px] font-black text-text-muted mt-0.5 uppercase tracking-[0.1em]">
+                                      <i18n-t keypath="routing.destinationsCount">
+                                          <template #count>{{ group.clients.length }}</template>
+                                      </i18n-t>
+                                  </p>
                               </div>
                           </div>
                           
@@ -545,7 +558,7 @@ const updateVolume = (client: any, event: Event) => {
                             <button @click.stop="snapcastStore.setGroupMute(group.id, !group.muted)"
                                     class="w-10 h-10 rounded-xl transition-all duration-300 border flex items-center justify-center group/mute shadow-md shrink-0"
                                     :class="group.muted ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-brand-surface text-text-muted border-white/5 hover:text-text-main hover:border-white/10'"
-                                    :aria-label="`${group.muted ? 'Unmute' : 'Mute'} ${group.name || 'Zone ' + group.id.slice(0,4)}`">
+                                    :aria-label="group.muted ? t('routing.unmuteZone', { name: getZoneLabel(group) }) : t('routing.muteZone', { name: getZoneLabel(group) })">
                                 <span class="material-symbols-outlined text-sm transition-transform group-hover/mute:scale-110">{{ group.muted ? 'volume_off' : 'volume_up' }}</span>
                             </button>
                             <div class="w-8 h-8 rounded-full flex items-center justify-center text-text-muted transition-transform duration-300"
@@ -574,13 +587,13 @@ const updateVolume = (client: any, event: Event) => {
                           <label class="flex items-center gap-3 w-full">
                               <span class="text-[9px] font-black text-text-muted uppercase tracking-[0.15em] shrink-0 flex items-center gap-1.5">
                                   <span class="material-symbols-outlined text-sm" aria-hidden="true">tune</span>
-                                  Source
+                                  {{ t('routing.source') }}
                               </span>
                               <span class="flex-1 min-w-0">
                                   <Select
                                       :model-value="group.stream_id"
                                       :options="streamSelectOptions"
-                                      placeholder="No source assigned"
+                                      :placeholder="t('routing.noSourceAssigned')"
                                       @update:model-value="(value) => onZoneSourceChange(group.id, value)"
                                   />
                               </span>
@@ -608,7 +621,7 @@ const updateVolume = (client: any, event: Event) => {
                                       <div v-else @click="startRename(client.id, client.config.name || client.host.name)" 
                                            class="flex items-center gap-2 cursor-pointer group/name w-full">
                                           <span class="text-sm font-semibold text-text-main truncate group-hover/name:text-brand-primary transition-colors">
-                                              {{ client.config.name || client.host.name || 'Unnamed Client' }}
+                                              {{ client.config.name || client.host.name || t('routing.unnamedClient') }}
                                           </span>
                                           <span class="material-symbols-outlined text-[14px] text-text-muted opacity-0 group-hover/name:opacity-100 transition-all">edit</span>
                                       </div>
@@ -624,14 +637,14 @@ const updateVolume = (client: any, event: Event) => {
                                   <button @click="snapcastStore.setClientVolume(client.id, { percent: client.config.volume.percent, muted: !client.config.volume.muted })"
                                           class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl transition-all hover:bg-white/5 border border-transparent"
                                           :class="client.config.volume.muted ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-text-muted hover:text-text-main hover:border-white/10'"
-                                          :aria-label="`${client.config.volume.muted ? 'Unmute' : 'Mute'} ${client.config.name || client.host.name || 'client'}`">
+                                          :aria-label="client.config.volume.muted ? t('routing.unmuteClient', { name: client.config.name || client.host.name || t('routing.client') }) : t('routing.muteClient', { name: client.config.name || client.host.name || t('routing.client') })">
                                       <span class="material-symbols-outlined text-[18px]">{{ client.config.volume.muted ? 'volume_off' : 'volume_up' }}</span>
                                   </button>
                                   <div class="flex items-center gap-3">
                                       <input type="range" class="w-full sm:w-28 h-2 bg-black/40 shadow-inner rounded-full appearance-none cursor-pointer accent-brand-primary hover:accent-brand-primary/80 transition-all" 
                                              min="0" max="100" v-model="client.config.volume.percent" @change="updateVolume(client, $event)">
                                       <span class="text-[11px] font-black tracking-wider w-10 text-right" :class="client.config.volume.muted ? 'text-red-400' : 'text-text-muted'">
-                                          {{ client.config.volume.muted ? 'MUTED' : client.config.volume.percent + '%' }}
+                                          {{ client.config.volume.muted ? t('routing.muted') : client.config.volume.percent + '%' }}
                                       </span>
                                   </div>
                               </div>
