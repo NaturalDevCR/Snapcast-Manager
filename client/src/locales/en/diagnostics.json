@@ -1,0 +1,19 @@
+{
+  "title": "Diagnostics",
+  "subtitle": "Self-diagnostic checks for unmanaged config, orphaned units, FIFOs without producers, snapserver health, and port conflicts -- each finding includes a repair action when a safe one exists.",
+  "refreshAriaLabel": "Refresh diagnostics",
+  "runFailedTitle": "Couldn't run diagnostics",
+  "runFailedDescription": "{error} -- click refresh to try again. This is NOT a confirmation that the system is healthy.",
+  "noIssuesTitle": "No issues found",
+  "noIssuesDescription": "This system's self-diagnostics found nothing to fix. Click refresh to check again.",
+  "running": "Running diagnostics…",
+  "repair": "Repair",
+  "repairSucceeded": "{label} succeeded.",
+  "repairFailed": "Repair failed",
+  "confirmRepairTitle": "Confirm repair: {label}",
+  "categoryUnmanagedConfig": "Unmanaged Config",
+  "categoryOrphanedUnit": "Orphaned Unit",
+  "categoryFifoNoProducer": "FIFO Without Producer",
+  "categorySnapserverDown": "Snapserver Down",
+  "categoryPortOccupied": "Port Occupied"
+}

@@ -2,17 +2,14 @@
 // Task 63 (Stage 5, item 5.5, part 2/2): self-diagnostics UI.
 //
 // Consumes GET /api/diagnostics (Task 62, server/src/services/diagnostics.ts)
-// via stores/diagnostics.ts. Deliberately plain hardcoded English strings,
-// NOT vue-i18n -- this view follows the SAME convention every other
-// non-piloted view in this codebase uses today (Tools.vue, Watchdogs.vue,
-// Logs.vue, PipeSources.vue, etc.); only the 5 already-piloted i18n views
-// (Dashboard.vue among them) use t(). Expanding i18n scope to a brand new
-// view is out of scope for this task -- see the task brief's i18n
-// scope-boundary note.
+// via stores/diagnostics.ts. Uses vue-i18n (the `diagnostics` namespace,
+// useScope: 'global'), registered in both client/src/i18n.ts and
+// client/src/test/mountView.ts.
 //
 // No polling -- manual refresh only, matching the Health panel's (Task 58)
 // own explicit no-polling discipline.
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import Layout from '../components/Layout.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
@@ -22,6 +19,7 @@ import { useUIStore } from '../stores/ui';
 
 const store = useDiagnosticsStore();
 const uiStore = useUIStore();
+const { t } = useI18n({ useScope: 'global' });
 
 onMounted(() => {
   store.fetchDiagnostics();
@@ -67,16 +65,20 @@ const SEVERITY_ICON: Record<DiagnosticFinding['severity'], string> = {
   info: 'info',
 };
 
-const CATEGORY_LABEL: Record<DiagnosticCategory, string> = {
-  'unmanaged-config': 'Unmanaged Config',
-  'orphaned-unit': 'Orphaned Unit',
-  'fifo-no-producer': 'FIFO Without Producer',
-  'snapserver-down': 'Snapserver Down',
-  'port-occupied': 'Port Occupied',
+// Human-readable display labels for the backend's DiagnosticCategory KEY
+// strings (e.g. 'unmanaged-config'). The category keys themselves are
+// API/contract values and must NOT be renamed or translated -- only these
+// derived labels change with locale.
+const CATEGORY_I18N_KEY: Record<DiagnosticCategory, string> = {
+  'unmanaged-config': 'diagnostics.categoryUnmanagedConfig',
+  'orphaned-unit': 'diagnostics.categoryOrphanedUnit',
+  'fifo-no-producer': 'diagnostics.categoryFifoNoProducer',
+  'snapserver-down': 'diagnostics.categorySnapserverDown',
+  'port-occupied': 'diagnostics.categoryPortOccupied',
 };
 
 function categoryLabel(category: DiagnosticCategory): string {
-  return CATEGORY_LABEL[category] ?? category;
+  return CATEGORY_I18N_KEY[category] ? t(CATEGORY_I18N_KEY[category]) : category;
 }
 
 // ---- repair flow ----
@@ -107,10 +109,10 @@ async function handleConfirmRepair() {
   applying.value = true;
   try {
     await store.applyRepair(repairAction);
-    uiStore.showToast(`${repairAction.label} succeeded.`, 'success');
+    uiStore.showToast(t('diagnostics.repairSucceeded', { label: repairAction.label }), 'success');
     await store.fetchDiagnostics();
   } catch (err: any) {
-    uiStore.showToast(err.message || 'Repair failed', 'error');
+    uiStore.showToast(err.message || t('diagnostics.repairFailed'), 'error');
   } finally {
     applying.value = false;
     pendingFinding.value = null;
@@ -125,17 +127,16 @@ async function handleConfirmRepair() {
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
-            Diagnostics
+            {{ t('diagnostics.title') }}
           </h1>
           <p class="text-zinc-400 mt-1 text-sm">
-            Self-diagnostic checks for unmanaged config, orphaned units, FIFOs without producers, snapserver health,
-            and port conflicts -- each finding includes a repair action when a safe one exists.
+            {{ t('diagnostics.subtitle') }}
           </p>
         </div>
         <button
           @click="handleRefresh"
           :disabled="store.loading"
-          aria-label="Refresh diagnostics"
+          :aria-label="t('diagnostics.refreshAriaLabel')"
           class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-all active:scale-95 disabled:opacity-50"
         >
           <span class="material-symbols-outlined text-[1.1rem]" :class="{ 'animate-spin': store.loading }">refresh</span>
@@ -154,8 +155,8 @@ async function handleConfirmRepair() {
       >
         <EmptyState
           icon="error"
-          title="Couldn't run diagnostics"
-          :description="`${store.error} -- click refresh to try again. This is NOT a confirmation that the system is healthy.`"
+          :title="t('diagnostics.runFailedTitle')"
+          :description="t('diagnostics.runFailedDescription', { error: store.error ?? '' })"
         />
       </div>
 
@@ -168,8 +169,8 @@ async function handleConfirmRepair() {
       >
         <EmptyState
           icon="check_circle"
-          title="No issues found"
-          description="This system's self-diagnostics found nothing to fix. Click refresh to check again."
+          :title="t('diagnostics.noIssuesTitle')"
+          :description="t('diagnostics.noIssuesDescription')"
         />
       </div>
 
@@ -178,7 +179,7 @@ async function handleConfirmRepair() {
            split. -->
       <div v-else-if="store.loading && sortedFindings.length === 0" class="flex items-center justify-center py-12 text-zinc-400 text-sm gap-2">
         <span class="material-symbols-outlined animate-spin text-[1rem]">sync</span>
-        Running diagnostics…
+        {{ t('diagnostics.running') }}
       </div>
 
       <!-- Findings list -->
@@ -212,7 +213,7 @@ async function handleConfirmRepair() {
               class="px-3 py-1.5 rounded bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 text-xs font-medium transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span class="material-symbols-outlined text-[1rem]">build</span>
-              Repair
+              {{ t('diagnostics.repair') }}
             </button>
           </div>
         </div>
@@ -222,9 +223,9 @@ async function handleConfirmRepair() {
     <!-- Repair confirmation -->
     <ConfirmDialog
       v-model="showConfirmRepair"
-      :title="`Confirm repair: ${pendingFinding?.repairAction?.label ?? ''}`"
+      :title="t('diagnostics.confirmRepairTitle', { label: pendingFinding?.repairAction?.label ?? '' })"
       :message="pendingFinding?.message ?? ''"
-      confirm-text="Repair"
+      :confirm-text="t('diagnostics.repair')"
       type="warning"
       @confirm="handleConfirmRepair"
     />

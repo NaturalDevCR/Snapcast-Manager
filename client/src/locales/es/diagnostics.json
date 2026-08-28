@@ -1,0 +1,19 @@
+{
+  "title": "Diagnósticos",
+  "subtitle": "Comprobaciones de autodiagnóstico para configuraciones no gestionadas, unidades huérfanas, FIFOs sin productor, salud de Snapserver y conflictos de puertos; cada hallazgo incluye una acción de reparación cuando existe una segura.",
+  "refreshAriaLabel": "Actualizar diagnósticos",
+  "runFailedTitle": "No se pudieron ejecutar los diagnósticos",
+  "runFailedDescription": "{error} -- haz clic en actualizar para intentarlo de nuevo. Esto NO es una confirmación de que el sistema esté sano.",
+  "noIssuesTitle": "No se encontraron problemas",
+  "noIssuesDescription": "El autodiagnóstico de este sistema no encontró nada que corregir. Haz clic en actualizar para comprobar de nuevo.",
+  "running": "Ejecutando diagnósticos…",
+  "repair": "Reparar",
+  "repairSucceeded": "{label} se realizó correctamente.",
+  "repairFailed": "Error en la reparación",
+  "confirmRepairTitle": "Confirmar reparación: {label}",
+  "categoryUnmanagedConfig": "Configuración No Gestionada",
+  "categoryOrphanedUnit": "Unidad Huérfana",
+  "categoryFifoNoProducer": "FIFO Sin Productor",
+  "categorySnapserverDown": "Snapserver Caído",
+  "categoryPortOccupied": "Puerto Ocupado"
+}

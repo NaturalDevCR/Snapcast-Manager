@@ -47,6 +47,17 @@ describe('Diagnostics.vue', () => {
     expect(wrapper.text()).toContain('No issues found');
   });
 
+  it('renders Spanish copy when locale is switched to "es"', async () => {
+    const wrapper = await mountSmokeTest(Diagnostics, '/diagnostics');
+    const store = useDiagnosticsStore();
+    store.findings = [];
+    useUIStore().setLocale('es');
+    await nextTick();
+
+    expect(wrapper.text()).toContain('No se encontraron problemas');
+    expect(wrapper.text()).toContain('El autodiagnóstico de este sistema no encontró nada que corregir. Haz clic en actualizar para comprobar de nuevo.');
+  });
+
   it('renders a distinct "couldn\'t check" state on a fetch failure, NOT the same empty state as confirmed-healthy', async () => {
     // Regression test for the Task 63 review finding: a failed fetch used to
     // be indistinguishable from "genuinely 0 findings" (both left `findings`

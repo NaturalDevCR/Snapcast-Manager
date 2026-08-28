@@ -15,6 +15,10 @@ import enLogs from './locales/en/logs.json';
 import esLogs from './locales/es/logs.json';
 import enSecurity from './locales/en/security.json';
 import esSecurity from './locales/es/security.json';
+import enDiagnostics from './locales/en/diagnostics.json';
+import esDiagnostics from './locales/es/diagnostics.json';
+import enWatchdogs from './locales/en/watchdogs.json';
+import esWatchdogs from './locales/es/watchdogs.json';
 
 export type SupportedLocale = 'en' | 'es';
 export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'es'];
@@ -34,8 +38,8 @@ export const i18n = createI18n({
   locale: initialLocale,
   fallbackLocale: 'en',
   messages: {
-    en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard, logs: enLogs, security: enSecurity },
-    es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard, logs: esLogs, security: esSecurity },
+    en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard, logs: enLogs, security: enSecurity, diagnostics: enDiagnostics, watchdogs: enWatchdogs },
+    es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard, logs: esLogs, security: esSecurity, diagnostics: esDiagnostics, watchdogs: esWatchdogs },
   },
 });
 
