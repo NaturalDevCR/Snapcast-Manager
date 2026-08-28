@@ -30,6 +30,27 @@ if [ -f "$SCRIPT_DIR/lib/migration.sh" ]; then
     source "$SCRIPT_DIR/lib/migration.sh"
 fi
 
+# Task 75: same pattern, for scripts/lib/verify-download.sh's pure
+# verify_download_hash() function (used by the remote-download flow below to
+# verify a downloaded release .zip's size/hash before extracting it).
+# Neither this file nor migration.sh above is actually packaged into the
+# release .zip (release.yml's "Prepare Release Package" step only copies
+# scripts/install.sh itself -- confirmed by reading that step; a real,
+# pre-existing gap, flagged separately, not fixed here as it's out of this
+# task's scope) NOR present at all in the primary documented install path
+# (`curl -sL .../install.sh | bash`, README.md/docs/installation.md --
+# nothing but this one file is ever fetched). So this optional source is a
+# best-effort win for the rarer case of running install.sh from a full git
+# checkout where scripts/lib/ happens to sit alongside it; the declare -f
+# guarded fallback definition at this function's actual call site below
+# (same "declare -f ... || define a fallback" pattern already used for
+# unit_needs_user_migration further down this file) is what guarantees real
+# verification actually runs on the common real-world paths.
+if [ -f "$SCRIPT_DIR/lib/verify-download.sh" ]; then
+    # shellcheck source=lib/verify-download.sh
+    source "$SCRIPT_DIR/lib/verify-download.sh"
+fi
+
 LATEST_RELEASE=$(curl -sL "https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/latest" | grep '"tag_name"' | head -1 | cut -d '"' -f 4)
 VERSION="${LATEST_RELEASE:-v0.2.2}"
 APP_VERSION="$VERSION"
@@ -372,33 +393,169 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
     fi
 
     if [ ! -d "$INSTALL_BASE_DIR" ]; then
-        if ! command -v wget >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
+        if ! command -v wget >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1 || ! command -v sha256sum >/dev/null 2>&1; then
             echo -e "${YELLOW}Step 0: Checking for essential tools...${NC}"
-            if prompt_yes_no "Missing wget or unzip. Install them?" "y"; then
+            # sha256sum (GNU coreutils) verifies the downloaded release .zip's
+            # hash below (Task 75) before it is ever extracted/installed --
+            # ships in every Debian/Ubuntu base install already, so this is
+            # a defensive check, not an expected real-world install path.
+            if prompt_yes_no "Missing wget, unzip, or sha256sum. Install them?" "y"; then
                 $SUDO apt-get update
-                $SUDO apt-get install -y wget unzip
+                $SUDO apt-get install -y wget unzip coreutils
             else
-                echo "Cannot proceed without wget and unzip. Installation aborted."
+                echo "Cannot proceed without wget, unzip, and sha256sum. Installation aborted."
                 exit 1
             fi
         fi
-        
+
+        # Task 75: verify_download_hash() (scripts/lib/verify-download.sh)
+        # size+hash-verifies the downloaded release .zip below, against the
+        # size/digest fields GitHub's Releases API returns for that asset.
+        # Fallback definition matching the exact real logic in that file --
+        # see this script's earlier optional `source
+        # "$SCRIPT_DIR/lib/verify-download.sh"` for why a fallback (rather
+        # than just failing when the lib file is absent) is needed here: the
+        # primary documented install path (`curl -sL .../install.sh |
+        # bash`, README.md) fetches ONLY this one file, never scripts/lib/,
+        # so relying solely on that optional source would silently skip
+        # real verification on the most common real-world path -- defeating
+        # this task's whole purpose. Kept byte-for-byte identical to
+        # scripts/lib/verify-download.sh's real body (that file remains the
+        # single source of truth exercised by scripts/test-verify-download.sh;
+        # this is a deliberate, disclosed duplication for the piped-install
+        # case, not a divergent reimplementation).
+        if ! declare -f verify_download_hash >/dev/null 2>&1; then
+            verify_download_hash() {
+                local file_path="$1"
+                local expected_size="$2"
+                local expected_digest="$3"
+
+                if [ ! -f "$file_path" ]; then
+                    echo "verify_download_hash: file not found: $file_path" >&2
+                    return 1
+                fi
+
+                if [ -n "$expected_size" ]; then
+                    local actual_size
+                    actual_size=$(stat -c '%s' "$file_path" 2>/dev/null || stat -f '%z' "$file_path" 2>/dev/null)
+                    if [ -z "$actual_size" ]; then
+                        echo "verify_download_hash: unable to determine file size for $file_path" >&2
+                        return 1
+                    fi
+                    if [ "$actual_size" != "$expected_size" ]; then
+                        echo "verify_download_hash: size mismatch for $file_path -- GitHub reported $expected_size bytes, got $actual_size bytes" >&2
+                        return 1
+                    fi
+                fi
+
+                if [ -n "$expected_digest" ]; then
+                    local expected_hash actual_hash
+                    expected_hash="${expected_digest#sha256:}"
+                    if command -v sha256sum >/dev/null 2>&1; then
+                        actual_hash=$(sha256sum "$file_path" | cut -d ' ' -f 1)
+                    elif command -v shasum >/dev/null 2>&1; then
+                        actual_hash=$(shasum -a 256 "$file_path" | cut -d ' ' -f 1)
+                    else
+                        echo "verify_download_hash: neither sha256sum nor shasum is available to compute a hash" >&2
+                        return 1
+                    fi
+                    if [ "$actual_hash" != "$expected_hash" ]; then
+                        echo "verify_download_hash: hash mismatch for $file_path -- GitHub reported sha256:$expected_hash, computed sha256:$actual_hash" >&2
+                        return 1
+                    fi
+                fi
+
+                return 0
+            }
+        fi
+
         echo "Downloading pre-built release $VERSION..."
 
         $SUDO rm -rf "$INSTALL_BASE_DIR"
         $SUDO mkdir -p "$INSTALL_BASE_DIR"
-        
-        # Fetch the download URL for any attached ZIP files in the release
+
+        # Fetch the release's full API response once (not pre-filtered to
+        # just browser_download_url lines, as before) -- Task 75 needs each
+        # asset's "size"/"digest" fields too, which live in the SAME object
+        # as its browser_download_url, not as standalone lines elsewhere in
+        # the response.
         API_URL="https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/tags/${VERSION}"
-        ASSETS=$(curl -sL "$API_URL" | grep "browser_download_url" || true)
-        REPO_ZIP_URL=$(echo "$ASSETS" | grep ".zip" | head -n 1 | cut -d '"' -f 4 || true)
-        
-        $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL" || {
+        RELEASE_JSON=$(curl -sL "$API_URL" || true)
+
+        # Isolate just the "assets": [ ... ] array (2-space indent, GitHub's
+        # standard pretty-printed API format) so the per-asset block split
+        # below can safely use "name" as a splitting anchor -- the top-level
+        # release object ALSO has its own unrelated "name" field (the
+        # release's display title, e.g. "v0.3.0"), which would otherwise be
+        # ambiguous.
+        ASSETS_JSON=$(printf '%s\n' "$RELEASE_JSON" | awk '
+            /^  "assets": \[/ { flag=1 }
+            flag { print }
+            flag && /^  \],?$/ { exit }
+        ')
+
+        # This repo's release asset filename (release.yml's "Prepare Release
+        # Package" step zips to exactly this name). Split ASSETS_JSON into
+        # per-asset blocks on the 4-space-indented "{"/"}" object boundaries
+        # (each array element), and keep only the block whose "name" field
+        # is an EXACT match -- not a substring match. Requirement 1 (this
+        # same task) now ALSO publishes a "snapcast-manager-release.zip.sha256"
+        # asset in the SAME assets array; a naive `grep ".zip"` (the old
+        # logic) would match EITHER asset depending on array order, since
+        # ".zip" is a substring of both filenames. Anchoring on the closing
+        # quote (`"name": "snapcast-manager-release.zip"` as a literal
+        # substring, which cannot appear inside the longer ".zip.sha256"
+        # name) makes the match exact.
+        RELEASE_ASSET_NAME="snapcast-manager-release.zip"
+        ASSET_BLOCK=$(printf '%s\n' "$ASSETS_JSON" | awk -v name="\"name\": \"$RELEASE_ASSET_NAME\"" '
+            /^    \{$/ { block = "" }
+            { block = block "\n" $0 }
+            /^    \},?$/ {
+                if (index(block, name) > 0) { print block; exit }
+            }
+        ')
+
+        REPO_ZIP_URL=$(printf '%s\n' "$ASSET_BLOCK" | grep '"browser_download_url":' | head -n 1 | cut -d '"' -f 4 || true)
+        ASSET_SIZE=$(printf '%s\n' "$ASSET_BLOCK" | grep '"size":' | head -n 1 | grep -oE '[0-9]+' || true)
+        ASSET_DIGEST=$(printf '%s\n' "$ASSET_BLOCK" | grep '"digest":' | head -n 1 | cut -d '"' -f 4 || true)
+
+        DOWNLOADED_PREBUILT_ASSET=false
+        if $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"; then
+            DOWNLOADED_PREBUILT_ASSET=true
+        else
             echo -e "${RED}[!] Pre-built asset $VERSION not found. Falling back to tagged source code...${NC}"
             REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/archive/refs/tags/${VERSION}.zip"
             $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"
-        }
-        
+        fi
+
+        if [ "$DOWNLOADED_PREBUILT_ASSET" = true ]; then
+            echo "Verifying downloaded release archive against GitHub's reported size/hash..."
+            if [ -z "$ASSET_SIZE" ] && [ -z "$ASSET_DIGEST" ]; then
+                # Genuinely nothing to verify against (e.g. GitHub API
+                # response didn't include this asset's metadata for some
+                # reason) -- logged clearly rather than silently treated as
+                # a pass, matching verifyDownloadedAsset()'s (Task 61,
+                # server/src/services/system.ts) own "no digest available"
+                # non-fatal-but-disclosed handling.
+                echo -e "${YELLOW}[!] No size/hash metadata available from GitHub's API for this asset -- proceeding WITHOUT verification.${NC}"
+            elif ! verify_download_hash /tmp/snapmanager.zip "$ASSET_SIZE" "$ASSET_DIGEST"; then
+                echo -e "${RED}[!] Downloaded release archive failed verification -- aborting BEFORE extraction/install.${NC}"
+                echo "This could mean a corrupted download, a mid-transfer network issue, or (far less"
+                echo "likely) a tampered asset. Re-run the installer; if this keeps happening, please"
+                echo "report it."
+                $SUDO rm -f /tmp/snapmanager.zip
+                exit 1
+            else
+                echo -e "${GREEN}[OK] Verified: size and hash match GitHub's reported asset metadata.${NC}"
+            fi
+        else
+            # The tagged-source-code fallback above is a GitHub-generated
+            # archive (Codeload), not a release asset -- it has no
+            # size/digest field to verify against at all (distinct from the
+            # "asset present but metadata missing" case above).
+            echo -e "${YELLOW}[!] Source-archive fallback has no GitHub-published checksum to verify against -- proceeding WITHOUT verification.${NC}"
+        fi
+
         echo "Extracting source..."
         TEMP_EXTRACT="/tmp/snapmgr_extract"
         $SUDO rm -rf "$TEMP_EXTRACT"

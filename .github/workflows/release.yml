@@ -16,6 +16,14 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          # Full history + tags, not the default shallow single-commit
+          # checkout -- git-cliff (CHANGELOG.md generation, see the "Update
+          # CHANGELOG.md" step below) needs the complete conventional-commit
+          # log and every tag to group releases correctly; a shallow clone
+          # would silently produce a near-empty changelog.
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -69,8 +77,55 @@ jobs:
 
           zip -r ../snapcast-manager-release.zip ./*
 
+      - name: Compute Release Checksum
+        run: |
+          # Publishes a human-readable, downloadable SHA256 checksum file
+          # alongside the release .zip (Task 75, requirement 1). This is
+          # separate from -- and complementary to -- the digest/size fields
+          # GitHub itself computes automatically for every release asset
+          # (confirmed present via a real `curl` against this repo's own
+          # releases API; see .superpowers/sdd/task-75-report.md), which is
+          # what scripts/install.sh actually verifies against
+          # programmatically (requirement 3). Standard `sha256sum` output
+          # format (`<hex-digest>  <filename>`), so it's also directly
+          # `sha256sum -c`-able by anyone who downloads both files by hand.
+          sha256sum snapcast-manager-release.zip > snapcast-manager-release.zip.sha256
+          cat snapcast-manager-release.zip.sha256
+
+      - name: Update CHANGELOG.md
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGELOG.md
+
+      - name: Commit CHANGELOG.md
+        run: |
+          # Regenerates CHANGELOG.md from this release's full conventional-
+          # commit history (Task 75, requirement 2) and commits it back to
+          # the branch the release tag points at, so the committed
+          # CHANGELOG.md stays in sync with the repo across releases -- the
+          # per-release notes GitHub itself auto-generates below
+          # (`generate_release_notes: true`) are a DIFFERENT, separate
+          # thing (per-tag release-page prose, not an accumulating
+          # committed file). Gated on there actually being a diff, since a
+          # release with no new conventional commits since the last run
+          # would otherwise produce an empty, failing commit.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "CHANGELOG.md unchanged, nothing to commit."
+          else
+            git add CHANGELOG.md
+            git commit -m "docs(changelog): update CHANGELOG.md for ${{ github.ref_name }}"
+            git push origin HEAD:main
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: snapcast-manager-release.zip
+          files: |
+            snapcast-manager-release.zip
+            snapcast-manager-release.zip.sha256
           generate_release_notes: true
