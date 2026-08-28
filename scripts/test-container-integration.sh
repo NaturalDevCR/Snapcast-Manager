@@ -26,6 +26,12 @@
 #      schema_migrations database by stripping that table from the real DB
 #      steps 1-5 already produced, restarts the app against it, and asserts
 #      it starts cleanly with the pre-existing data intact.
+#   7. Reboot simulation (Task 66) -- stops the unit, `rm -rf`s
+#      /run/snapcast-manager to reproduce a real host reboot's tmpfs wipe,
+#      restarts it, and asserts it comes up clean with the directory
+#      recreated snapmanager:audio mode 770 by the unit's own
+#      RuntimeDirectory= directive (not the installer's one-time mkdir,
+#      which never runs again after install).
 #
 # Every step asserts something concrete and independently checkable (a real
 # systemd active-state, a real file's real content, a real HTTP response
@@ -549,6 +555,61 @@ step_6_old_style_db_migration() {
   ok "schema_migrations rebuilt with all 7 versions recorded, none of them re-ran up() against already-present tables/columns"
 }
 
+
+# ============================================================================
+# Step 7: reboot simulation (Task 66 -- RuntimeDirectory= regression test)
+# ============================================================================
+#
+# /run/snapcast-manager is tmpfs-backed, so a real host reboot wipes it.
+# Before Task 66, nothing re-created it on every boot -- only
+# ensureRuntimeDir()/a radio unit's own ExecStartPre, both of which only run
+# once a pipe source has actually been created or started. On a host where
+# snapmanager.service starts (After=network.target snapserver.service)
+# before any pipe source ever has, its own ReadWritePaths= entry for this
+# path would hard-fail NAMESPACE setup post-reboot, identically to the
+# fresh-install gap Task 65 found for the OTHER ReadWritePaths= entries.
+#
+# `systemctl stop` + `rm -rf` the directory + `systemctl start` is the
+# closest a container test can get to a real reboot's tmpfs wipe without an
+# actual reboot: it reproduces the exact on-disk precondition (path
+# genuinely absent) that NAMESPACE setup would hit on step 1's freshly-
+# installed unit if RuntimeDirectory= were missing or broken.
+step_7_reboot_simulation() {
+  step "Step 7/7: reboot simulation (RuntimeDirectory= regression test)"
+
+  info "Stopping ${SERVICE_NAME}..."
+  systemctl stop "$SERVICE_NAME" || fail "Step 7: systemctl stop $SERVICE_NAME failed"
+  wait_for_active "$SERVICE_NAME" 5 && fail "Step 7: $SERVICE_NAME is still active after systemctl stop"
+
+  info "Simulating a tmpfs wipe of /run/snapcast-manager..."
+  rm -rf /run/snapcast-manager
+  [ ! -e /run/snapcast-manager ] || fail "Step 7: /run/snapcast-manager still exists after rm -rf -- test setup itself is broken"
+  ok "/run/snapcast-manager removed (tmpfs-wipe precondition reproduced)"
+
+  info "Starting ${SERVICE_NAME} against the wiped /run/snapcast-manager..."
+  systemctl start "$SERVICE_NAME" || fail "Step 7: systemctl start $SERVICE_NAME failed against a missing /run/snapcast-manager -- this is the exact NAMESPACE failure RuntimeDirectory= exists to prevent"
+  wait_for_active "$SERVICE_NAME" 30 || fail "Step 7: $SERVICE_NAME did not become active within 30s after a simulated reboot"
+  ok "${SERVICE_NAME} started cleanly against a wiped /run/snapcast-manager"
+
+  [ -d /run/snapcast-manager ] || fail "Step 7: /run/snapcast-manager was not recreated by RuntimeDirectory= on unit start"
+  ok "/run/snapcast-manager recreated by RuntimeDirectory= on unit start"
+
+  local mode owner group
+  mode="$(stat -c '%a' /run/snapcast-manager)"
+  owner="$(stat -c '%U' /run/snapcast-manager)"
+  group="$(stat -c '%G' /run/snapcast-manager)"
+  [ "$mode" = "770" ] || fail "Step 7: /run/snapcast-manager mode is $mode, expected 770 (RuntimeDirectoryMode=)"
+  [ "$owner" = "snapmanager" ] || fail "Step 7: /run/snapcast-manager owner is $owner, expected snapmanager"
+  [ "$group" = "audio" ] || fail "Step 7: /run/snapcast-manager group is $group, expected audio (the ExecStartPre chgrp did not run/failed)"
+  ok "/run/snapcast-manager is snapmanager:audio, mode 770 -- matches ensureRuntimeDir()'s own convention"
+
+  wait_for_http "${BASE_URL}/api/status" 30 || fail "Step 7: ${BASE_URL}/api/status did not respond within 30s of restart"
+  api GET /api/status
+  assert_status 200 "Step 7 GET /api/status"
+  [ "$(api_field '.status')" = "online" ] || fail "Step 7: GET /api/status body did not report status=online after simulated reboot: $(cat "$API_BODY_FILE")"
+  ok "GET /api/status: online after simulated reboot"
+}
+
 main() {
   step_1_installation
   step_2_setup
@@ -556,8 +617,9 @@ main() {
   step_4_adoption
   step_5_backup_restore
   step_6_old_style_db_migration
+  step_7_reboot_simulation
   echo -e "\n${GREEN}==============================================${NC}"
-  echo -e "${GREEN} ALL 6 container integration test steps passed${NC}"
+  echo -e "${GREEN} ALL 7 container integration test steps passed${NC}"
   echo -e "${GREEN}==============================================${NC}"
 }
 

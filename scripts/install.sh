@@ -776,13 +776,25 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
 
     # /run/snapcast-manager: services/pipeSources.ts's RUNTIME_DIR (the FIFO
     # directory) -- ephemeral by nature (lives on tmpfs-backed /run, so it
-    # never survives a reboot regardless of this installer), normally
-    # re-created on demand by ensureRuntimeDir()/a radio unit's own
-    # ExecStartPre the first time ANY pipe source is created or started.
-    # But snapmanager.service's own ReadWritePaths= needs it to exist
-    # already at snapmanager.service's OWN first start, which can happen
-    # before any pipe source ever has -- mode 0770 + group audio matches
-    # ensureRuntimeDir()'s own convention exactly.
+    # never survives a reboot regardless of this installer). This one-time
+    # pre-creation used to be load-bearing for snapmanager.service's OWN
+    # first start (its ReadWritePaths= entry for this path hard-fails the
+    # unit's NAMESPACE setup if the target doesn't already exist on disk --
+    # see the Task 65 ReadWritePaths comment block below), which could
+    # happen before any pipe source had ever created it via
+    # ensureRuntimeDir()/a radio unit's own ExecStartPre.
+    #
+    # That's now handled properly by the unit itself: NEW_UNIT_CONTENT below
+    # carries a `RuntimeDirectory=snapcast-manager` directive, systemd's own
+    # built-in mechanism for exactly this -- it (re-)creates /run/<name>
+    # fresh before EVERY unit start (including after a real reboot's tmpfs
+    # wipe, not just the first one), before ReadWritePaths=' mount-namespace
+    # setup ever runs, and removes it on stop. That makes this block
+    # redundant for correctness. Left in place anyway as harmless,
+    # idempotent defense-in-depth: it's a no-op once RuntimeDirectory= has
+    # created the directory, and it protects an install still running on a
+    # pre-Task-66 unit file (before this migration ships) or a
+    # hypothetically ancient systemd without RuntimeDirectory= support.
     $SUDO mkdir -p -m 0770 /run/snapcast-manager
     $SUDO chgrp audio /run/snapcast-manager 2>/dev/null || true
 
@@ -883,6 +895,47 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     # this task's "small contained fix" scope -- left as a disclosed,
     # explicit follow-up rather than attempted here. See task-65-report.md
     # for the full account.
+    #
+    # Task 66: `RuntimeDirectory=snapcast-manager` added below.
+    # /run/snapcast-manager (services/pipeSources.ts's RUNTIME_DIR) is
+    # tmpfs-backed and does NOT survive a real host reboot; before this,
+    # nothing re-created it on every boot -- only ensureRuntimeDir()/a radio
+    # unit's own ExecStartPre, both of which only run once a pipe source has
+    # actually been created or started. On a host where this unit starts
+    # (After=network.target snapserver.service) before any pipe source ever
+    # has, its own ReadWritePaths= entry for this path would hard-fail
+    # NAMESPACE setup post-reboot, identically to the fresh-install gap Task
+    # 65 found (see the ReadWritePaths comment block below). RuntimeDirectory=
+    # is systemd's own built-in fix for exactly this: it (re-)creates
+    # /run/<name>, owned by this unit's User=/Group=, fresh before EVERY
+    # start -- not just the first -- ahead of ReadWritePaths' mount-namespace
+    # setup, and removes it on stop. RuntimeDirectoryMode=0770 matches the
+    # mode ensureRuntimeDir() already uses for this exact directory.
+    #
+    # Group ownership: `Group=audio` is added below (this unit previously
+    # had no explicit `Group=`, defaulting to $SNAPMANAGER_USER's own
+    # per-user primary group from useradd). ensureRuntimeDir()'s chgrp
+    # convention -- and the FIFOs underneath, chgrp'd audio by the radio
+    # unit's own ExecStartPre -- rely on group `audio` specifically, so
+    # snapserver/mpd (both real `audio`-group members, not members of
+    # $SNAPMANAGER_USER's own per-user group) need that to even traverse
+    # into this directory. The first attempt here was an unprivileged
+    # `ExecStartPre=-/bin/chgrp audio /run/snapcast-manager` instead (to
+    # avoid touching Group=, since that also becomes the process's own
+    # default GID for anything else it creates) -- REJECTED after real
+    # container verification: the chgrp itself succeeded
+    # (`code=exited, status=0/SUCCESS` in `systemctl status`), but the
+    # directory's group was back to $SNAPMANAGER_USER's own group by the
+    # time ExecStart ran anyway -- systemd re-applies RuntimeDirectory='s
+    # configured User=/Group= ownership before EVERY Exec* line of a single
+    # unit start, not just once, silently undoing a chgrp done in an earlier
+    # one. `Group=audio` is the only durable fix; the side effect (any file
+    # this process creates directly, without an explicit chown, now
+    # defaults to group `audio` instead of $SNAPMANAGER_USER's own group)
+    # is harmless here -- every such path (the SQLite DB, snapshots/) is
+    # read/written exclusively by this same process under its own **user**
+    # ownership, which is unaffected; nothing in this codebase gates access
+    # by group equality.
     NEW_UNIT_CONTENT=$(cat <<EOF
 [Unit]
 Description=Snapcast Manager Service
@@ -891,7 +944,10 @@ After=network.target snapserver.service
 [Service]
 Type=simple
 User=$SNAPMANAGER_USER
+Group=audio
 WorkingDirectory=$INSTALL_DIR/server
+RuntimeDirectory=snapcast-manager
+RuntimeDirectoryMode=0770
 ExecStart=$(command -v node) dist/index.js
 Restart=always
 EnvironmentFile=$INSTALL_DIR/server/.env
