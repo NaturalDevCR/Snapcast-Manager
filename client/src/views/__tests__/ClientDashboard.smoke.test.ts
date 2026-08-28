@@ -5,11 +5,23 @@ import ClientDashboard from '../ClientDashboard.vue';
 import { mountSmokeTest } from '../../test/mountView';
 import { useSystemStore } from '../../stores/system';
 import { useSnapclientInstancesStore } from '../../stores/snapclientInstances';
+import { useUIStore } from '../../stores/ui';
 
 describe('ClientDashboard.vue', () => {
   it('mounts without throwing', async () => {
     const wrapper = await mountSmokeTest(ClientDashboard, '/client');
     expect(wrapper.exists()).toBe(true);
+  });
+
+  it('renders Spanish copy when locale is switched to "es"', async () => {
+    const wrapper = await mountSmokeTest(ClientDashboard, '/client');
+    useUIStore().setLocale('es');
+    await nextTick();
+
+    expect(wrapper.text()).toContain('Panel de Clientes');
+    expect(wrapper.text()).toContain('Administra instancias de receptor de audio Snapclient.');
+    expect(wrapper.text()).toContain('SINCRONIZAR TODO');
+    expect(wrapper.text()).toContain('Instalado');
   });
 
   // Task 31: instance deletion used to call window.confirm() directly. It

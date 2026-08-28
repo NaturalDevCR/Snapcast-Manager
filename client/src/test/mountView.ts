@@ -33,6 +33,10 @@ import enServerConfig from '../locales/en/serverConfig.json';
 import esServerConfig from '../locales/es/serverConfig.json';
 import enPipeSources from '../locales/en/pipeSources.json';
 import esPipeSources from '../locales/es/pipeSources.json';
+import enClientDashboard from '../locales/en/clientDashboard.json';
+import esClientDashboard from '../locales/es/clientDashboard.json';
+import enTools from '../locales/en/tools.json';
+import esTools from '../locales/es/tools.json';
 import { useUIStore } from '../stores/ui';
 
 // A fresh i18n instance per mount (not the app's shared singleton) so tests
@@ -45,8 +49,8 @@ function createTestI18n() {
     locale: 'en',
     fallbackLocale: 'en',
     messages: {
-      en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard, logs: enLogs, security: enSecurity, diagnostics: enDiagnostics, watchdogs: enWatchdogs, serverConfig: enServerConfig, pipeSources: enPipeSources },
-      es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard, logs: esLogs, security: esSecurity, diagnostics: esDiagnostics, watchdogs: esWatchdogs, serverConfig: esServerConfig, pipeSources: esPipeSources },
+      en: { common: enCommon, layout: enLayout, login: enLogin, setup: enSetup, onboarding: enOnboarding, dashboard: enDashboard, logs: enLogs, security: enSecurity, diagnostics: enDiagnostics, watchdogs: enWatchdogs, serverConfig: enServerConfig, pipeSources: enPipeSources, clientDashboard: enClientDashboard, tools: enTools },
+      es: { common: esCommon, layout: esLayout, login: esLogin, setup: esSetup, onboarding: esOnboarding, dashboard: esDashboard, logs: esLogs, security: esSecurity, diagnostics: esDiagnostics, watchdogs: esWatchdogs, serverConfig: esServerConfig, pipeSources: esPipeSources, clientDashboard: esClientDashboard, tools: esTools },
     },
   });
 }
