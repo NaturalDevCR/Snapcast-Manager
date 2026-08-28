@@ -61,7 +61,7 @@ route audio sources to output zones, and back up/restore your setup.
 ## 🏗️ Architecture
 
 - **Client**: Vue 3 + Vite + Tailwind CSS, talking to the server over a JSON REST API plus a server-sent-events (SSE) stream for live Snapcast status, jobs, and metrics.
-- **Server**: Express on Node.js, written in TypeScript, backed by a `better-sqlite3` database (`server/data/snapmanager.db`) for users, pipe sources, and snapshot metadata.
+- **Server**: Express on Node.js, written in TypeScript, backed by a `better-sqlite3` database for users, pipe sources, and snapshot metadata (`server/data/snapmanager.db` in local dev; a real install's `NODE_ENV=production` puts it at `/opt/snapcast-manager/data/snapmanager.db` instead).
 - **Auth**: JWT-based, issued after the one-time Setup Wizard creates the first admin account.
 - **System integration**: the server drives `systemctl`, `apt`/`dpkg`, and config files for `snapserver`, `snapclient`, `mpd`/`myMPD`, and `shairport-sync` (AirPlay) — see the pipe-source/FIFO model below.
 - **Audio routing**: pipe sources (radio streams, MPD output, etc.) are FIFOs (`/run/snapcast-manager/*`) each fed by their own generated systemd unit; `snapserver.conf` and the FIFOs are what actually route audio into Snapcast's stream/group model that the UI's matrix visualizes.
