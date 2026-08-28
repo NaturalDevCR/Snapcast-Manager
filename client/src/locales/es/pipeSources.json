@@ -32,7 +32,7 @@
   "statusInactive": "Detenido",
   "typeMpd": "MPD",
   "typeRadio": "Radio",
-  "deletedToast": "Fuente eliminada y servicio removido. Reinicia snapserver para descargarlo de memoria.",
+  "deletedToast": "Fuente eliminada y servicio quitado. Reinicia snapserver para descargarlo de memoria.",
   "deleteFailedToast": "Error al eliminar",
   "serviceStarted": "Servicio iniciado",
   "serviceStopped": "Servicio detenido",
