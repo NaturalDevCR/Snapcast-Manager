@@ -8,6 +8,15 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.4] - 2026-09-01
+
+### 🐛 Bug Fixes
+
+- *(ui)* Connect the light/dark theme toggle + fix hardcoded dark-only colors (v0.3.4) (#7)
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.3
 ## [0.3.3] - 2026-09-01
 
 ### 🐛 Bug Fixes
