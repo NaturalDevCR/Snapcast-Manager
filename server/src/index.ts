@@ -56,6 +56,30 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 // style-src/font-src must explicitly allow just those two hosts -- no
 // other external host is allowed beyond them. Tighten this back to
 // helmet's plain defaults once fonts are self-hosted.
+// Post-v0.3.1 fix (found for real: a user's browser refused to load ANY
+// static asset -- CSS/JS/manifest/icons all failed with
+// ERR_SSL_PROTOCOL_ERROR, in a fresh incognito window too, ruling out
+// cached HSTS -- immediately after installing and visiting the app over
+// plain HTTP, its documented default deployment model with no reverse
+// proxy). `helmet.contentSecurityPolicy.getDefaultDirectives()` includes
+// `upgrade-insecure-requests` by default, and the spread below never
+// excluded it -- that CSP directive tells the browser to rewrite EVERY
+// same-page resource request (scripts, styles, images, fonts) from `http:`
+// to `https:` before even sending it, regardless of what protocol the page
+// itself loaded over. This app has no built-in TLS listener (see
+// SECURITY.md's/README's own "should not be exposed directly to the
+// public internet without a reverse proxy and TLS" guidance -- TLS, if
+// any, terminates at an admin-provided reverse proxy, never in this Node
+// process itself), so on the documented default (plain HTTP, no proxy)
+// this directive made the page's own static assets permanently
+// unloadable: the browser silently upgraded each asset request to
+// `https://` and got `ERR_SSL_PROTOCOL_ERROR` back, since nothing is
+// listening on 443. `null` explicitly removes the directive (helmet's own
+// documented way to drop a default directive) rather than leaving it
+// unset, which would still inherit the default. An admin who DOES
+// terminate TLS at a reverse proxy is unaffected either way -- that proxy
+// serves the page over `https:` to begin with, so there is nothing left to
+// "upgrade".
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -63,6 +87,7 @@ app.use(
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         'style-src': ["'self'", 'https://fonts.googleapis.com'],
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
+        'upgrade-insecure-requests': null,
       },
     },
   })

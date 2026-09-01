@@ -775,6 +775,35 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
 
     echo -e "${CYAN}Applying privilege-hardening: dedicated '${SNAPMANAGER_USER}' user, sudoers.d, systemd sandboxing (Task 16)...${NC}"
 
+    # --- 6a-pre. The `sudo` package itself (which provides `visudo` AND
+    # `/usr/bin/sudo`) must be installed, independent of whether THIS
+    # SCRIPT needed sudo to run. Found for real (v0.3.1) on a Proxmox VE
+    # host logged in as root directly: `$(id -u) -eq 0` above sets
+    # `SUDO=""` and skips the "is sudo installed?" check entirely (root
+    # never needs to invoke `sudo` to elevate itself) -- but the privilege
+    # MODEL this step is about to set up needs `sudo`/`visudo` to exist on
+    # the HOST regardless, because it's the unprivileged `snapmanager`
+    # user (not whoever ran this installer) that will need to invoke
+    # `sudo` afterward for every privileged action the running app takes.
+    # Proxmox VE (and any other root-login-only Debian host, which is
+    # common -- root has no need for `sudo` when it's already root) does
+    # NOT ship the `sudo` package by default. Without this check, `visudo`
+    # not existing at all made Step 6c below fail with the exact same
+    # generic "[!] The sudoers file failed 'visudo -c' validation -- NOT
+    # installing it." message a genuine syntax error would produce
+    # (`command -v visudo` failing makes the `if $SUDO visudo -c -f ...`
+    # check below false either way) -- actively misleading, since the file
+    # itself was never actually wrong.
+    if ! command -v visudo >/dev/null 2>&1; then
+        echo "The 'sudo' package (needed for 'visudo' and for the 'snapmanager' user to escalate privileges later) is not installed..."
+        $SUDO apt-get update -qq
+        if ! $SUDO apt-get install -y sudo; then
+            echo -e "${RED}[!] Failed to install the 'sudo' package. Privilege-hardening cannot proceed without it -- fix this manually (e.g. 'apt-get install sudo') and re-run this installer.${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}[OK] 'sudo' package installed.${NC}"
+    fi
+
     # --- 6a. Dedicated system user (idempotent: skipped entirely if it already exists) ---
     if ! getent group audio >/dev/null 2>&1; then
         echo "Creating 'audio' group (not present on this host)..."
