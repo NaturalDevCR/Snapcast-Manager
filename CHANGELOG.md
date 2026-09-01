@@ -8,7 +8,7 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
-## [unreleased]
+## [0.3.1] - 2026-09-01
 
 ### 🚀 Features
 
@@ -62,6 +62,7 @@ regenerate.
 - *(i18n)* Extract ServerConfig + PipeSources view strings to en/es namespaces (Task 72)
 - *(i18n)* Extract ClientDashboard + Tools view strings to en/es namespaces (Task 73)
 - *(i18n)* Extract Routing view strings to en/es namespaces (Task 74)
+- *(release)* Reproducible releases -- checksums, CHANGELOG.md, install.sh hash verify (Task 75)
 
 ### 🐛 Bug Fixes
 
@@ -104,6 +105,9 @@ regenerate.
 - *(i18n)* Keep 'Manager' untranslated in logs.json's ES tab label
 - *(i18n)* Remove erroneous 'Server' bleed-in from watchdogs.json ES
 - *(i18n)* Correct 2 mistranslated strings in routing.json ES
+- *(ci)* Make no-shell-injection gate fail the build
+- *(install)* RuntimeDirectory= for /run/snapcast-manager, survive reboot
+- *(security)* Missing tar sudoers grant + real package-install sandbox fixes (Task 66, v0.3.1) (#4)
 
 ### 💼 Other
 
