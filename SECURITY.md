@@ -96,12 +96,13 @@ already expect group-`audio` access.
 - Installing/removing Debian packages (`apt-get`, `dpkg`) and the general
   filesystem/user-management tools the installer and in-app package flows
   use (`mkdir`, `chmod`, `chown`, `rm`, `cp`, `mv`, `gpg`,
-  `wget`, `useradd`, `groupadd`, `usermod`, `make`, `ss -K *`,
+  `wget`, `useradd`, `groupadd`, `usermod`, `make`, `tar`, `ss -K *`,
   `alsactl store`, `systemd-analyze verify *`), and exactly one specific,
   versioned script: `bash /opt/snapcast-manager/server/scripts/install-shairport-sync.sh`.
   (`find` and `tee` were removed from this grant in a post-Task-16 fix pass
   -- see "Package-management is intentionally NOT narrowly restricted"
-  below.)
+  below. `tar` was ADDED in a post-Task-65 fix pass -- see "`tar` is a
+  separate, disclosed GTFOBins-class risk" below.)
 
 **What it explicitly CANNOT do:** run an arbitrary shell (`/bin/bash *` /
 `/bin/sh *` are never granted -- the one bash grant above is a single
@@ -117,13 +118,19 @@ kernel mount-namespace level, independent of and in addition to `sudo`.
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=/opt/snapcast-manager/data /opt/snapcast-manager/server/snapshots /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.bak /etc/snapserver.conf.d /etc/snapcast-manager /run/snapcast-manager /var/lib/snapcast-manager/scripts /var/backups/snapmanager /etc/mpd.conf /var/lib/mpd /etc/systemd/system /etc/default/snapclient /etc/snapclient-manager /var/lib/snapserver /etc/apt/keyrings /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl /var/lib/dpkg /var/cache/apt /var/lib/apt/lists /usr/local/bin /usr/bin /etc/passwd /etc/group /etc/shadow /etc/gshadow
+ReadWritePaths=/opt/snapcast-manager/data /opt/snapcast-manager/server/snapshots /run /etc /var /usr /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.bak /etc/snapserver.conf.d /etc/snapcast-manager /var/lib/snapcast-manager/scripts /var/backups/snapmanager /etc/mpd.conf /var/lib/mpd /etc/systemd/system /etc/default/snapclient /etc/snapclient-manager /var/lib/snapserver /etc/apt/keyrings /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl /var/lib/dpkg /var/cache/apt /var/lib/apt/lists /usr/local/bin /usr/bin /etc/passwd /etc/group /etc/shadow /etc/gshadow
 ```
 
 The last three groups above (`/var/lib/dpkg /var/cache/apt /var/lib/apt/lists`,
 `/usr/local/bin /usr/bin`, `/etc/passwd /etc/group /etc/shadow /etc/gshadow`)
 were added in a post-Task-16 fix pass -- see "Fix-pass additions (post-Task-16
-review)" below for the reasoning behind each.
+review)" below for the reasoning behind each. `/etc`, `/var`, `/usr`, and
+`/run` wholesale were added in a later, post-Task-65 fix pass -- see
+"`ReadWritePaths=` widened to `/etc`/`/var`/`/usr`/`/run` (post-Task-65 fix
+pass)" below; every other, narrower entry in the line above predates that
+change and is now redundant (fully covered by these four) but is left in
+place for its own historical
+reasoning and because it doesn't hurt to keep it.
 
 **`NoNewPrivileges=yes` was REMOVED from this unit by Task 65** (container
 integration tests) after being confirmed, for real, to make this entire
@@ -223,6 +230,135 @@ problem documented above, not the same one restated:
   like the apt-get/dpkg gap above -- it exists because
   `install-shairport-sync.sh` genuinely needs to build third-party source,
   and it is not fixed further in this task.
+
+### `ReadWritePaths=` widened to `/etc`/`/var`/`/usr`/`/run` (post-Task-65 fix pass)
+
+Found while verifying the missing-`/usr/bin/tar`-sudoers-grant fix (below)
+end-to-end against a real hardened container: the narrowly-enumerated
+`ReadWritePaths=` entry list (everything except the four directories named
+in this section's own heading) only ever covered paths THIS APP ITSELF
+writes directly (its own data dir, its own generated config files/units). It
+never covered a REAL `apt-get install`/`apt-get install --only-upgrade` of a
+package with actual library dependencies -- confirmed for real, in two
+separate rounds: (1) installing `mpd` failed with `Read-only file system`
+while dpkg unpacked `/usr/lib/<arch-triplet>/liburing.so.2.3`,
+`/usr/share/doc/libjs-jquery`, and similar paths that were never in the old
+list at all; (2) after widening to `/etc`/`/var`/`/usr` fixed that, the SAME
+`apt-get install mpd` still failed one layer deeper, this time inside mpd's
+own postinst script (`adduser --system mpd` failing with `could not open
+lock file /run/adduser!`) -- `/run` (beyond the already-listed
+`/run/snapcast-manager`) had the identical gap.
+
+This is not specific to `mpd`. `mympd` (`installMympd()`), `ffmpeg` (the
+generic `apt` fallback in `installPackage()`), and `node`/`gpg`
+(`updateNodeJs()`) all install real packages through the exact same
+`platform/apt.ts` `install()`/`upgrade()` code path, and a package's dpkg
+postinst script (and its TRANSITIVE dependencies' postinst scripts) can
+write to essentially unpredictable paths -- installing `mpd` was also seen
+to touch `/etc/apache2` via a documentation-only transitive dependency
+(`javascript-common`), a path with zero direct connection to mpd itself.
+There is no finite, enumerable path list that stays correct for arbitrary
+future Debian packages this app's own package-management feature is
+explicitly designed to install.
+
+Given that, and given this file's own "Package-management is intentionally
+NOT narrowly restricted" section above already establishes that
+`apt-get`/`dpkg` carry broad, unrestricted-argument NOPASSWD sudo access
+(so a real dpkg postinst script already runs arbitrary root code today,
+regardless of this mount-namespace boundary), widening `ReadWritePaths=` to
+`/etc`, `/var`, `/usr`, and `/run` wholesale is the honest acknowledgment of
+that SAME existing trade-off, not a new one: `ProtectSystem=strict`'s real
+containment value against a compromised `snapmanager` process invoking one
+of ITS OWN granted `sudo` tools directly (`cp`, `chmod`, `rm`, `mkdir`, ...)
+outside these four directories is unaffected -- what changes is that a REAL
+`apt-get install`/`dpkg` invocation (already fully trusted with root via
+sudoers) can now actually write where its own packages, and their postinst
+scripts, need to write. `/boot`, `/root`, `/home`, and the API filesystems
+(`/dev`, `/proc`, `/sys`) remain read-only/inaccessible as before -- this
+widening is scoped to exactly the four top-level directories a normal
+Debian package install needs, not the entire root filesystem.
+
+**Also found in the same round of live verification, fixed alongside this:**
+a real `apt-get install mpd` still failed even with (1) and (2) above both
+fixed -- this time hanging on `dpkg`'s own interactive conffile prompt for
+`/etc/mpd.conf` (`scripts/install.sh` pre-touches it as an empty placeholder
+before the unit's first start, which makes dpkg treat it as "modified
+locally" on the package's first real install), with no TTY to answer it:
+`dpkg: error processing package mpd (--configure): end of file on stdin at
+conffile prompt`. This is NOT a `ReadWritePaths=`/sandbox issue -- it's
+`platform/apt.ts`'s `install()`/`upgrade()` never having set
+`DEBIAN_FRONTEND=noninteractive` or a dpkg conffile policy at all. Fixed
+there directly: `install()` now passes `--force-confnew` (the "existing"
+file at first-install time is only the empty placeholder, nothing worth
+preserving), `upgrade()` passes `--force-confdef --force-confold` (preserve
+real admin-edited config on a later upgrade, matching
+`services/system.ts`'s existing `aptGetInstallFix()` choice) -- see
+`platform/apt.ts`'s own `dpkgConfflictArgs()`/`aptGetNonInteractive()`
+docstring for the full account.
+
+### `tar` is a separate, disclosed GTFOBins-class risk (post-Task-65 fix pass)
+
+`/usr/bin/tar` was **missing entirely** from the sudoers grant until this fix
+pass, even though `server/src/services/backup.ts`'s `BackupService` has
+always shelled out to `sudo tar czf ...` (`createPreUpdateBackup()`) and
+`sudo tar -xPzf ...` (`restoreBackup()`) via its `privileged()` helper,
+against the root-owned `/var/backups/snapmanager` directory. On a real
+hardened install this meant every pre-update/pre-install backup and every
+restore silently failed with `sudo: a password is required` -- found during
+Task 65's container integration testing, disclosed there as a known,
+not-yet-fixed gap, and closed in this pass by adding `/usr/bin/tar` to the
+grant.
+
+Like `make` above, this is a **different risk category** from the
+`apt-get`/`dpkg` `.deb`-ambiguity problem, not the same one restated:
+
+- `tar` is a documented [GTFOBins](https://gtfobins.github.io/gtfobins/tar/)
+  arbitrary-code-execution primitive: `sudo tar --checkpoint=1
+  --checkpoint-action=exec=/bin/sh -cf /dev/null /dev/null` grants a full
+  root shell to anyone who can invoke `sudo tar` with attacker-chosen
+  arguments.
+- It is granted anyway because `createPreUpdateBackup()`/`restoreBackup()`
+  are `backup.ts`'s only privileged code paths and both genuinely need it.
+  There is no narrower sudoers-level alternative: the archive command's
+  trailing argument list is a dynamic, existing-files-only source list this
+  app builds itself (`collectSources()`/`resolveExistingSources()`), and
+  `restoreBackup()`/`deleteBackup()` are already guarded by the
+  `/^pre-[a-z\-]+-\d{8}-\d{6}\.tar\.gz$/` filename regex in `backup.ts` --
+  but sudoers pattern-matches the command **line**, not semantic argument
+  types or call-site provenance, so it cannot distinguish "this app's own
+  generated `tar` invocation" from "a compromised `snapmanager` process
+  invoking `tar` with `--checkpoint-action=exec=...`".
+- This is an **accepted, disclosed limitation** of this design, exactly
+  like the `apt-get`/`dpkg` and `make` gaps above -- not fixed further in
+  this pass.
+
+### `restoreBackup()` stages through `cp`, not an in-place `tar -xPzf` (post-Task-65 fix pass)
+
+Also found while verifying the `tar` sudoers fix end-to-end:
+`server/src/services/backup.ts`'s `restoreBackup()` used to run a direct,
+in-place `sudo tar -xPzf <archive>`. Confirmed for real against a hardened
+container, this fails for any archive member that is granted
+INDIVIDUALLY in `ReadWritePaths=` rather than via its containing directory
+(e.g. `/etc/mpd.conf`, `/etc/snapserver.conf` and its `.base`/`.bak`
+siblings -- their containing directory, `/etc` itself, deliberately stayed
+read-only before the widening above): GNU tar's default overwrite behavior
+`unlink()`s the existing destination before recreating it, which needs
+write permission on the file's PARENT DIRECTORY, not just the file itself.
+The real error was `tar: /etc/mpd.conf: Cannot open: File exists` (or
+`Read-only file system` with `--overwrite`, which skips the confirmation
+prompt but attempts the same unlink-based open). `restoreBackup()` now
+extracts into a private staging directory under `/var/backups/snapmanager`
+(already fully read-write) and then runs `sudo cp -r -T <staged> /`, which
+truncates each already-existing destination file in place instead of
+unlinking it -- exactly the technique `platform/files.ts`'s
+`installPrivilegedFile()` already relies on for the identical reason (see
+its own post-Task-24 note above). This widened `ReadWritePaths=` fix pass
+means the specific failure this worked around (individually-granted files
+under `/etc`) is now moot going forward -- `/etc` itself is read-write --
+but the staging-based restore is left in place anyway: it is strictly safer
+(never attempts to unlink/recreate anything outside the archive's own
+already-existing members) and does not depend on `/etc`/`/var`/`/usr`
+staying wholesale-writable if that widening is ever narrowed back down.
 
 ### Account-database write access is broad by necessity (fix-pass addition)
 

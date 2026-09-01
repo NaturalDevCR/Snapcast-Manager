@@ -32,6 +32,21 @@
 #      recreated snapmanager:audio mode 770 by the unit's own
 #      RuntimeDirectory= directive (not the installer's one-time mkdir,
 #      which never runs again after install).
+#   8. services/backup.ts's real BackupService round-trip (POST
+#      /api/system/install/mpd, POST /api/system/update/mpd, POST
+#      /api/system/backups/restore) -- the job-based install/update path
+#      Step 5's scope note above says routes/snapshot.ts does NOT exercise.
+#      Installs the real `mpd` Debian package, updates it (which runs
+#      safeBackupOrAbort() -> createPreUpdateBackup() -> a REAL `sudo tar
+#      czf`), and restores that backup (a REAL staged `sudo tar -xzf` +
+#      `sudo cp -r -T`) -- proving all of it genuinely works under the
+#      hardened snapmanager sandbox. Closes/verifies three real gaps found
+#      while doing this verification, all disclosed in SECURITY.md: (1)
+#      `/usr/bin/tar` missing from scripts/sudoers.d/snapcast-manager
+#      entirely (Task 65's own disclosed-but-unfixed finding); (2)
+#      `ReadWritePaths=` never covering a real `apt-get install`'s actual
+#      write targets; (3) `restoreBackup()`'s old in-place `tar -xPzf`
+#      failing on any individually-granted single file.
 #
 # Every step asserts something concrete and independently checkable (a real
 # systemd active-state, a real file's real content, a real HTTP response
@@ -110,6 +125,33 @@ wait_for_path() {
   return 1
 }
 
+# Polls GET /api/system/jobs/:id (routes/system.ts's jobService-backed
+# endpoint) until the job reaches a terminal status ('done'/'error') or
+# `timeout` seconds elapse. Writes the job's own JSON body to
+# $API_BODY_FILE on every poll (same convention as `api()`) so callers can
+# read `.status`/`.output`/`.error`/`.log` via `api_field` immediately
+# afterward, and sets $JOB_STATUS to the final status ("timeout" if it never
+# reached a terminal one). Package installs/updates genuinely take tens of
+# seconds (real apt-get), so this polls on a longer interval than the other
+# wait_for_* helpers above.
+JOB_STATUS=""
+wait_for_job() {
+  local job_id="$1" timeout="${2:-120}" waited=0
+  while [ "$waited" -lt "$timeout" ]; do
+    api GET "/api/system/jobs/${job_id}"
+    if [ "$API_STATUS" = "200" ]; then
+      JOB_STATUS="$(api_field '.status')"
+      if [ "$JOB_STATUS" = "done" ] || [ "$JOB_STATUS" = "error" ] || [ "$JOB_STATUS" = "interrupted" ]; then
+        return 0
+      fi
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  JOB_STATUS="timeout"
+  return 1
+}
+
 # ---- tiny JSON HTTP client (curl + jq) ----
 # Sets $API_STATUS (HTTP status code) and writes the response body to
 # $API_BODY_FILE (read back via `jq` at each call site). Auth is applied
@@ -155,7 +197,7 @@ assert_file_not_contains() {
 # Step 1: Installation
 # ============================================================================
 step_1_installation() {
-  step "Step 1/6: install.sh -y (LOCAL-source flow)"
+  step "Step 1/7: install.sh -y (LOCAL-source flow)"
 
   cd "$REPO_DIR" || fail "Step 1: $REPO_DIR does not exist"
   [ -d server ] && [ -d client ] || fail "Step 1: server/ or client/ missing from $REPO_DIR -- install.sh would take the REMOTE-download flow, not the local one this test requires"
@@ -226,7 +268,7 @@ ADMIN_USERNAME="task65admin"
 ADMIN_PASSWORD="Task65Integration!"   # 19 chars, clears MIN_PASSWORD_LENGTH=12
 
 step_2_setup() {
-  step "Step 2/6: first-run setup (POST /api/auth/setup, GET /api/auth/setup-status, POST /api/auth/login)"
+  step "Step 2/7: first-run setup (POST /api/auth/setup, GET /api/auth/setup-status, POST /api/auth/login)"
 
   api GET /api/auth/setup-status
   assert_status 200 "GET /api/auth/setup-status (pre-setup)"
@@ -262,7 +304,7 @@ PIPE1_UNIT="/etc/systemd/system/snapcast-radio-test-radio-station.service"
 PIPE1_URL="http://example.invalid/stream.mp3"
 
 step_3_create_pipe_source() {
-  step "Step 3/6: pipe source creation (POST /api/pipe-sources)"
+  step "Step 3/7: pipe source creation (POST /api/pipe-sources)"
 
   api POST /api/pipe-sources "$(jq -n --arg n "$PIPE1_NAME" --arg u "$PIPE1_URL" '{name:$n,type:"radio",url:$u}')"
   assert_status 200 "POST /api/pipe-sources"
@@ -309,7 +351,7 @@ LEGACY_UNIT="/etc/systemd/system/${LEGACY_UNIT_BASENAME}.service"
 LEGACY_URL="http://example.invalid/legacy-stream.mp3"
 
 step_4_adoption() {
-  step "Step 4/6: adoption of a hand-created, unmanaged pipe source"
+  step "Step 4/7: adoption of a hand-created, unmanaged pipe source"
 
   # ---- Simulate a pre-existing, unmanaged setup, created OUTSIDE the app's own API ----
   mkdir -p /run/snapcast-manager
@@ -436,7 +478,7 @@ UNITEOF
 # component-aware path specifically. Disclosed rather than silently
 # reinterpreted or silently skipped.
 step_5_backup_restore() {
-  step "Step 5/6: backup + restore (POST /api/snapshots, POST /api/snapshots/:id/restore)"
+  step "Step 5/7: backup + restore (POST /api/snapshots, POST /api/snapshots/:id/restore)"
 
   local pre_snapshot_checksum
   pre_snapshot_checksum="$(sha256sum /etc/snapserver.conf | awk '{print $1}')"
@@ -476,7 +518,7 @@ step_5_backup_restore() {
 # Step 6: Old-style-DB migration
 # ============================================================================
 step_6_old_style_db_migration() {
-  step "Step 6/6: old-style (pre-schema_migrations) database migration"
+  step "Step 6/7: old-style (pre-schema_migrations) database migration"
 
   [ -f "$DB_PATH" ] || fail "Step 6: DB file $DB_PATH does not exist"
 
@@ -610,6 +652,145 @@ step_7_reboot_simulation() {
   ok "GET /api/status: online after simulated reboot"
 }
 
+# ============================================================================
+# Step 8: services/backup.ts's real BackupService round-trip
+# ============================================================================
+#
+# See this script's own top-of-file comment for why this step exists: Step
+# 5 above exercises routes/snapshot.ts's simple single-file backup, NOT
+# services/backup.ts's component-aware BackupService, which is reachable
+# only through the job-based package install/update endpoints. Installs the
+# real `mpd` Debian package (so it has real config files to back up),
+# updates it (triggering safeBackupOrAbort() -> createPreUpdateBackup() ->
+# a real `sudo tar czf`), then restores the resulting backup (`restoreBackup()`'s
+# staged `sudo tar -xzf` + `sudo cp -r -T`, not a direct in-place `tar -xPzf`
+# -- see backup.ts's own restoreBackup() docstring) -- proving both
+# privileged code paths genuinely work under snapmanager's hardened
+# sudo/systemd sandbox. This closes/verifies THREE real gaps Task 65
+# disclosed and left unfixed, all found while verifying THIS step for real
+# against a hardened container: (1) `/usr/bin/tar` was missing from
+# scripts/sudoers.d/snapcast-manager entirely, so every privileged tar call
+# used to fail outright with "sudo: a password is required"; (2) even with
+# that grant added, a real `apt-get install mpd` still failed with
+# "Read-only file system" (ReadWritePaths= never covered a real package
+# install's actual write targets -- /usr/lib, /usr/share, /run/adduser,
+# etc. -- until widened; see SECURITY.md's "ReadWritePaths= widened to
+# /etc/var/usr/run" note); (3) restoreBackup()'s old in-place `tar -xPzf`
+# failed on any individually-granted single file like /etc/mpd.conf (see
+# SECURITY.md's "restoreBackup() stages through cp" note).
+step_8_backup_service_round_trip() {
+  step "Step 8/8: services/backup.ts round-trip (POST /api/system/install/mpd, POST /api/system/update/mpd, POST /api/system/backups/restore)"
+
+  # ---- Install mpd for real, so it has real config files on disk ----
+  api POST /api/system/install/mpd
+  assert_status 202 "POST /api/system/install/mpd"
+  local install_job_id
+  install_job_id="$(api_field '.jobId')"
+  [ -n "$install_job_id" ] && [ "$install_job_id" != "null" ] || fail "Step 8: POST /api/system/install/mpd did not return a jobId: $(cat "$API_BODY_FILE")"
+  ok "POST /api/system/install/mpd: 202, jobId=${install_job_id}"
+
+  wait_for_job "$install_job_id" 180 || fail "Step 8: install mpd job did not reach a terminal status within 180s (last status: ${JOB_STATUS})"
+  [ "$JOB_STATUS" = "done" ] || fail "Step 8: install mpd job finished with status '${JOB_STATUS}', not 'done': $(cat "$API_BODY_FILE")"
+  ok "install mpd job: done"
+
+  [ -f /etc/mpd.conf ] || fail "Step 8: /etc/mpd.conf does not exist after installing mpd -- not a real package install"
+  ok "/etc/mpd.conf exists on disk (real mpd package install)"
+
+  api GET /api/system/installed/mpd
+  assert_status 200 "GET /api/system/installed/mpd"
+  [ "$(api_field '.installed')" = "true" ] || fail "Step 8: GET /api/system/installed/mpd reports installed=false after a successful install: $(cat "$API_BODY_FILE")"
+  ok "GET /api/system/installed/mpd: installed=true"
+
+  # ---- Update mpd for real -- this is the call that runs
+  #      safeBackupOrAbort()/createPreUpdateBackup() with real, existing
+  #      sources to archive, so it genuinely reaches `sudo tar czf`. A
+  #      fresh install (above) would NOT exercise this: createPreUpdateBackup()
+  #      skips the tar call entirely when there is nothing pre-existing to
+  #      back up (see backup.ts's own comment on that early-return). ----
+  local pre_update_backup_count
+  pre_update_backup_count="$(find /var/backups/snapmanager -maxdepth 1 -name 'pre-mpd-*.tar.gz' 2>/dev/null | wc -l | tr -d ' ')"
+
+  api POST /api/system/update/mpd '{}'
+  assert_status 202 "POST /api/system/update/mpd"
+  local update_job_id
+  update_job_id="$(api_field '.jobId')"
+  [ -n "$update_job_id" ] && [ "$update_job_id" != "null" ] || fail "Step 8: POST /api/system/update/mpd did not return a jobId: $(cat "$API_BODY_FILE")"
+  ok "POST /api/system/update/mpd: 202, jobId=${update_job_id}"
+
+  wait_for_job "$update_job_id" 180 || fail "Step 8: update mpd job did not reach a terminal status within 180s (last status: ${JOB_STATUS})"
+  # A sudoers-grant gap surfaces here as status='error' with "sudo: a
+  # password is required" somewhere in .error/.log -- this is the exact
+  # regression this step exists to catch, so failure here is diagnosed with
+  # the job's own body, not just a generic "not done".
+  [ "$JOB_STATUS" = "done" ] || fail "Step 8: update mpd job finished with status '${JOB_STATUS}', not 'done' -- likely the pre-update backup's 'sudo tar' failed (check for a missing /usr/bin/tar grant in scripts/sudoers.d/snapcast-manager): $(cat "$API_BODY_FILE")"
+  ok "update mpd job: done (safeBackupOrAbort() -> createPreUpdateBackup() -> 'sudo tar czf' succeeded)"
+
+  # ---- The real backup file this update produced is genuinely on disk ----
+  local post_update_backup_count new_backup_file
+  post_update_backup_count="$(find /var/backups/snapmanager -maxdepth 1 -name 'pre-mpd-*.tar.gz' 2>/dev/null | wc -l | tr -d ' ')"
+  [ "$post_update_backup_count" -gt "$pre_update_backup_count" ] || fail "Step 8: no new pre-mpd-*.tar.gz file appeared under /var/backups/snapmanager after updating mpd (before=$pre_update_backup_count, after=$post_update_backup_count)"
+  # Filenames embed a sortable `pre-mpd-YYYYMMDD-HHMMSS.tar.gz` timestamp
+  # (backup.ts's formatTimestamp()), so the lexicographically-last match is
+  # genuinely the newest one -- no need for `find -newer`.
+  new_backup_file="$(find /var/backups/snapmanager -maxdepth 1 -name 'pre-mpd-*.tar.gz' 2>/dev/null | sort | tail -n1)"
+  [ -f "$new_backup_file" ] || fail "Step 8: could not locate the new backup file on disk"
+  ok "New backup file genuinely on disk: ${new_backup_file}"
+
+  # createPreUpdateBackup() sudo-chmod's the archive to 600 (backup.ts) --
+  # confirms the SECOND privileged call (chmod, already granted pre-existing)
+  # also completed, not just tar.
+  local backup_mode
+  backup_mode="$(stat -c '%a' "$new_backup_file")"
+  [ "$backup_mode" = "600" ] || fail "Step 8: backup file mode is '$backup_mode', expected '600' (chmod step of createPreUpdateBackup() did not complete)"
+  ok "Backup file mode is 600 (chmod step of createPreUpdateBackup() completed)"
+
+  tar -tzf "$new_backup_file" | grep -q 'mpd.conf$' || fail "Step 8: backup archive $new_backup_file does not contain mpd.conf: $(tar -tzf "$new_backup_file")"
+  ok "Backup archive genuinely contains mpd.conf ($(tar -tzf "$new_backup_file" | tr '\n' ' '))"
+
+  # ---- A real, detectable change to the file this backup covers, made
+  #      directly on disk -- same pattern as Step 5, so restore below proves
+  #      a genuine revert, not just "the API returned 200". ----
+  local pre_restore_sha
+  echo "# TASK66_TEST_MARKER $(date -u +%s)" >> /etc/mpd.conf
+  assert_file_contains /etc/mpd.conf "TASK66_TEST_MARKER" "Step 8 pre-restore"
+  # Member names were stored WITH their leading `/` (the archive was created
+  # with `--absolute-names` -- see backup.ts's createPreUpdateBackup()), so
+  # `tar -xzOf` needs the leading slash too, or it silently extracts
+  # nothing (empty stdout, NOT a non-zero exit) rather than failing loudly.
+  pre_restore_sha="$(tar -xzOf "$new_backup_file" /etc/mpd.conf 2>/dev/null | sha256sum | awk '{print $1}')"
+  [ -n "$pre_restore_sha" ] && [ "$pre_restore_sha" != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" ] \
+    || fail "Step 8: could not extract /etc/mpd.conf from $new_backup_file to compute its checksum (got empty/nonexistent-file sha256)"
+  ok "Made a real, detectable change to /etc/mpd.conf (the file this backup covers)"
+
+  # ---- Restore it for real -- restoreBackup()'s staged extract + `sudo cp
+  #      -r -T` (see backup.ts's own docstring), via the direct restore
+  #      endpoint. NOTE: this is mounted under /api/system (routes/system.ts
+  #      is app.use('/api/system', ...) in index.ts), NOT bare /api/backups. ----
+  local backup_basename
+  backup_basename="$(basename "$new_backup_file")"
+  api POST /api/system/backups/restore "$(jq -n --arg n "$backup_basename" '{name:$n}')"
+  assert_status 200 "POST /api/system/backups/restore"
+  ok "POST /api/system/backups/restore: 200 (${backup_basename}) -- staged 'sudo tar -xzf' + 'sudo cp -r -T' succeeded"
+
+  # ---- GET /api/system/backups genuinely lists it ----
+  api GET /api/system/backups
+  assert_status 200 "GET /api/system/backups"
+  local listed
+  listed="$(jq -r --arg n "$backup_basename" '.backups[] | select(.name==$n) | .name' "$API_BODY_FILE")"
+  [ "$listed" = "$backup_basename" ] || fail "Step 8: GET /api/system/backups does not list ${backup_basename}: $(cat "$API_BODY_FILE")"
+  ok "GET /api/system/backups lists the new backup: ${backup_basename}"
+
+  # ---- The change was genuinely reverted: /etc/mpd.conf no longer contains
+  #      the marker, and matches the archived copy's checksum exactly --
+  #      confirms cp -r -T actually landed the staged content, not just that
+  #      the API call returned 200. ----
+  assert_file_not_contains /etc/mpd.conf "TASK66_TEST_MARKER" "Step 8 post-restore"
+  local post_restore_sha
+  post_restore_sha="$(sha256sum /etc/mpd.conf | awk '{print $1}')"
+  [ "$post_restore_sha" = "$pre_restore_sha" ] || fail "Step 8: /etc/mpd.conf content after restore does not match the archived copy's checksum (archived=$pre_restore_sha, real=$post_restore_sha) -- restoreBackup()'s staged cp -r -T did not genuinely land the content"
+  ok "/etc/mpd.conf genuinely reverted -- matches the archived copy's checksum exactly (checksum-level, not just a 200 response)"
+}
+
 main() {
   step_1_installation
   step_2_setup
@@ -618,8 +799,9 @@ main() {
   step_5_backup_restore
   step_6_old_style_db_migration
   step_7_reboot_simulation
+  step_8_backup_service_round_trip
   echo -e "\n${GREEN}==============================================${NC}"
-  echo -e "${GREEN} ALL 7 container integration test steps passed${NC}"
+  echo -e "${GREEN} ALL 8 container integration test steps passed${NC}"
   echo -e "${GREEN}==============================================${NC}"
 }
 

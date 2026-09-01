@@ -656,7 +656,17 @@ test('deleteBackup() rejects an invalid backup filename BEFORE ever calling run(
   }
 });
 
-test('restoreBackup() runs tar -xPzf on the full path via argv, sudo-gated when needsSudo() is true', async () => {
+// Post-Task-65 fix: restoreBackup() no longer runs a direct in-place
+// `tar -xPzf` (confirmed for real, against a hardened container, to fail
+// with "Cannot open: File exists" / "Read-only file system" on any archive
+// member granted INDIVIDUALLY in ReadWritePaths=, e.g. /etc/mpd.conf --
+// see backup.ts's own restoreBackup() docstring for the full account). It
+// now stages into a private directory under BACKUP_DIR, then merges that
+// staged tree onto the real root via `cp -r -T` (which truncates existing
+// files in place instead of unlinking them; NOT `-a`/`--archive`, which was
+// also confirmed for real to fail trying to preserve ancestor directories'
+// own metadata -- see backup.ts's own docstring), then removes the staging dir.
+test('restoreBackup() stages via tar into BACKUP_DIR then cp -r -T onto /, sudo-gated when needsSudo() is true', async () => {
   const calls: Call[] = [];
   const restoreRun = stubRun(calls);
   const restoreSudo = stubNeedsSudo(true);
@@ -664,14 +674,62 @@ test('restoreBackup() runs tar -xPzf on the full path via argv, sudo-gated when 
   try {
     const service = new BackupService();
     const message = await service.restoreBackup('pre-general-20260101-120000.tar.gz');
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, 4, `expected 4 calls (mkdir, tar, cp, rm), got: ${JSON.stringify(calls)}`);
+
     assert.equal(calls[0].bin, 'sudo');
-    assert.deepEqual(calls[0].args, [
+    assert.equal(calls[0].args[0], 'mkdir');
+    assert.equal(calls[0].args[1], '-p');
+    const stagingDir = calls[0].args[2];
+    assert.ok(
+      stagingDir.startsWith(`${BACKUP_DIR}/.restore-`),
+      `staging dir should live under BACKUP_DIR, got: ${stagingDir}`,
+    );
+
+    assert.equal(calls[1].bin, 'sudo');
+    assert.deepEqual(calls[1].args, [
       'tar',
-      '-xPzf',
+      '-xzf',
       `${BACKUP_DIR}/pre-general-20260101-120000.tar.gz`,
+      '-C',
+      stagingDir,
     ]);
+
+    assert.equal(calls[2].bin, 'sudo');
+    assert.deepEqual(calls[2].args, ['cp', '-r', '-T', stagingDir, '/']);
+
+    assert.equal(calls[3].bin, 'sudo');
+    assert.deepEqual(calls[3].args, ['rm', '-rf', stagingDir]);
+
     assert.match(message, /Restored from/);
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreAccess();
+  }
+});
+
+test('restoreBackup() removes the staging dir even when the tar/cp step throws', async () => {
+  const calls: Call[] = [];
+  const restoreSudo = stubNeedsSudo(true);
+  const restoreAccess = stubModuleFn(fsPromisesDefault, 'access', async () => {});
+  const restoreRun = stubModuleFn(execModule, 'run', async (bin: string, args: string[]) => {
+    calls.push({ bin, args });
+    if (args[0] === 'tar') throw new Error('tar exited with code 2');
+    return { stdout: '', stderr: '' };
+  });
+  try {
+    const service = new BackupService();
+    await assert.rejects(
+      () => service.restoreBackup('pre-general-20260101-120000.tar.gz'),
+      /tar exited with code 2/,
+    );
+    // mkdir, tar (throws), rm -- cp never runs, but cleanup still does.
+    assert.equal(calls.length, 3, `expected mkdir+tar+rm even on failure, got: ${JSON.stringify(calls)}`);
+    assert.equal(calls[0].args[0], 'mkdir');
+    assert.equal(calls[1].args[0], 'tar');
+    assert.equal(calls[2].args[0], 'rm');
+    assert.equal(calls[2].args[1], '-rf');
+    assert.equal(calls[2].args[2], calls[0].args[2], 'cleanup must remove the SAME staging dir mkdir created');
   } finally {
     restoreRun();
     restoreSudo();

@@ -69,16 +69,70 @@ export async function update(): Promise<void> {
   await aptGet(['update'], needsSudo());
 }
 
+/**
+ * Post-Task-65 fix pass, found while verifying the `tar`-sudoers-grant fix
+ * end-to-end: `install()`/`upgrade()` used to run bare `apt-get install
+ * [--only-upgrade] -y <pkgs>`, no `DEBIAN_FRONTEND`, no dpkg conffile
+ * policy. Confirmed for real against a hardened container that this hangs
+ * forever waiting on a conffile prompt neither `apt-get` nor `dpkg` has a
+ * TTY to ask -- and it always would, for a package like `mpd` whose config
+ * file (`/etc/mpd.conf`) `scripts/install.sh` pre-touches as an empty
+ * placeholder before the unit's first start (that placeholder existing at
+ * all makes dpkg think the conffile was "modified locally", which triggers
+ * the interactive prompt on ANY first real install): `dpkg: error
+ * processing package mpd (--configure): end of file on stdin at conffile
+ * prompt`. `INSTALL_TIMEOUT_MS`'s own comment already anticipated exactly
+ * this failure mode without preventing it.
+ *
+ * `DEBIAN_FRONTEND=noninteractive` ALONE does not fix this -- the conffile
+ * prompt is `dpkg`'s own, not `debconf`'s, and is controlled separately via
+ * `Dpkg::Options::=--force-conf*` (confirmed empirically: `noninteractive`
+ * alone still hit the identical EOF error above). Two different DEBIAN_FRONTEND
+ * mechanisms depending on whether `sudo` is in the way, same reasoning as
+ * `services/system.ts`'s `aptGetInstallFix()` (see that function's own
+ * docstring for the full argv-vs-RunOptions.env explanation) -- this
+ * mirrors it rather than duplicating the reasoning here.
+ *
+ * `install()` forces `--force-confnew` (use the package maintainer's
+ * file): appropriate ONLY for a genuinely first-time install, where the
+ * "existing" conffile is install.sh's own empty placeholder, not real admin
+ * configuration -- there is nothing to preserve. `upgrade()` instead uses
+ * `--force-confdef --force-confold` (keep the currently-installed file when
+ * there's a real conflict, matching `aptGetInstallFix()`'s existing
+ * choice): by the time a package is upgraded it may carry real,
+ * admin-edited configuration that `safeBackupOrAbort()` already backed up
+ * before this call runs, but silently overwriting it on every upgrade would
+ * still be poor UX independent of that backup existing.
+ */
+function dpkgConfflictArgs(policy: 'confnew' | 'confold-def'): string[] {
+  return policy === 'confnew'
+    ? ['-o', 'Dpkg::Options::=--force-confnew']
+    : ['-o', 'Dpkg::Options::=--force-confdef', '-o', 'Dpkg::Options::=--force-confold'];
+}
+
+function aptGetNonInteractive(args: string[], sudo: boolean, opts?: RunOptions) {
+  if (sudo) {
+    return run('sudo', ['DEBIAN_FRONTEND=noninteractive', 'apt-get', ...args], opts);
+  }
+  return run('apt-get', args, { ...opts, env: { ...opts?.env, DEBIAN_FRONTEND: 'noninteractive' } });
+}
+
 export async function install(packages: string[]): Promise<void> {
   assertValidPackageNames(packages);
-  await aptGet(['install', '-y', ...packages], needsSudo(), { timeoutMs: INSTALL_TIMEOUT_MS });
+  await aptGetNonInteractive(
+    ['install', '-y', ...dpkgConfflictArgs('confnew'), ...packages],
+    needsSudo(),
+    { timeoutMs: INSTALL_TIMEOUT_MS },
+  );
 }
 
 export async function upgrade(packages: string[]): Promise<void> {
   assertValidPackageNames(packages);
-  await aptGet(['install', '-y', '--only-upgrade', ...packages], needsSudo(), {
-    timeoutMs: INSTALL_TIMEOUT_MS,
-  });
+  await aptGetNonInteractive(
+    ['install', '-y', '--only-upgrade', ...dpkgConfflictArgs('confold-def'), ...packages],
+    needsSudo(),
+    { timeoutMs: INSTALL_TIMEOUT_MS },
+  );
 }
 
 export async function remove(packages: string[]): Promise<void> {
