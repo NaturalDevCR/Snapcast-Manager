@@ -8,6 +8,15 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.3] - 2026-09-01
+
+### 🐛 Bug Fixes
+
+- *(install)* Restart service after an update when the unit content is unchanged (v0.3.3) (#6)
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.2
 ## [0.3.2] - 2026-09-01
 
 ### 🐛 Bug Fixes
