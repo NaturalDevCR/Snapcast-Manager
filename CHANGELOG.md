@@ -8,6 +8,15 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.2] - 2026-09-01
+
+### 🐛 Bug Fixes
+
+- *(install,security)* Auto-install missing sudo package + drop upgrade-insecure-requests CSP directive (v0.3.2) (#5)
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.1
 ## [0.3.1] - 2026-09-01
 
 ### 🚀 Features
@@ -323,19 +332,22 @@ regenerate.
 - Bump version to v0.0.10 in install script and Dashboard UI
 ## [0.0.9] - 2026-03-18
 
+### 🚀 Features
+
+- *(ui+api)* Navigation overhaul, zone rename, and client log filtering
+
 ### ⚙️ Miscellaneous Tasks
 
+- Bump version to v0.0.9
 - Bump version to v0.0.9 and fix undefined access in Logs.vue
 ## [0.0.8] - 2026-03-18
 
 ### 🚀 Features
 
 - *(ui)* Redesign navbar and configuration tab navigation
-- *(ui+api)* Navigation overhaul, zone rename, and client log filtering
 
 ### ⚙️ Miscellaneous Tasks
 
-- Bump version to v0.0.9
 - Bump version to v0.0.8 and ignore .claude
 ## [0.0.7] - 2026-03-18
 
