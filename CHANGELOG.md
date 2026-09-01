@@ -8,6 +8,15 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.6] - 2026-09-01
+
+### 🐛 Bug Fixes
+
+- *(ui)* Break Raw Editor feedback loop + add real install/update log window (v0.3.6) (#9)
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.5
 ## [0.3.5] - 2026-09-01
 
 ### 🐛 Bug Fixes
