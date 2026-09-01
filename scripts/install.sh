@@ -1211,9 +1211,34 @@ EOF
     fi
 
     if [ "$UNIT_CHANGED" = false ]; then
-        echo -e "${GREEN}[OK] systemd unit already up to date (User=$SNAPMANAGER_USER, hardening directives present) -- no changes, no restart needed.${NC}"
+        echo -e "${GREEN}[OK] systemd unit already up to date (User=$SNAPMANAGER_USER, hardening directives present) -- no unit changes needed.${NC}"
         $SUDO systemctl daemon-reload
         $SUDO systemctl enable "$SERVICE_NAME" 2>/dev/null || true
+        # Post-v0.3.2 fix, found live: this branch used to assume the
+        # service was already running whenever the unit file itself hadn't
+        # changed, and never called start/restart -- true on a fresh
+        # install (nothing to stop yet) but false on the REMOTE update
+        # flow, which explicitly stops the running service earlier (see
+        # this script's own "Stopping existing service..." step, well
+        # before reaching here) to safely back up data before re-extracting
+        # the new release. Whenever the unit content happens to be
+        # byte-identical between the old and new version (true for a
+        # v0.3.1 -> v0.3.2 update, since neither changed the unit template
+        # itself), the service was left stopped after every such update --
+        # confirmed live on a real host. Explicitly check and (re)start it.
+        if $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
+            echo -e "${GREEN}[OK] Service already active.${NC}"
+        else
+            echo "Service is not currently active -- starting it..."
+            $SUDO systemctl start "$SERVICE_NAME"
+            sleep 2
+            if $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
+                echo -e "${GREEN}[OK] Service started.${NC}"
+            else
+                echo -e "${RED}[!] Service failed to start with the existing (unchanged) unit configuration. Checking logs...${NC}"
+                $SUDO journalctl -u "$SERVICE_NAME" -n 50 --no-pager
+            fi
+        fi
     else
         echo "$NEW_UNIT_CONTENT" | $SUDO tee "$UNIT_FILE" >/dev/null
         $SUDO systemctl daemon-reload
