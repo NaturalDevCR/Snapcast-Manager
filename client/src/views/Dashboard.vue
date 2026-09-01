@@ -213,37 +213,37 @@ const openMympd = () => {
             @click="handleHealthRefresh"
             :disabled="healthStore.loading"
             :aria-label="t('dashboard.healthRefreshAria')"
-            class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] text-text-muted hover:text-text-main border border-white/[0.05] transition-all active:scale-95 disabled:opacity-50"
+            class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-text-muted hover:text-text-main border border-black/[0.05] dark:border-white/[0.05] transition-all active:scale-95 disabled:opacity-50"
           >
             <span class="material-symbols-outlined text-[1rem]" :class="{ 'animate-spin': healthStore.loading }">refresh</span>
           </button>
         </template>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col space-y-1">
+          <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col space-y-1">
             <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthSystemdLabel') }}</span>
             <span :class="healthStore.detail?.snapserver?.systemdActive ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-xs font-black uppercase tracking-wide">
               {{ healthStore.detail?.snapserver?.systemdActive ? t('dashboard.healthActiveStatus') : t('dashboard.healthInactiveStatus') }}
             </span>
           </div>
-          <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col space-y-1">
+          <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col space-y-1">
             <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthRpcLabel') }}</span>
             <span :class="healthStore.detail?.snapserver?.rpcConnected ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-xs font-black uppercase tracking-wide">
               {{ healthStore.detail?.snapserver?.rpcConnected ? t('dashboard.healthConnectedStatus') : t('dashboard.healthDisconnectedStatus') }}
             </span>
           </div>
-          <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col space-y-1">
+          <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col space-y-1">
             <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthDiskLabel') }}</span>
             <span :class="diskFreePercent !== null && diskFreePercent < 10 ? 'text-[#ff3b30]' : 'text-emerald-400'" class="text-xs font-black uppercase tracking-wide">
               {{ diskFreePercent !== null ? t('dashboard.healthDiskFreeValue', { percent: diskFreePercent }) : t('dashboard.healthDiskUnknownStatus') }}
             </span>
           </div>
-          <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col space-y-1">
+          <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col space-y-1">
             <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthPermissionsLabel') }}</span>
             <span :class="healthStore.detail?.permissions?.snapshotsDirWritable ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-xs font-black uppercase tracking-wide">
               {{ healthStore.detail?.permissions?.snapshotsDirWritable ? t('dashboard.healthWritableYes') : t('dashboard.healthWritableNo') }}
             </span>
           </div>
-          <div class="col-span-2 sm:col-span-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col space-y-1">
+          <div class="col-span-2 sm:col-span-4 p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col space-y-1">
             <div class="flex items-center justify-between">
               <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthConfigLabel') }}</span>
               <span :class="healthStore.detail?.config?.parseable ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-xs font-black uppercase tracking-wide">
@@ -263,7 +263,7 @@ const openMympd = () => {
              that would silently reassure an admin during exactly the kind of
              connectivity/auth problem this panel exists to surface (see
              Task 63 review). -->
-        <div class="mt-3 pt-3 border-t border-white/5">
+        <div class="mt-3 pt-3 border-t border-black/5 dark:border-white/5">
           <router-link
             v-if="diagnosticsStore.error"
             to="/diagnostics"
@@ -319,14 +319,14 @@ const openMympd = () => {
                     
                     <div class="space-y-2 max-h-[140px] overflow-y-auto pr-2 custom-scrollbar">
                         <div v-for="stream in snapcastStore.status.streams" :key="stream.id"
-                             class="group/item flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-brand-primary/30 transition-all duration-300">
+                             class="group/item flex items-center justify-between p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] hover:border-brand-primary/30 transition-all duration-300">
                             <div class="flex items-center space-x-3 min-w-0">
-                                <div class="w-1.5 h-1.5 rounded-full transition-colors" :class="stream.status === 'playing' ? 'bg-emerald-400' : 'bg-white/10'"></div>
+                                <div class="w-1.5 h-1.5 rounded-full transition-colors" :class="stream.status === 'playing' ? 'bg-emerald-400' : 'bg-black/10 dark:bg-white/10'"></div>
                                 <span class="text-xs font-semibold text-text-main/70 truncate group-hover/item:text-text-main transition-colors" :title="stream.id">
                                     {{ stream.uri?.query?.name || stream.id }}
                                 </span>
                             </div>
-                            <span :class="stream.status === 'playing' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-text-muted bg-white/5 border-white/10'"
+                            <span :class="stream.status === 'playing' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-text-muted bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10'"
                                   class="px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider transition-all">
                                 {{ stream.status }}
                             </span>
@@ -355,7 +355,7 @@ const openMympd = () => {
                     <div class="space-y-2 max-h-[140px] overflow-y-auto pr-2 custom-scrollbar">
                         <template v-for="group in snapcastStore.status.groups" :key="group.id">
                             <div v-for="client in group.clients.filter(c => c.connected)" :key="client.id" 
-                                 class="group/item flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-brand-primary/30 transition-all duration-300">
+                                 class="group/item flex items-center justify-between p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] hover:border-brand-primary/30 transition-all duration-300">
                                 <div class="flex flex-col min-w-0">
                                     <span class="text-xs font-semibold text-text-main/70 truncate group-hover/item:text-text-main transition-colors">
                                         {{ client.config.name || client.host.name }}
@@ -363,7 +363,7 @@ const openMympd = () => {
                                     <span class="text-[9px] text-text-muted font-mono mt-0.5">{{ client.host.ip }}</span>
                                 </div>
                                 <div class="flex items-center space-x-2">
-                                    <div class="h-1 w-12 bg-white/5 rounded-full overflow-hidden">
+                                    <div class="h-1 w-12 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
                                         <div class="h-full bg-brand-primary transition-all duration-500" :style="{ width: client.config.volume.percent + '%', opacity: client.config.volume.muted ? 0.2 : 1 }"></div>
                                     </div>
                                     <span :class="client.config.volume.muted ? 'text-[#ff3b30]' : 'text-brand-primary'" class="text-[9px] font-black w-6 text-right">
@@ -388,7 +388,7 @@ const openMympd = () => {
                 </template>
                 <div class="space-y-4">
                     <!-- Master Status Indicator -->
-                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
+                    <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div class="relative flex h-2.5 w-2.5">
                                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-40"></span>
@@ -400,13 +400,13 @@ const openMympd = () => {
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
-                        <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col items-center justify-center text-center space-y-1">
+                        <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col items-center justify-center text-center space-y-1">
                             <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.versionLabel') }}</span>
                             <span class="text-xs font-mono font-semibold text-brand-primary group-hover:text-text-main transition-colors">
                                 {{ systemStore.packageVersions.snapserver || (snapcastStore.status ? snapcastStore.status.server.version : '...') }}
                             </span>
                         </div>
-                        <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex flex-col items-center justify-center text-center space-y-1">
+                        <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col items-center justify-center text-center space-y-1">
                             <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.groupsLabel') }}</span>
                             <span class="text-xs font-semibold text-text-main">
                                 {{ snapcastStore.status.groups.length }}
@@ -419,7 +419,7 @@ const openMympd = () => {
                             <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthLabel') }}</span>
                             <span class="text-[9px] font-bold text-emerald-400">100%</span>
                         </div>
-                        <div class="h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div class="h-1 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
                             <div class="h-full bg-brand-primary w-full"></div>
                         </div>
                     </div>
@@ -435,7 +435,7 @@ const openMympd = () => {
           <p class="text-xs text-gray-400 max-w-md mx-auto">{{ snapcastStore.error }}</p>
       </div>
 
-      <div class="border-t border-white/5 my-10"></div>
+      <div class="border-t border-black/5 dark:border-white/5 my-10"></div>
 
       <!-- System Services Category -->
       <div class="flex items-center space-x-2 px-1 mb-4">
@@ -477,9 +477,9 @@ const openMympd = () => {
                  </div>
             </div>
 
-            <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages.snapserver">
+            <div class="pt-4 flex flex-col space-y-3 border-t border-black/5 dark:border-white/5" v-if="systemStore.installedPackages.snapserver">
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'snapserver')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-text-main border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
+                    <button @click="systemStore.controlService('restart', 'snapserver')" class="px-3 py-2.5 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-text-main border border-black/5 dark:border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
                     <button v-if="systemStore.snapserverStatus === 'active'" @click="systemStore.controlService('stop', 'snapserver')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.stopButton') }}</button>
                     <button v-else @click="systemStore.controlService('start', 'snapserver')" class="px-3 py-2.5 bg-[#00ff9d]/10 hover:bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.startButton') }}</button>
                 </div>
@@ -488,13 +488,13 @@ const openMympd = () => {
                             'w-full px-4 py-3 rounded-xl text-xs font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 uppercase',
                             systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown'
                             ? 'bg-brand-primary text-white border border-brand-primary/50 shadow-xl shadow-brand-primary/30 hover:shadow-brand-primary/50 hover:bg-brand-primary/80'
-                            : 'bg-black/40 text-gray-400 hover:bg-white/10 hover:text-text-main border border-white/5'
+                            : 'bg-black/40 text-gray-400 hover:bg-black/10 dark:hover:bg-white/10 hover:text-text-main border border-black/5 dark:border-white/5'
                         ]"
                         :disabled="systemStore.loading">
                     {{ systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' ? t('dashboard.installUpdateButton') : t('dashboard.cleanReinstallLabel') }}
                 </button>
             </div>
-            <div class="pt-4 border-t border-white/5" v-else>
+            <div class="pt-4 border-t border-black/5 dark:border-white/5" v-else>
                  <button @click="systemStore.installPackage('snapserver')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black tracking-widest uppercase text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.installSnapserverButton') }}</button>
             </div>
         </div>
@@ -519,7 +519,7 @@ const openMympd = () => {
                  </div>
 
                  <div class="mt-4 space-y-3">
-                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest block border-b border-white/5 pb-2">{{ t('dashboard.selectLtsLabel') }}</span>
+                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest block border-b border-black/5 dark:border-white/5 pb-2">{{ t('dashboard.selectLtsLabel') }}</span>
                     <div class="grid grid-cols-3 gap-3">
                         <button v-for="v in ['18', '20', '22']" :key="v"
                                 @click="selectedNodeVersion = v"
@@ -527,7 +527,7 @@ const openMympd = () => {
                                     'py-2.5 rounded-xl text-xs font-black transition-all border',
                                     selectedNodeVersion === v
                                     ? 'bg-[#00ff9d]/10 border-[#00ff9d]/30 text-[#00ff9d] drop-shadow-[0_0_8px_rgba(0,255,157,0.4)]'
-                                    : 'bg-black/40 border-white/5 text-gray-400 hover:border-white/20 hover:text-gray-300'
+                                    : 'bg-black/40 border-black/5 dark:border-white/5 text-gray-400 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-300'
                                 ]"
                         >
                             v{{ v }}
@@ -535,7 +535,7 @@ const openMympd = () => {
                     </div>
                  </div>
             </div>
-            <div class="pt-5 border-t border-white/5">
+            <div class="pt-5 border-t border-black/5 dark:border-white/5">
                  <button @click="triggerUpdateNodeJs" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     {{ t('dashboard.updateNodeButton', { version: selectedNodeVersion }) }}
                  </button>
@@ -555,8 +555,8 @@ const openMympd = () => {
             <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-inner shadow-brand-primary/10 mt-auto mb-4">
                 <p class="text-[10px] font-bold text-brand-primary leading-relaxed text-center tracking-widest uppercase">{{ t('dashboard.syncedMessage', { version }) }}</p>
             </div>
-            <div class="pt-4 border-t border-white/5">
-                 <button disabled class="w-full px-4 py-3 bg-black/40 text-text-muted rounded-xl font-black text-xs uppercase tracking-widest cursor-default border border-white/5">
+            <div class="pt-4 border-t border-black/5 dark:border-white/5">
+                 <button disabled class="w-full px-4 py-3 bg-black/40 text-text-muted rounded-xl font-black text-xs uppercase tracking-widest cursor-default border border-black/5 dark:border-white/5">
                     {{ t('dashboard.uiUpToDateButton') }}
                  </button>
             </div>
@@ -595,7 +595,7 @@ const openMympd = () => {
                  </div>
             </div>
             <p class="text-[11px] font-medium text-text-muted leading-relaxed">{{ t('dashboard.snapCtrlDescription') }}</p>
-            <div class="pt-3 border-t border-white/5">
+            <div class="pt-3 border-t border-black/5 dark:border-white/5">
                  <button @click="handleUpdate('snap-ctrl')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     {{ systemStore.installedPackages['snap-ctrl'] ? t('dashboard.updateInterfaceButton') : t('dashboard.installInterfaceButton') }}
                  </button>
@@ -623,16 +623,16 @@ const openMympd = () => {
                     <span class="text-xs font-mono font-bold text-gray-300 truncate max-w-[150px]">{{ systemStore.packageVersions.ffmpeg || '...' }}</span>
                  </div>
             </div>
-            <div class="pt-3 border-t border-white/5" v-if="!systemStore.installedPackages.ffmpeg">
+            <div class="pt-3 border-t border-black/5 dark:border-white/5" v-if="!systemStore.installedPackages.ffmpeg">
                  <button @click="systemStore.installPackage('ffmpeg')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     {{ t('dashboard.installFfmpegButton') }}
                  </button>
             </div>
-            <div class="pt-4 flex flex-col space-y-4 border-t border-white/5" v-else>
+            <div class="pt-4 flex flex-col space-y-4 border-t border-black/5 dark:border-white/5" v-else>
                 <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-inner shadow-brand-primary/10">
                     <p class="text-[10px] font-bold text-brand-primary uppercase tracking-widest leading-relaxed text-center">{{ t('dashboard.ffmpegDescription') }}</p>
                 </div>
-                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-300 rounded-xl hover:bg-white/10 hover:text-text-main border border-white/5 transition-all text-xs font-bold uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.refreshPackagesButton') }}</button>
+                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-300 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 hover:text-text-main border border-black/5 dark:border-white/5 transition-all text-xs font-bold uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.refreshPackagesButton') }}</button>
             </div>
         </div>
       </Card>
@@ -660,9 +660,9 @@ const openMympd = () => {
                       {{ systemStore.packageVersions['shairport-sync'] }}
                   </span>
              </div>
-            <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages['shairport-sync']">
+            <div class="pt-4 flex flex-col space-y-3 border-t border-black/5 dark:border-white/5" v-if="systemStore.installedPackages['shairport-sync']">
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'shairport-sync')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-text-main border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
+                    <button @click="systemStore.controlService('restart', 'shairport-sync')" class="px-3 py-2.5 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-text-main border border-black/5 dark:border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
                     <button v-if="systemStore.shairportSyncStatus === 'active'" @click="systemStore.controlService('stop', 'shairport-sync')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.stopButton') }}</button>
                     <button v-else @click="systemStore.controlService('start', 'shairport-sync')" class="px-3 py-2.5 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.startButton') }}</button>
                 </div>
@@ -673,7 +673,7 @@ const openMympd = () => {
                     {{ t('dashboard.uninstallAirplayButton') }}
                 </button>
             </div>
-            <div class="pt-4 border-t border-white/5" v-else>
+            <div class="pt-4 border-t border-black/5 dark:border-white/5" v-else>
                  <button @click="systemStore.installPackage('shairport-sync')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     {{ t('dashboard.installAirplayButton') }}
                  </button>
@@ -703,9 +703,9 @@ const openMympd = () => {
                   <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.versionLabel') }}</span>
                   <span class="text-sm font-bold text-gray-200">{{ systemStore.packageVersions['mpd'] }}</span>
             </div>
-            <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages['mpd']">
+            <div class="pt-4 flex flex-col space-y-3 border-t border-black/5 dark:border-white/5" v-if="systemStore.installedPackages['mpd']">
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'mpd')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-text-main border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
+                    <button @click="systemStore.controlService('restart', 'mpd')" class="px-3 py-2.5 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-text-main border border-black/5 dark:border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
                     <button v-if="systemStore.mpdStatus === 'active'" @click="systemStore.controlService('stop', 'mpd')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.stopButton') }}</button>
                     <button v-else @click="systemStore.controlService('start', 'mpd')" class="px-3 py-2.5 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.startButton') }}</button>
                 </div>
@@ -716,7 +716,7 @@ const openMympd = () => {
                     {{ t('dashboard.uninstallMpdButton') }}
                 </button>
             </div>
-            <div class="pt-4 border-t border-white/5" v-else>
+            <div class="pt-4 border-t border-black/5 dark:border-white/5" v-else>
                  <button @click="systemStore.installPackage('mpd')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     {{ t('dashboard.installMpdButton') }}
                  </button>
@@ -746,12 +746,12 @@ const openMympd = () => {
                   <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.versionLabel') }}</span>
                   <span class="text-sm font-bold text-gray-200">{{ systemStore.packageVersions['mympd'] }}</span>
             </div>
-            <div class="pt-4 flex flex-col space-y-3 border-t border-white/5" v-if="systemStore.installedPackages['mympd']">
+            <div class="pt-4 flex flex-col space-y-3 border-t border-black/5 dark:border-white/5" v-if="systemStore.installedPackages['mympd']">
                 <button v-if="systemStore.mympdRunning" @click="openMympd" class="w-full px-4 py-3 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95">
                     <span class="material-symbols-outlined text-[1rem] mr-1 align-middle">open_in_new</span>{{ t('dashboard.openMympdButton') }}
                 </button>
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'mympd')" class="px-3 py-2.5 bg-black/40 hover:bg-white/10 text-text-main border border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
+                    <button @click="systemStore.controlService('restart', 'mympd')" class="px-3 py-2.5 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-text-main border border-black/5 dark:border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
                     <button v-if="systemStore.mympdStatus === 'active'" @click="systemStore.controlService('stop', 'mympd')" class="px-3 py-2.5 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.stopButton') }}</button>
                     <button v-else @click="systemStore.controlService('start', 'mympd')" class="px-3 py-2.5 bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 border border-emerald-400/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.startButton') }}</button>
                 </div>
@@ -762,7 +762,7 @@ const openMympd = () => {
                     {{ t('dashboard.uninstallMympdButton') }}
                 </button>
             </div>
-            <div class="pt-4 border-t border-white/5" v-else>
+            <div class="pt-4 border-t border-black/5 dark:border-white/5" v-else>
                  <button @click="systemStore.installPackage('mympd')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                     {{ t('dashboard.installMympdButton') }}
                  </button>

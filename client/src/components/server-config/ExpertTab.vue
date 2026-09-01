@@ -132,17 +132,17 @@ const handleExportBackup = async () => {
       <!-- Page Header -->
       <div class="flex items-center justify-between">
           <div>
-              <h2 class="text-xl font-black text-white uppercase tracking-wider drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Raw Editor</h2>
+              <h2 class="text-xl font-black text-text-main uppercase tracking-wider dark:drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Raw Editor</h2>
               <p class="text-[11px] font-bold text-text-muted uppercase tracking-widest mt-1">
                   Directly modify the <code class="bg-brand-primary/20 px-1.5 py-0.5 rounded text-brand-primary text-[10px] font-mono border border-brand-primary/10">snapserver.conf</code> for advanced control.
               </p>
           </div>
           <div class="flex items-center space-x-3">
-              <button @click="emit('revert-requested')" class="flex items-center space-x-1.5 px-4 py-2 rounded-xl border border-white/5 bg-black/20 hover:bg-white/5 text-gray-400 hover:text-white transition-all text-xs font-black uppercase tracking-widest">
+              <button @click="emit('revert-requested')" class="flex items-center space-x-1.5 px-4 py-2 rounded-xl border border-black/5 dark:border-white/5 bg-black/20 hover:bg-black/5 dark:hover:bg-white/5 text-gray-400 hover:text-white transition-all text-xs font-black uppercase tracking-widest">
                   <span class="material-symbols-outlined text-[16px]">history</span>
                   <span>Revert</span>
               </button>
-              <button @click="handleExportBackup" class="flex items-center space-x-1.5 px-4 py-2 rounded-xl border border-white/5 bg-black/20 hover:bg-white/5 text-gray-400 hover:text-white transition-all text-xs font-black uppercase tracking-widest">
+              <button @click="handleExportBackup" class="flex items-center space-x-1.5 px-4 py-2 rounded-xl border border-black/5 dark:border-white/5 bg-black/20 hover:bg-black/5 dark:hover:bg-white/5 text-gray-400 hover:text-white transition-all text-xs font-black uppercase tracking-widest">
                   <span class="material-symbols-outlined text-[16px]">download</span>
                   <span>Backup</span>
               </button>
@@ -150,9 +150,9 @@ const handleExportBackup = async () => {
       </div>
 
       <!-- Editor Wrapper -->
-      <div class="rounded-2xl border border-white/5 bg-[#140b1b]/80 backdrop-blur-md overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+      <div class="rounded-2xl border border-black/5 dark:border-white/5 bg-[#140b1b]/80 backdrop-blur-md overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
           <!-- Frame Header -->
-          <div class="bg-black/30 px-6 py-2.5 flex items-center justify-between text-[10px] font-mono text-gray-400 border-b border-white/5">
+          <div class="bg-black/30 px-6 py-2.5 flex items-center justify-between text-[10px] font-mono text-gray-400 border-b border-black/5 dark:border-white/5">
               <div class="flex items-center space-x-2">
                   <span class="material-symbols-outlined text-[14px]">description</span>
                   <span>/etc/snapserver.conf</span>
@@ -174,7 +174,7 @@ const handleExportBackup = async () => {
               <span class="leading-relaxed">Warning: Restart required after applying changes to configuration.</span>
           </div>
           <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              <button @click="emit('revert-requested')" class="w-full sm:w-auto py-3.5 px-6 rounded-xl text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest border border-white/5 flex items-center justify-center">
+              <button @click="emit('revert-requested')" class="w-full sm:w-auto py-3.5 px-6 rounded-xl text-gray-400 hover:text-white bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest border border-black/5 dark:border-white/5 flex items-center justify-center">
                   Discard Changes
               </button>
           </div>

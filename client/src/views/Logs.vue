@@ -65,18 +65,18 @@ onUnmounted(() => {
       <!-- Header -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 class="text-3xl font-black text-white tracking-tight drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">{{ t('logs.title') }}</h1>
+          <h1 class="text-3xl font-black text-text-main tracking-tight dark:drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">{{ t('logs.title') }}</h1>
           <p class="text-gray-400 font-medium mt-1">{{ t('logs.subtitle') }}</p>
         </div>
-        <div class="flex items-center space-x-4 bg-black/40 p-2 rounded-2xl border border-white/5 shadow-inner backdrop-blur-md">
+        <div class="flex items-center space-x-4 bg-black/40 p-2 rounded-2xl border border-black/5 dark:border-white/5 shadow-inner backdrop-blur-md">
           <label class="flex items-center cursor-pointer group px-3">
             <div class="relative inline-flex items-center">
               <input type="checkbox" v-model="autoRefresh" class="sr-only peer">
-              <div class="w-10 h-5 bg-white/10 peer-focus:outline-none peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all border-white/5 peer-checked:bg-brand-primary rounded-full"></div>
+              <div class="w-10 h-5 bg-black/10 dark:bg-white/10 peer-focus:outline-none peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all border-black/5 dark:border-white/5 peer-checked:bg-brand-primary rounded-full"></div>
               <span class="ml-3 text-xs font-black text-terminal-muted uppercase tracking-widest group-hover:text-brand-primary transition-colors">{{ t('logs.liveUpdate') }}</span>
             </div>
           </label>
-          <div class="h-6 w-px bg-white/10"></div>
+          <div class="h-6 w-px bg-black/10 dark:bg-white/10"></div>
           <button @click="fetchLogs" class="inline-flex items-center px-4 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest group">
             <span class="material-symbols-outlined text-[1.1rem] mr-2 transition-transform" :class="{'animate-spin': autoRefresh, 'group-hover:rotate-180': !autoRefresh}">sync</span>
             {{ t('logs.syncNow') }}
@@ -89,36 +89,36 @@ onUnmounted(() => {
         <!-- Server services -->
         <button @click="switchService('snapserver')"
           :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'snapserver' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-terminal-muted border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+            activeService === 'snapserver' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">router</span>
           <span>{{ t('logs.snapserver') }}</span>
         </button>
         <button @click="switchService('shairport-sync')"
           :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'shairport-sync' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-terminal-muted border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+            activeService === 'shairport-sync' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">cast</span>
           <span>{{ t('logs.airplay') }}</span>
         </button>
         <button @click="switchService('snapmanager')"
           :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'snapmanager' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-terminal-muted border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+            activeService === 'snapmanager' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">dashboard_customize</span>
           <span>{{ t('logs.manager') }}</span>
         </button>
         <button v-if="systemStore.installedPackages['mpd']" @click="switchService('mpd')"
           :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'mpd' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-terminal-muted border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+            activeService === 'mpd' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
           <span class="material-symbols-outlined text-[1.1rem]">queue_music</span>
           <span>{{ t('logs.mpd') }}</span>
         </button>
 
         <!-- Snapclient instance buttons (shown when instances exist) -->
         <template v-if="instanceStore.instances.length > 0">
-          <div class="w-px h-10 bg-white/10 self-center mx-1"></div>
+          <div class="w-px h-10 bg-black/10 dark:bg-white/10 self-center mx-1"></div>
           <button v-for="inst in instanceStore.instances" :key="inst.id"
             @click="switchService('snapclient-' + inst.id)"
             :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-              activeService === 'snapclient-' + inst.id ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-terminal-muted border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+              activeService === 'snapclient-' + inst.id ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50 shadow-[0_0_15px_rgb(var(--brand-primary-rgb)/0.3)]' : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
             <span class="material-symbols-outlined text-[1.1rem]">speaker</span>
             <span>{{ inst.name }}</span>
             <span :class="inst.status === 'active' ? 'bg-[#00ff9d]' : 'bg-[#ff3b30]'" class="w-1.5 h-1.5 rounded-full"></span>
@@ -126,8 +126,8 @@ onUnmounted(() => {
         </template>
       </div>
 
-      <div class="bg-black/40 border border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
-        <div class="px-6 py-4 border-b border-white/5 bg-white/5 flex items-center space-x-3">
+      <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center space-x-3">
           <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">terminal</span>
           <span class="text-sm font-black text-white uppercase tracking-widest">{{ t('logs.consoleOutput') }}</span>
           <span v-if="activeService.startsWith('snapclient-')" class="ml-auto text-[10px] font-mono text-brand-primary">

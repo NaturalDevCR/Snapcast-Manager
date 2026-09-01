@@ -11,5 +11,7 @@
   "clientMode": "Modo Cliente",
   "admin": "Administrador",
   "sessionActive": "Sesión Activa",
-  "signOut": "Cerrar sesión"
+  "signOut": "Cerrar sesión",
+  "switchToLight": "Cambiar a modo claro",
+  "switchToDark": "Cambiar a modo oscuro"
 }

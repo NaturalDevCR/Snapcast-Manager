@@ -236,7 +236,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
 
 <template>
   <!-- Section Sub-Tabs -->
-  <div class="relative border-b border-white/10 flex overflow-x-auto flex-nowrap no-scrollbar">
+  <div class="relative border-b border-black/10 dark:border-white/10 flex overflow-x-auto flex-nowrap no-scrollbar">
       <button
         v-for="sKey in orderedSections"
         :key="sKey"
@@ -295,7 +295,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
               </button>
             </div>
 
-            <div v-if="!localParsedConfig.stream?.source" class="border border-dashed border-white/10 rounded-xl bg-black/20">
+            <div v-if="!localParsedConfig.stream?.source" class="border border-dashed border-black/10 dark:border-white/10 rounded-xl bg-black/20">
               <!-- No CTA here: the "Add Source" button is already visible directly
                    above this empty state in the section header (Task 33). -->
               <EmptyState
@@ -307,9 +307,9 @@ const updateSourceAtIndex = (idx: number, value: string) => {
 
             <div v-else class="space-y-3">
               <div v-for="(_item, idx) in (Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source : [localParsedConfig.stream.source])" :key="idx"
-                class="rounded-xl border border-white/5 bg-black/30 overflow-hidden shadow-sm hover:border-brand-primary/30 transition-colors">
+                class="rounded-xl border border-black/5 dark:border-white/5 bg-black/30 overflow-hidden shadow-sm hover:border-brand-primary/30 transition-colors">
                 <!-- Source header with name badge -->
-                <div class="flex items-center justify-between px-3 py-2 bg-white/5 border-b border-white/5">
+                <div class="flex items-center justify-between px-3 py-2 bg-black/5 dark:bg-white/5 border-b border-black/5 dark:border-white/5">
                   <div class="flex items-center space-x-2">
                     <span class="px-2 py-0.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 text-[10px] font-black uppercase tracking-widest rounded-md">
                       {{ getSourceType(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) }}
@@ -333,13 +333,13 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     v-if="Array.isArray(localParsedConfig.stream.source)"
                     :value="localParsedConfig.stream.source[idx]"
                     @input="updateSourceAtIndex(idx as number, ($event.target as HTMLInputElement).value)"
-                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
+                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
                   />
                   <input
                     v-else
                     :value="localParsedConfig.stream.source"
                     @input="setPropertyValue('stream', 'source', ($event.target as HTMLInputElement).value)"
-                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
+                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
                   />
                 </div>
               </div>
@@ -347,7 +347,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
           </div>
 
           <!-- ==== DIVIDER ==== -->
-          <div class="border-t border-white/5 my-8"></div>
+          <div class="border-t border-black/5 dark:border-white/5 my-8"></div>
 
           <!-- ==== SUB-SECTION 2: Stream Settings ==== -->
           <div>
@@ -481,7 +481,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
 
       <!-- ==== NON-STREAM SECTIONS: Standard property loop ==== -->
       <div v-else class="space-y-1">
-          <div v-if="allPropertyKeys.length === 0" class="text-center py-12 border border-dashed border-white/10 rounded-xl bg-black/20">
+          <div v-if="allPropertyKeys.length === 0" class="text-center py-12 border border-dashed border-black/10 dark:border-white/10 rounded-xl bg-black/20">
               <p class="text-xs font-black text-text-muted uppercase tracking-widest">No properties available for this section</p>
           </div>
 
@@ -489,7 +489,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
             :class="[
               'grid grid-cols-1 md:grid-cols-12 gap-3 items-start py-3 px-4 rounded-xl transition-all -mx-4',
               isPropertyEnabled(activeSection, key)
-                ? 'hover:bg-white/5'
+                ? 'hover:bg-black/5 dark:hover:bg-white/5'
                 : 'opacity-40 hover:opacity-60'
             ]">
 
@@ -556,7 +556,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     <select
                       :value="getPropertyValue(activeSection, key)"
                       @change="setPropertyValue(activeSection, key, ($event.target as HTMLSelectElement).value)"
-                      class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 appearance-none pr-10"
+                      class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 appearance-none pr-10"
                     >
                       <option v-for="opt in getMetaForKey(activeSection, key)?.options" :key="opt" :value="opt" class="bg-black text-white">
                         {{ opt || '(auto)' }}
@@ -572,7 +572,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     :value="getPropertyValue(activeSection, key)"
                     @input="setPropertyValue(activeSection, key, ($event.target as HTMLInputElement).value)"
                     :placeholder="String(getMetaForKey(activeSection, key)?.default ?? '')"
-                    class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 placeholder-gray-600"
+                    class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 placeholder-gray-600"
                   />
 
                   <!-- Default Text Input -->
@@ -581,7 +581,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     :value="getPropertyValue(activeSection, key)"
                     @input="setPropertyValue(activeSection, key, ($event.target as HTMLInputElement).value)"
                     :placeholder="String(getMetaForKey(activeSection, key)?.default ?? '')"
-                    class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 placeholder-gray-600"
+                    class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 placeholder-gray-600"
                   />
               </div>
           </div>
@@ -590,7 +590,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
 
   <!-- Bottom Actions -->
   <div class="mt-8 mb-24 flex justify-center">
-      <button @click="emit('reset-requested')" class="py-3 px-6 border border-white/5 rounded-xl text-text-muted hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 hover:border-[#ff3b30]/20 transition-all flex items-center space-x-2">
+      <button @click="emit('reset-requested')" class="py-3 px-6 border border-black/5 dark:border-white/5 rounded-xl text-text-muted hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 hover:border-[#ff3b30]/20 transition-all flex items-center space-x-2">
           <span class="material-symbols-outlined text-[16px]">restart_alt</span>
           <span class="text-[10px] font-black uppercase tracking-widest">Reset Configuration to Default</span>
       </button>

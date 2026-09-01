@@ -121,7 +121,7 @@ async function skip() {
 
       <div class="flex items-center gap-2" :aria-label="t('onboarding.progressLabel')">
         <div v-for="n in 3" :key="n" class="flex-1 h-1 rounded-full"
-             :class="onboardingStore.step >= n ? 'bg-brand-primary' : 'bg-white/10'"></div>
+             :class="onboardingStore.step >= n ? 'bg-brand-primary' : 'bg-black/10 dark:bg-white/10'"></div>
       </div>
 
       <div v-if="onboardingStore.step === 1" class="space-y-4">

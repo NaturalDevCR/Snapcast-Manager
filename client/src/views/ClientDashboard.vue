@@ -249,13 +249,13 @@ onMounted(async () => {
                 {{ t('clientDashboard.upToDate') }}
               </div>
             </div>
-            <div class="pt-4 border-t border-white/5 flex flex-col gap-2" v-if="systemStore.installedPackages.snapclient">
+            <div class="pt-4 border-t border-black/5 dark:border-white/5 flex flex-col gap-2" v-if="systemStore.installedPackages.snapclient">
               <button @click="handleUpdate(systemStore.packageVersions.snapclient === systemStore.availableVersions.snapclient || systemStore.availableVersions.snapclient === 'unknown')"
                       :class="[
                         'w-full px-4 py-3 rounded-xl text-xs font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 uppercase',
                         systemStore.packageVersions.snapclient !== systemStore.availableVersions.snapclient && systemStore.availableVersions.snapclient !== 'unknown'
                         ? 'bg-brand-primary text-white border border-brand-primary/50 shadow-xl shadow-brand-primary/30 hover:bg-brand-primary/80'
-                        : 'bg-black/40 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'
+                        : 'bg-black/40 text-gray-400 hover:bg-black/10 dark:hover:bg-white/10 hover:text-white border border-black/5 dark:border-white/5'
                       ]" :disabled="systemStore.loading">
                 {{ systemStore.packageVersions.snapclient !== systemStore.availableVersions.snapclient && systemStore.availableVersions.snapclient !== 'unknown' ? t('clientDashboard.installUpdate') : t('clientDashboard.cleanReinstall') }}
               </button>
@@ -263,7 +263,7 @@ onMounted(async () => {
                 {{ t('clientDashboard.uninstall') }}
               </button>
             </div>
-            <div class="pt-4 border-t border-white/5" v-else>
+            <div class="pt-4 border-t border-black/5 dark:border-white/5" v-else>
               <button @click="systemStore.installPackage('snapclient')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black tracking-widest uppercase text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
                 {{ t('clientDashboard.installSnapclient') }}
               </button>
@@ -274,7 +274,7 @@ onMounted(async () => {
 
       <!-- ── Instances Section ────────────────────────────────────────── -->
       <template v-if="systemStore.installedPackages.snapclient">
-        <div class="border-t border-white/5 pt-8">
+        <div class="border-t border-black/5 dark:border-white/5 pt-8">
           <div class="flex items-center justify-between px-1 mb-6">
             <div class="flex items-center space-x-2">
               <span class="material-symbols-outlined text-brand-primary">dynamic_feed</span>
@@ -288,7 +288,7 @@ onMounted(async () => {
           </div>
 
           <!-- Empty state -->
-          <div v-if="instanceStore.instances.length === 0" class="rounded-2xl border border-white/5 bg-white/[0.02]">
+          <div v-if="instanceStore.instances.length === 0" class="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02]">
             <EmptyState
               icon="speaker"
               :title="t('clientDashboard.noInstances')"
@@ -327,16 +327,16 @@ onMounted(async () => {
                   <span class="text-xs font-mono text-brand-primary">{{ inst.instanceNum }}</span>
                 </div>
                 <!-- Soundcard -->
-                <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                <div class="p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05]">
                   <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest block mb-1">{{ t('clientDashboard.audioOutput') }}</span>
                   <span class="text-[11px] font-mono text-brand-primary break-all">{{ inst.soundcard }}</span>
                 </div>
 
                 <!-- ALSA Mixer toggle + panel -->
-                <div class="rounded-xl border border-white/[0.06] overflow-hidden">
+                <div class="rounded-xl border border-black/[0.06] dark:border-white/[0.06] overflow-hidden">
                   <button
                     @click="toggleAlsa(inst)"
-                    class="w-full flex items-center justify-between px-3 py-2 bg-white/[0.02] hover:bg-white/[0.05] transition-colors"
+                    class="w-full flex items-center justify-between px-3 py-2 bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] transition-colors"
                   >
                     <div class="flex items-center gap-2">
                       <span class="material-symbols-outlined text-[0.95rem] text-brand-primary">tune</span>
@@ -357,7 +357,7 @@ onMounted(async () => {
                     leave-from-class="opacity-100 max-h-96"
                     leave-to-class="opacity-0 max-h-0"
                   >
-                    <div v-if="alsaState[inst.id]?.expanded" class="px-3 py-3 space-y-3 border-t border-white/5 overflow-hidden">
+                    <div v-if="alsaState[inst.id]?.expanded" class="px-3 py-3 space-y-3 border-t border-black/5 dark:border-white/5 overflow-hidden">
                       <div v-if="alsaState[inst.id]?.controls.length === 0" class="text-[11px] text-text-muted italic text-center py-2">
                         {{ t('clientDashboard.noPlaybackControls') }}
                       </div>
@@ -372,7 +372,7 @@ onMounted(async () => {
                           :value="ctrl.percent"
                           @input="ctrl.percent = parseInt(($event.target as HTMLInputElement).value)"
                           @change="handleAlsaChange(inst, ctrl)"
-                          class="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-white/10"
+                          class="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-black/10 dark:bg-white/10"
                           style="accent-color: var(--brand-primary, #0ea5e9)"
                         />
                       </div>
@@ -381,12 +381,12 @@ onMounted(async () => {
                 </div>
 
                 <!-- Controls -->
-                <div class="pt-3 border-t border-white/5 space-y-2">
+                <div class="pt-3 border-t border-black/5 dark:border-white/5 space-y-2">
                   <div class="grid grid-cols-3 gap-2">
-                    <button @click="handleControl(inst, 'restart')" class="py-2 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">{{ t('clientDashboard.restart') }}</button>
+                    <button @click="handleControl(inst, 'restart')" class="py-2 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-white border border-black/5 dark:border-white/5 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">{{ t('clientDashboard.restart') }}</button>
                     <button v-if="inst.status === 'active'" @click="handleControl(inst, 'stop')" class="py-2 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">{{ t('clientDashboard.stop') }}</button>
                     <button v-else @click="handleControl(inst, 'start')" class="py-2 bg-[#00ff9d]/10 hover:bg-[#00ff9d]/20 text-[#00ff9d] border border-[#00ff9d]/20 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">{{ t('clientDashboard.start') }}</button>
-                    <button @click="openEdit(inst)" class="py-2 bg-black/40 hover:bg-white/10 text-white border border-white/5 rounded-xl transition-all text-[10px] font-bold active:scale-95">{{ t('clientDashboard.edit') }}</button>
+                    <button @click="openEdit(inst)" class="py-2 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-white border border-black/5 dark:border-white/5 rounded-xl transition-all text-[10px] font-bold active:scale-95">{{ t('clientDashboard.edit') }}</button>
                   </div>
                   <button @click="confirmDeleteInstance(inst)" class="w-full py-2 bg-[#ff3b30]/5 hover:bg-[#ff3b30]/15 text-[#ff3b30]/60 hover:text-[#ff3b30] border border-[#ff3b30]/10 rounded-xl transition-all text-[10px] font-bold active:scale-95" :disabled="instanceStore.loading">
                     {{ t('clientDashboard.deleteInstance') }}
@@ -402,10 +402,10 @@ onMounted(async () => {
       <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
         <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="closeModal"></div>
-          <div class="relative bg-brand-bg border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 duration-200">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+          <div class="relative bg-brand-bg border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 duration-200">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-black/5 dark:border-white/5">
               <h3 class="text-sm font-black text-white uppercase tracking-widest">{{ editingInstance ? t('clientDashboard.editInstance') : t('clientDashboard.newInstance') }}</h3>
-              <button @click="closeModal" class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors" :aria-label="t('clientDashboard.close')">
+              <button @click="closeModal" class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-gray-400 hover:text-white transition-colors" :aria-label="t('clientDashboard.close')">
                 <span class="material-symbols-outlined text-[1.1rem]">close</span>
               </button>
             </div>
@@ -414,22 +414,22 @@ onMounted(async () => {
               <!-- Name -->
               <div>
                 <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">{{ t('clientDashboard.instanceName') }}</label>
-                <input v-model="form.name" type="text" :placeholder="t('clientDashboard.namePlaceholder')" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
+                <input v-model="form.name" type="text" :placeholder="t('clientDashboard.namePlaceholder')" class="w-full bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
               </div>
 
               <!-- Audio Device -->
               <div>
                 <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">{{ t('clientDashboard.audioOutputDevice') }}</label>
-                <div v-if="instanceStore.devices.length === 0" class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] text-xs text-text-muted italic">{{ t('clientDashboard.noAlsaDevices') }}</div>
+                <div v-if="instanceStore.devices.length === 0" class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] text-xs text-text-muted italic">{{ t('clientDashboard.noAlsaDevices') }}</div>
                 <div v-else class="space-y-2 max-h-48 overflow-y-auto pr-1">
                   <label v-for="d in availableDevices" :key="d.hwId"
                     :class="[
                       'flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all',
                       d.inUse && d.hwId !== form.soundcard
-                        ? 'border-white/5 bg-white/[0.01] opacity-40 cursor-not-allowed'
+                        ? 'border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01] opacity-40 cursor-not-allowed'
                         : form.soundcard === d.hwId
                           ? 'border-brand-primary/50 bg-brand-primary/10'
-                          : 'border-white/5 bg-white/[0.02] hover:border-brand-primary/30 hover:bg-white/[0.05]'
+                          : 'border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] hover:border-brand-primary/30 hover:bg-black/[0.05] dark:hover:bg-white/[0.05]'
                     ]"
                   >
                     <input type="radio" :value="d.hwId" v-model="form.soundcard" :disabled="d.inUse && d.hwId !== form.soundcard" class="mt-0.5 accent-brand-primary" />
@@ -447,11 +447,11 @@ onMounted(async () => {
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">{{ t('clientDashboard.snapserverHost') }}</label>
-                  <input v-model="form.host" type="text" placeholder="192.168.1.10" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
+                  <input v-model="form.host" type="text" placeholder="192.168.1.10" class="w-full bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
                 </div>
                 <div>
                   <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">{{ t('clientDashboard.port') }}</label>
-                  <input v-model.number="form.port" type="number" placeholder="1704" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
+                  <input v-model.number="form.port" type="number" placeholder="1704" class="w-full bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
                 </div>
               </div>
 
@@ -462,12 +462,12 @@ onMounted(async () => {
                     <template #optional><span class="text-text-muted normal-case font-normal">({{ t('clientDashboard.optionalHint') }})</span></template>
                   </i18n-t>
                 </label>
-                <input v-model="form.hostId" type="text" :placeholder="t('clientDashboard.hostIdPlaceholder')" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
+                <input v-model="form.hostId" type="text" :placeholder="t('clientDashboard.hostIdPlaceholder')" class="w-full bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-primary/50" />
               </div>
             </div>
 
             <div class="flex gap-3 px-6 pb-6">
-              <button @click="closeModal" class="flex-1 py-3 bg-black/40 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5 rounded-xl text-xs font-black uppercase tracking-widest transition-all">{{ t('clientDashboard.cancel') }}</button>
+              <button @click="closeModal" class="flex-1 py-3 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-gray-400 hover:text-white border border-black/5 dark:border-white/5 rounded-xl text-xs font-black uppercase tracking-widest transition-all">{{ t('clientDashboard.cancel') }}</button>
               <button @click="submitForm" :disabled="!form.name || !form.soundcard || instanceStore.loading" class="flex-1 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-brand-primary/30 border border-brand-primary/50 disabled:opacity-50 active:scale-95">
                 {{ editingInstance ? t('clientDashboard.saveChanges') : t('clientDashboard.createInstance') }}
               </button>

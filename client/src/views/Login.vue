@@ -36,7 +36,7 @@ const handleLogin = async () => {
     </div>
 
     <div class="max-w-md w-full relative group">
-      <div class="relative bg-brand-surface/80 backdrop-blur-3xl shadow-2xl shadow-brand-primary/10 rounded-[2.5rem] p-8 md:p-12 border border-white/[0.04] animate-in fade-in zoom-in duration-700">
+      <div class="relative bg-brand-surface/80 backdrop-blur-3xl shadow-2xl shadow-brand-primary/10 rounded-[2.5rem] p-8 md:p-12 border border-black/[0.04] dark:border-white/[0.04] animate-in fade-in zoom-in duration-700">
         <div class="text-center mb-8">
            <div class="inline-flex items-center justify-center w-20 h-20 mb-6 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 shadow-xl shadow-brand-primary/20">
               <span class="material-symbols-outlined text-4xl text-brand-primary">settings_input_antenna</span>
@@ -58,7 +58,7 @@ const handleLogin = async () => {
                 type="text" 
                 required 
                 v-model="username" 
-                class="block w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-medium"
+                class="block w-full pl-11 pr-4 py-3 bg-black/20 border border-black/10 dark:border-white/10 rounded-xl text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-medium"
                 :placeholder="t('login.usernamePlaceholder')"
               >
             </div>
@@ -71,7 +71,7 @@ const handleLogin = async () => {
                 type="password" 
                 required 
                 v-model="password"
-                class="block w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-medium"
+                class="block w-full pl-11 pr-4 py-3 bg-black/20 border border-black/10 dark:border-white/10 rounded-xl text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-medium"
                 :placeholder="t('login.passwordPlaceholder')"
               >
             </div>

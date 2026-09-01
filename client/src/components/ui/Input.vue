@@ -3,7 +3,7 @@
 //
 // Visual style matches Login.vue's established input markup (rounded-xl,
 // bordered, focus ring in brand-primary) but is rebuilt on tokens only:
-// Login.vue's `bg-black/20 border-white/10` is a literal black/white
+// Login.vue's `bg-black/20 border-black/10 dark:border-white/10` is a literal black/white
 // overlay that predates the token system and is explicitly disallowed in
 // this file's color palette, so this uses `bg-brand-bg` (the token for the
 // page's sunken background) against the surrounding `bg-brand-surface`

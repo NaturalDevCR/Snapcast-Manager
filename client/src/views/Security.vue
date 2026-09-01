@@ -93,7 +93,7 @@ const handleExportBackup = async () => {
     <div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <!-- Header -->
       <div>
-        <h1 class="text-3xl font-black text-white tracking-tight drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">{{ t('security.title') }}</h1>
+        <h1 class="text-3xl font-black text-text-main tracking-tight dark:drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">{{ t('security.title') }}</h1>
         <p class="text-gray-400 font-medium mt-1">{{ t('security.subtitle') }}</p>
       </div>
 
@@ -107,17 +107,17 @@ const handleExportBackup = async () => {
             <div>
               <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.currentPasswordLabel') }}</label>
               <input v-model="currentPassword" type="password" :placeholder="t('security.currentPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
+                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
             </div>
             <div>
               <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.newPasswordLabel') }}</label>
               <input v-model="newPassword" type="password" :placeholder="t('security.newPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
+                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
             </div>
             <div>
               <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.confirmPasswordLabel') }}</label>
               <input v-model="confirmPassword" type="password" :placeholder="t('security.confirmPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
+                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
             </div>
             <button
               @click="handleChangePassword"
