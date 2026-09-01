@@ -9,6 +9,7 @@ import Card from '../components/Card.vue';
 import ConfirmDestructive from '../components/ui/ConfirmDestructive.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import Button from '../components/ui/Button.vue';
+import JobLogPanel from '../components/JobLogPanel.vue';
 
 const { t } = useI18n({ useScope: 'global' });
 const systemStore = useSystemStore();
@@ -210,11 +211,17 @@ onMounted(async () => {
         </button>
       </div>
 
-      <!-- Loading Overlay -->
-      <div v-if="systemStore.loading || instanceStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-brand-bg/40 backdrop-blur-sm pointer-events-none">
+      <!-- systemStore.loading covers real background jobs (installPackage/
+           updatePackage, e.g. snapclient) with a real log -- JobLogPanel.vue
+           shows that log window. instanceStore.loading covers this view's
+           OWN, log-less, synchronous instance operations (create/edit/
+           restart a snapclient instance) -- kept as the original simple
+           overlay, since there is no job log to show for those. -->
+      <JobLogPanel />
+      <div v-if="instanceStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-brand-bg/40 backdrop-blur-sm pointer-events-none">
         <div class="bg-brand-surface/90 p-5 rounded-2xl shadow-2xl flex items-center space-x-3 border border-brand-primary/20 animate-in fade-in zoom-in duration-300 pointer-events-auto backdrop-blur-xl">
           <span class="material-symbols-outlined animate-spin text-brand-primary text-2xl">sync</span>
-          <span class="text-sm font-bold text-white tracking-widest uppercase">{{ instanceStore.loadingMessage || systemStore.loadingMessage || t('clientDashboard.syncing') }}</span>
+          <span class="text-sm font-bold text-text-main tracking-widest uppercase">{{ instanceStore.loadingMessage || t('clientDashboard.syncing') }}</span>
         </div>
       </div>
 

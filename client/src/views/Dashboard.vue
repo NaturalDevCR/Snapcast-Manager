@@ -14,6 +14,7 @@ import Card from '../components/Card.vue';
 import Badge from '../components/ui/Badge.vue';
 import ConfirmDestructive from '../components/ui/ConfirmDestructive.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
+import JobLogPanel from '../components/JobLogPanel.vue';
 import { version } from '../../package.json';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -287,13 +288,8 @@ const openMympd = () => {
         </div>
       </Card>
 
-      <!-- Loading Overlay (more subtle now) -->
-      <div v-if="systemStore.loading" class="fixed inset-0 z-50 flex items-center justify-center bg-brand-bg/40 backdrop-blur-sm pointer-events-none">
-          <div class="bg-brand-surface/90 p-5 rounded-2xl shadow-2xl flex items-center space-x-3 border border-brand-primary/20 animate-in fade-in zoom-in duration-300 pointer-events-auto backdrop-blur-xl">
-              <span class="material-symbols-outlined animate-spin text-brand-primary text-2xl">sync</span>
-              <span class="text-sm font-bold text-text-main tracking-widest uppercase">{{ systemStore.loadingMessage || t('dashboard.loadingFallback') }}</span>
-          </div>
-      </div>
+      <!-- Loading overlay + full job log window (JobLogPanel.vue) -->
+      <JobLogPanel />
 
 
       <!-- Enhanced Snapcast Live Metrics -->

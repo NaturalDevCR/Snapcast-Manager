@@ -6,6 +6,16 @@ export const useSystemStore = defineStore('system', () => {
   const loading = ref(false);
   const loadingMessage = ref('');
   const error = ref('');
+  // Feature request found live: a user asked for a real log window during
+  // install/update jobs -- runJob() already polled the job's FULL log
+  // array every 2s (server/src/services/jobs.ts already tracks it, pushed
+  // over SSE too via jobEvents, see routes/events.ts), but only ever
+  // surfaced the single LAST line into `loadingMessage`, overwritten each
+  // poll. `jobLog` exposes the full, growing array so a UI panel can show
+  // real install/build output as it happens instead of one line that
+  // keeps disappearing. Cleared at the start of each new job (below) so a
+  // second install doesn't show a stale tail from a previous one.
+  const jobLog = ref<string[]>([]);
   const snapserverStatus = ref('unknown');
   const snapclientStatus = ref('unknown');
   const shairportSyncStatus = ref('unknown');
@@ -95,6 +105,7 @@ export const useSystemStore = defineStore('system', () => {
    */
   async function runJob(endpoint: string, body: Record<string, unknown> | null, message: string): Promise<void> {
     loadingMessage.value = message;
+    jobLog.value = [];
     loading.value = true;
     try {
       const start = await fetchApi(endpoint, {
@@ -106,6 +117,7 @@ export const useSystemStore = defineStore('system', () => {
       while (true) {
         await new Promise(resolve => setTimeout(resolve, 2000));
         const job = await fetchApi(`/system/jobs/${start.jobId}`);
+        jobLog.value = job.log || [];
         const lastLine = job.log?.length ? job.log[job.log.length - 1] : '';
         loadingMessage.value = lastLine ? `${message} — ${lastLine}` : message;
         if (job.status === 'done') return;
@@ -115,6 +127,12 @@ export const useSystemStore = defineStore('system', () => {
       error.value = err.message;
       throw err;
     } finally {
+      // jobLog is deliberately NOT cleared here -- the log panel (see
+      // JobLogPanel.vue) stays open a moment after `loading` goes false so
+      // the user can read the final lines (e.g. "...installed
+      // successfully.") instead of it vanishing the instant the job
+      // finishes; it's cleared at the START of the next runJob() call
+      // above instead.
       loading.value = false;
       loadingMessage.value = '';
     }
@@ -263,6 +281,7 @@ export const useSystemStore = defineStore('system', () => {
   return {
     loading,
     loadingMessage,
+    jobLog,
     error,
     snapserverStatus,
     snapclientStatus,

@@ -16,6 +16,7 @@ import Layout from '../components/Layout.vue';
 import Button from '../components/ui/Button.vue';
 import Select from '../components/ui/Select.vue';
 import AddEditPipeDialog from '../components/pipe-sources/AddEditPipeDialog.vue';
+import JobLogPanel from '../components/JobLogPanel.vue';
 import { useOnboardingStore } from '../stores/onboarding';
 import { useSystemStore } from '../stores/system';
 import { usePipeSourcesStore } from '../stores/pipeSources';
@@ -111,6 +112,7 @@ async function skip() {
 
 <template>
   <Layout>
+    <JobLogPanel />
     <div class="max-w-2xl mx-auto py-12 space-y-8">
       <div class="flex items-center justify-between">
         <h1 class="text-2xl font-black text-text-main">{{ t('onboarding.getStarted') }}</h1>
