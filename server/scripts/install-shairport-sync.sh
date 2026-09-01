@@ -71,11 +71,27 @@ $SUDO apt-get install -y --no-install-recommends build-essential git autoconf au
   libplist-utils libavutil-dev libavcodec-dev libavformat-dev
 
 echo "Cleaning up any legacy installations..."
+# Post-v0.3.4 fix, found live: every systemctl call in this script below
+# used to omit the trailing `.service` unit-type suffix (e.g. `systemctl
+# stop shairport-sync`, not `systemctl stop shairport-sync.service`).
+# `systemctl` itself treats those as equivalent (it appends `.service` by
+# default when no unit type is given), but `scripts/sudoers.d/
+# snapcast-manager`'s NOPASSWD grants are written with the explicit
+# `.service` suffix, and sudoers matches the literal command LINE, not
+# systemctl's own unit-name normalization -- so every one of these calls
+# was silently rejected as "command not allowed" on a real hardened
+# install (confirmed live via `journalctl -t sudo`: `pam_unix(sudo:auth):
+# auth could not identify password for [snapmanager]` immediately followed
+# by `command not allowed`), leaving shairport-sync/nqptp installs stuck
+# in a stop/disable-fails -> rm-binaries -> rebuild -> enable-fails loop
+# that never reached a genuinely running service. Every systemctl
+# invocation below now names the unit with its `.service` suffix
+# explicitly, matching the sudoers grant exactly.
 $SUDO apt-get remove --purge -y shairport-sync 2>/dev/null || true
-$SUDO systemctl stop shairport-sync 2>/dev/null || true
-$SUDO systemctl disable shairport-sync 2>/dev/null || true
-$SUDO systemctl stop nqptp 2>/dev/null || true
-$SUDO systemctl disable nqptp 2>/dev/null || true
+$SUDO systemctl stop shairport-sync.service 2>/dev/null || true
+$SUDO systemctl disable shairport-sync.service 2>/dev/null || true
+$SUDO systemctl stop nqptp.service 2>/dev/null || true
+$SUDO systemctl disable nqptp.service 2>/dev/null || true
 $SUDO rm -f /usr/local/bin/shairport-sync /usr/bin/shairport-sync /usr/local/bin/nqptp /usr/bin/nqptp
 $SUDO rm -f /etc/systemd/system/shairport-sync.service /etc/systemd/system/nqptp.service
 $SUDO rm -f /lib/systemd/system/shairport-sync.service /lib/systemd/system/nqptp.service
@@ -100,8 +116,8 @@ autoreconf -fvi
 make -C "$NQPTP_BUILD_DIR" -j"$(nproc)"
 $SUDO make -C "$NQPTP_BUILD_DIR" install
 $SUDO systemctl daemon-reload
-$SUDO systemctl enable nqptp
-$SUDO systemctl restart nqptp
+$SUDO systemctl enable nqptp.service
+$SUDO systemctl restart nqptp.service
 
 echo "Building and installing shairport-sync..."
 SPS_BUILD_DIR=/tmp/shairport-sync-build
@@ -123,6 +139,6 @@ if ! id "shairport-sync" >/dev/null 2>&1; then
 fi
 
 $SUDO systemctl daemon-reload
-$SUDO systemctl enable shairport-sync
-$SUDO systemctl restart shairport-sync
+$SUDO systemctl enable shairport-sync.service
+$SUDO systemctl restart shairport-sync.service
 echo "Shairport-sync and nqptp installed successfully."

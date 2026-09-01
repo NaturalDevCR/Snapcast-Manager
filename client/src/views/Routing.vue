@@ -380,8 +380,8 @@ const updateVolume = (client: any, event: Event) => {
                 <p class="text-[10px] text-text-muted font-black uppercase tracking-[0.3em] mt-1">{{ t('routing.subtitle') }}</p>
             </div>
         </div>
-        <button @click="snapcastStore.fetchStatus()" :disabled="snapcastStore.loading" 
-                class="px-6 py-3 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-white rounded-2xl text-xs font-black border border-black/[0.05] dark:border-white/[0.05] backdrop-blur-xl transition-all active:scale-95 flex items-center gap-3 group/btn shadow-xl z-20">
+        <button @click="snapcastStore.fetchStatus()" :disabled="snapcastStore.loading"
+                class="px-6 py-3 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-text-main rounded-2xl text-xs font-black border border-black/[0.05] dark:border-white/[0.05] backdrop-blur-xl transition-all active:scale-95 flex items-center gap-3 group/btn shadow-xl z-20">
             <span class="material-symbols-outlined text-sm group-hover/btn:rotate-180 transition-transform duration-700" :class="{'animate-spin': snapcastStore.loading}">refresh</span>
             {{ t('routing.resync') }}
         </button>
