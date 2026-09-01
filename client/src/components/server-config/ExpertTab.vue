@@ -45,6 +45,35 @@ let editorInstance: any = null;
 // once per navigation into the tab, same as before), and onUnmounted
 // fires on navigating away (same teardown timing as the old `else`
 // branch nulling out `editorInstance`).
+// Post-v0.3.5 fix, found live: the plain two-way watch below (editor
+// 'update' -> rawConfig.value = ...; watch(rawConfig) -> editorInstance.
+// setOptions({value})) was a genuine feedback loop with no guard against
+// re-entering it from its OWN write. Every keystroke fired the editor's
+// 'update' event synchronously mid-keypress, which wrote `rawConfig.value`
+// -- and Vue's `watch(rawConfig, ...)` then fired on the NEXT tick and
+// called `setOptions({value: newVal})` back on the SAME editor instance
+// while it may still have been finishing that keystroke's own internal
+// DOM update (prism-code-editor renders into a Shadow DOM with its own
+// invisible, exactly-overlaid `<textarea>` -- see basicEditor()'s own
+// internals). `editorInstance.value !== newVal` was meant to short-circuit
+// this, but by the time the watch callback ran, the editor's own `.value`
+// had ALREADY been updated internally by typing (that's what fired
+// 'update' in the first place) -- so the guard rarely actually prevented
+// the redundant setOptions() call; it just usually landed on an already-
+// equal value moments too late to be free of a mid-keystroke re-render
+// race. Symptom reported: while typing, a small, unstyled native
+// `<textarea>` (roughly the browser's default 2-row size, no CSS at all)
+// visibly appeared inside the editor -- consistent with the Shadow DOM's
+// own `<textarea>` briefly re-rendering before its scoped `<style>` was
+// (re-)applied.
+//
+// Fixed with an explicit "this write came from the editor itself, not an
+// external source (Revert button, a fresh GET, etc.)" flag: the watch now
+// skips the redundant setOptions() call for a write it just caused,
+// leaving setOptions({value}) to only ever run for genuinely EXTERNAL
+// changes -- exactly the case it exists for.
+let isInternalUpdate = false;
+
 onMounted(async () => {
     if (editorRef.value) {
         editorInstance = basicEditor(
@@ -57,6 +86,7 @@ onMounted(async () => {
             () => {
                 if (editorInstance && typeof editorInstance.on === 'function') {
                     editorInstance.on('update', (value: string) => {
+                        isInternalUpdate = true;
                         rawConfig.value = value;
                     });
                 }
@@ -76,6 +106,14 @@ watch(() => uiStore.isDark, (isDark) => {
 });
 
 watch(rawConfig, (newVal) => {
+    if (isInternalUpdate) {
+        // This change originated from the editor's own 'update' event
+        // above -- the editor already has this value, re-applying it via
+        // setOptions() would be both redundant and the exact source of
+        // the mid-keystroke re-render race described above.
+        isInternalUpdate = false;
+        return;
+    }
     if (editorInstance && editorInstance.value !== newVal) {
         editorInstance.setOptions({ value: newVal });
     }
