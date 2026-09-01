@@ -8,6 +8,15 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.5] - 2026-09-01
+
+### 🐛 Bug Fixes
+
+- *(install,ui)* Missing .service suffix breaking shairport-sync installs + more light-mode contrast (v0.3.5) (#8)
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.4
 ## [0.3.4] - 2026-09-01
 
 ### 🐛 Bug Fixes
