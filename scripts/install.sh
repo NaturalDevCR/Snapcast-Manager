@@ -1093,6 +1093,54 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     # read/written exclusively by this same process under its own **user**
     # ownership, which is unaffected; nothing in this codebase gates access
     # by group equality.
+    #
+    # ReadWritePaths= widened to /etc, /var, /usr wholesale (post-Task-65
+    # fix pass, found while verifying the missing-`tar`-sudoers-grant fix
+    # end-to-end): the previous, narrowly-enumerated entry list only ever
+    # covered paths THIS APP ITSELF writes directly. It never covered a REAL
+    # `apt-get install`/`--only-upgrade` of a package with actual library
+    # dependencies -- confirmed for real against a hardened container:
+    # installing `mpd` for real fails with "Read-only file system" while
+    # dpkg unpacks `/usr/lib/<arch-triplet>/liburing.so.2.3`,
+    # `/usr/share/doc/libjs-jquery`, etc. -- none of which were ever in the
+    # old list. This isn't specific to `mpd`: `mympd` (installMympd()),
+    # `ffmpeg` (generic apt fallback in installPackage()), and `node`/`gpg`
+    # (updateNodeJs()) all install real packages via the exact same
+    # `apt.install()`/`apt.upgrade()` code path in server/src/services/
+    # system.ts, and dpkg postinst scripts write to essentially
+    # unpredictable paths driven by a package's own (and its TRANSITIVE
+    # dependencies') maintainer scripts -- e.g. installing `mpd` was also
+    # seen to touch `/etc/apache2` via a documentation-only transitive dep
+    # (`javascript-common`), a path with zero connection to mpd itself.
+    # There is no finite, enumerable path list that stays correct for
+    # arbitrary future Debian packages this app's own package-management
+    # feature is explicitly designed to install (see this repo's own
+    # scripts/sudoers.d/snapcast-manager and SECURITY.md's "Package-
+    # management is intentionally NOT narrowly restricted" section --
+    # apt-get/dpkg are ALREADY granted broad, unrestricted-argument
+    # NOPASSWD sudo access for exactly this reason; a real dpkg postinst
+    # already runs arbitrary root code today regardless of this
+    # mount-namespace boundary). Widening ReadWritePaths= to these three
+    # top-level directories is the honest acknowledgment of that existing
+    # trade-off, not a new one -- the narrower, individually-listed entries
+    # below are now redundant (fully covered by /etc, /var, /usr, /run) but
+    # are left in place rather than removed, both for the historical
+    # reasoning attached to each and because $INSTALL_BASE_DIR/data and
+    # $INSTALL_BASE_DIR/server/snapshots still need their own entries (they
+    # don't live under /etc, /var, /usr, or /run).
+    #
+    # /run was ALSO widened wholesale in this same fix pass (was previously
+    # only /run/snapcast-manager individually) -- confirmed for real: even
+    # with /etc/var/usr open, a real `apt-get install mpd` still failed,
+    # this time in mpd's own postinst script (`adduser --system mpd`
+    # failing with "could not open lock file /run/adduser!"). Same
+    # unpredictable-transitive-postinst-script reasoning as /etc/var/usr
+    # above applies identically to /run. NOT redundant with `Task 66`'s
+    # `RuntimeDirectory=snapcast-manager` right above -- that directive only
+    # (re-)creates this app's OWN `/run/snapcast-manager` subdirectory
+    # across reboots; this `ReadWritePaths=` widening is what lets an
+    # unrelated dpkg postinst script write its OWN, different `/run` paths
+    # (`/run/adduser`, etc.) that neither directive knew about in advance.
     NEW_UNIT_CONTENT=$(cat <<EOF
 [Unit]
 Description=Snapcast Manager Service
@@ -1111,7 +1159,7 @@ EnvironmentFile=$INSTALL_DIR/server/.env
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=$INSTALL_BASE_DIR/data $INSTALL_BASE_DIR/server/snapshots /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.bak /etc/snapserver.conf.d /etc/snapcast-manager /run/snapcast-manager /var/lib/snapcast-manager/scripts /var/backups/snapmanager /etc/mpd.conf /var/lib/mpd /etc/systemd/system /etc/default/snapclient /etc/snapclient-manager /var/lib/snapserver /etc/apt/keyrings /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl /var/lib/dpkg /var/cache/apt /var/lib/apt/lists /usr/local/bin /usr/bin /etc/passwd /etc/group /etc/shadow /etc/gshadow
+ReadWritePaths=$INSTALL_BASE_DIR/data $INSTALL_BASE_DIR/server/snapshots /run /etc /var /usr /etc/snapserver.conf /etc/snapserver.conf.base /etc/snapserver.conf.bak /etc/snapserver.conf.d /etc/snapcast-manager /var/lib/snapcast-manager/scripts /var/backups/snapmanager /etc/mpd.conf /var/lib/mpd /etc/systemd/system /etc/default/snapclient /etc/snapclient-manager /var/lib/snapserver /etc/apt/keyrings /etc/apt/sources.list.d /usr/share/snapserver/snap-ctrl /var/lib/dpkg /var/cache/apt /var/lib/apt/lists /usr/local/bin /usr/bin /etc/passwd /etc/group /etc/shadow /etc/gshadow
 
 [Install]
 WantedBy=multi-user.target

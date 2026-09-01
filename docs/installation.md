@@ -147,7 +147,12 @@ This is the privilege-hardening step described in detail in
    `/etc/mpd.conf`, `/run/snapcast-manager`, etc.) so the unit's own
    mount-namespace sandboxing doesn't fail to start on a genuinely fresh
    host — a real bug found and fixed via Task 65's container tests (see
-   `SECURITY.md`).
+   `SECURITY.md`). As of v0.3.1, `ReadWritePaths=` also grants `/etc`,
+   `/var`, `/usr`, and `/run` wholesale (not just this app's own specific
+   paths under them) — needed for a REAL `apt-get install` of a package
+   like `mpd`/`mympd` to actually succeed under the sandbox; see
+   `SECURITY.md`'s "ReadWritePaths= widened to /etc/var/usr/run" section
+   for why.
 4. Validates and installs a scoped `sudoers.d` rule
    (`/etc/sudoers.d/snapcast-manager`, mode `0440`) via `visudo -c` before
    ever writing it live — a validation failure is reported loudly rather
@@ -253,16 +258,45 @@ update-detection menu described above (not available under `-y`, since
    application files are removed but your data directory is kept; if you
    confirm, everything under `/opt/snapcast-manager` is removed.
 
+## Upgrading an existing install to v0.3.1+
+
+If you installed any earlier version, the privilege-hardening step
+(Phase 5 above) is idempotent and safe to re-run on its own — no special
+migration procedure, flag, or data-loss risk. Simply re-run the installer
+against your existing install (the same one-liner for a remote install,
+or `bash scripts/install.sh` from a local checkout) and let it detect and
+migrate the existing unit/sudoers/`ReadWritePaths=` state, same as any
+other update.
+
+**One thing worth knowing before you do:** if you originally installed via
+the remote (`curl | bash`) one-liner on ANY version before v0.3.1, your
+`/etc/sudoers.d/snapcast-manager` grant likely never existed at all — a
+real, disclosed bug (`.github/workflows/release.yml` never packaged
+`scripts/sudoers.d/` into the release `.zip`, since Task 16 first
+introduced the privilege model) meant `install.sh` silently skipped
+installing it, rather than failing loudly. If package installs/updates
+from the UI have never worked for you, this is very likely why — see
+[`docs/troubleshooting.md`](troubleshooting.md#4-package-installs-fail-mpdmympdffmpegnode-even-though-sudo-works)
+for how to confirm it and the fix (re-run the one-liner to fetch a
+v0.3.1+ release, which includes the grant this time).
+
+Three other real, disclosed bugs specific to installing/updating a
+package (mpd, mympd, ffmpeg, Node.js) from the UI — a real `apt-get
+install` failing with `Read-only file system`, and `dpkg` hanging on an
+unanswerable interactive conffile prompt — were also fixed in v0.3.1; see
+the same troubleshooting section for symptoms and confirmation steps if
+you're upgrading from an older release and those still concern you.
+
 ## Where to go next
 
 - **[`SECURITY.md`](../SECURITY.md)** — the full privilege model (what the
   `snapmanager` user can and can't do, the sudoers grants, the systemd
   sandbox, and currently-known, disclosed limitations), and the
   real-hardware validation checklist recommended before production use.
-- **Troubleshooting** — a dedicated `docs/troubleshooting.md` is planned
-  as follow-up work and doesn't exist yet at the time of writing; until
-  then, `SECURITY.md` and this document's step-by-step breakdown above
-  are the best reference for what a given install phase is supposed to
-  do, and the installer's own console output (plus, for the systemd step,
-  `journalctl -u snapmanager -n 50 --no-pager`, which the installer runs
-  automatically on a failed restart) is the primary diagnostic tool today.
+- **[`docs/troubleshooting.md`](troubleshooting.md)** — organized by
+  symptom, covering installation issues, sudo/permission errors, package
+  install failures, snapserver/snapclient, pipe sources, myMPD, and
+  backup/restore. The installer's own console output (plus, for the
+  systemd step, `journalctl -u snapmanager -n 50 --no-pager`, which the
+  installer runs automatically on a failed restart) is the primary
+  diagnostic tool alongside it.

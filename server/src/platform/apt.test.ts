@@ -147,8 +147,18 @@ test('update() prefixes with sudo via argv (not string concatenation) when needs
 });
 
 // ---- install() ----
+//
+// Post-Task-65 fix pass: install() now forces DEBIAN_FRONTEND=noninteractive
+// and `--force-confnew`, confirmed for real against a hardened container to
+// be REQUIRED -- without it, installing a package like `mpd` whose conffile
+// (`/etc/mpd.conf`) install.sh pre-touches as an empty placeholder hangs
+// forever on `dpkg`'s own interactive conffile prompt (`end of file on
+// stdin at conffile prompt`), which a systemd unit with no TTY can never
+// answer. See apt.ts's own dpkgConfflictArgs()/aptGetNonInteractive()
+// docstring for the full account and why install() picks `--force-confnew`
+// specifically (vs. upgrade()'s `--force-confdef --force-confold`).
 
-test('install() calls apt-get install -y <packages> via argv', async () => {
+test('install() calls apt-get install -y <packages> via argv, non-interactive with --force-confnew', async () => {
   const calls: Call[] = [];
   const restoreRun = stubRunRecording(calls);
   const restoreSudo = stubNeedsSudo(() => false);
@@ -156,14 +166,23 @@ test('install() calls apt-get install -y <packages> via argv', async () => {
     await install(['ffmpeg', 'build-essential']);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].bin, 'apt-get');
-    assert.deepEqual(calls[0].args, ['install', '-y', 'ffmpeg', 'build-essential']);
+    assert.deepEqual(calls[0].args, [
+      'install',
+      '-y',
+      '-o',
+      'Dpkg::Options::=--force-confnew',
+      'ffmpeg',
+      'build-essential',
+    ]);
+    const opts = calls[0].opts as { env?: Record<string, string> } | undefined;
+    assert.equal(opts?.env?.DEBIAN_FRONTEND, 'noninteractive');
   } finally {
     restoreRun();
     restoreSudo();
   }
 });
 
-test('install() prefixes with sudo via argv when needsSudo() is true', async () => {
+test('install() prefixes with sudo via argv when needsSudo() is true, DEBIAN_FRONTEND passed as a literal argv element (not RunOptions.env)', async () => {
   const calls: Call[] = [];
   const restoreRun = stubRunRecording(calls);
   const restoreSudo = stubNeedsSudo(() => true);
@@ -171,7 +190,15 @@ test('install() prefixes with sudo via argv when needsSudo() is true', async () 
     await install(['ffmpeg']);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].bin, 'sudo');
-    assert.deepEqual(calls[0].args, ['apt-get', 'install', '-y', 'ffmpeg']);
+    assert.deepEqual(calls[0].args, [
+      'DEBIAN_FRONTEND=noninteractive',
+      'apt-get',
+      'install',
+      '-y',
+      '-o',
+      'Dpkg::Options::=--force-confnew',
+      'ffmpeg',
+    ]);
   } finally {
     restoreRun();
     restoreSudo();
@@ -222,8 +249,14 @@ test('install() rejects an empty package array without calling run()', async () 
 });
 
 // ---- upgrade() ----
+//
+// Same post-Task-65 fix as install() above, but with `--force-confdef
+// --force-confold` (keep the currently-installed conffile on a real
+// conflict) instead of `--force-confnew` -- by upgrade time a package may
+// carry real admin-edited configuration, unlike a first-time install where
+// the "existing" file is only install.sh's own empty placeholder.
 
-test('upgrade() calls apt-get install -y --only-upgrade <packages> via argv', async () => {
+test('upgrade() calls apt-get install -y --only-upgrade <packages> via argv, non-interactive with --force-confdef/--force-confold', async () => {
   const calls: Call[] = [];
   const restoreRun = stubRunRecording(calls);
   const restoreSudo = stubNeedsSudo(() => false);
@@ -231,14 +264,26 @@ test('upgrade() calls apt-get install -y --only-upgrade <packages> via argv', as
     await upgrade(['ffmpeg', 'snapserver']);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].bin, 'apt-get');
-    assert.deepEqual(calls[0].args, ['install', '-y', '--only-upgrade', 'ffmpeg', 'snapserver']);
+    assert.deepEqual(calls[0].args, [
+      'install',
+      '-y',
+      '--only-upgrade',
+      '-o',
+      'Dpkg::Options::=--force-confdef',
+      '-o',
+      'Dpkg::Options::=--force-confold',
+      'ffmpeg',
+      'snapserver',
+    ]);
+    const opts = calls[0].opts as { env?: Record<string, string> } | undefined;
+    assert.equal(opts?.env?.DEBIAN_FRONTEND, 'noninteractive');
   } finally {
     restoreRun();
     restoreSudo();
   }
 });
 
-test('upgrade() prefixes with sudo via argv when needsSudo() is true', async () => {
+test('upgrade() prefixes with sudo via argv when needsSudo() is true, DEBIAN_FRONTEND passed as a literal argv element (not RunOptions.env)', async () => {
   const calls: Call[] = [];
   const restoreRun = stubRunRecording(calls);
   const restoreSudo = stubNeedsSudo(() => true);
@@ -246,7 +291,18 @@ test('upgrade() prefixes with sudo via argv when needsSudo() is true', async () 
     await upgrade(['ffmpeg']);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].bin, 'sudo');
-    assert.deepEqual(calls[0].args, ['apt-get', 'install', '-y', '--only-upgrade', 'ffmpeg']);
+    assert.deepEqual(calls[0].args, [
+      'DEBIAN_FRONTEND=noninteractive',
+      'apt-get',
+      'install',
+      '-y',
+      '--only-upgrade',
+      '-o',
+      'Dpkg::Options::=--force-confdef',
+      '-o',
+      'Dpkg::Options::=--force-confold',
+      'ffmpeg',
+    ]);
   } finally {
     restoreRun();
     restoreSudo();

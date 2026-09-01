@@ -56,6 +56,37 @@ jobs:
           mkdir release_package/scripts
           cp scripts/install.sh release_package/scripts/install.sh
 
+          # Post-Task-65 fix (found while preparing to publish a release
+          # after fixing a missing sudoers.d grant -- checking whether that
+          # fix would even reach a real install via THIS workflow surfaced
+          # that it never would have): install.sh resolves both of these
+          # relative to its OWN on-disk location at install time --
+          # `$INSTALL_DIR/scripts/sudoers.d/snapcast-manager` (Step 6,
+          # SUDOERS_SRC) and `$SCRIPT_DIR/lib/migration.sh` (top of the
+          # script) -- neither was ever copied into release_package here.
+          # `scripts/sudoers.d/` missing is the serious one: install.sh
+          # treats a missing SUDOERS_SRC as non-fatal (prints "[!] ... not
+          # found in this release -- skipping sudoers.d installation." and
+          # continues), which means EVERY install done via the documented
+          # `curl | bash` remote-download flow -- pulling this exact
+          # release zip -- has silently run with NO sudoers.d grant at all
+          # since Task 16 first introduced the privilege-hardening model:
+          # every privileged operation (package install/update, systemd
+          # service control, every installPrivilegedFile() config write)
+          # would fail with "sudo: a password is required". This was never
+          # caught because every previous real-hardware/container
+          # verification (Task 65, and this fix pass's own re-verification)
+          # exercised install.sh's LOCAL-source flow (a full repo checkout,
+          # where scripts/sudoers.d/ genuinely exists on disk already), not
+          # a real downloaded release zip. `scripts/lib/migration.sh`
+          # missing is comparatively benign -- install.sh already guards
+          # its `source` with `if [ -f ... ]` and falls back to always
+          # running the full, idempotent migration steps rather than
+          # skipping them -- but it's packaged too now since the code's own
+          # comment already assumed it "ships alongside install.sh itself".
+          cp -r scripts/sudoers.d release_package/scripts/sudoers.d
+          cp -r scripts/lib release_package/scripts/lib
+
           # Modify the install script to work with the prebuilt files
           cd release_package
 

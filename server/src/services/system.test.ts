@@ -850,7 +850,7 @@ test('installMpd() runs apt install then the systemctl chain (stop/disable socke
     const bins = calls.map(c => `${c.bin} ${c.args.join(' ')}`);
     assert.deepEqual(bins, [
       'apt-get update',
-      'apt-get install -y mpd',
+      'apt-get install -y -o Dpkg::Options::=--force-confnew mpd',
       'systemctl stop mpd.socket',
       'systemctl disable mpd.socket',
       'systemctl unmask mpd.service',
@@ -880,7 +880,7 @@ test('installMpd() prefixes every mutating call with sudo via argv when needsSud
     const argvs = calls.map(c => c.args.join(' '));
     assert.deepEqual(argvs, [
       'apt-get update',
-      'apt-get install -y mpd',
+      'DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::=--force-confnew mpd',
       'systemctl stop mpd.socket',
       'systemctl disable mpd.socket',
       'systemctl unmask mpd.service',
@@ -1122,7 +1122,7 @@ test('installPackage() generic branch (ffmpeg) runs apt update + install via pla
     assert.match(result, /ffmpeg installed successfully/);
     assert.deepEqual(calls.map(c => `${c.bin} ${c.args.join(' ')}`), [
       'apt-get update',
-      'apt-get install -y ffmpeg',
+      'apt-get install -y -o Dpkg::Options::=--force-confnew ffmpeg',
     ]);
   } finally {
     restoreRun();
@@ -1142,7 +1142,7 @@ test('updatePackage() generic branch (ffmpeg) runs apt update + --only-upgrade v
     assert.match(result, /ffmpeg updated successfully/);
     assert.deepEqual(calls.map(c => `${c.bin} ${c.args.join(' ')}`), [
       'apt-get update',
-      'apt-get install -y --only-upgrade ffmpeg',
+      'apt-get install -y --only-upgrade -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold ffmpeg',
     ]);
   } finally {
     restoreRun();

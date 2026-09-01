@@ -143,4 +143,33 @@ snapmanager ALL=(root) NOPASSWD: /usr/bin/journalctl -u * -n * --no-pager
 # runs. This is an accepted, disclosed limitation of this design, not fixed
 # further in this pass -- see SECURITY.md's "Privilege model" section for
 # the full writeup.
-snapmanager ALL=(root) NOPASSWD: /usr/bin/apt-get, /usr/bin/dpkg, /usr/bin/wget, /usr/bin/mkdir, /usr/bin/chmod, /usr/bin/chown, /usr/bin/rm, /usr/bin/cp, /usr/bin/mv, /usr/bin/gpg, /usr/sbin/useradd, /usr/sbin/groupadd, /usr/sbin/usermod, /usr/bin/make, /bin/bash /opt/snapcast-manager/server/scripts/install-shairport-sync.sh, /usr/bin/systemd-analyze verify *, /usr/sbin/ss -K *, /usr/sbin/alsactl store
+#
+# Fix-pass note (post-Task-65 gap): `/usr/bin/tar` was MISSING from this
+# grant entirely -- server/src/services/backup.ts's BackupService
+# (createPreUpdateBackup()/restoreBackup(), via its privileged() helper)
+# has always shelled out to `sudo tar czf ...` / `sudo tar -xPzf ...`
+# against the root-owned /var/backups/snapmanager directory, but no line
+# below ever authorized it. On a real hardened install (snapmanager running
+# unprivileged, per Task 16) every pre-update/pre-install backup and every
+# restore silently failed with "sudo: a password is required" -- found
+# during Task 65's container integration testing, disclosed there as a
+# known gap, and fixed here. Granted broadly (no argument wildcarding),
+# same category as `make` above, NOT the same risk restated: `tar` is
+# ALSO a documented GTFOBins arbitrary-code-execution primitive (`tar
+# --checkpoint=1 --checkpoint-action=exec=/bin/sh -cf /dev/null
+# /dev/null` grants a root shell to anyone who can invoke `sudo tar` with
+# attacker-chosen arguments). It is granted anyway because
+# createPreUpdateBackup()/restoreBackup() are backup.ts's ONLY privileged
+# code paths and both genuinely need it, and there is no narrower
+# sudoers-level alternative: the archive command's trailing argument list
+# is a dynamic, existing-files-only source list built from this app's own
+# collectSources()/resolveExistingSources(), and the restore/delete paths
+# are already guarded by the `/^pre-[a-z\-]+-\d{8}-\d{6}\.tar\.gz$/`
+# filename regex in backup.ts, but sudoers pattern-matches the command
+# LINE, not semantic argument types or call-site provenance -- it cannot
+# distinguish "this app's own generated tar invocation" from "a
+# compromised snapmanager process invoking tar with
+# --checkpoint-action=exec=...". This is an accepted, disclosed limitation
+# of this design, exactly like the apt-get/dpkg and make gaps above -- not
+# fixed further in this pass. See SECURITY.md's "Privilege model" section.
+snapmanager ALL=(root) NOPASSWD: /usr/bin/apt-get, /usr/bin/dpkg, /usr/bin/wget, /usr/bin/mkdir, /usr/bin/chmod, /usr/bin/chown, /usr/bin/rm, /usr/bin/cp, /usr/bin/mv, /usr/bin/gpg, /usr/sbin/useradd, /usr/sbin/groupadd, /usr/sbin/usermod, /usr/bin/make, /usr/bin/tar, /bin/bash /opt/snapcast-manager/server/scripts/install-shairport-sync.sh, /usr/bin/systemd-analyze verify *, /usr/sbin/ss -K *, /usr/sbin/alsactl store

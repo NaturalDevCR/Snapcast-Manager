@@ -72,21 +72,24 @@ Snapcast Manager needs elevated privileges to manage system services and
 packages, but it does not run as root. The installer creates a dedicated,
 unprivileged `snapmanager` system account (no login shell) that the service
 runs as; privileged operations (installing packages, controlling systemd
-units, writing a handful of specific `/etc` config files) go through a
-narrowly-scoped `sudo` grant in `/etc/sudoers.d/snapcast-manager`, and the
-service's own systemd unit further restricts filesystem access with
-`ProtectSystem=strict` and an explicit `ReadWritePaths=` allowlist.
+units, writing config files) go through a narrowly-scoped `sudo` grant in
+`/etc/sudoers.d/snapcast-manager`, and the service's own systemd unit
+further restricts filesystem access with `ProtectSystem=strict` and an
+explicit `ReadWritePaths=` allowlist (as of v0.3.1, `/etc`, `/var`, `/usr`,
+and `/run` wholesale — needed for a real `apt-get install` to actually
+succeed under the sandbox, not just this app's own specific paths).
 
 This is a real, currently-imperfect security posture, not a marketing
-claim — package-management commands (`apt-get`, `dpkg`, `make`) are
+claim — package-management commands (`apt-get`, `dpkg`, `make`, `tar`) are
 necessarily granted broadly rather than narrowly scoped, which is a
 disclosed, accepted limitation, and a past hardening pass briefly (and
 unintentionally) broke the entire sudo-based privilege model by adding
 `NoNewPrivileges=yes` to the unit, since fixed and now covered by a nightly
-automated container test. **Read [`SECURITY.md`](SECURITY.md)
-for the full privilege model, its known limitations, and the real-hardware
-validation checklist** before exposing this to anything beyond a trusted
-LAN.
+automated container test (8 real round-trips against a live systemd-PID-1
+container, including a real package install/update/restore, as of v0.3.1).
+**Read [`SECURITY.md`](SECURITY.md) for the full privilege model, its known
+limitations, and the real-hardware validation checklist** before exposing
+this to anything beyond a trusted LAN.
 
 **This application should not be exposed directly to the public internet**
 without a reverse proxy and TLS — see `SECURITY.md`'s threat model for

@@ -190,7 +190,67 @@ unexpected.
 
 ---
 
-## 4. snapserver / snapclient not starting
+## 4. Package installs fail (mpd/mympd/ffmpeg/node) even though sudo works
+
+Three distinct, real bugs were found and fixed in one pass (v0.3.1) while
+verifying the sudoers fix from Section 3 above against a real hardened
+install — all three affect **installing or updating a real Debian package
+from the UI** (mpd, mympd, ffmpeg, Node.js) specifically, not the rest of
+the app. If Section 3's checks above already say sudo escalation itself
+works fine, but package installs/updates still fail, you're likely hitting
+one of these.
+
+**Symptom A — every privileged action fails, but `sudo -n systemctl
+daemon-reload` (Section 3's probe) succeeds.** This means it's NOT the
+`NoNewPrivileges` regression from Section 3. Check whether the sudoers
+grant exists at all:
+
+```bash
+ls -la /etc/sudoers.d/snapcast-manager
+```
+
+If it's **missing entirely**, you installed via the remote (`curl | bash`)
+one-liner on a release built before v0.3.1: `.github/workflows/release.yml`
+never packaged `scripts/sudoers.d/` into the release `.zip` for any
+version since the privilege-hardening model was introduced (Task 16) —
+`scripts/install.sh` treats a missing sudoers source as non-fatal (prints
+a warning and continues), so the install silently completed with **no
+sudo grant installed at all**. Fixed in v0.3.1's release workflow.
+**Fix:** re-run the one-liner (not just a service restart) to fetch a
+v0.3.1+ release, which now includes it.
+
+**Symptom B — a specific package install/update job fails with `"error":
+"sudo exited with code 1"` (or similar), and `journalctl -t sudo -n 50`
+shows `Read-only file system` while `dpkg` unpacks the package (e.g.
+`/usr/lib/<arch>/liburing.so...`, `/usr/share/doc/...`).** The generated
+`snapmanager.service` unit's `ReadWritePaths=` (before v0.3.1) only
+covered paths this app itself writes directly — never the real files a
+`dpkg` install writes under `/usr`, `/var`, `/etc`, and `/run` (package
+libraries, docs, apt state, and postinst-script runtime files like
+`/run/adduser`). See [`SECURITY.md`](../SECURITY.md#readwritepaths-widened-to-etcvarusrrun-post-task-65-fix-pass)
+for the full account. **Fix:** re-run `scripts/install.sh` — it's
+idempotent (see Section 2/3 above) and rewrites the unit with the widened
+`ReadWritePaths=` on a v0.3.1+ checkout/release.
+
+**Symptom C — a package install job fails and `journalctl -t sudo -n 50`
+shows `dpkg: error processing package ... end of file on stdin at
+conffile prompt`.** Before v0.3.1, `platform/apt.ts`'s `install()`/
+`upgrade()` never set `DEBIAN_FRONTEND=noninteractive` or a dpkg conffile
+policy, so `dpkg` hung on an interactive prompt (most commonly for
+`/etc/mpd.conf`, which `install.sh` pre-touches as an empty placeholder —
+`dpkg` treats that as "locally modified" on the package's first real
+install) that a systemd unit with no TTY can never answer. **Fix:**
+upgrade to v0.3.1+ — no manual action needed beyond that; the fix is in
+the application code, not the install-time configuration.
+
+**None of the three require reinstalling from scratch** — for B and C,
+re-running the current installer against your existing install is
+sufficient (it preserves your data and configuration); for A, re-running
+the one-liner fetches the fixed release package.
+
+---
+
+## 5. snapserver / snapclient not starting
 
 Start with the **System Health card** on the Dashboard (or
 `GET /api/health/detail`): it reports snapserver's systemd unit state and
@@ -230,7 +290,7 @@ fails, the job log says manual intervention is required.
 
 ---
 
-## 5. Pipe sources / audio not routing
+## 6. Pipe sources / audio not routing
 
 Radio/MPD pipe sources are FIFOs under `/run/snapcast-manager/`, each fed
 by its own generated systemd unit named `snapcast-radio-<name>.service`.
@@ -270,7 +330,7 @@ Two things worth knowing:
 
 ---
 
-## 6. myMPD
+## 7. myMPD
 
 myMPD serves **its own web UI on port 8080** (configurable via
 `/var/lib/mympd/config/http_port`) and that UI is **not** behind this
@@ -292,7 +352,7 @@ directly.
 
 ---
 
-## 7. Backup / restore issues
+## 8. Backup / restore issues
 
 There are two distinct backup systems — know which one you're using:
 
@@ -340,7 +400,7 @@ Managed through the job-based package endpoints (`POST /api/system/install/:pkg`
 
 ---
 
-## 8. Where to get more help
+## 9. Where to get more help
 
 - Open an issue at the GitHub repository's issues page:
   <https://github.com/NaturalDevCR/Snapcast-Manager/issues>

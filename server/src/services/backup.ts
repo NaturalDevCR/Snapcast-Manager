@@ -393,6 +393,54 @@ export class BackupService {
     }
   }
 
+  /**
+   * Post-Task-65 fix (found while verifying the missing-`tar`-sudoers-grant
+   * fix end-to-end against a real hardened container): restores via a
+   * staging directory + `cp -r -T`, NOT a direct `tar -xPzf` in place.
+   *
+   * A direct in-place `tar -xPzf <archive>` fails against a real hardened
+   * (`snapmanager`, `ProtectSystem=strict`) install for any archive member
+   * that is granted INDIVIDUALLY in `ReadWritePaths=` rather than via its
+   * containing directory -- e.g. `/etc/mpd.conf`, `/etc/snapserver.conf`,
+   * `/etc/snapserver.conf.base`, `/etc/snapserver.conf.bak` (their
+   * containing directory, `/etc` itself, deliberately stayed read-only
+   * before this same fix pass's `ReadWritePaths=` widening -- see this same
+   * reasoning already documented on `installPrivilegedFile()` in
+   * `platform/files.ts` and in SECURITY.md's post-Task-24
+   * `installPrivilegedFile()` note). GNU tar's default overwrite behavior
+   * `unlink()`s the existing destination before recreating it, which needs
+   * WRITE permission on the file's PARENT DIRECTORY, not just the file
+   * itself -- confirmed for real against a hardened container: `sudo tar
+   * -xPzf` on an archive containing `/etc/mpd.conf` fails with `tar:
+   * /etc/mpd.conf: Cannot open: File exists` (or `Read-only file system`
+   * with `--overwrite`, which skips the confirmation prompt but still
+   * attempts the same unlink-based open). `cp` onto an EXISTING destination
+   * file instead truncates the existing inode in place -- no directory
+   * write needed -- exactly the technique `installPrivilegedFile()` already
+   * relies on for the identical reason.
+   *
+   * `-r` (recursive), NOT `-a`/`--archive`: confirmed for real that `-a`
+   * (which additionally tries to preserve mode/ownership/timestamps on
+   * EVERY directory it recurses through, not just the archive's own
+   * members) fails here too -- `cp -a -T <staged> /` recurses through real,
+   * pre-existing ANCESTOR directories on the way to each member (`/`,
+   * `/opt`, `/opt/snapcast-manager`, ...) and tries to `utime()`/`chmod()`
+   * each one to match the staging copy, which needs write permission on
+   * THEIR metadata too and fails with `Read-only file system` even though
+   * the actual member files were already copied successfully. Plain `-r`
+   * only copies file CONTENTS (truncating each already-existing
+   * destination in place, same as above) without touching any ancestor
+   * directory's own metadata -- there is nothing worth preserving there
+   * anyway, since every real destination file already had correct
+   * permissions/ownership before this restore ever ran.
+   *
+   * Every path an archive here can contain already existed on disk at
+   * backup time (`collectSources()`/`resolveExistingSources()` only ever
+   * back up pre-existing paths), so this restore only ever OVERWRITES
+   * already-present files/directories -- it never needs to create a new
+   * directory entry in a read-only location, which is the one case this
+   * approach would not cover.
+   */
   async restoreBackup(backupName: string): Promise<string> {
     if (!/^pre-[a-z\-]+-\d{8}-\d{6}\.tar\.gz$/.test(backupName)) {
       throw new Error('Invalid backup name format');
@@ -402,7 +450,29 @@ export class BackupService {
       throw new Error(`Backup ${backupName} not found`);
     }
 
-    await this.privileged('tar', ['-xPzf', fullPath]);
+    // Staged under BACKUP_DIR (already fully read-write, no individually-
+    // granted-file restrictions there), so extracting into it never hits
+    // the problem this whole approach exists to avoid.
+    const stagingDir = `${BACKUP_DIR}/.restore-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await this.privileged('mkdir', ['-p', stagingDir]);
+    try {
+      // Member names were stored WITH their leading `/` (the archive was
+      // created with `--absolute-names`). Extracting WITHOUT `-P` here
+      // strips that leading `/` and places members relative to `-C`, i.e.
+      // under stagingDir -- `-P` would keep them absolute and tar would
+      // write straight back to the real paths, defeating the staging step
+      // entirely.
+      await this.privileged('tar', ['-xzf', fullPath, '-C', stagingDir]);
+      // `-r` (recursive, content only -- see this method's own docstring
+      // for why NOT `-a`/`--archive`) `-T` (treat DEST as the literal
+      // target, not "copy SRC INTO DEST") merges the staged tree onto the
+      // real root filesystem, overwriting each already-existing
+      // file/directory's CONTENT via truncation -- never unlinking, never
+      // touching ancestor directory metadata.
+      await this.privileged('cp', ['-r', '-T', stagingDir, '/']);
+    } finally {
+      await this.privileged('rm', ['-rf', stagingDir]).catch(() => {});
+    }
     return `Restored from ${fullPath}`;
   }
 
