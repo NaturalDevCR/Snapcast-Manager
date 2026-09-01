@@ -59,7 +59,7 @@ const handleSetup = async () => {
             <!-- Glow Effect -->
             <div class="absolute -inset-1 bg-brand-primary/20 rounded-[2.5rem] blur opacity-15 group-hover:opacity-30 transition duration-1000"></div>
 
-            <div class="relative bg-brand-surface/80 backdrop-blur-3xl shadow-2xl rounded-[2.5rem] p-8 md:p-14 border border-white/[0.04] animate-in fade-in zoom-in duration-1000">
+            <div class="relative bg-brand-surface/80 backdrop-blur-3xl shadow-2xl rounded-[2.5rem] p-8 md:p-14 border border-black/[0.04] dark:border-white/[0.04] animate-in fade-in zoom-in duration-1000">
                 <div class="text-center mb-12">
                      <div class="inline-flex items-center justify-center p-5 bg-brand-primary/10 rounded-3xl mb-8 border border-brand-primary/20 shadow-[inset_0_0_15px_rgba(166,13,242,0.1)]">
                         <span class="material-symbols-outlined text-[3rem] text-brand-primary drop-shadow-[0_0_15px_rgba(166,13,242,0.4)]">rocket_launch</span>
@@ -84,7 +84,7 @@ const handleSetup = async () => {
                                     v-model="username"
                                     type="text"
                                     required
-                                    class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
+                                    class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-black/10 dark:border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
                                     :placeholder="t('setup.usernamePlaceholder')"
                                 />
                             </div>
@@ -101,7 +101,7 @@ const handleSetup = async () => {
                                         v-model="password"
                                         type="password"
                                         required
-                                        class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
+                                        class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-black/10 dark:border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
                                         :placeholder="t('setup.passwordPlaceholder')"
                                     />
                                 </div>
@@ -116,7 +116,7 @@ const handleSetup = async () => {
                                         v-model="confirmPassword"
                                         type="password"
                                         required
-                                        class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
+                                        class="block w-full pl-12 pr-6 py-4 bg-black/20 border border-black/10 dark:border-white/10 rounded-2xl text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-bold"
                                         :placeholder="t('setup.confirmPlaceholder')"
                                     />
                                 </div>

@@ -181,15 +181,15 @@ const handleSave = () => {
 <template>
   <Layout>
       <!-- Main Tabs Navigation & Actions -->
-      <div class="sticky top-[57px] z-30 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 p-2 bg-brand-bg/60 backdrop-blur-xl border border-white/5 rounded-3xl shadow-2xl">
-          <div class="flex overflow-x-auto flex-nowrap space-x-2 bg-black/40 p-1.5 rounded-2xl w-fit max-w-full border border-white/10">
+      <div class="sticky top-[57px] z-30 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 p-2 bg-brand-bg/60 backdrop-blur-xl border border-black/5 dark:border-white/5 rounded-3xl shadow-2xl">
+          <div class="flex overflow-x-auto flex-nowrap space-x-2 bg-black/40 p-1.5 rounded-2xl w-fit max-w-full border border-black/10 dark:border-white/10">
               <button
                 @click="activeTab = 'standard'"
                 :class="[
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                     activeTab === 'standard'
                     ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    : 'text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                 ]"
               >
                   <span class="material-symbols-outlined text-[18px]">tune</span>
@@ -204,7 +204,7 @@ const handleSave = () => {
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                     activeTab === 'expert'
                     ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    : 'text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                 ]"
               >
                   <span class="material-symbols-outlined text-[18px]">code</span>
@@ -219,7 +219,7 @@ const handleSave = () => {
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                     activeTab === 'snapshots'
                     ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    : 'text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                 ]"
               >
                   <span class="material-symbols-outlined text-[18px]">history</span>
@@ -235,7 +235,7 @@ const handleSave = () => {
               <button 
                   @click="handleSave" 
                   :disabled="configStore.loading"
-                  class="w-full md:w-auto flex items-center justify-center space-x-3 px-8 py-3 rounded-2xl shadow-[0_0_20px_rgba(166,13,242,0.4)] text-[11px] font-black text-white bg-brand-primary hover:bg-[#b526ff] hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 transition-all duration-300 border border-white/10 uppercase tracking-[0.2em]"
+                  class="w-full md:w-auto flex items-center justify-center space-x-3 px-8 py-3 rounded-2xl shadow-[0_0_20px_rgba(166,13,242,0.4)] text-[11px] font-black text-white bg-brand-primary hover:bg-[#b526ff] hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 transition-all duration-300 border border-black/10 dark:border-white/10 uppercase tracking-[0.2em]"
               >
                   <span v-if="configStore.loading" class="material-symbols-outlined text-[18px] animate-spin">sync</span>
                   <span v-else class="material-symbols-outlined text-[18px]">save</span>

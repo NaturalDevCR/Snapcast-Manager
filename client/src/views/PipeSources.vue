@@ -260,7 +260,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
            that. -->
       <div v-if="store.loading && store.pipes.length === 0"
         class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <div v-for="n in 2" :key="n" class="bg-brand-surface/80 border border-white/[0.04] rounded-[2rem] p-6 sm:p-8 space-y-4">
+        <div v-for="n in 2" :key="n" class="bg-brand-surface/80 border border-black/[0.04] dark:border-white/[0.04] rounded-[2rem] p-6 sm:p-8 space-y-4">
           <div class="flex items-center gap-2">
             <Skeleton variant="text" width="40%" height="20px" />
             <Skeleton variant="text" width="15%" height="18px" />

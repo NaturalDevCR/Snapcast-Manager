@@ -2,6 +2,18 @@
 @import "./fonts.css";
 
 /*
+ * Theme toggle fix: this app has always driven light/dark via a manually
+ * toggled `.dark` class on <html> (see stores/ui.ts's toggleTheme()/
+ * initTheme() and index.html's synchronous pre-mount init script) -- NOT
+ * the OS-level `prefers-color-scheme` media query. Tailwind v4's `dark:`
+ * variant defaults to that media query unless told otherwise; without this
+ * line, every `dark:*` utility in this codebase silently ignored the
+ * in-app toggle and only ever responded to the OS setting. This is
+ * Tailwind's own documented pattern for class-based dark mode in v4.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
  * prefers-reduced-motion: reduce - global override (Task 20).
  *
  * A blanket, well-established pattern rather than a full per-component

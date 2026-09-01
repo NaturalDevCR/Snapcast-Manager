@@ -60,8 +60,8 @@ const typeConfigs = {
         :class="[typeConfigs[toast.type].bg, typeConfigs[toast.type].border, typeConfigs[toast.type].glow]"
       >
         <!-- Progress Bar -->
-        <div class="absolute bottom-0 left-0 h-1 bg-white/20 w-full overflow-hidden">
-            <div class="h-full bg-white/40 animate-shrink"></div>
+        <div class="absolute bottom-0 left-0 h-1 bg-black/20 dark:bg-white/20 w-full overflow-hidden">
+            <div class="h-full bg-black/40 dark:bg-white/40 animate-shrink"></div>
         </div>
 
         <div class="flex-shrink-0 mr-3">
@@ -74,7 +74,7 @@ const typeConfigs = {
 
         <button
           @click="uiStore.removeToast(toast.id)"
-          class="ml-4 flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
+          class="ml-4 flex-shrink-0 p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
           :class="typeConfigs[toast.type].text"
           aria-label="Dismiss notification"
         >

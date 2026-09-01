@@ -366,7 +366,7 @@ const updateVolume = (client: any, event: Event) => {
   <Layout>
     <div class="space-y-8 pb-12 w-full max-w-[1600px] mx-auto overflow-x-hidden">
       <!-- Page Header -->
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-brand-surface/40 backdrop-blur-3xl border border-white/[0.03] p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-brand-surface/40 backdrop-blur-3xl border border-black/[0.03] dark:border-white/[0.03] p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
         <div class="absolute inset-0 bg-gradient-to-r from-brand-primary/5 to-transparent pointer-events-none"></div>
         <div class="relative z-10 flex items-center space-x-4">
             <div class="p-4 bg-brand-primary/10 rounded-2xl border border-brand-primary/20 shadow-lg shadow-brand-primary/20 group-hover:shadow-xl group-hover:shadow-brand-primary/40 transition-all duration-500">
@@ -377,11 +377,11 @@ const updateVolume = (client: any, event: Event) => {
                     <h1 class="text-3xl font-black text-text-main tracking-tight">{{ t('routing.title') }}</h1>
                     <Badge :variant="sseStatusBadge(sse.status.value).variant" size="sm">{{ sseStatusBadge(sse.status.value).label }}</Badge>
                 </div>
-                <p class="text-[10px] text-white/40 font-black uppercase tracking-[0.3em] mt-1">{{ t('routing.subtitle') }}</p>
+                <p class="text-[10px] text-text-muted font-black uppercase tracking-[0.3em] mt-1">{{ t('routing.subtitle') }}</p>
             </div>
         </div>
         <button @click="snapcastStore.fetchStatus()" :disabled="snapcastStore.loading" 
-                class="px-6 py-3 bg-white/[0.03] hover:bg-white/[0.08] text-white rounded-2xl text-xs font-black border border-white/[0.05] backdrop-blur-xl transition-all active:scale-95 flex items-center gap-3 group/btn shadow-xl z-20">
+                class="px-6 py-3 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-white rounded-2xl text-xs font-black border border-black/[0.05] dark:border-white/[0.05] backdrop-blur-xl transition-all active:scale-95 flex items-center gap-3 group/btn shadow-xl z-20">
             <span class="material-symbols-outlined text-sm group-hover/btn:rotate-180 transition-transform duration-700" :class="{'animate-spin': snapcastStore.loading}">refresh</span>
             {{ t('routing.resync') }}
         </button>
@@ -449,12 +449,12 @@ const updateVolume = (client: any, event: Event) => {
                  </h2>
                  <div v-for="stream in snapcastStore.status?.streams || []" :key="stream.id"
                       class="bg-brand-surface/80 backdrop-blur-xl border rounded-[1.5rem] p-4 flex items-center justify-between shadow-lg transition-all duration-300 relative group/source"
-                      :class="[stream.status === 'playing' ? 'border-brand-primary/30' : 'border-white/5']"
+                      :class="[stream.status === 'playing' ? 'border-brand-primary/30' : 'border-black/5 dark:border-white/5']"
                       :style="`--stream-color: ${getStreamColor(stream.id)}`">
                       
                       <!-- Left side info -->
                       <div class="flex items-center gap-4 overflow-hidden">
-                         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-white/5 flex items-center justify-center shrink-0">
+                         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-black/5 dark:border-white/5 flex items-center justify-center shrink-0">
                            <span class="material-symbols-outlined text-lg opacity-80" :style="{ color: getStreamColor(stream.id) }">cast</span>
                          </div>
                          <div class="truncate pr-4 flex flex-col justify-center">
@@ -499,7 +499,7 @@ const updateVolume = (client: any, event: Event) => {
                       :ref="setZoneCardRef(group.id)"
                       class="bg-brand-surface/80 backdrop-blur-3xl border rounded-[1.5rem] shadow-xl transition-all duration-500 relative flex flex-col group/zone"
                       :class="[
-                         hoverZoneId === group.id ? 'border-brand-primary bg-brand-primary/5 scale-[1.02] shadow-[0_0_30px_rgba(59,130,246,0.15)] z-20' : 'border-white/5 hover:border-white/10',
+                         hoverZoneId === group.id ? 'border-brand-primary bg-brand-primary/5 scale-[1.02] shadow-[0_0_30px_rgba(59,130,246,0.15)] z-20' : 'border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10',
                          !group.stream_id ? 'border-red-500/20 shadow-red-500/5' : ''
                       ]">
                       
@@ -541,7 +541,7 @@ const updateVolume = (client: any, event: Event) => {
                                         <span class="truncate">{{ getZoneLabel(group) }}</span>
                                         <span class="material-symbols-outlined text-[13px] text-text-muted opacity-0 group-hover/zonename:opacity-100 transition-all">edit</span>
                                     </div>
-                                    <span v-if="group.stream_id" class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-white/10 shrink-0" :style="{ color: getStreamColor(group.stream_id) }">
+                                    <span v-if="group.stream_id" class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-black/10 dark:bg-white/10 shrink-0" :style="{ color: getStreamColor(group.stream_id) }">
                                         {{ getStreamLabel(snapcastStore.status?.streams?.find(s => s.id === group.stream_id) || {}) }}
                                     </span>
                                   </h3>
@@ -557,7 +557,7 @@ const updateVolume = (client: any, event: Event) => {
                           <div class="flex items-center gap-2 shrink-0">
                             <button @click.stop="snapcastStore.setGroupMute(group.id, !group.muted)"
                                     class="w-10 h-10 rounded-xl transition-all duration-300 border flex items-center justify-center group/mute shadow-md shrink-0"
-                                    :class="group.muted ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-brand-surface text-text-muted border-white/5 hover:text-text-main hover:border-white/10'"
+                                    :class="group.muted ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-brand-surface text-text-muted border-black/5 dark:border-white/5 hover:text-text-main hover:border-black/10 dark:hover:border-white/10'"
                                     :aria-label="group.muted ? t('routing.unmuteZone', { name: getZoneLabel(group) }) : t('routing.muteZone', { name: getZoneLabel(group) })">
                                 <span class="material-symbols-outlined text-sm transition-transform group-hover/mute:scale-110">{{ group.muted ? 'volume_off' : 'volume_up' }}</span>
                             </button>
@@ -604,11 +604,11 @@ const updateVolume = (client: any, event: Event) => {
                       <transition name="slide">
                         <div v-if="expandedGroups.has(group.id)" class="bg-black/20 rounded-b-[2rem] p-4 sm:p-6 space-y-2 relative z-10 w-full overflow-hidden transition-all duration-500">
                           <div v-for="client in group.clients" :key="client.id" 
-                               class="p-4 rounded-2xl bg-brand-surface/40 backdrop-blur-md border border-white/5 hover:border-white/10 transition-all duration-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full group/client">
+                               class="p-4 rounded-2xl bg-brand-surface/40 backdrop-blur-md border border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10 transition-all duration-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full group/client">
                               
                               <!-- Client Detail -->
                               <div class="flex items-center gap-4 min-w-0 w-full lg:w-1/2">
-                                  <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-white/5 flex items-center justify-center shrink-0 transition-colors"
+                                  <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-black/5 dark:border-white/5 flex items-center justify-center shrink-0 transition-colors"
                                        :class="client.connected ? 'text-text-main' : 'text-text-muted'">
                                       <span class="material-symbols-outlined text-[20px]">{{ client.config.name ? 'speaker' : 'smartphone' }}</span>
                                   </div>
@@ -635,8 +635,8 @@ const updateVolume = (client: any, event: Event) => {
                               <!-- Volume Controls -->
                               <div class="flex items-center gap-3 w-full sm:w-auto shrink-0 justify-end">
                                   <button @click="snapcastStore.setClientVolume(client.id, { percent: client.config.volume.percent, muted: !client.config.volume.muted })"
-                                          class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl transition-all hover:bg-white/5 border border-transparent"
-                                          :class="client.config.volume.muted ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-text-muted hover:text-text-main hover:border-white/10'"
+                                          class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl transition-all hover:bg-black/5 dark:hover:bg-white/5 border border-transparent"
+                                          :class="client.config.volume.muted ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-text-muted hover:text-text-main hover:border-black/10 dark:hover:border-white/10'"
                                           :aria-label="client.config.volume.muted ? t('routing.unmuteClient', { name: client.config.name || client.host.name || t('routing.client') }) : t('routing.muteClient', { name: client.config.name || client.host.name || t('routing.client') })">
                                       <span class="material-symbols-outlined text-[18px]">{{ client.config.volume.muted ? 'volume_off' : 'volume_up' }}</span>
                                   </button>

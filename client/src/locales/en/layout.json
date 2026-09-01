@@ -11,5 +11,7 @@
   "clientMode": "Client Mode",
   "admin": "Admin",
   "sessionActive": "Session Active",
-  "signOut": "Sign out"
+  "signOut": "Sign out",
+  "switchToLight": "Switch to light mode",
+  "switchToDark": "Switch to dark mode"
 }
