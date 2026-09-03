@@ -221,9 +221,27 @@
   }
 }
 
+/*
+ * Theme toggle fix (real bug, found live): `transition: background-color /
+ * color` here used to fade the theme switch smoothly. But `--brand-bg` /
+ * `--text-main` are PLAIN (untyped) custom properties, changed on <html>
+ * (an ANCESTOR of <body>, not body itself -- see stores/ui.ts's
+ * toggleTheme()). Untyped custom properties aren't interpolatable, and
+ * Chromium's before/after style comparison that decides whether to START a
+ * transition can misfire when the value change is inherited from an
+ * ancestor's class toggle rather than a direct change on the transitioning
+ * element -- confirmed live: toggling `.dark` on <html> and reading
+ * getComputedStyle(body).backgroundColor back afterward returned the
+ * PREVIOUS theme's color, one full toggle behind, every time (reported by
+ * user as "the toggle doesn't apply until I click again" and, following
+ * from that, "the theme doesn't survive a reload" -- it did; what they saw
+ * right before reloading was this stale, lagged color, so the correct
+ * post-reload color looked like a revert). Dropping the transition removes
+ * the exact mechanism that produces a lagged value -- an instant color snap
+ * on toggle instead of a 150ms fade, no functional loss.
+ */
 body {
   background-color: var(--brand-bg);
   color: var(--text-main);
-  transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s ease;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
