@@ -8,6 +8,15 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.7] - 2026-09-03
+
+### 🐛 Bug Fixes
+
+- *(ui)* Theme toggle one-toggle-behind lag (v0.3.7) (#10)
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.6
 ## [0.3.6] - 2026-09-01
 
 ### 🐛 Bug Fixes
