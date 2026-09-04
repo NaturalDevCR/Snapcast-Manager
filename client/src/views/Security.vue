@@ -94,7 +94,7 @@ const handleExportBackup = async () => {
       <!-- Header -->
       <div>
         <h1 class="text-3xl font-black text-text-main tracking-tight dark:drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">{{ t('security.title') }}</h1>
-        <p class="text-gray-400 font-medium mt-1">{{ t('security.subtitle') }}</p>
+        <p class="text-text-muted font-medium mt-1">{{ t('security.subtitle') }}</p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -107,17 +107,17 @@ const handleExportBackup = async () => {
             <div>
               <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.currentPasswordLabel') }}</label>
               <input v-model="currentPassword" type="password" :placeholder="t('security.currentPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
+                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600">
             </div>
             <div>
               <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.newPasswordLabel') }}</label>
               <input v-model="newPassword" type="password" :placeholder="t('security.newPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
+                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600">
             </div>
             <div>
               <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.confirmPasswordLabel') }}</label>
               <input v-model="confirmPassword" type="password" :placeholder="t('security.confirmPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-300 placeholder-gray-600">
+                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-[#ff2a5f]/30 focus:border-[#ff2a5f] outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600">
             </div>
             <button
               @click="handleChangePassword"
@@ -136,12 +136,12 @@ const handleExportBackup = async () => {
             <span class="material-symbols-outlined text-[20px] text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">download</span>
           </template>
           <div class="space-y-5">
-            <p class="text-sm font-medium text-gray-400 leading-relaxed">
+            <p class="text-sm font-medium text-text-muted leading-relaxed">
               <i18n-t keypath="security.exportDescription">
                 <template #archive><span class="text-[#00ff9d] font-bold drop-shadow-[0_0_5px_rgba(0,255,157,0.2)]">.tar.gz</span></template>
               </i18n-t>
             </p>
-            <ul class="text-xs font-semibold text-gray-300 space-y-3 mb-6">
+            <ul class="text-xs font-semibold text-text-muted space-y-3 mb-6">
               <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-brand-primary">security</span> {{ t('security.administratorAccount') }}</li>
               <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-[#00d4ff]">history</span> {{ t('security.savedSnapshots') }}</li>
               <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-[#ff2a5f]">tune</span> {{ t('security.snapserverConfig') }}</li>

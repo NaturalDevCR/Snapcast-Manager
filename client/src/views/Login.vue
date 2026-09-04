@@ -51,7 +51,7 @@ const handleLogin = async () => {
           <div class="space-y-4">
             <div class="relative">
               <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <span class="material-symbols-outlined text-gray-400 text-lg">person</span>
+                <span class="material-symbols-outlined text-text-muted text-lg">person</span>
               </div>
               <input 
                 id="username" 
@@ -64,7 +64,7 @@ const handleLogin = async () => {
             </div>
             <div class="relative">
               <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <span class="material-symbols-outlined text-gray-400 text-lg">key</span>
+                <span class="material-symbols-outlined text-text-muted text-lg">key</span>
               </div>
               <input 
                 id="password" 

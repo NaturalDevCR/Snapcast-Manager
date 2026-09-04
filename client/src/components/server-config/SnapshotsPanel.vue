@@ -88,12 +88,12 @@ const handleDeleteSnapshot = async () => {
                     <div>
                         <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">Identifier</label>
                         <input v-model="snapshotName" type="text" placeholder="e.g. Pre-optimization"
-                          class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600">
+                          class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600">
                     </div>
                     <div>
                         <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">Notes</label>
                         <textarea v-model="snapshotDescription" placeholder="Briefly describe why this checkpoint is being made..."
-                          class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600 h-32 resize-none"></textarea>
+                          class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600 h-32 resize-none"></textarea>
                     </div>
                     <button
                       @click="handleCreateSnapshot"
@@ -128,8 +128,8 @@ const handleDeleteSnapshot = async () => {
                     <div v-for="snapshot in snapshotStore.snapshots" :key="snapshot.id"
                       class="p-5 border border-black/5 dark:border-white/5 rounded-2xl flex justify-between items-center bg-black/30 hover:bg-black/50 hover:border-brand-primary/30 transition-all group shadow-sm">
                         <div class="space-y-1">
-                            <h4 class="font-black text-white uppercase tracking-tight drop-shadow-[0_0_5px_rgba(255,255,255,0.2)]">{{ snapshot.name }}</h4>
-                            <p v-if="snapshot.description" class="text-xs font-semibold text-gray-400">{{ snapshot.description }}</p>
+                            <h4 class="font-black text-gray-900 dark:text-white uppercase tracking-tight dark:drop-shadow-[0_0_5px_rgba(255,255,255,0.2)]">{{ snapshot.name }}</h4>
+                            <p v-if="snapshot.description" class="text-xs font-semibold text-text-muted">{{ snapshot.description }}</p>
                             <div class="flex items-center text-[10px] font-bold text-brand-primary bg-brand-primary/10 border border-brand-primary/20 px-2 py-0.5 rounded w-fit mt-2 uppercase tracking-widest">
                               {{ new Date(snapshot.timestamp).toLocaleString() }}
                             </div>
@@ -140,7 +140,7 @@ const handleDeleteSnapshot = async () => {
                                 Restore
                             </button>
                             <button @click="triggerDeleteSnapshot(snapshot.id)"
-                              class="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 border border-transparent hover:border-[#ff3b30]/20 rounded-lg transition-all group-hover:opacity-100 md:opacity-0 active:scale-95"
+                              class="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-text-muted hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 border border-transparent hover:border-[#ff3b30]/20 rounded-lg transition-all group-hover:opacity-100 md:opacity-0 active:scale-95"
                               :aria-label="`Delete snapshot ${snapshot.name}`">
                                 <span class="material-symbols-outlined text-[18px]">delete</span>
                             </button>

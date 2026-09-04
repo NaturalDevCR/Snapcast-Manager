@@ -243,7 +243,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
         @click="activeSection = sKey"
         :class="[
             'relative flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-200 flex-shrink-0',
-            activeSection === sKey ? 'text-brand-primary' : 'text-text-muted hover:text-gray-300'
+            activeSection === sKey ? 'text-brand-primary' : 'text-text-muted hover:text-gray-700 dark:hover:text-gray-300'
         ]"
       >
           <span
@@ -266,7 +266,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
           <div class="flex items-center space-x-3">
             <span class="material-symbols-outlined text-[20px] text-brand-primary drop-shadow-[0_0_8px_rgba(166,13,242,0.5)]">{{ sectionIcons[activeSection] || 'tune' }}</span>
             <div>
-              <span class="text-sm font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">{{ currentSectionMeta.label }}</span>
+              <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest dark:drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">{{ currentSectionMeta.label }}</span>
               <p class="text-[10px] font-semibold text-text-muted mt-0.5">{{ currentSectionMeta.description }}</p>
             </div>
           </div>
@@ -286,7 +286,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center space-x-2">
                 <span class="material-symbols-outlined text-[18px] text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">queue_music</span>
-                <h3 class="text-[11px] font-black text-white uppercase tracking-widest">Audio Sources</h3>
+                <h3 class="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-widest">Audio Sources</h3>
                 <span v-if="availableSourceNames.length" class="px-2 py-0.5 bg-[#00ff9d]/10 text-[#00ff9d] border border-[#00ff9d]/20 text-[10px] font-black rounded-full">{{ availableSourceNames.length }}</span>
               </div>
               <button @click="addEditSourceDialog?.openAdd()" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-[#00ff9d] hover:bg-[#00ff9d]/10 hover:text-white rounded-lg transition-all uppercase tracking-widest border border-[#00ff9d]/30 shadow-[inset_0_0_10px_rgba(0,255,157,0.1)] hover:shadow-[0_0_15px_rgba(0,255,157,0.3)]">
@@ -319,10 +319,10 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     </span>
                   </div>
                   <div class="flex items-center space-x-1">
-                    <button @click="addEditSourceDialog?.openEdit(idx as number)" class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors border border-transparent hover:border-brand-primary/20" title="Edit source" :aria-label="`Edit ${extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'source'}`">
+                    <button @click="addEditSourceDialog?.openEdit(idx as number)" class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-text-muted hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors border border-transparent hover:border-brand-primary/20" title="Edit source" :aria-label="`Edit ${extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'source'}`">
                       <span class="material-symbols-outlined text-[16px]">edit</span>
                     </button>
-                    <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-400 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors border border-transparent hover:border-[#ff3b30]/20" title="Remove source" :aria-label="`Remove ${extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'source'}`">
+                    <button v-if="Array.isArray(localParsedConfig.stream.source)" @click="removeSourceEntry(idx as number)" class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-text-muted hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors border border-transparent hover:border-[#ff3b30]/20" title="Remove source" :aria-label="`Remove ${extractSourceName(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) || 'source'}`">
                       <span class="material-symbols-outlined text-[16px]">delete</span>
                     </button>
                   </div>
@@ -333,13 +333,13 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     v-if="Array.isArray(localParsedConfig.stream.source)"
                     :value="localParsedConfig.stream.source[idx]"
                     @input="updateSourceAtIndex(idx as number, ($event.target as HTMLInputElement).value)"
-                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
+                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600"
                   />
                   <input
                     v-else
                     :value="localParsedConfig.stream.source"
                     @input="setPropertyValue('stream', 'source', ($event.target as HTMLInputElement).value)"
-                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
+                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600"
                   />
                 </div>
               </div>
@@ -354,7 +354,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center space-x-2">
                 <span class="material-symbols-outlined text-[18px] text-[#00d4ff] drop-shadow-[0_0_5px_rgba(0,212,255,0.5)]">tune</span>
-                <h3 class="text-[11px] font-black text-white uppercase tracking-widest">Stream Settings</h3>
+                <h3 class="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-widest">Stream Settings</h3>
               </div>
               <button @click="triggerAddProperty('stream')" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-[#00d4ff] hover:text-white hover:bg-[#00d4ff]/10 border border-[#00d4ff]/30 rounded-lg transition-all uppercase tracking-widest shadow-[inset_0_0_10px_rgba(0,212,255,0.1)] hover:shadow-[0_0_15px_rgba(0,212,255,0.3)]" title="Add custom property">
                 <span class="material-symbols-outlined text-[14px] mr-1">add</span>
@@ -511,7 +511,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
               <!-- Label Column (col 2-4) -->
               <div class="md:col-span-3">
                   <div class="flex flex-col min-w-0">
-                    <label class="text-[11px] font-black text-gray-300 uppercase tracking-wide">
+                    <label class="text-[11px] font-black text-text-muted uppercase tracking-wide">
                       {{ getMetaForKey(activeSection, key)?.label || key }}
                     </label>
                     <span v-if="getMetaForKey(activeSection, key)?.description"
@@ -546,7 +546,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     >
                       <span :class="[String(getPropertyValue(activeSection, key)) === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                     </button>
-                    <span class="ml-3 text-xs text-gray-400 font-bold uppercase tracking-widest">
+                    <span class="ml-3 text-xs text-text-muted font-bold uppercase tracking-widest">
                       {{ String(getPropertyValue(activeSection, key)) === 'true' ? 'Enabled' : 'Disabled' }}
                     </span>
                   </div>
@@ -556,13 +556,13 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     <select
                       :value="getPropertyValue(activeSection, key)"
                       @change="setPropertyValue(activeSection, key, ($event.target as HTMLSelectElement).value)"
-                      class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 appearance-none pr-10"
+                      class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-800 dark:text-gray-200 appearance-none pr-10"
                     >
                       <option v-for="opt in getMetaForKey(activeSection, key)?.options" :key="opt" :value="opt" class="bg-black text-white">
                         {{ opt || '(auto)' }}
                       </option>
                     </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-[18px]">expand_more</span>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-[18px]">expand_more</span>
                   </div>
 
                   <!-- Number Input -->
@@ -572,7 +572,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     :value="getPropertyValue(activeSection, key)"
                     @input="setPropertyValue(activeSection, key, ($event.target as HTMLInputElement).value)"
                     :placeholder="String(getMetaForKey(activeSection, key)?.default ?? '')"
-                    class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 placeholder-gray-600"
+                    class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600"
                   />
 
                   <!-- Default Text Input -->
@@ -581,7 +581,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     :value="getPropertyValue(activeSection, key)"
                     @input="setPropertyValue(activeSection, key, ($event.target as HTMLInputElement).value)"
                     :placeholder="String(getMetaForKey(activeSection, key)?.default ?? '')"
-                    class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 placeholder-gray-600"
+                    class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600"
                   />
               </div>
           </div>

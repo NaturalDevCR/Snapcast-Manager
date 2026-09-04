@@ -189,7 +189,7 @@ const handleSave = () => {
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                     activeTab === 'standard'
                     ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
-                    : 'text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                 ]"
               >
                   <span class="material-symbols-outlined text-[18px]">tune</span>
@@ -204,7 +204,7 @@ const handleSave = () => {
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                     activeTab === 'expert'
                     ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
-                    : 'text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                 ]"
               >
                   <span class="material-symbols-outlined text-[18px]">code</span>
@@ -219,7 +219,7 @@ const handleSave = () => {
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                     activeTab === 'snapshots'
                     ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
-                    : 'text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                 ]"
               >
                   <span class="material-symbols-outlined text-[18px]">history</span>
