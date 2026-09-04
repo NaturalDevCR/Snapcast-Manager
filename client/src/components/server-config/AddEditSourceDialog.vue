@@ -348,7 +348,7 @@ defineExpose({ openAdd, openEdit });
               <h3 class="text-sm font-black text-text-main uppercase tracking-widest dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">{{ isEditingSource ? 'Edit Audio Source' : 'Add Audio Source' }}</h3>
               <p class="text-[10px] text-text-muted mt-0.5">{{ isEditingSource ? 'Modify the source parameters' : 'Select a source type and configure its parameters' }}</p>
             </div>
-            <button @click="showAddSourceDialog = false" class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-500 hover:text-white rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-all" aria-label="Close">
+            <button @click="showAddSourceDialog = false" class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-600 dark:text-gray-500 hover:text-white rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-all" aria-label="Close">
               <span class="material-symbols-outlined text-[20px]">close</span>
             </button>
           </div>
@@ -364,10 +364,10 @@ defineExpose({ openAdd, openEdit });
                   class="flex flex-col items-center p-4 rounded-xl border border-black/5 dark:border-white/5 bg-black/40 hover:border-brand-primary/50 hover:bg-brand-primary/10 transition-all group text-center shadow-lg"
                 >
                   <div class="p-2 bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-lg group-hover:bg-brand-primary/20 group-hover:border-brand-primary/30 transition-colors mb-2 shadow-[inset_0_0_10px_rgba(255,255,255,0.05)] group-hover:shadow-[inset_0_0_15px_rgba(166,13,242,0.3)]">
-                    <span class="material-symbols-outlined text-[24px] text-gray-400 group-hover:text-brand-primary transition-colors drop-shadow-[0_0_5px_currentColor]">queue_music</span>
+                    <span class="material-symbols-outlined text-[24px] text-text-muted group-hover:text-brand-primary transition-colors drop-shadow-[0_0_5px_currentColor]">queue_music</span>
                   </div>
-                  <span class="text-xs font-black uppercase tracking-wider text-gray-200 group-hover:text-white">{{ tmpl.label }}</span>
-                  <span class="text-[9px] text-text-muted mt-1 leading-tight group-hover:text-gray-400">{{ tmpl.description.split('.')[0] }}</span>
+                  <span class="text-xs font-black uppercase tracking-wider text-gray-800 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white">{{ tmpl.label }}</span>
+                  <span class="text-[9px] text-text-muted mt-1 leading-tight group-hover:text-gray-600 dark:group-hover:text-gray-400">{{ tmpl.description.split('.')[0] }}</span>
                 </button>
               </div>
             </div>
@@ -401,7 +401,7 @@ defineExpose({ openAdd, openEdit });
                   <input
                     v-model="sourceFormPath"
                     :placeholder="selectedTemplate.pathPlaceholder"
-                    class="w-full text-sm font-mono px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
+                    class="w-full text-sm font-mono px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600"
                   />
                 </div>
 
@@ -433,7 +433,7 @@ defineExpose({ openAdd, openEdit });
                           'inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border',
                           metaSelectedSources.includes(srcName)
                             ? 'bg-brand-primary/10 text-brand-primary/50 border-brand-primary/10 cursor-not-allowed'
-                            : 'bg-black/40 text-gray-300 border-black/5 dark:border-white/5 hover:border-[#00ff9d]/40 hover:bg-[#00ff9d]/10 hover:text-[#00ff9d] cursor-pointer'
+                            : 'bg-black/40 text-gray-700 dark:text-gray-300 border-black/5 dark:border-white/5 hover:border-[#00ff9d]/40 hover:bg-[#00ff9d]/10 hover:text-[#00ff9d] cursor-pointer'
                         ]"
                       >
                         <span class="material-symbols-outlined text-[14px]">{{ metaSelectedSources.includes(srcName) ? 'check_circle' : 'add_circle' }}</span>
@@ -450,7 +450,7 @@ defineExpose({ openAdd, openEdit });
                       <span class="text-[9px] text-text-muted font-semibold normal-case tracking-normal ml-1">— first = highest priority (active), last = fallback</span>
                     </label>
                     <div v-if="metaSelectedSources.length === 0" class="text-center py-6 border border-dashed border-black/10 dark:border-white/10 rounded-xl bg-black/20">
-                      <span class="material-symbols-outlined text-[24px] text-gray-600">playlist_add</span>
+                      <span class="material-symbols-outlined text-[24px] text-text-muted">playlist_add</span>
                       <p class="text-[10px] text-text-muted mt-1 font-bold uppercase tracking-widest">Click sources above to add them</p>
                     </div>
                     <div v-else class="space-y-2">
@@ -472,7 +472,7 @@ defineExpose({ openAdd, openEdit });
                           {{ idx + 1 }}
                         </span>
                         <!-- Name -->
-                        <span class="flex-1 text-sm font-bold" :class="idx === 0 ? 'text-[#00ff9d]' : 'text-gray-300'">{{ srcName }}</span>
+                        <span class="flex-1 text-sm font-bold" :class="idx === 0 ? 'text-[#00ff9d]' : 'text-text-muted'">{{ srcName }}</span>
                         <!-- Priority label -->
                         <span v-if="idx === 0" class="text-[8px] font-black uppercase tracking-widest text-[#00ff9d]/70 px-2 py-0.5 bg-[#00ff9d]/10 rounded border border-[#00ff9d]/20">Primary</span>
                         <span v-else-if="idx === metaSelectedSources.length - 1" class="text-[8px] font-black uppercase tracking-widest text-amber-500/70 px-2 py-0.5 bg-amber-500/10 rounded border border-amber-500/20">Fallback</span>
@@ -481,7 +481,7 @@ defineExpose({ openAdd, openEdit });
                           @click="moveMetaSource(idx, 'up')"
                           :disabled="idx === 0"
                           class="p-1 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg transition-colors"
-                          :class="idx === 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-black/10 dark:hover:bg-white/10'"
+                          :class="idx === 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/10 dark:hover:bg-white/10'"
                           :aria-label="`Move ${srcName} up`"
                         >
                           <span class="material-symbols-outlined text-[16px]">arrow_upward</span>
@@ -490,7 +490,7 @@ defineExpose({ openAdd, openEdit });
                           @click="moveMetaSource(idx, 'down')"
                           :disabled="idx === metaSelectedSources.length - 1"
                           class="p-1 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg transition-colors"
-                          :class="idx === metaSelectedSources.length - 1 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-black/10 dark:hover:bg-white/10'"
+                          :class="idx === metaSelectedSources.length - 1 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/10 dark:hover:bg-white/10'"
                           :aria-label="`Move ${srcName} down`"
                         >
                           <span class="material-symbols-outlined text-[16px]">arrow_downward</span>
@@ -498,7 +498,7 @@ defineExpose({ openAdd, openEdit });
                         <!-- Remove -->
                         <button
                           @click="removeMetaSource(idx)"
-                          class="p-1 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-500 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors"
+                          class="p-1 min-w-[40px] min-h-[40px] flex items-center justify-center text-text-muted hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 rounded-lg transition-colors"
                           :aria-label="`Remove ${srcName}`"
                         >
                           <span class="material-symbols-outlined text-[16px]">close</span>
@@ -538,7 +538,7 @@ defineExpose({ openAdd, openEdit });
                     >
                       <span :class="[sourceFormParams[param.key] === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200']" />
                     </button>
-                    <span class="ml-3 text-xs text-gray-400 font-bold uppercase tracking-widest">
+                    <span class="ml-3 text-xs text-text-muted font-bold uppercase tracking-widest">
                       {{ sourceFormParams[param.key] === 'true' ? 'Yes' : 'No' }}
                     </span>
                   </div>
@@ -547,11 +547,11 @@ defineExpose({ openAdd, openEdit });
                   <div v-else-if="param.type === 'select'" class="relative">
                     <select
                       v-model="sourceFormParams[param.key]"
-                      class="w-full text-sm font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-200 appearance-none pr-10"
+                      class="w-full text-sm font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-800 dark:text-gray-200 appearance-none pr-10"
                     >
                       <option v-for="opt in param.options" :key="opt" :value="opt" class="bg-black text-white">{{ opt }}</option>
                     </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-[18px]">expand_more</span>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-[18px]">expand_more</span>
                   </div>
 
                   <!-- Number param -->
@@ -560,7 +560,7 @@ defineExpose({ openAdd, openEdit });
                     type="number"
                     v-model="sourceFormParams[param.key]"
                     :placeholder="param.default || ''"
-                    class="w-full text-sm font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
+                    class="w-full text-sm font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600"
                   />
 
                   <!-- Text param -->
@@ -568,7 +568,7 @@ defineExpose({ openAdd, openEdit });
                     v-else
                     v-model="sourceFormParams[param.key]"
                     :placeholder="param.placeholder || param.default || ''"
-                    class="w-full text-sm font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-300 placeholder-gray-600"
+                    class="w-full text-sm font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600"
                   />
                 </div>
               </div>

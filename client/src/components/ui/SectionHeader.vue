@@ -19,7 +19,7 @@
 // `description` intentionally overrides the title's uppercase/tracking
 // (`normal-case tracking-normal`) since descriptive prose reads better in
 // sentence case — matching how Dashboard.vue's own error description under
-// an uppercase `<h3>` (`<p class="text-xs text-gray-400 ...">`) is plain
+// an uppercase `<h3>` (`<p class="text-xs text-text-muted ...">`) is plain
 // sentence-case text, not tracked/uppercase.
 export interface SectionHeaderProps {
   title: string;

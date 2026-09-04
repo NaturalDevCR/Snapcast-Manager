@@ -290,7 +290,7 @@ onMounted(() => {
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 class="text-3xl font-black text-text-main tracking-tight dark:drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">{{ t('tools.title') }}</h1>
-          <p class="text-gray-400 font-medium mt-1">{{ t('tools.subtitle') }}</p>
+          <p class="text-text-muted font-medium mt-1">{{ t('tools.subtitle') }}</p>
         </div>
       </div>
 
@@ -335,8 +335,8 @@ onMounted(() => {
         <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
           <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-              <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">schedule</span>
-              <span class="text-sm font-black text-white uppercase tracking-widest">{{ t('tools.crontabEditor') }}</span>
+              <span class="material-symbols-outlined text-text-muted text-[1.2rem]">schedule</span>
+              <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('tools.crontabEditor') }}</span>
             </div>
             <div class="flex items-center gap-3">
               <button @click="loadCrontab" :disabled="crontabLoading"
@@ -360,7 +360,7 @@ onMounted(() => {
               v-model="crontabContent"
               rows="18"
               spellcheck="false"
-              class="w-full bg-black/60 border border-black/5 dark:border-white/5 rounded-xl text-sm font-mono text-gray-200 p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
+              class="w-full bg-black/60 border border-black/5 dark:border-white/5 rounded-xl text-sm font-mono text-gray-800 dark:text-gray-200 p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
               placeholder="# No crontab entries yet&#10;# min hour day month weekday command"
             ></textarea>
           </div>
@@ -374,7 +374,7 @@ onMounted(() => {
           <!-- Script List -->
           <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
             <div class="px-5 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
-              <span class="text-sm font-black text-white uppercase tracking-widest">{{ t('tools.tabScripts') }}</span>
+              <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('tools.tabScripts') }}</span>
               <button @click="showAddForm = !showAddForm"
                 class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary rounded-lg transition-all"
                 :aria-label="showAddForm ? t('tools.cancelAddScript') : t('tools.addScript')">
@@ -385,9 +385,9 @@ onMounted(() => {
             <!-- Add Form -->
             <div v-if="showAddForm" class="p-4 border-b border-black/5 dark:border-white/5 bg-brand-primary/5 space-y-3">
               <input v-model="newScriptLabel" type="text" :placeholder="t('tools.labelPlaceholder')"
-                class="w-full bg-black/60 border border-black/10 dark:border-white/10 rounded-xl text-xs font-mono text-gray-200 px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
+                class="w-full bg-black/60 border border-black/10 dark:border-white/10 rounded-xl text-xs font-mono text-gray-800 dark:text-gray-200 px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
               <input v-model="newScriptPath" type="text" placeholder="/path/to/script.sh"
-                class="w-full bg-black/60 border border-black/10 dark:border-white/10 rounded-xl text-xs font-mono text-gray-200 px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
+                class="w-full bg-black/60 border border-black/10 dark:border-white/10 rounded-xl text-xs font-mono text-gray-800 dark:text-gray-200 px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
               <button @click="addScriptPath"
                 class="w-full px-3 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 border border-brand-primary/50">
                 {{ t('tools.addScriptButton') }}
@@ -404,7 +404,7 @@ onMounted(() => {
                 :class="['flex items-center justify-between px-5 py-3.5 cursor-pointer transition-all group',
                   selectedScript?.id === script.id ? 'bg-brand-primary/10 border-l-2 border-brand-primary' : 'hover:bg-black/5 dark:hover:bg-white/5']">
                 <div class="min-w-0 mr-2">
-                  <p class="text-xs font-black text-white truncate">{{ script.label }}</p>
+                  <p class="text-xs font-black text-gray-900 dark:text-white truncate">{{ script.label }}</p>
                   <p class="text-[10px] font-mono text-terminal-muted truncate mt-0.5">{{ script.path }}</p>
                 </div>
                 <button @click.stop="confirmRemoveScript(script.id)"
@@ -420,8 +420,8 @@ onMounted(() => {
           <div class="lg:col-span-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
             <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
               <div class="flex items-center space-x-3">
-                <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">code</span>
-                <span class="text-sm font-black text-white uppercase tracking-widest">
+                <span class="material-symbols-outlined text-text-muted text-[1.2rem]">code</span>
+                <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">
                   {{ selectedScript ? selectedScript.label : t('tools.selectAScript') }}
                 </span>
                 <span v-if="selectedScript" class="text-[10px] font-mono text-terminal-muted truncate max-w-[200px]">{{ selectedScript.path }}</span>
@@ -446,7 +446,7 @@ onMounted(() => {
                 v-model="scriptContent"
                 rows="22"
                 spellcheck="false"
-                class="w-full bg-black/60 border border-black/5 dark:border-white/5 rounded-xl text-sm font-mono text-gray-200 p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
+                class="w-full bg-black/60 border border-black/5 dark:border-white/5 rounded-xl text-sm font-mono text-gray-800 dark:text-gray-200 p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
                 placeholder="#!/bin/bash&#10;# Script content..."
               ></textarea>
             </div>
@@ -459,8 +459,8 @@ onMounted(() => {
         <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
           <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-              <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">queue_music</span>
-              <span class="text-sm font-black text-white uppercase tracking-widest">{{ t('tools.tabMpdConfig') }}</span>
+              <span class="material-symbols-outlined text-text-muted text-[1.2rem]">queue_music</span>
+              <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('tools.tabMpdConfig') }}</span>
               <span class="text-[10px] font-mono text-terminal-muted">/etc/mpd.conf</span>
             </div>
             <div class="flex items-center gap-3">
@@ -496,7 +496,7 @@ onMounted(() => {
               v-model="mpdConfigContent"
               rows="28"
               spellcheck="false"
-              class="w-full bg-black/60 border border-black/5 dark:border-white/5 rounded-xl text-sm font-mono text-gray-200 p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
+              class="w-full bg-black/60 border border-black/5 dark:border-white/5 rounded-xl text-sm font-mono text-gray-800 dark:text-gray-200 p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
               placeholder="# /etc/mpd.conf&#10;# MPD configuration file"
             ></textarea>
           </div>
@@ -508,8 +508,8 @@ onMounted(() => {
         <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
           <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-              <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">settings_backup_restore</span>
-              <span class="text-sm font-black text-white uppercase tracking-widest">{{ t('tools.configurationBackups') }}</span>
+              <span class="material-symbols-outlined text-text-muted text-[1.2rem]">settings_backup_restore</span>
+              <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('tools.configurationBackups') }}</span>
             </div>
             <button @click="loadBackups" :disabled="backupsLoading"
               class="inline-flex items-center px-3 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
@@ -528,7 +528,7 @@ onMounted(() => {
               <div v-for="backup in backups" :key="backup.name"
                 class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 hover:bg-black/5 dark:hover:bg-white/5 transition-all rounded-xl">
                 <div class="min-w-0">
-                  <p class="text-xs font-black text-white truncate font-mono">{{ backup.name }}</p>
+                  <p class="text-xs font-black text-gray-900 dark:text-white truncate font-mono">{{ backup.name }}</p>
                   <p class="text-[10px] font-mono text-terminal-muted mt-0.5">
                     {{ formatDate(backup.mtime) }} · {{ formatSize(backup.size) }}
                     <span v-if="backup.components.length"> · {{ backup.components.join(', ') }}</span>

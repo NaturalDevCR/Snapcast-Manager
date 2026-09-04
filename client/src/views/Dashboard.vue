@@ -428,7 +428,7 @@ const openMympd = () => {
       <div v-else-if="!snapcastStore.loading && snapcastStore.error" class="bg-[#ff3b30]/10 border border-[#ff3b30]/30 rounded-2xl p-8 text-center backdrop-blur-xl shadow-[0_0_30px_rgba(255,59,48,0.1)]">
           <span class="material-symbols-outlined text-[3rem] text-[#ff3b30] drop-shadow-[0_0_15px_rgba(255,59,48,0.5)] mb-4">cloud_off</span>
           <h3 class="text-sm font-black text-text-main uppercase tracking-[0.2em] mb-2">{{ t('dashboard.snapserverOfflineTitle') }}</h3>
-          <p class="text-xs text-gray-400 max-w-md mx-auto">{{ snapcastStore.error }}</p>
+          <p class="text-xs text-text-muted max-w-md mx-auto">{{ snapcastStore.error }}</p>
       </div>
 
       <div class="border-t border-black/5 dark:border-white/5 my-10"></div>
@@ -446,13 +446,13 @@ const openMympd = () => {
         </template>
         <div class="space-y-4">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.snapserverInstalledLabel') }}</span>
+                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.snapserverInstalledLabel') }}</span>
                 <span :class="systemStore.installedPackages.snapserver ? 'text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]' : 'text-[#ff3b30] drop-shadow-[0_0_5px_rgba(255,59,48,0.5)]'" class="text-sm font-black">
                     {{ systemStore.installedPackages.snapserver ? t('dashboard.snapserverInstalledYes') : t('dashboard.snapserverInstalledNo') }}
                 </span>
             </div>
             <div class="flex items-center justify-between" v-if="systemStore.installedPackages.snapserver">
-                 <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.statusLabel') }}</span>
+                 <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.statusLabel') }}</span>
                  <span :class="systemStore.snapserverStatus === 'active' ? 'text-[#00ff9d] bg-[#00ff9d]/10 border-[#00ff9d]/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
                      {{ systemStore.snapserverStatus }}
                  </span>
@@ -460,7 +460,7 @@ const openMympd = () => {
             <div class="flex flex-col" v-if="systemStore.installedPackages.snapserver">
                  <div class="flex items-center justify-between mb-2">
                     <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">{{ t('dashboard.versionLabel') }}</span>
-                    <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions.snapserver || '...' }}</span>
+                    <span class="text-xs font-mono font-bold text-text-muted">{{ systemStore.packageVersions.snapserver || '...' }}</span>
                  </div>
                  <div v-if="systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' && systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver"
                        class="mt-2 bg-[#ffcc00]/10 border border-[#ffcc00]/20 text-[#ffcc00] text-[10px] px-3 py-2 rounded-xl font-black flex items-center justify-between">
@@ -484,7 +484,7 @@ const openMympd = () => {
                             'w-full px-4 py-3 rounded-xl text-xs font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 uppercase',
                             systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown'
                             ? 'bg-brand-primary text-white border border-brand-primary/50 shadow-xl shadow-brand-primary/30 hover:shadow-brand-primary/50 hover:bg-brand-primary/80'
-                            : 'bg-black/40 text-gray-400 hover:bg-black/10 dark:hover:bg-white/10 hover:text-text-main border border-black/5 dark:border-white/5'
+                            : 'bg-black/40 text-gray-600 dark:text-gray-400 hover:bg-black/10 dark:hover:bg-white/10 hover:text-text-main border border-black/5 dark:border-white/5'
                         ]"
                         :disabled="systemStore.loading">
                     {{ systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' ? t('dashboard.installUpdateButton') : t('dashboard.cleanReinstallLabel') }}
@@ -503,7 +503,7 @@ const openMympd = () => {
         </template>
         <div class="space-y-4">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.nodeJsLabel') }}</span>
+                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.nodeJsLabel') }}</span>
                 <span class="text-[#00ff9d] font-black text-sm tracking-widest leading-none drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]">
                     {{ systemStore.packageVersions.node || t('dashboard.nodeUnknownLabel') }}
                 </span>
@@ -511,7 +511,7 @@ const openMympd = () => {
             <div class="flex flex-col">
                  <div class="flex items-center justify-between mb-2">
                     <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">{{ t('dashboard.engineVersionLabel') }}</span>
-                    <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions.node || '...' }}</span>
+                    <span class="text-xs font-mono font-bold text-text-muted">{{ systemStore.packageVersions.node || '...' }}</span>
                  </div>
 
                  <div class="mt-4 space-y-3">
@@ -523,7 +523,7 @@ const openMympd = () => {
                                     'py-2.5 rounded-xl text-xs font-black transition-all border',
                                     selectedNodeVersion === v
                                     ? 'bg-[#00ff9d]/10 border-[#00ff9d]/30 text-[#00ff9d] drop-shadow-[0_0_8px_rgba(0,255,157,0.4)]'
-                                    : 'bg-black/40 border-black/5 dark:border-white/5 text-gray-400 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-300'
+                                    : 'bg-black/40 border-black/5 dark:border-white/5 text-gray-600 dark:text-gray-400 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-300'
                                 ]"
                         >
                             v{{ v }}
@@ -574,7 +574,7 @@ const openMympd = () => {
         </template>
         <div class="space-y-4">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.statusLabel') }}</span>
+                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.statusLabel') }}</span>
                 <span :class="systemStore.installedPackages['snap-ctrl'] ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
                     {{ systemStore.installedPackages['snap-ctrl'] ? t('dashboard.installedBadge') : t('dashboard.notInstalledBadge') }}
                 </span>
@@ -582,7 +582,7 @@ const openMympd = () => {
             <div class="flex flex-col">
                  <div class="flex items-center justify-between mb-2">
                     <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">{{ t('dashboard.versionLabel') }}</span>
-                    <span class="text-xs font-mono font-bold text-gray-300">{{ systemStore.packageVersions['snap-ctrl'] || '...' }}</span>
+                    <span class="text-xs font-mono font-bold text-text-muted">{{ systemStore.packageVersions['snap-ctrl'] || '...' }}</span>
                  </div>
                  <div v-if="systemStore.availableVersions['snap-ctrl'] && systemStore.availableVersions['snap-ctrl'] !== 'unknown' && systemStore.packageVersions['snap-ctrl'] !== systemStore.availableVersions['snap-ctrl']"
                        class="mt-2 bg-[#ffcc00]/10 border border-[#ffcc00]/20 text-[#ffcc00] text-[10px] px-3 py-2 rounded-xl font-black flex items-center justify-between">
@@ -608,7 +608,7 @@ const openMympd = () => {
         </template>
         <div class="space-y-4">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.toolkitLabel') }}</span>
+                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.toolkitLabel') }}</span>
                 <span :class="systemStore.installedPackages.ffmpeg ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-sm font-black">
                     {{ systemStore.installedPackages.ffmpeg ? t('dashboard.readyLabel') : t('dashboard.absentLabel') }}
                 </span>
@@ -616,7 +616,7 @@ const openMympd = () => {
             <div class="flex flex-col" v-if="systemStore.installedPackages.ffmpeg">
                  <div class="flex items-center justify-between mb-2">
                     <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">{{ t('dashboard.versionInfoLabel') }}</span>
-                    <span class="text-xs font-mono font-bold text-gray-300 truncate max-w-[150px]">{{ systemStore.packageVersions.ffmpeg || '...' }}</span>
+                    <span class="text-xs font-mono font-bold text-text-muted truncate max-w-[150px]">{{ systemStore.packageVersions.ffmpeg || '...' }}</span>
                  </div>
             </div>
             <div class="pt-3 border-t border-black/5 dark:border-white/5" v-if="!systemStore.installedPackages.ffmpeg">
@@ -628,7 +628,7 @@ const openMympd = () => {
                 <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-inner shadow-brand-primary/10">
                     <p class="text-[10px] font-bold text-brand-primary uppercase tracking-widest leading-relaxed text-center">{{ t('dashboard.ffmpegDescription') }}</p>
                 </div>
-                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-300 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 hover:text-text-main border border-black/5 dark:border-white/5 transition-all text-xs font-bold uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.refreshPackagesButton') }}</button>
+                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 hover:text-text-main border border-black/5 dark:border-white/5 transition-all text-xs font-bold uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.refreshPackagesButton') }}</button>
             </div>
         </div>
       </Card>
@@ -639,19 +639,19 @@ const openMympd = () => {
         </template>
         <div class="space-y-4">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.receiverLabel') }}</span>
+                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.receiverLabel') }}</span>
                 <span :class="systemStore.installedPackages['shairport-sync'] ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-sm font-black">
                     {{ systemStore.installedPackages['shairport-sync'] ? t('dashboard.enabledLabel') : t('dashboard.disabledLabel') }}
                 </span>
             </div>
             <div class="flex items-center justify-between" v-if="systemStore.installedPackages['shairport-sync']">
-                 <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.statusLabel') }}</span>
+                 <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.statusLabel') }}</span>
                  <span :class="systemStore.shairportSyncStatus === 'active' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
                      {{ systemStore.shairportSyncStatus }}
                  </span>
             </div>
             <div class="flex items-center justify-between" v-if="systemStore.packageVersions['shairport-sync']">
-                  <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.versionLabel') }}</span>
+                  <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.versionLabel') }}</span>
                   <span class="text-sm font-bold text-gray-200">
                       {{ systemStore.packageVersions['shairport-sync'] }}
                   </span>
@@ -684,19 +684,19 @@ const openMympd = () => {
         </template>
         <div class="space-y-4">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.musicPlayerDaemonLabel') }}</span>
+                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.musicPlayerDaemonLabel') }}</span>
                 <span :class="systemStore.installedPackages['mpd'] ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-sm font-black">
                     {{ systemStore.installedPackages['mpd'] ? t('dashboard.installedBadge') : t('dashboard.notInstalledBadge') }}
                 </span>
             </div>
             <div class="flex items-center justify-between" v-if="systemStore.installedPackages['mpd']">
-                 <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.statusLabel') }}</span>
+                 <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.statusLabel') }}</span>
                  <span :class="systemStore.mpdStatus === 'active' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
                      {{ systemStore.mpdStatus }}
                  </span>
             </div>
             <div class="flex items-center justify-between" v-if="systemStore.packageVersions['mpd']">
-                  <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.versionLabel') }}</span>
+                  <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.versionLabel') }}</span>
                   <span class="text-sm font-bold text-gray-200">{{ systemStore.packageVersions['mpd'] }}</span>
             </div>
             <div class="pt-4 flex flex-col space-y-3 border-t border-black/5 dark:border-white/5" v-if="systemStore.installedPackages['mpd']">
@@ -727,19 +727,19 @@ const openMympd = () => {
         </template>
         <div class="space-y-4">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.webMusicClientLabel') }}</span>
+                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.webMusicClientLabel') }}</span>
                 <span :class="systemStore.installedPackages['mympd'] ? 'text-emerald-400' : 'text-[#ff3b30]'" class="text-sm font-black">
                     {{ systemStore.installedPackages['mympd'] ? t('dashboard.installedBadge') : t('dashboard.notInstalledBadge') }}
                 </span>
             </div>
             <div class="flex items-center justify-between" v-if="systemStore.installedPackages['mympd']">
-                 <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.statusLabel') }}</span>
+                 <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.statusLabel') }}</span>
                  <span :class="systemStore.mympdStatus === 'active' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-[#ffcc00] bg-[#ffcc00]/10 border-[#ffcc00]/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
                      {{ systemStore.mympdStatus }}
                  </span>
             </div>
             <div class="flex items-center justify-between" v-if="systemStore.packageVersions['mympd']">
-                  <span class="text-sm font-semibold text-gray-400">{{ t('dashboard.versionLabel') }}</span>
+                  <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.versionLabel') }}</span>
                   <span class="text-sm font-bold text-gray-200">{{ systemStore.packageVersions['mympd'] }}</span>
             </div>
             <div class="pt-4 flex flex-col space-y-3 border-t border-black/5 dark:border-white/5" v-if="systemStore.installedPackages['mympd']">

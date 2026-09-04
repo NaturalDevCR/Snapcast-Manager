@@ -115,7 +115,7 @@ function handleClickOutside(e: MouseEvent) {
           <!-- Burger Button (Mobile) -->
           <button
             @click="isMobileMenuOpen = !isMobileMenuOpen"
-            class="p-2 min-w-[40px] min-h-[40px] mr-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-400 hover:text-text-main rounded-xl border border-black/5 dark:border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center"
+            class="p-2 min-w-[40px] min-h-[40px] mr-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-text-main rounded-xl border border-black/5 dark:border-white/5 transition-all duration-300 sm:hidden flex items-center justify-center"
             :title="isMobileMenuOpen ? t('layout.closeMenu') : t('layout.openMenu')"
             :aria-label="isMobileMenuOpen ? t('layout.closeMenu') : t('layout.openMenu')"
           >
@@ -137,14 +137,14 @@ function handleClickOutside(e: MouseEvent) {
             <div v-if="systemStore.snapcastMode === 'both'" class="flex items-center bg-black/5 dark:bg-white/5 rounded-lg p-0.5 border border-black/5 dark:border-white/5 mr-3">
               <button
                 @click="switchMode('server')"
-                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
+                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-text-muted hover:text-text-main', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
               >
                 <span class="material-symbols-outlined text-[0.85rem]">dns</span>
                 {{ t('layout.server') }}
               </button>
               <button
                 @click="switchMode('client')"
-                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
+                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-text-muted hover:text-text-main', 'px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1']"
               >
                 <span class="material-symbols-outlined text-[0.85rem]">speaker</span>
                 {{ t('layout.client') }}
@@ -167,7 +167,7 @@ function handleClickOutside(e: MouseEvent) {
               :class="[
                 isNavActive(item.href)
                   ? 'bg-black/10 dark:bg-white/10 text-text-main border border-black/5 dark:border-white/5'
-                  : 'text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main border border-transparent',
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main border border-transparent',
                 'px-3 py-1.5 rounded-lg font-bold text-xs transition-all duration-200 flex items-center gap-1.5 uppercase tracking-wide'
               ]"
             >
@@ -184,7 +184,7 @@ function handleClickOutside(e: MouseEvent) {
                 :class="[
                   isSystemActive
                     ? 'bg-black/10 dark:bg-white/10 text-text-main border-black/5 dark:border-white/5'
-                    : 'text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main border-transparent',
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main border-transparent',
                   'px-3 py-1.5 rounded-lg font-bold text-xs transition-all duration-200 flex items-center gap-1.5 uppercase tracking-wide border'
                 ]"
               >
@@ -227,13 +227,13 @@ function handleClickOutside(e: MouseEvent) {
                       :class="[
                         isItemActive(item)
                           ? 'bg-brand-primary/15 text-text-main'
-                          : 'text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main',
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main',
                         'flex items-center gap-3 px-4 py-2.5 transition-all duration-150 mx-1.5 rounded-xl'
                       ]"
                     >
                       <span
                         class="material-symbols-outlined text-[1.1rem] flex-shrink-0"
-                        :class="isItemActive(item) ? 'text-brand-primary' : 'text-gray-500'"
+                        :class="isItemActive(item) ? 'text-brand-primary' : 'text-text-muted'"
                       >{{ item.icon }}</span>
                       <div>
                         <p class="text-xs font-black uppercase tracking-wide leading-tight">{{ item.name }}</p>
@@ -286,7 +286,7 @@ function handleClickOutside(e: MouseEvent) {
                 </div>
                 <button
                   @click="authStore.logout()"
-                  class="p-2 min-w-[40px] min-h-[40px] bg-black/5 dark:bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-black/5 dark:border-white/5 transition-all duration-300 group flex items-center justify-center"
+                  class="p-2 min-w-[40px] min-h-[40px] bg-black/5 dark:bg-white/5 hover:bg-red-500/20 text-gray-600 dark:text-gray-400 hover:text-red-400 rounded-xl border border-black/5 dark:border-white/5 transition-all duration-300 group flex items-center justify-center"
                   :title="t('layout.signOut')"
                   :aria-label="t('layout.signOut')"
                 >
@@ -329,7 +329,7 @@ function handleClickOutside(e: MouseEvent) {
                 </div>
                 <span class="text-lg font-black text-text-main">Snapcast <span class="text-brand-primary">Manager</span></span>
               </div>
-              <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl text-gray-400 hover:text-text-main hover:bg-black/5 dark:hover:bg-white/5" :aria-label="t('layout.closeMenu')">
+              <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl text-gray-600 dark:text-gray-400 hover:text-text-main hover:bg-black/5 dark:hover:bg-white/5" :aria-label="t('layout.closeMenu')">
                 <span class="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -338,14 +338,14 @@ function handleClickOutside(e: MouseEvent) {
             <div v-if="systemStore.snapcastMode === 'both'" class="flex items-center bg-black/5 dark:bg-white/5 rounded-xl p-1 border border-black/5 dark:border-white/5 mt-5">
               <button
                 @click="switchMode('server')"
-                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
+                :class="[!isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-text-muted hover:text-text-main', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
               >
                 <span class="material-symbols-outlined text-[0.9rem]">dns</span>
                 {{ t('layout.server') }}
               </button>
               <button
                 @click="switchMode('client')"
-                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-gray-400 hover:text-text-main', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
+                :class="[isClientMode ? 'bg-brand-primary text-white shadow-md' : 'text-text-muted hover:text-text-main', 'flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5']"
               >
                 <span class="material-symbols-outlined text-[0.9rem]">speaker</span>
                 {{ t('layout.client') }}
@@ -368,7 +368,7 @@ function handleClickOutside(e: MouseEvent) {
                 :class="[
                   isNavActive(item.href)
                     ? 'bg-black/10 dark:bg-white/10 text-text-main border border-black/5 dark:border-white/5'
-                    : 'text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main border border-transparent',
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main border border-transparent',
                   'px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200 flex items-center gap-3'
                 ]"
               >
@@ -386,7 +386,7 @@ function handleClickOutside(e: MouseEvent) {
                   :class="[
                     isSystemActive
                       ? 'bg-black/10 dark:bg-white/10 text-text-main border-black/5 dark:border-white/5'
-                      : 'text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main border-transparent',
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main border-transparent',
                     'px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200 flex items-center gap-3 border w-full text-left mt-1'
                   ]"
                 >
@@ -421,7 +421,7 @@ function handleClickOutside(e: MouseEvent) {
                         :class="[
                           isItemActive(item)
                             ? 'text-text-main'
-                            : 'text-text-muted hover:text-gray-300',
+                            : 'text-text-muted hover:text-gray-700 dark:hover:text-gray-300',
                           'py-1 text-sm font-bold transition-all duration-200 flex items-center gap-2.5'
                         ]"
                       >
@@ -451,7 +451,7 @@ function handleClickOutside(e: MouseEvent) {
                 </button>
                 <button
                   @click="authStore.logout(); isMobileMenuOpen = false"
-                  class="p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center bg-black/5 dark:bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-xl border border-black/5 dark:border-white/5 transition-all duration-300"
+                  class="p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center bg-black/5 dark:bg-white/5 hover:bg-red-500/20 text-gray-600 dark:text-gray-400 hover:text-red-400 rounded-xl border border-black/5 dark:border-white/5 transition-all duration-300"
                   :aria-label="t('layout.signOut')"
                 >
                   <span class="material-symbols-outlined text-[1.2rem]">logout</span>
@@ -479,7 +479,7 @@ function handleClickOutside(e: MouseEvent) {
           <span class="font-black tracking-widest uppercase text-[10px]">VERSION {{ version }}</span>
         </div>
         <div class="flex flex-col sm:flex-row items-center gap-4">
-          <a href="https://github.com/NaturalDevCR/TCP-Streamer" target="_blank" class="flex items-center gap-1 hover:text-text-main text-gray-400 font-bold transition-colors duration-300">
+          <a href="https://github.com/NaturalDevCR/TCP-Streamer" target="_blank" class="flex items-center gap-1 hover:text-text-main text-text-muted font-bold transition-colors duration-300">
             <span class="material-symbols-outlined text-[1rem]">link</span>
             TCP-Streamer
           </a>

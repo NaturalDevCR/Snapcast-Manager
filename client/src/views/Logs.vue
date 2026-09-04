@@ -66,7 +66,7 @@ onUnmounted(() => {
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 class="text-3xl font-black text-text-main tracking-tight dark:drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">{{ t('logs.title') }}</h1>
-          <p class="text-gray-400 font-medium mt-1">{{ t('logs.subtitle') }}</p>
+          <p class="text-text-muted font-medium mt-1">{{ t('logs.subtitle') }}</p>
         </div>
         <div class="flex items-center space-x-4 bg-black/40 p-2 rounded-2xl border border-black/5 dark:border-white/5 shadow-inner backdrop-blur-md">
           <label class="flex items-center cursor-pointer group px-3">
@@ -128,8 +128,8 @@ onUnmounted(() => {
 
       <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
         <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center space-x-3">
-          <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">terminal</span>
-          <span class="text-sm font-black text-white uppercase tracking-widest">{{ t('logs.consoleOutput') }}</span>
+          <span class="material-symbols-outlined text-text-muted text-[1.2rem]">terminal</span>
+          <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('logs.consoleOutput') }}</span>
           <span v-if="activeService.startsWith('snapclient-')" class="ml-auto text-[10px] font-mono text-brand-primary">
             snapclient-manager-{{ activeService.replace('snapclient-', '') }}.service
           </span>
@@ -147,8 +147,8 @@ onUnmounted(() => {
             </div>
             <div v-else class="space-y-1">
               <div v-for="(line, i) in logs.split('\n')" :key="i" class="flex group/line">
-                <span class="w-10 shrink-0 text-white/20 select-none text-right pr-4 font-bold">{{ i + 1 }}</span>
-                <pre class="text-gray-300 whitespace-pre-wrap break-all selection:bg-brand-primary/30">{{ line }}</pre>
+                <span class="w-10 shrink-0 text-black/20 dark:text-white/20 select-none text-right pr-4 font-bold">{{ i + 1 }}</span>
+                <pre class="text-text-muted whitespace-pre-wrap break-all selection:bg-brand-primary/30">{{ line }}</pre>
               </div>
             </div>
           </div>

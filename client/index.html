@@ -12,21 +12,19 @@
         2. Every route avoids a flash-of-wrong-theme between first paint
            and Vue's mount (which previously always rendered hardcoded
            class="dark" for a frame regardless of stored preference).
-      This logic must mirror useUIStore's `isDark` default exactly
-      (localStorage 'theme' !== 'light' => dark) or the two would fall
-      out of sync on first load.
+
+      v0.3.8 fix: this used to be inline here. helmet's CSP (server/src/
+      index.ts) is `script-src 'self'` with no 'unsafe-inline' -- browsers
+      silently block inline <script> tags under that policy, so this NEVER
+      RAN on any real (server-served) deployment, regardless of what was
+      stored in localStorage. Moved to an external same-origin file
+      (theme-init.js, served from client/public/ -- see that file for the
+      full account), which `script-src 'self'` allows with no CSP change.
+      A plain (non-module, non-defer) <script src> still blocks parsing
+      and runs synchronously in document order, same as the inline version
+      did -- required for both guarantees above.
     -->
-    <script>
-      (function () {
-        try {
-          var isDark = localStorage.getItem('theme') !== 'light';
-          document.documentElement.classList.toggle('dark', isDark);
-        } catch (e) {
-          // localStorage unavailable (e.g. private mode edge cases) - default to dark.
-          document.documentElement.classList.add('dark');
-        }
-      })();
-    </script>
+    <script src="/theme-init.js"></script>
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />

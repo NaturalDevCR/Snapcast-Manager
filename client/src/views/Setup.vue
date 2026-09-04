@@ -78,7 +78,7 @@ const handleSetup = async () => {
                             <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.usernameLabel') }}</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                    <span class="material-symbols-outlined text-gray-400 group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">person_add</span>
+                                    <span class="material-symbols-outlined text-text-muted group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">person_add</span>
                                 </div>
                                 <input
                                     v-model="username"
@@ -95,7 +95,7 @@ const handleSetup = async () => {
                                 <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.passwordLabel') }}</label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                        <span class="material-symbols-outlined text-gray-400 group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">lock</span>
+                                        <span class="material-symbols-outlined text-text-muted group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">lock</span>
                                     </div>
                                     <input
                                         v-model="password"
@@ -110,7 +110,7 @@ const handleSetup = async () => {
                                 <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.confirmLabel') }}</label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                        <span class="material-symbols-outlined text-gray-400 group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">check_circle</span>
+                                        <span class="material-symbols-outlined text-text-muted group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">check_circle</span>
                                     </div>
                                     <input
                                         v-model="confirmPassword"
