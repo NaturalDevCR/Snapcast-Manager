@@ -24,7 +24,32 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm test
+
+      - name: TEMP DIAGNOSTIC - ts-node/node-test root cause
+        working-directory: ./server
+        continue-on-error: true
+        run: |
+          echo "--- node -v / npm -v ---"
+          node -v
+          npm -v
+          echo "--- shell that npm run-scripts use ---"
+          npm config get script-shell || true
+          echo "--- ts-node resolved version ---"
+          node -e "console.log(require('ts-node/package.json').version)"
+          echo "--- does --import ts-node/register register the .ts require hook? ---"
+          node --import ts-node/register -e "console.log(require('module')._extensions['.ts'] ? 'HOOK SET' : 'HOOK NOT SET')"
+          echo "--- native type-stripping flag present? ---"
+          node --help | grep -i "strip-types" || echo "no --experimental-strip-types in --help"
+          echo "--- single file, no glob ---"
+          node --test --import ts-node/register src/auth.test.ts 2>&1 | tail -20
+          echo "--- exit code above: $? ---"
+          echo "--- same, with native strip-types disabled ---"
+          node --no-experimental-strip-types --test --import ts-node/register src/auth.test.ts 2>&1 | tail -20
+          echo "--- exit code above: $? ---"
+
+      - name: Test server
+        working-directory: ./server
+        run: npm test
 
   client:
     runs-on: ubuntu-latest
