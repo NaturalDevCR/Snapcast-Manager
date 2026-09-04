@@ -25,13 +25,13 @@ jobs:
           npm ci
           npm run build
 
-      - name: TEMP DIAGNOSTIC 3 - NODE_OPTIONS fix hypothesis
+      - name: TEMP DIAGNOSTIC 4 - --require instead of --import
         working-directory: ./server
         continue-on-error: true
         run: |
-          echo "--- candidate fix: NODE_OPTIONS instead of CLI --import, capped at 60s ---"
+          echo "--- candidate fix: --require ts-node/register (correct flag for a CommonJS entry point), capped at 60s ---"
           set +e
-          timeout 60 env LOG_LEVEL=silent NODE_OPTIONS="--import ts-node/register" node --test src/*.test.ts src/**/*.test.ts 2>&1 | tail -30
+          timeout 60 env LOG_LEVEL=silent node --test --require ts-node/register src/*.test.ts src/**/*.test.ts 2>&1 | tail -30
           echo "--- exit code above: $? ---"
 
   client:
