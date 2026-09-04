@@ -25,18 +25,13 @@ jobs:
           npm ci
           npm run build
 
-      - name: TEMP DIAGNOSTIC 2 - reproduce exact npm test with guards
+      - name: TEMP DIAGNOSTIC 3 - NODE_OPTIONS fix hypothesis
         working-directory: ./server
         continue-on-error: true
         run: |
-          echo "--- files matched by the two glob patterns ---"
-          ls -1 src/*.test.ts src/**/*.test.ts 2>&1 | sort -u | wc -l
-          echo "--- unmodified npm test, capped at 60s ---"
+          echo "--- candidate fix: NODE_OPTIONS instead of CLI --import, capped at 60s ---"
           set +e
-          timeout 60 npm test 2>&1 | tail -60
-          echo "--- exit code above: $? ---"
-          echo "--- same but serialized (--test-concurrency=1), capped at 90s ---"
-          timeout 90 env LOG_LEVEL=silent node --test --test-concurrency=1 --import ts-node/register src/*.test.ts src/**/*.test.ts 2>&1 | tail -60
+          timeout 60 env LOG_LEVEL=silent NODE_OPTIONS="--import ts-node/register" node --test src/*.test.ts src/**/*.test.ts 2>&1 | tail -30
           echo "--- exit code above: $? ---"
 
   client:
