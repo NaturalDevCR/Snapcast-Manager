@@ -8,6 +8,16 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.8] - 2026-09-04
+
+### 🐛 Bug Fixes
+
+- *(server)* Use --require instead of --import for ts-node/register in test script (#11)
+- *(ui)* Theme persistence CSP block + broad light-mode contrast sweep (v0.3.8) (#12)
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.7
 ## [0.3.7] - 2026-09-03
 
 ### 🐛 Bug Fixes
