@@ -8,6 +8,31 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.9] - 2026-09-21
+
+### 🚀 Features
+
+- *(backup)* Add scheduled backups with their own retention pool
+- *(backup)* Add BackupScheduleService for recurring backups
+- *(backup)* Expose backup-schedule API and wire shutdown
+- *(ui)* Add scheduled backup configuration to Tools > Backups
+
+### 🐛 Bug Fixes
+
+- *(backup)* Always include snapserver state in every backup
+- *(backup)* Include snapserver state in manual export
+- *(backup)* Stop schedule-service test leaks and guard against stacked concurrent backups
+- *(backup)* Close TOCTOU race in runNow()'s in-flight guard
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.8
+- *(specs)* Add scheduled disaster-recovery backups design
+- *(plans)* Add scheduled disaster-recovery backups implementation plan
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to v0.3.9
 ## [0.3.8] - 2026-09-04
 
 ### 🐛 Bug Fixes
