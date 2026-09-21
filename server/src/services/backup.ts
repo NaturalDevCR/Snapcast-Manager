@@ -127,6 +127,41 @@ export class BackupService {
     await this.privileged('mkdir', ['-p', BACKUP_DIR]);
   }
 
+  /**
+   * `tar`/`chmod` above both run via `privileged()`, which sudo-prefixes
+   * them whenever `needsSudo()` is true -- i.e. on a normal hardened
+   * install, where this whole Node process runs as the unprivileged
+   * `snapmanager` service account (scripts/install.sh's systemd unit sets
+   * `User=snapmanager`; see platform/exec.ts's `needsSudo()`), not root.
+   * `sudo tar`/`sudo chmod 600` create the archive owned by root:root --
+   * fine for every OTHER consumer of these files (restoreBackup()'s `sudo
+   * tar -x`/deleteBackup()'s `sudo rm` both run as root too, so root:root
+   * 600 never blocks them), but routes/system.ts's download route reads
+   * the file's CONTENTS directly via a plain, unprivileged
+   * `fs.createReadStream()` -- deliberately not sudo-wrapped, since piping
+   * a spawned `sudo cat`'s stdout through the response is unnecessary
+   * complexity for a read-only path. `open()` for read on a root:root
+   * mode-600 file, called as `snapmanager`, is a plain EACCES -- the
+   * unhandled version of that exact failure was the process-crashing bug
+   * this same file's download route just got fixed for (see
+   * routes/system.ts's `GET /backups/download/:name`); this is what
+   * causes the EACCES in the first place. `chown`s the just-created
+   * archive to THIS process's own (real, unprivileged) uid/gid --
+   * `process.getuid()`/`getgid()` reflect the actual `snapmanager`
+   * account regardless of any individual command being run through sudo --
+   * so the download route's later same-process read succeeds while the
+   * file stays owner-only (600) and unreadable by any OTHER local
+   * account. When this process already runs as root (`needsSudo()` false
+   * -- e.g. local dev run as root), `getuid()`/`getgid()` are already 0,
+   * so this is a harmless root:root-to-root:root no-op.
+   */
+  private async chownToSelf(fullPath: string): Promise<void> {
+    const uid = process.getuid?.();
+    const gid = process.getgid?.();
+    if (uid === undefined || gid === undefined) return;
+    await this.privileged('chown', [`${uid}:${gid}`, fullPath]);
+  }
+
   private async ensureScheduledBackupDir(): Promise<void> {
     await this.privileged('mkdir', ['-p', SCHEDULED_BACKUP_DIR]);
   }
@@ -365,6 +400,7 @@ export class BackupService {
     await this.privileged('tar', archiveArgs);
 
     await this.privileged('chmod', ['600', fullPath]);
+    await this.chownToSelf(fullPath);
 
     const stat = await fs.stat(fullPath).catch(() => null);
     if (!stat) throw new Error(`Backup file ${fullPath} could not be stat'd`);
@@ -421,6 +457,7 @@ export class BackupService {
     const archiveArgs: string[] = ['czf', fullPath, '--absolute-names', ...existing];
     await this.privileged('tar', archiveArgs);
     await this.privileged('chmod', ['600', fullPath]);
+    await this.chownToSelf(fullPath);
 
     const stat = await fs.stat(fullPath).catch(() => null);
     if (!stat) throw new Error(`Backup file ${fullPath} could not be stat'd`);

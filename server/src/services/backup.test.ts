@@ -438,6 +438,36 @@ test('createPreUpdateBackup() sudo-gates BOTH the tar and chmod calls via argv w
   }
 });
 
+test("createPreUpdateBackup() chowns the archive back to this process's own uid:gid after chmod 600, so a later unprivileged read (the download route) doesn't hit EACCES on a root:root file", async () => {
+  const calls: Call[] = [];
+  const restoreRun = stubRun(calls);
+  const restoreSudo = stubNeedsSudo(true);
+  const restoreFs = stubCreatePreUpdateBackupFs({
+    existingFixedSources: [WATCHDOGS_CONFIG_DIR],
+    systemdEntries: [],
+  });
+  try {
+    const service = new BackupService();
+    const result = await service.createPreUpdateBackup('snapclient');
+
+    const chownCalls = calls.filter(c => c.args[0] === 'chown');
+    assert.equal(chownCalls.length, 1);
+    assert.equal(chownCalls[0].bin, 'sudo', 'chown must be sudo-gated too, same as tar/chmod, when needsSudo() is true');
+    assert.deepEqual(chownCalls[0].args, ['chown', `${process.getuid!()}:${process.getgid!()}`, result.path]);
+
+    // Ordering matters: chown must come AFTER chmod 600 (chowning before
+    // it would be pointless -- chmod doesn't touch ownership either way,
+    // but this asserts the intended sequence rather than assuming it).
+    const chmodIndex = calls.findIndex(c => c.args[0] === 'chmod');
+    const chownIndex = calls.findIndex(c => c.args[0] === 'chown');
+    assert.ok(chmodIndex < chownIndex, 'chmod must run before chown');
+  } finally {
+    restoreRun();
+    restoreSudo();
+    restoreFs();
+  }
+});
+
 test('createPreUpdateBackup() does NOT sudo-gate tar/chmod when needsSudo() is false', async () => {
   const calls: Call[] = [];
   const restoreRun = stubRun(calls);
@@ -881,6 +911,26 @@ test('createScheduledBackup() tars into BACKUP_DIR/scheduled with a scheduled-* 
     const tarCall = calls.find(c => c.bin === 'tar');
     assert.ok(tarCall, 'tar must be invoked');
     assert.ok(tarCall!.args.includes(result.path), 'tar must archive into the scheduled subdirectory');
+  } finally {
+    restoreFs();
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test("createScheduledBackup() also chowns the archive back to this process's own uid:gid (same EACCES-on-download fix as createPreUpdateBackup())", async () => {
+  const calls: Call[] = [];
+  const restoreRun = stubRun(calls);
+  const restoreSudo = stubNeedsSudo(true);
+  const restoreFs = stubGeneralBackupFs();
+  try {
+    const service = new BackupService();
+    const result = await service.createScheduledBackup(7);
+
+    const chownCall = calls.find(c => c.args[0] === 'chown');
+    assert.ok(chownCall, 'chown must be invoked');
+    assert.equal(chownCall!.bin, 'sudo');
+    assert.deepEqual(chownCall!.args, ['chown', `${process.getuid!()}:${process.getgid!()}`, result.path]);
   } finally {
     restoreFs();
     restoreRun();
