@@ -8,6 +8,19 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.10] - 2026-09-21
+
+### 🐛 Bug Fixes
+
+- *(backup)* Handle read-stream errors on backup download
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.9
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to v0.3.10
 ## [0.3.9] - 2026-09-21
 
 ### 🚀 Features
