@@ -342,7 +342,20 @@ test('checkAndRunIfDue() skips a tick while a previous run is still in flight, i
   }
 });
 
-test('runNow() rejects with a clear conflict error when a backup is already in progress', async () => {
+// This is a genuine TOCTOU (time-of-check-to-time-of-use) race test: the two
+// runNow() calls are fired back-to-back with NO synchronization between them
+// -- neither is awaited first, and nothing waits for `running` to flip
+// before the second call starts. That's deliberate: waiting for `running`
+// to already be true before firing the second call (as an earlier version
+// of this test did) sidesteps the actual race window entirely, since it
+// guarantees the check-then-set has already completed by the time the
+// second call runs. The real bug was that runNow() used to `await
+// this.load()` -- a genuine event-loop yield -- between the `if
+// (this.running)` check and setting `running = true`, so two calls fired
+// close together could both pass the check before either set the flag.
+// Mirrors the reviewer's standalone repro:
+// Promise.allSettled([service.runNow(), service.runNow()]).
+test('runNow() closes the TOCTOU race: two unsynchronized concurrent calls settle as exactly one fulfilled, one rejected', async () => {
   let resolveBackup: (result: BackupResult) => void = () => {};
   const backupPromise = new Promise<BackupResult>((resolve) => {
     resolveBackup = resolve;
@@ -356,16 +369,28 @@ test('runNow() rejects with a clear conflict error when a backup is already in p
   try {
     await (service as any).ready; // disabled config -> constructor catch-up is a no-op
 
-    const firstRunNow = service.runNow();
-    while (!(service as any).running) {
-      await new Promise((resolve) => setImmediate(resolve));
-    }
+    // Fire both calls synchronously, back-to-back, with no await between
+    // them -- this is what actually exercises the check-then-set window.
+    const settled = Promise.allSettled([service.runNow(), service.runNow()]);
 
-    await assert.rejects(service.runNow(), /already in progress/);
-    assert.deepEqual(calls, [3], 'the conflicting call must not invoke createScheduledBackup a second time');
+    // Give any in-flight load() I/O (the async work that used to sit
+    // between the check and the set) time to complete, so that if the
+    // guard were broken, BOTH calls would have reached
+    // createScheduledBackup() by now. createScheduledBackup() itself is
+    // still blocked on backupPromise, so this doesn't let either runNow()
+    // call finish yet -- it just lets the race play out.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepEqual(calls, [3], 'exactly one call may reach createScheduledBackup(); a second entry means the TOCTOU guard let both through');
 
     resolveBackup({ path: '/tmp/x', fileName: 'scheduled-x.tar.gz', size: 1, timestamp: 'x', components: [], files: [] });
-    await firstRunNow;
+    const results = await settled;
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+    assert.equal(fulfilled.length, 1, 'exactly one of the two concurrent runNow() calls must fulfill');
+    assert.equal(rejected.length, 1, 'exactly one of the two concurrent runNow() calls must reject');
+    assert.match((rejected[0] as PromiseRejectedResult).reason.message, /already in progress/);
+
     assert.equal((service as any).running, false, 'the running flag must be cleared once the in-flight run-now settles');
   } finally {
     restoreCreate();

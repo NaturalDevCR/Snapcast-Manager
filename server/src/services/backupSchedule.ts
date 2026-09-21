@@ -171,9 +171,9 @@ export class BackupScheduleService {
     if (this.running) {
       throw new Error(BACKUP_ALREADY_IN_PROGRESS_MESSAGE);
     }
-    const config = await this.load();
     this.running = true;
     try {
+      const config = await this.load();
       return await backupService.createScheduledBackup(config.retainCount);
     } finally {
       this.running = false;
