@@ -14,12 +14,39 @@ import http from 'http';
 import jwt from 'jsonwebtoken';
 import * as path from 'path';
 import * as os from 'os';
+import { unlinkSync } from 'fs';
 
-// Must run before `./system` is imported below -- routes/system.ts
-// transitively imports ../database (DB_PATH) and ../auth (JWT_SECRET) at
-// module-load time. Same ordering as health.test.ts/diagnostics.test.ts.
+// Must run before `../services/backupSchedule` (imported just below --
+// itself imported transitively by `./system`) is imported -- that module
+// chain reaches services/backup.ts's `import { dbDir } from '../database'`,
+// so importing it any earlier binds ../database's module-level `db` to
+// whatever DB_PATH was set (or unset) at THAT point instead of this test's
+// own temp path. Same ordering as health.test.ts/diagnostics.test.ts.
 process.env.DB_PATH = path.join(os.tmpdir(), `system-backup-schedule-test-${process.pid}-${Date.now()}.db`);
 process.env.JWT_SECRET = 'test-only-fixed-secret-for-system-backup-schedule-test-ts';
+
+import { BackupScheduleService } from '../services/backupSchedule';
+
+// Also must run before `./system` is imported below: routes/system.ts
+// constructs a module-level `export const backupScheduleService = new
+// BackupScheduleService()` singleton at import time. Without this stub,
+// that constructor's checkAndRunIfDue() -> ensureConfig() call would touch
+// a REAL config path -- /etc/snapcast-manager/backup-schedule.json in
+// production (writable when this process runs as root, e.g. on the
+// deployed Pi), or server/config/backup-schedule.json as the local-dev
+// fallback otherwise. This file's 'PUT ... enabled: true' test below drives
+// that same singleton and would persist test values into whichever of
+// those two files was live, poisoning it for the next real run (dev) or
+// overwriting an admin's real schedule (prod). Pointing ensureConfig() at
+// an OS-temp-dir path instead means this file never touches either one.
+// Same technique as services/backupSchedule.test.ts's
+// newServiceWithTempConfig(). Restored in test.after() below.
+const backupScheduleConfigPath = path.join(
+  os.tmpdir(),
+  `system-backup-schedule-test-config-${process.pid}-${Date.now()}.json`,
+);
+const originalEnsureConfig = (BackupScheduleService.prototype as any).ensureConfig;
+(BackupScheduleService.prototype as any).ensureConfig = async () => backupScheduleConfigPath;
 
 import systemRouter, { backupScheduleService } from './system';
 import db from '../database';
@@ -56,6 +83,12 @@ test.before(async () => {
 
 test.after(async () => {
   backupScheduleService.stop();
+  (BackupScheduleService.prototype as any).ensureConfig = originalEnsureConfig;
+  try {
+    unlinkSync(backupScheduleConfigPath);
+  } catch {
+    // never written / already gone -- fine.
+  }
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 

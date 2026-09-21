@@ -33,6 +33,11 @@ const DEFAULT_CONFIG: BackupScheduleConfig = {
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+/** Thrown by runNow() when a backup (scheduled tick or a prior runNow())
+ * is already in flight. Exported so callers (routes/system.ts) can key a
+ * 409 response off the exact message rather than duplicating the string. */
+export const BACKUP_ALREADY_IN_PROGRESS_MESSAGE = 'A backup is already in progress';
+
 /**
  * Computes the next local-time occurrence of `config`'s schedule strictly
  * after `from`. Pure function (no I/O, no `new Date()` inside) so it's
@@ -76,6 +81,16 @@ export class BackupScheduleService {
   // deterministically observe the one-time construction-time catch-up
   // without polling. Same idiom as WatchdogService.ready in watchdog.ts.
   private ready: Promise<void>;
+  // True while a backup (scheduled tick or a manual runNow()) is actually
+  // executing backupService.createScheduledBackup(). Guards against a slow
+  // `tar` (root, full disaster-recovery scope, plausible on a Raspberry
+  // Pi's SD card) outliving the 60s poll interval: without this, the next
+  // tick would re-read a config whose nextRunAt hasn't advanced yet (that
+  // only happens after the in-flight call resolves) and launch a second
+  // concurrent tar against the same paths -- see checkAndRunIfDue() and
+  // runNow() below. Shared by both call sites so a scheduled tick and a
+  // manual "run now" can never overlap each other either.
+  private running = false;
 
   constructor() {
     this.ready = this.checkAndRunIfDue().catch(error => {
@@ -147,10 +162,22 @@ export class BackupScheduleService {
   }
 
   /** Manual "run now" -- creates a scheduled-scope backup immediately,
-   * independent of the schedule (does not read/write lastRunAt/nextRunAt). */
+   * independent of the schedule (does not read/write lastRunAt/nextRunAt).
+   * Rejects with BACKUP_ALREADY_IN_PROGRESS_MESSAGE (routes/system.ts maps
+   * this to a 409) rather than silently no-opping or queuing, since this is
+   * a direct user action with a UI button waiting on a response -- see the
+   * `running` flag's doc comment above. */
   async runNow(): Promise<BackupResult> {
+    if (this.running) {
+      throw new Error(BACKUP_ALREADY_IN_PROGRESS_MESSAGE);
+    }
     const config = await this.load();
-    return backupService.createScheduledBackup(config.retainCount);
+    this.running = true;
+    try {
+      return await backupService.createScheduledBackup(config.retainCount);
+    } finally {
+      this.running = false;
+    }
   }
 
   /**
@@ -192,7 +219,19 @@ export class BackupScheduleService {
 
     if (new Date(config.nextRunAt) > new Date()) return;
 
-    await backupService.createScheduledBackup(config.retainCount);
+    // A previous run (this tick's own catch-up, an earlier tick, or a
+    // concurrent manual runNow()) is still in flight -- skip this tick
+    // rather than stacking a second concurrent backup. nextRunAt hasn't
+    // advanced yet, so the next tick will pick this up once `running`
+    // clears.
+    if (this.running) return;
+
+    this.running = true;
+    try {
+      await backupService.createScheduledBackup(config.retainCount);
+    } finally {
+      this.running = false;
+    }
     config.lastRunAt = new Date().toISOString();
     config.nextRunAt = computeNextRunAt(config, new Date()).toISOString();
     await this.save(config);

@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { systemService } from '../services/system';
 import { configService } from '../services/config';
 import { backupService, resolveBackupPath } from '../services/backup';
-import { BackupScheduleService } from '../services/backupSchedule';
+import { BackupScheduleService, BACKUP_ALREADY_IN_PROGRESS_MESSAGE } from '../services/backupSchedule';
 import { jobService } from '../services/jobs';
 import { authenticateToken } from '../auth';
 import { spawn } from 'child_process';
@@ -243,6 +243,12 @@ router.post('/backup-schedule/run-now', async (_req: Request, res: Response) => 
         const result = await backupScheduleService.runNow();
         res.json(result);
     } catch (error: any) {
+        // Same convention as startJob() above / routes/tools.ts's
+        // duplicate-path check: a conflicting concurrent action gets 409,
+        // everything else falls through to 500.
+        if (error.message === BACKUP_ALREADY_IN_PROGRESS_MESSAGE) {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: error.message });
     }
 });

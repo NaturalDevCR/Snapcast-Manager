@@ -33,6 +33,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { BackupScheduleService, BackupScheduleConfig, computeNextRunAt } from './backupSchedule';
 import * as backupModule from './backup';
+import { BackupResult } from './backup';
 
 function stubModuleFn(mod: any, key: string, impl: (...args: any[]) => any): () => void {
   const original = mod[key];
@@ -293,6 +294,81 @@ test('start()/stop() are idempotent and stop() actually clears the interval', as
     assert.equal((service as any).intervalId, null, 'interval must be cleared after stop()');
     service.stop(); // idempotent
   } finally {
+    restore();
+  }
+});
+
+// ---- In-flight guard: a slow backup must not let the timer (or a manual
+// "run now") stack a second concurrent createScheduledBackup() call. See
+// docs/superpowers/sdd/final-review-fix-report.md finding #3. ----
+
+test('checkAndRunIfDue() skips a tick while a previous run is still in flight, instead of stacking a second concurrent backup', async () => {
+  let resolveBackup: (result: BackupResult) => void = () => {};
+  const backupPromise = new Promise<BackupResult>((resolve) => {
+    resolveBackup = resolve;
+  });
+  const calls: number[] = [];
+  const restoreCreate = stubModuleFn(backupModule.backupService, 'createScheduledBackup', async (retainCount: number) => {
+    calls.push(retainCount);
+    return backupPromise;
+  });
+  const pastIso = new Date(Date.now() - 60_000).toISOString();
+  const { service, restore } = newServiceWithTempConfig({ enabled: true, frequency: 'daily', time: '00:00', retainCount: 3, nextRunAt: pastIso });
+  try {
+    // The constructor's catch-up check kicked off checkAndRunIfDue() already
+    // (it's currently awaiting backupPromise, which we haven't resolved
+    // yet). Wait until that call has actually reached its
+    // `running = true` point before firing a second tick -- otherwise this
+    // test would race two "cold" calls against each other instead of
+    // exercising the real scenario (a live in-flight run, e.g. a slow tar
+    // that outlives the 60s poll interval, still running when the next
+    // tick fires).
+    while (!(service as any).running) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+
+    // Simulate the next setInterval tick landing while the first run is
+    // still in flight.
+    await (service as any).checkAndRunIfDue();
+    assert.deepEqual(calls, [3], 'a tick that lands while a run is in flight must not invoke createScheduledBackup a second time');
+
+    resolveBackup({ path: '/tmp/x', fileName: 'scheduled-x.tar.gz', size: 1, timestamp: 'x', components: [], files: [] });
+    await (service as any).ready;
+    assert.deepEqual(calls, [3], 'still only one call after the in-flight run completes');
+    assert.equal((service as any).running, false, 'the running flag must be cleared once the backup settles');
+  } finally {
+    restoreCreate();
+    restore();
+  }
+});
+
+test('runNow() rejects with a clear conflict error when a backup is already in progress', async () => {
+  let resolveBackup: (result: BackupResult) => void = () => {};
+  const backupPromise = new Promise<BackupResult>((resolve) => {
+    resolveBackup = resolve;
+  });
+  const calls: number[] = [];
+  const restoreCreate = stubModuleFn(backupModule.backupService, 'createScheduledBackup', async (retainCount: number) => {
+    calls.push(retainCount);
+    return backupPromise;
+  });
+  const { service, restore } = newServiceWithTempConfig({ enabled: false, frequency: 'daily', time: '00:00', retainCount: 3 });
+  try {
+    await (service as any).ready; // disabled config -> constructor catch-up is a no-op
+
+    const firstRunNow = service.runNow();
+    while (!(service as any).running) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+
+    await assert.rejects(service.runNow(), /already in progress/);
+    assert.deepEqual(calls, [3], 'the conflicting call must not invoke createScheduledBackup a second time');
+
+    resolveBackup({ path: '/tmp/x', fileName: 'scheduled-x.tar.gz', size: 1, timestamp: 'x', components: [], files: [] });
+    await firstRunNow;
+    assert.equal((service as any).running, false, 'the running flag must be cleared once the in-flight run-now settles');
+  } finally {
+    restoreCreate();
     restore();
   }
 });
