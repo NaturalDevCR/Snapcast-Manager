@@ -172,21 +172,26 @@ export class BackupService {
     components.push('snapmanager-data');
     sources.push(WATCHDOGS_CONFIG_DIR);
     components.push('snapmanager-config');
+    // snapserver's own persistent data directory (server.json -- volumes,
+    // client/group state -- plus its single-slot rotating backup file),
+    // confirmed real via system.ts's own executeDebUpdate()/setup code,
+    // which creates, chowns, and purges /var/lib/snapserver. Moved out of
+    // the snapserver-only branch below: this is STATE, and every backup
+    // (whatever component triggered it) should be able to restore it --
+    // losing zone/group/volume state to a same-day mpd update would be a
+    // silent regression a user would only discover much later.
+    sources.push('/var/lib/snapserver');
+    components.push('snapmanager-data');
     dynamicUnitPatterns.push(/^snapcast-radio-.*\.service$/);
 
-    // ---- snapserver: /etc/snapserver.conf* (already there) plus the
-    // daemon's own persistent data directory (server.json -- volumes,
-    // client/group state) and its single-slot rotating backup file, both
-    // confirmed real via system.ts's own executeDebUpdate()/setup code,
-    // which creates, chowns, and purges /var/lib/snapserver, and
-    // config.ts's SNAPSERVER_CONFIG_BAK. ----
+    // ---- snapserver: /etc/snapserver.conf* only -- /var/lib/snapserver
+    // (state) moved to the cross-cutting block above. ----
     if (component === 'snapserver' || includeAll) {
       sources.push(
         '/etc/snapserver.conf',
         '/etc/snapserver.conf.base',
         '/etc/snapserver.conf.d',
         '/etc/snapserver.conf.bak',
-        '/var/lib/snapserver',
       );
       components.push('snapserver-config');
     }

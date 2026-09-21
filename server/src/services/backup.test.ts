@@ -246,6 +246,18 @@ test('collectSources() includes the cross-cutting snapcast-radio-*.service dynam
   }
 });
 
+test('collectSources() includes /var/lib/snapserver for every component, not just snapserver', async () => {
+  const service = new BackupService();
+  const nonSnapserverComponents: BackupComponent[] = ['mpd', 'mympd', 'shairport-sync', 'snapclient', 'snap-ctrl', 'ffmpeg', 'node'];
+  for (const component of nonSnapserverComponents) {
+    const { sources } = (service as any).collectSources(component);
+    assert.ok(
+      sources.includes('/var/lib/snapserver'),
+      `component '${component}' must include /var/lib/snapserver (snapserver state) in its backup sources`,
+    );
+  }
+});
+
 test("collectSources('snapserver') includes snapserver.conf/.base/.d/.bak and /var/lib/snapserver, and excludes every other component's sources", () => {
   const service = new BackupService();
   const { sources, dynamicUnitPatterns } = (service as any).collectSources('snapserver');
@@ -261,13 +273,14 @@ test("collectSources('snapserver') includes snapserver.conf/.base/.d/.bak and /v
   assert.ok(!dynamicUnitPatterns.some((p: RegExp) => p.source === SNAPCLIENT_MANAGER_PATTERN.source));
 });
 
-test("collectSources('snapclient') includes /etc/snapclient-manager, /etc/default/snapclient, and the snapclient-manager-*.service dynamic pattern -- excludes snapserver/mpd/mympd/shairport-sync sources", () => {
+test("collectSources('snapclient') includes /etc/snapclient-manager, /etc/default/snapclient, and the snapclient-manager-*.service dynamic pattern -- excludes snapserver/mpd/mympd/shairport-sync sources, but DOES include /var/lib/snapserver (cross-cutting state)", () => {
   const service = new BackupService();
   const { sources, dynamicUnitPatterns } = (service as any).collectSources('snapclient');
   assert.ok(sources.includes('/etc/snapclient-manager'));
   assert.ok(sources.includes('/etc/default/snapclient'));
+  assert.ok(sources.includes('/var/lib/snapserver'), 'snapclient must include /var/lib/snapserver (cross-cutting snapserver state)');
   assert.ok(dynamicUnitPatterns.some((p: RegExp) => p.source === SNAPCLIENT_MANAGER_PATTERN.source));
-  for (const p of ['/etc/snapserver.conf', '/var/lib/snapserver', ...MPD_CONF_PATHS, MYMPD_CONFIG_DIR, SHAIRPORT_SYNC_CONF]) {
+  for (const p of ['/etc/snapserver.conf', ...MPD_CONF_PATHS, MYMPD_CONFIG_DIR, SHAIRPORT_SYNC_CONF]) {
     assert.ok(!sources.includes(p), `snapclient sources must NOT include ${p}, got: ${JSON.stringify(sources)}`);
   }
 });
@@ -301,11 +314,11 @@ test("collectSources('shairport-sync') includes /etc/shairport-sync.conf and exc
   }
 });
 
-test("collectSources('ffmpeg') and collectSources('node') get ONLY the cross-cutting sources -- neither ships an app-managed config file this service can identify", () => {
+test("collectSources('ffmpeg') and collectSources('node') get ONLY the cross-cutting sources (including /var/lib/snapserver for state) -- neither ships an app-managed config file this service can identify", () => {
   const service = new BackupService();
   for (const component of ['ffmpeg', 'node'] as BackupComponent[]) {
     const { sources, dynamicUnitPatterns } = (service as any).collectSources(component);
-    assert.deepEqual([...sources].sort(), [dbDir, WATCHDOGS_CONFIG_DIR].sort());
+    assert.deepEqual([...sources].sort(), [dbDir, WATCHDOGS_CONFIG_DIR, '/var/lib/snapserver'].sort());
     assert.equal(dynamicUnitPatterns.length, 1); // just the cross-cutting radio pattern
   }
 });
