@@ -234,31 +234,50 @@ router.get('/check-updates/:pkg', async (req: Request, res: Response) => {
     }
 });
 
+// Pure decision function ("which tar -C targets, given what exists on
+// disk"), pulled out of the route handler so it's unit-testable without a
+// real filesystem or a spawned tar process -- see system.export.test.ts.
+export function buildExportTargets(opts: {
+    dataDirExists: boolean;
+    confFileExists: boolean;
+    snapserverStateExists: boolean;
+}): string[] {
+    const targets: string[] = [];
+    if (opts.dataDirExists) {
+        targets.push('-C', '/opt/snapcast-manager', 'data');
+    }
+    if (opts.confFileExists) {
+        targets.push('-C', '/etc', 'snapserver.conf');
+    }
+    if (opts.snapserverStateExists) {
+        // snapserver's persistent state directory (server.json -- volumes,
+        // client/group state). Same path services/backup.ts's
+        // collectSources() backs up cross-cuttingly (Task 1) -- the manual
+        // export was a second, independent code path that missed it.
+        targets.push('-C', '/var', 'lib/snapserver');
+    }
+    return targets;
+}
+
 router.get('/export', authenticateToken, (req: Request, res: Response) => {
     const backupName = `snapcast-backup-${Date.now()}.tar.gz`;
     res.setHeader('Content-disposition', `attachment; filename="${backupName}"`);
     res.setHeader('Content-type', 'application/gzip');
-    
-    // We want to tar /opt/snapcast-manager/data and /etc/snapserver.conf
-    const dataDir = '/opt/snapcast-manager/data';
-    const confFile = '/etc/snapserver.conf';
-    
-    const targets: string[] = [];
-    if (fs.existsSync(dataDir)) {
-        targets.push('-C', '/opt/snapcast-manager', 'data');
-    }
-    if (fs.existsSync(confFile)) {
-        targets.push('-C', '/etc', 'snapserver.conf');
-    }
+
+    const targets = buildExportTargets({
+        dataDirExists: fs.existsSync('/opt/snapcast-manager/data'),
+        confFileExists: fs.existsSync('/etc/snapserver.conf'),
+        snapserverStateExists: fs.existsSync('/var/lib/snapserver'),
+    });
 
     if (targets.length === 0) {
         return res.status(404).json({ error: 'No backup data found.' });
     }
 
     const tarProcess = spawn('tar', ['-czf', '-', ...targets]);
-    
+
     tarProcess.stdout.pipe(res);
-    
+
     tarProcess.stderr.on('data', (data) => {
         console.error(`Tar stderr: ${data}`);
     });
