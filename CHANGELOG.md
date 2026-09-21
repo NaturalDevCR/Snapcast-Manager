@@ -8,6 +8,19 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.11] - 2026-09-21
+
+### 🐛 Bug Fixes
+
+- *(backup)* Chown backup archives back to the service account after creation
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.10
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to v0.3.11
 ## [0.3.10] - 2026-09-21
 
 ### 🐛 Bug Fixes
