@@ -52,7 +52,7 @@ if [ -f "$SCRIPT_DIR/lib/verify-download.sh" ]; then
 fi
 
 LATEST_RELEASE=$(curl -sL "https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/latest" | grep '"tag_name"' | head -1 | cut -d '"' -f 4)
-VERSION="${LATEST_RELEASE:-v0.2.2}"
+VERSION="${LATEST_RELEASE:-v0.3.9}"
 APP_VERSION="$VERSION"
 
 # Colors for output
