@@ -1,13 +1,21 @@
 import express, { Request, Response } from 'express';
 import { systemService } from '../services/system';
 import { configService } from '../services/config';
-import { backupService } from '../services/backup';
+import { backupService, resolveBackupPath } from '../services/backup';
+import { BackupScheduleService } from '../services/backupSchedule';
 import { jobService } from '../services/jobs';
 import { authenticateToken } from '../auth';
 import { spawn } from 'child_process';
 import fs from 'fs';
 
 const router = express.Router();
+
+// Same convention as routes/watchdog.ts's watchdogService: this router's
+// own instantiation IS the app's one BackupScheduleService instance
+// (services/backupSchedule.ts has no module-level singleton of its own),
+// exported so index.ts's graceful-shutdown handler can call stop() on
+// this SAME instance.
+export const backupScheduleService = new BackupScheduleService();
 
 router.use(authenticateToken);
 
@@ -192,10 +200,12 @@ router.delete('/backups/:name', async (req: Request, res: Response) => {
 
 router.get('/backups/download/:name', (req: Request, res: Response) => {
     const name = req.params.name;
-    if (!/^pre-[a-z\-]+-\d{8}-\d{6}\.tar\.gz$/.test(name)) {
+    let fullPath: string;
+    try {
+        fullPath = resolveBackupPath(name);
+    } catch {
         return res.status(400).json({ error: 'Invalid backup name' });
     }
-    const fullPath = `/var/backups/snapmanager/${name}`;
     if (!fs.existsSync(fullPath)) {
         return res.status(404).json({ error: 'Backup not found' });
     }
@@ -204,6 +214,37 @@ router.get('/backups/download/:name', (req: Request, res: Response) => {
     res.setHeader('Content-type', 'application/gzip');
     res.setHeader('Content-length', String(stat.size));
     fs.createReadStream(fullPath).pipe(res);
+});
+
+router.get('/backup-schedule', async (_req: Request, res: Response) => {
+    try {
+        const config = await backupScheduleService.getConfig();
+        res.json(config);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.put('/backup-schedule', async (req: Request, res: Response) => {
+    const { enabled, frequency, dayOfWeek, time, retainCount } = req.body;
+    if (typeof enabled !== 'boolean' || (frequency !== 'daily' && frequency !== 'weekly')) {
+        return res.status(400).json({ error: 'Invalid enabled/frequency' });
+    }
+    try {
+        const config = await backupScheduleService.updateConfig({ enabled, frequency, dayOfWeek, time, retainCount });
+        res.json(config);
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.post('/backup-schedule/run-now', async (_req: Request, res: Response) => {
+    try {
+        const result = await backupScheduleService.runNow();
+        res.json(result);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 const VALID_PACKAGES = ['snapserver', 'snapclient', 'ffmpeg', 'shairport-sync', 'snap-ctrl', 'node', 'mpd', 'mympd'];

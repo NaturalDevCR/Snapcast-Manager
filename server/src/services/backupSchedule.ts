@@ -81,7 +81,6 @@ export class BackupScheduleService {
     this.ready = this.checkAndRunIfDue().catch(error => {
       console.error('Backup schedule initialization error:', error);
     });
-    this.start();
   }
 
   private async ensureConfig(): Promise<string> {
@@ -143,6 +142,7 @@ export class BackupScheduleService {
       next.nextRunAt = computeNextRunAt(next, new Date()).toISOString();
     }
     await this.save(next);
+    this.applyScheduleState(next);
     return next;
   }
 
@@ -153,8 +153,35 @@ export class BackupScheduleService {
     return backupService.createScheduledBackup(config.retainCount);
   }
 
+  /**
+   * Starts/stops the poll timer based on whether `config` currently calls
+   * for it to be running -- same "decide from a config already in hand,
+   * never a fresh load() of its own" shape as WatchdogService's
+   * applyAutoCleanupState() (services/watchdog.ts), and fixing the same
+   * class of bug that method's own doc comment describes: this service's
+   * constructor used to call start() unconditionally, so every process
+   * that merely imports the module holding its singleton (routes/system.ts,
+   * mirroring routes/watchdog.ts's watchdogService convention) started a
+   * real setInterval(60_000) regardless of whether scheduled backups were
+   * even enabled -- keeping that process's event loop alive forever. That
+   * silently broke `node --test`'s per-file process isolation for any test
+   * file importing routes/system.ts without itself knowing to call
+   * backupScheduleService.stop() (caught via system.export.test.ts hanging
+   * indefinitely after Task 5 wired the singleton in). start()/stop() are
+   * both idempotent, so calling this redundantly (constructor AND every
+   * updateConfig() call) is always safe and cheap.
+   */
+  private applyScheduleState(config: BackupScheduleConfig): void {
+    if (config.enabled) {
+      this.start();
+    } else {
+      this.stop();
+    }
+  }
+
   private async checkAndRunIfDue(): Promise<void> {
     const config = await this.load();
+    this.applyScheduleState(config);
     if (!config.enabled) return;
 
     if (!config.nextRunAt) {

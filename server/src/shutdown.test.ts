@@ -56,6 +56,9 @@ test('gracefulShutdown runs every cleanup step in the documented order, then exi
     stopWatchdog: () => {
       calls.push('watchdog.stop');
     },
+    stopBackupSchedule: () => {
+      calls.push('backupSchedule.stop');
+    },
     closeDb: () => {
       calls.push('db.close');
     },
@@ -69,6 +72,7 @@ test('gracefulShutdown runs every cleanup step in the documented order, then exi
     'sse.close',
     'ws.disconnect',
     'watchdog.stop',
+    'backupSchedule.stop',
     'db.close',
     'exit(0)',
   ]);
@@ -90,6 +94,9 @@ test('gracefulShutdown continues remaining steps and still exits 0 when one step
     stopWatchdog: () => {
       calls.push('watchdog');
     },
+    stopBackupSchedule: () => {
+      calls.push('backupSchedule');
+    },
     closeDb: () => {
       calls.push('db');
     },
@@ -98,7 +105,7 @@ test('gracefulShutdown continues remaining steps and still exits 0 when one step
     logger,
   });
 
-  assert.deepEqual(calls, ['sse', 'ws', 'watchdog', 'db', 'exit(0)']);
+  assert.deepEqual(calls, ['sse', 'ws', 'watchdog', 'backupSchedule', 'db', 'exit(0)']);
   assert.ok(errors.some((e) => e.includes('sse boom')), 'the thrown error must be logged');
 });
 
@@ -118,6 +125,9 @@ test('gracefulShutdown continues remaining steps when an ASYNC step rejects', as
     stopWatchdog: () => {
       calls.push('watchdog');
     },
+    stopBackupSchedule: () => {
+      calls.push('backupSchedule');
+    },
     closeDb: () => {
       calls.push('db');
     },
@@ -126,7 +136,7 @@ test('gracefulShutdown continues remaining steps when an ASYNC step rejects', as
     logger,
   });
 
-  assert.deepEqual(calls, ['sse', 'ws', 'watchdog', 'db', 'exit(0)']);
+  assert.deepEqual(calls, ['sse', 'ws', 'watchdog', 'backupSchedule', 'db', 'exit(0)']);
   assert.ok(errors.some((e) => e.includes('ws boom')));
 });
 
@@ -146,6 +156,9 @@ test('gracefulShutdown force-exits with code 1 if a cleanup step hangs past the 
     },
     stopWatchdog: () => {
       calls.push('watchdog');
+    },
+    stopBackupSchedule: () => {
+      calls.push('backupSchedule');
     },
     closeDb: () => {
       calls.push('db');
@@ -173,6 +186,7 @@ test('gracefulShutdown never force-exits a second time after completing normally
     closeSse: () => {},
     disconnectSnapcastLive: () => {},
     stopWatchdog: () => {},
+    stopBackupSchedule: () => {},
     closeDb: () => {},
     exit: (code: number) => exitCodes.push(code),
     timeoutMs: 30,
@@ -197,6 +211,7 @@ test('gracefulShutdown logs (but tolerates) an error reported via the http.close
     closeSse: () => {},
     disconnectSnapcastLive: () => {},
     stopWatchdog: () => {},
+    stopBackupSchedule: () => {},
     closeDb: () => {},
     exit: (code: number) => exitCodes.push(code),
     timeoutMs: 1000,

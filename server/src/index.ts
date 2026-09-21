@@ -5,7 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import authRouter from './auth';
-import systemRouter from './routes/system';
+import systemRouter, { backupScheduleService } from './routes/system';
 import configRouter from './routes/config';
 import snapshotRouter from './routes/snapshot';
 import snapcastRouter from './routes/snapcast';
@@ -238,6 +238,7 @@ async function start(): Promise<void> {
       closeSse: () => eventsRouter.closeAllConnections(),
       disconnectSnapcastLive: () => snapcastLive.stop(),
       stopWatchdog: () => watchdogService.stopAutoCleanup(),
+      stopBackupSchedule: () => backupScheduleService.stop(),
       closeDb: () => {
         db.close();
       },

@@ -51,6 +51,7 @@ export interface ShutdownDeps {
   closeSse: () => void | Promise<void>;
   disconnectSnapcastLive: () => void | Promise<void>;
   stopWatchdog: () => void | Promise<void>;
+  stopBackupSchedule: () => void | Promise<void>;
   closeDb: () => void | Promise<void>;
   exit: (code: number) => void;
   /** Hard force-exit bound in ms -- 10s in production (see index.ts); tests pass something much shorter so RED/GREEN doesn't require waiting on a real 10s timer. */
@@ -96,6 +97,7 @@ export async function gracefulShutdown(deps: ShutdownDeps): Promise<void> {
   await step('close SSE connections', deps.closeSse);
   await step('disconnect snapcast WebSocket', deps.disconnectSnapcastLive);
   await step('stop watchdog timer', deps.stopWatchdog);
+  await step('stop backup schedule timer', deps.stopBackupSchedule);
   await step('close database', deps.closeDb);
 
   if (settled) return; // the hard timeout already fired and force-exited; nothing left to do

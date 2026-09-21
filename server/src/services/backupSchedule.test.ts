@@ -232,6 +232,56 @@ test('constructor: does nothing when disabled', async () => {
   }
 });
 
+// Regression test for a bug found integrating this service into
+// routes/system.ts (Task 5): the constructor used to call start()
+// unconditionally, so every process that merely imported the module
+// holding the routes/system.ts singleton (mirroring routes/watchdog.ts's
+// watchdogService convention -- the router's own instantiation IS the
+// app's one instance) started a real setInterval(60_000) regardless of
+// whether scheduled backups were even enabled, keeping that process's
+// event loop alive forever. In practice this hung `node --test`'s
+// per-file process isolation for any test file importing routes/system.ts
+// without itself knowing to call backupScheduleService.stop() (caught via
+// system.export.test.ts hanging indefinitely once Task 5 wired the
+// singleton in). Fixed by applyScheduleState(), mirroring
+// WatchdogService.applyAutoCleanupState()'s "decide from a config already
+// in hand" shape.
+test('constructor never leaves the poll timer running when the persisted config is disabled', async () => {
+  const { service, restore } = newServiceWithTempConfig({ enabled: false, frequency: 'daily', time: '00:00', retainCount: 3 });
+  try {
+    await (service as any).ready;
+    assert.equal((service as any).intervalId, null, 'a disabled schedule must not leave a live timer running');
+  } finally {
+    restore();
+  }
+});
+
+test('constructor starts the poll timer when the persisted config is enabled', async () => {
+  const { service, restore } = newServiceWithTempConfig({ enabled: true, frequency: 'daily', time: '23:59', retainCount: 3 });
+  try {
+    await (service as any).ready;
+    assert.ok((service as any).intervalId, 'an enabled schedule must start its timer at construction time');
+  } finally {
+    restore();
+  }
+});
+
+test('updateConfig() starts the timer immediately when enabling, and stops it immediately when disabling', async () => {
+  const { service, restore } = newServiceWithTempConfig(undefined);
+  try {
+    await (service as any).ready;
+    assert.equal((service as any).intervalId, null, 'starts disabled (default config)');
+
+    await service.updateConfig({ enabled: true, frequency: 'daily', time: '23:59', retainCount: 3 });
+    assert.ok((service as any).intervalId, 'enabling via updateConfig() must start the timer without waiting for a restart');
+
+    await service.updateConfig({ enabled: false, frequency: 'daily', time: '23:59', retainCount: 3 });
+    assert.equal((service as any).intervalId, null, 'disabling via updateConfig() must stop the timer immediately');
+  } finally {
+    restore();
+  }
+});
+
 test('start()/stop() are idempotent and stop() actually clears the interval', async () => {
   const { service, restore } = newServiceWithTempConfig(undefined);
   try {
