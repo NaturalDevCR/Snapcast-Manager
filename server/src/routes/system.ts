@@ -213,7 +213,26 @@ router.get('/backups/download/:name', (req: Request, res: Response) => {
     res.setHeader('Content-disposition', `attachment; filename="${name}"`);
     res.setHeader('Content-type', 'application/gzip');
     res.setHeader('Content-length', String(stat.size));
-    fs.createReadStream(fullPath).pipe(res);
+    // An unhandled 'error' on a readable stream (e.g. EACCES if the file's
+    // ownership/permissions don't allow this process to read it, or the
+    // file vanishing between the existsSync() check above and the actual
+    // open) throws asynchronously with no listener -- Node's default
+    // behavior for that is an uncaught exception, which crashes the whole
+    // process, not just this one request. That's a real, observed failure
+    // mode here: it doesn't just fail this download, it drops every other
+    // in-flight connection too (e.g. the SSE stream), until the process
+    // manager restarts it. Handling the error explicitly confines the
+    // failure to this one response.
+    const stream = fs.createReadStream(fullPath);
+    stream.on('error', (err: NodeJS.ErrnoException) => {
+        console.error(`[backups] failed to read ${fullPath} for download:`, err);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to read backup file' });
+        } else {
+            res.destroy(err);
+        }
+    });
+    stream.pipe(res);
 });
 
 router.get('/backup-schedule', async (_req: Request, res: Response) => {
