@@ -175,7 +175,67 @@ async function saveScript() {
 }
 
 // ─── Backups ──────────────────────────────────────────────────────────────────
-interface BackupEntry { name: string; size: number; mtime: string; components: string[]; }
+interface BackupEntry { name: string; size: number; mtime: string; components: string[]; type: 'pre-update' | 'scheduled'; }
+
+interface BackupScheduleConfig {
+  enabled: boolean;
+  frequency: 'daily' | 'weekly';
+  dayOfWeek?: number;
+  time: string;
+  retainCount: number;
+  lastRunAt?: string;
+  nextRunAt?: string;
+}
+
+const schedule = ref<BackupScheduleConfig>({ enabled: false, frequency: 'daily', time: '03:00', retainCount: 7 });
+const scheduleLoading = ref(false);
+const scheduleSaving = ref(false);
+const scheduleRunning = ref(false);
+
+async function loadSchedule() {
+  scheduleLoading.value = true;
+  try {
+    schedule.value = await fetchApi('/system/backup-schedule');
+  } catch (e: any) {
+    uiStore.showToast(t('tools.failedToLoadSchedule') + e.message, 'error');
+  } finally {
+    scheduleLoading.value = false;
+  }
+}
+
+async function saveSchedule() {
+  scheduleSaving.value = true;
+  try {
+    schedule.value = await fetchApi('/system/backup-schedule', {
+      method: 'PUT',
+      body: JSON.stringify({
+        enabled: schedule.value.enabled,
+        frequency: schedule.value.frequency,
+        dayOfWeek: schedule.value.frequency === 'weekly' ? schedule.value.dayOfWeek ?? 0 : undefined,
+        time: schedule.value.time,
+        retainCount: schedule.value.retainCount,
+      }),
+    });
+    uiStore.showToast(t('tools.scheduleSaved'), 'success');
+  } catch (e: any) {
+    uiStore.showToast(t('tools.failedToSaveSchedule') + e.message, 'error');
+  } finally {
+    scheduleSaving.value = false;
+  }
+}
+
+async function runScheduleNow() {
+  scheduleRunning.value = true;
+  try {
+    await fetchApi('/system/backup-schedule/run-now', { method: 'POST' });
+    uiStore.showToast(t('tools.scheduleRunStarted'), 'success', 8000);
+    await loadBackups();
+  } catch (e: any) {
+    uiStore.showToast(t('tools.failedToRunSchedule') + e.message, 'error');
+  } finally {
+    scheduleRunning.value = false;
+  }
+}
 
 const backups = ref<BackupEntry[]>([]);
 const backupsLoading = ref(false);
@@ -273,7 +333,7 @@ function switchTab(tab: Tab) {
   if (tab === 'crontab') loadCrontab();
   if (tab === 'mpd-config') loadMpdConfig();
   if (tab === 'scripts') loadScriptPaths();
-  if (tab === 'backups') loadBackups();
+  if (tab === 'backups') { loadBackups(); loadSchedule(); }
 }
 
 onMounted(() => {
@@ -506,6 +566,66 @@ onMounted(() => {
       <!-- ─── Backups ─────────────────────────────────────────────────── -->
       <div v-if="activeTab === 'backups'" class="space-y-4">
         <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
+          <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center space-x-3">
+            <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">event_repeat</span>
+            <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('tools.scheduledBackups') }}</span>
+          </div>
+          <div class="p-4 space-y-4">
+            <p class="text-[10px] font-mono text-terminal-muted leading-relaxed">
+              {{ t('tools.scheduledBackupsDescription') }}
+            </p>
+            <label class="flex items-center gap-2 text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">
+              <input type="checkbox" v-model="schedule.enabled" class="w-4 h-4" />
+              {{ t('tools.scheduleEnabled') }}
+            </label>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleFrequency') }}</label>
+                <select v-model="schedule.frequency" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white">
+                  <option value="daily">{{ t('tools.scheduleFrequencyDaily') }}</option>
+                  <option value="weekly">{{ t('tools.scheduleFrequencyWeekly') }}</option>
+                </select>
+              </div>
+              <div v-if="schedule.frequency === 'weekly'">
+                <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleDayOfWeek') }}</label>
+                <select v-model.number="schedule.dayOfWeek" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white">
+                  <option :value="0">{{ t('tools.scheduleDaySunday') }}</option>
+                  <option :value="1">{{ t('tools.scheduleDayMonday') }}</option>
+                  <option :value="2">{{ t('tools.scheduleDayTuesday') }}</option>
+                  <option :value="3">{{ t('tools.scheduleDayWednesday') }}</option>
+                  <option :value="4">{{ t('tools.scheduleDayThursday') }}</option>
+                  <option :value="5">{{ t('tools.scheduleDayFriday') }}</option>
+                  <option :value="6">{{ t('tools.scheduleDaySaturday') }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleTime') }}</label>
+                <input type="time" v-model="schedule.time" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleRetainCount') }}</label>
+                <input type="number" min="1" v-model.number="schedule.retainCount" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white" />
+              </div>
+            </div>
+            <p class="text-[10px] font-mono text-terminal-muted">
+              {{ t('tools.scheduleLastRun') }}: {{ schedule.lastRunAt ? formatDate(schedule.lastRunAt) : t('tools.scheduleNeverRun') }}
+              ·
+              {{ t('tools.scheduleNextRun') }}: {{ schedule.nextRunAt ? formatDate(schedule.nextRunAt) : t('tools.scheduleNeverRun') }}
+            </p>
+            <div class="flex items-center gap-2">
+              <button @click="saveSchedule" :disabled="scheduleSaving"
+                class="inline-flex items-center px-3 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 border border-brand-primary/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+                {{ t('tools.scheduleSave') }}
+              </button>
+              <button @click="runScheduleNow" :disabled="scheduleRunning"
+                class="inline-flex items-center px-3 py-1.5 text-xs font-black text-gray-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 border border-black/20 dark:border-white/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+                {{ t('tools.scheduleRunNow') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
           <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
             <div class="flex items-center space-x-3">
               <span class="material-symbols-outlined text-text-muted text-[1.2rem]">settings_backup_restore</span>
@@ -528,7 +648,13 @@ onMounted(() => {
               <div v-for="backup in backups" :key="backup.name"
                 class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 hover:bg-black/5 dark:hover:bg-white/5 transition-all rounded-xl">
                 <div class="min-w-0">
-                  <p class="text-xs font-black text-gray-900 dark:text-white truncate font-mono">{{ backup.name }}</p>
+                  <p class="text-xs font-black text-gray-900 dark:text-white truncate font-mono">
+                    {{ backup.name }}
+                    <span class="ml-2 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest"
+                      :class="backup.type === 'scheduled' ? 'bg-brand-primary/20 text-brand-primary' : 'bg-white/10 text-terminal-muted'">
+                      {{ backup.type === 'scheduled' ? t('tools.backupTypeScheduled') : t('tools.backupTypePreUpdate') }}
+                    </span>
+                  </p>
                   <p class="text-[10px] font-mono text-terminal-muted mt-0.5">
                     {{ formatDate(backup.mtime) }} · {{ formatSize(backup.size) }}
                     <span v-if="backup.components.length"> · {{ backup.components.join(', ') }}</span>
