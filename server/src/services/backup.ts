@@ -22,6 +22,27 @@ import { MPD_CONF_PATHS } from './pipeSources';
 const BACKUP_DIR = '/var/backups/snapmanager';
 const MAX_BACKUPS = 15;
 
+const SCHEDULED_BACKUP_DIR = `${BACKUP_DIR}/scheduled`;
+const MAX_SCHEDULED_BACKUPS_FALLBACK = 7; // only used if a caller ever omits retainCount
+
+const PRE_UPDATE_NAME_RE = /^pre-[a-z\-]+-\d{8}-\d{6}\.tar\.gz$/;
+const SCHEDULED_NAME_RE = /^scheduled-\d{8}-\d{6}\.tar\.gz$/;
+
+/**
+ * Resolves a backup file name to its full path, validating it against
+ * BOTH known naming schemes -- the original `pre-<component>-<ts>.tar.gz`
+ * (lives directly under BACKUP_DIR) and the new
+ * `scheduled-<ts>.tar.gz` (lives under BACKUP_DIR/scheduled). Exported so
+ * routes/system.ts's download route can resolve+validate the same way
+ * restoreBackup()/deleteBackup() do below, instead of duplicating the
+ * regex/path logic a third time.
+ */
+export function resolveBackupPath(name: string): string {
+  if (PRE_UPDATE_NAME_RE.test(name)) return `${BACKUP_DIR}/${name}`;
+  if (SCHEDULED_NAME_RE.test(name)) return `${SCHEDULED_BACKUP_DIR}/${name}`;
+  throw new Error('Invalid backup name format');
+}
+
 // The directory `resolveExistingSources()` scans for dynamically-named
 // managed unit files (`snapclient-manager-*.service`,
 // `snapcast-radio-*.service`) -- see that function's docstring for why
@@ -74,6 +95,7 @@ export interface BackupEntry {
   size: number;
   mtime: string;
   components: string[];
+  type: 'pre-update' | 'scheduled';
 }
 
 export class BackupService {
@@ -103,6 +125,10 @@ export class BackupService {
 
   private async ensureBackupDir(): Promise<void> {
     await this.privileged('mkdir', ['-p', BACKUP_DIR]);
+  }
+
+  private async ensureScheduledBackupDir(): Promise<void> {
+    await this.privileged('mkdir', ['-p', SCHEDULED_BACKUP_DIR]);
   }
 
   private formatTimestamp(): string {
@@ -357,6 +383,80 @@ export class BackupService {
     };
   }
 
+  /**
+   * Full disaster-recovery backup: reuses collectSources('general') -- the
+   * same union-of-everything scope the 'general' BackupComponent already
+   * produces for an unrecognized package -- so a scheduled backup always
+   * covers every managed component's config plus the manager's own
+   * data/config and snapserver's state (Task 1 moved that into the
+   * cross-cutting block collectSources() always includes).
+   *
+   * Stored under its own SCHEDULED_BACKUP_DIR subdirectory with its own
+   * retainCount-based retention (caller-supplied, from
+   * BackupScheduleService's persisted config), independent of
+   * createPreUpdateBackup()'s MAX_BACKUPS=15 pool -- a burst of scheduled
+   * runs can never evict a recent pre-update backup, or vice versa.
+   */
+  async createScheduledBackup(retainCount: number = MAX_SCHEDULED_BACKUPS_FALLBACK): Promise<BackupResult> {
+    await this.ensureScheduledBackupDir();
+
+    const { sources, components, dynamicUnitPatterns } = this.collectSources('general');
+    const existing = await this.resolveExistingSources(sources, dynamicUnitPatterns);
+
+    if (existing.length === 0) {
+      console.warn('[backup] No existing files to back up for scheduled backup; skipping.');
+      return {
+        path: '',
+        fileName: '',
+        size: 0,
+        timestamp: this.formatTimestamp(),
+        components,
+        files: [],
+      };
+    }
+
+    const fileName = `scheduled-${this.formatTimestamp()}.tar.gz`;
+    const fullPath = `${SCHEDULED_BACKUP_DIR}/${fileName}`;
+
+    const archiveArgs: string[] = ['czf', fullPath, '--absolute-names', ...existing];
+    await this.privileged('tar', archiveArgs);
+    await this.privileged('chmod', ['600', fullPath]);
+
+    const stat = await fs.stat(fullPath).catch(() => null);
+    if (!stat) throw new Error(`Backup file ${fullPath} could not be stat'd`);
+
+    await this.cleanupOldScheduledBackups(retainCount);
+
+    console.log(`[backup] Created scheduled backup ${fullPath} (${stat.size} bytes) covering: ${components.join(', ')}`);
+
+    return {
+      path: fullPath,
+      fileName,
+      size: stat.size,
+      timestamp: this.formatTimestamp(),
+      components,
+      files: existing,
+    };
+  }
+
+  /** Same sort-by-filename-then-slice approach as cleanupOldBackups(),
+   * scoped to SCHEDULED_BACKUP_DIR and driven by the caller-supplied
+   * retainCount instead of the fixed MAX_BACKUPS. */
+  private async cleanupOldScheduledBackups(retainCount: number): Promise<void> {
+    try {
+      const files = await fs.readdir(SCHEDULED_BACKUP_DIR);
+      const backups = files.filter(f => SCHEDULED_NAME_RE.test(f)).sort();
+      if (backups.length > retainCount) {
+        const toDelete = backups.slice(0, backups.length - retainCount);
+        for (const f of toDelete) {
+          await this.privileged('rm', ['-f', `${SCHEDULED_BACKUP_DIR}/${f}`]).catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.warn('[backup] Scheduled backup cleanup failed:', err);
+    }
+  }
+
   private async cleanupOldBackups(): Promise<void> {
     try {
       const files = await fs.readdir(BACKUP_DIR);
@@ -375,13 +475,22 @@ export class BackupService {
   }
 
   async listBackups(): Promise<BackupEntry[]> {
-    await this.ensureBackupDir();
+    const [preUpdate, scheduled] = await Promise.all([
+      this.listBackupsIn(BACKUP_DIR, PRE_UPDATE_NAME_RE, 'pre-update'),
+      this.listBackupsIn(SCHEDULED_BACKUP_DIR, SCHEDULED_NAME_RE, 'scheduled'),
+    ]);
+    return [...preUpdate, ...scheduled].sort((a, b) => b.mtime.localeCompare(a.mtime));
+  }
+
+  private async listBackupsIn(dir: string, nameRe: RegExp, type: BackupEntry['type']): Promise<BackupEntry[]> {
+    if (type === 'pre-update') await this.ensureBackupDir();
+    else await this.ensureScheduledBackupDir();
     try {
-      const files = await fs.readdir(BACKUP_DIR);
+      const files = await fs.readdir(dir);
       const result: BackupEntry[] = [];
       for (const f of files) {
-        if (!f.endsWith('.tar.gz')) continue;
-        const fullPath = `${BACKUP_DIR}/${f}`;
+        if (!nameRe.test(f)) continue;
+        const fullPath = `${dir}/${f}`;
         const stat = await fs.stat(fullPath).catch(() => null);
         if (!stat) continue;
         const componentMatch = f.match(/^pre-([a-z\-]+)-/);
@@ -390,9 +499,10 @@ export class BackupService {
           size: stat.size,
           mtime: stat.mtime.toISOString(),
           components: componentMatch ? [componentMatch[1]] : [],
+          type,
         });
       }
-      return result.sort((a, b) => b.mtime.localeCompare(a.mtime));
+      return result;
     } catch {
       return [];
     }
@@ -447,10 +557,7 @@ export class BackupService {
    * approach would not cover.
    */
   async restoreBackup(backupName: string): Promise<string> {
-    if (!/^pre-[a-z\-]+-\d{8}-\d{6}\.tar\.gz$/.test(backupName)) {
-      throw new Error('Invalid backup name format');
-    }
-    const fullPath = `${BACKUP_DIR}/${backupName}`;
+    const fullPath = resolveBackupPath(backupName);
     if (!(await this.pathExists(fullPath))) {
       throw new Error(`Backup ${backupName} not found`);
     }
@@ -482,10 +589,7 @@ export class BackupService {
   }
 
   async deleteBackup(backupName: string): Promise<void> {
-    if (!/^pre-[a-z\-]+-\d{8}-\d{6}\.tar\.gz$/.test(backupName)) {
-      throw new Error('Invalid backup name format');
-    }
-    const fullPath = `${BACKUP_DIR}/${backupName}`;
+    const fullPath = resolveBackupPath(backupName);
     await this.privileged('rm', ['-f', fullPath]);
   }
 }

@@ -38,7 +38,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as execModule from '../platform/exec';
-import { BackupService, BackupComponent } from './backup';
+import { BackupService, BackupComponent, resolveBackupPath } from './backup';
 import fsPromisesDefault from 'fs/promises';
 import { dbDir } from '../database';
 import { WATCHDOGS_CONFIG_DIR } from './watchdog';
@@ -818,5 +818,162 @@ test('cleanupOldBackups() deletes only the oldest backups beyond MAX_BACKUPS=15,
     restoreRun();
     restoreSudo();
     restoreReaddir();
+  }
+});
+
+// ---- resolveBackupPath() / createScheduledBackup() / listBackups() type
+// tagging / restoreBackup() & deleteBackup() accepting scheduled-* names
+// (Task 3 of the scheduled-backups plan) ----
+
+test('resolveBackupPath() resolves a pre-update name under BACKUP_DIR', () => {
+  assert.equal(
+    resolveBackupPath('pre-snapserver-20260101-120000.tar.gz'),
+    `${BACKUP_DIR}/pre-snapserver-20260101-120000.tar.gz`,
+  );
+});
+
+test('resolveBackupPath() resolves a scheduled name under BACKUP_DIR/scheduled', () => {
+  assert.equal(
+    resolveBackupPath('scheduled-20260101-120000.tar.gz'),
+    `${BACKUP_DIR}/scheduled/scheduled-20260101-120000.tar.gz`,
+  );
+});
+
+test('resolveBackupPath() rejects a name matching neither pattern', () => {
+  assert.throws(() => resolveBackupPath('../../etc/passwd'), /Invalid backup name format/);
+  assert.throws(() => resolveBackupPath('scheduled-not-a-timestamp.tar.gz'), /Invalid backup name format/);
+});
+
+// createScheduledBackup() drives collectSources('general') -- the
+// union-of-everything scope -- so unlike a single-component
+// createPreUpdateBackup() test, it isn't worth enumerating every fixed
+// source individually here (that's already covered per-component by the
+// existing createPreUpdateBackup() tests above, and 'general' is proven to
+// be their union by the collectSources() tests near the top of this file).
+// This helper just pretends every fixed source exists so resolveExistingSources()
+// finds a non-empty set and createScheduledBackup() actually reaches tar --
+// same "pretend everything exists" shape as the /^pre-/ tests' `access`
+// stub, minus needing to enumerate which specific paths satisfy the assertion.
+function stubGeneralBackupFs(scheduledDirEntries: string[] = []): () => void {
+  const scheduledDir = `${BACKUP_DIR}/scheduled`;
+  const restores = [
+    stubModuleFn(fsPromisesDefault, 'access', async () => {}), // every fixed source "exists"
+    stubModuleFn(fsPromisesDefault, 'readdir', async (dir: string) => {
+      if (dir === SYSTEMD_DIR) return [];
+      if (dir === scheduledDir) return scheduledDirEntries;
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+    }),
+    stubModuleFn(fsPromisesDefault, 'stat', async () => ({ size: 4096 })),
+  ];
+  return () => restores.forEach(r => r());
+}
+
+test('createScheduledBackup() tars into BACKUP_DIR/scheduled with a scheduled-* name', async () => {
+  const calls: Call[] = [];
+  const restoreRun = stubRun(calls);
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreFs = stubGeneralBackupFs();
+  try {
+    const service = new BackupService();
+    const result = await service.createScheduledBackup(7);
+    assert.match(result.fileName, /^scheduled-\d{8}-\d{6}\.tar\.gz$/);
+    assert.equal(result.path, `${BACKUP_DIR}/scheduled/${result.fileName}`);
+    const tarCall = calls.find(c => c.bin === 'tar');
+    assert.ok(tarCall, 'tar must be invoked');
+    assert.ok(tarCall!.args.includes(result.path), 'tar must archive into the scheduled subdirectory');
+  } finally {
+    restoreFs();
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('createScheduledBackup() prunes only within the scheduled subdirectory, honoring retainCount', async () => {
+  const scheduledDir = `${BACKUP_DIR}/scheduled`;
+  const calls: Call[] = [];
+  const restoreRun = stubRun(calls);
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreFs = stubGeneralBackupFs([
+    'scheduled-20260101-000000.tar.gz',
+    'scheduled-20260102-000000.tar.gz',
+    'scheduled-20260103-000000.tar.gz',
+  ]);
+  try {
+    const service = new BackupService();
+    await service.createScheduledBackup(2); // retain 2 of the 3 pre-existing + the new one
+    const rmCalls = calls.filter(c => c.bin === 'rm');
+    assert.ok(
+      rmCalls.some(c => c.args.includes(`${scheduledDir}/scheduled-20260101-000000.tar.gz`)),
+      'the oldest scheduled backup beyond retainCount must be removed',
+    );
+    assert.ok(
+      !rmCalls.some(c => c.args.some(a => a.startsWith(`${BACKUP_DIR}/pre-`))),
+      'pruning must never touch the pre-update pool',
+    );
+  } finally {
+    restoreFs();
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('listBackups() tags entries with their type and reads both pools', async () => {
+  const restoreReaddir = stubModuleFn(fsPromisesDefault, 'readdir', async (dir: string) => {
+    if (dir === BACKUP_DIR) return ['pre-snapserver-20260101-120000.tar.gz'];
+    if (dir === `${BACKUP_DIR}/scheduled`) return ['scheduled-20260102-090000.tar.gz'];
+    throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+  });
+  const restoreStat = stubModuleFn(fsPromisesDefault, 'stat', async () => ({
+    size: 42,
+    mtime: new Date('2026-01-01T00:00:00.000Z'),
+  }));
+  const restoreRun = stubRun([]);
+  const restoreSudo = stubNeedsSudo(false);
+  try {
+    const service = new BackupService();
+    const entries = await service.listBackups();
+    const preUpdate = entries.find(e => e.name === 'pre-snapserver-20260101-120000.tar.gz');
+    const scheduled = entries.find(e => e.name === 'scheduled-20260102-090000.tar.gz');
+    assert.equal(preUpdate?.type, 'pre-update');
+    assert.equal(scheduled?.type, 'scheduled');
+  } finally {
+    restoreReaddir();
+    restoreStat();
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('deleteBackup() accepts a scheduled-* name and resolves it under the scheduled subdirectory', async () => {
+  const calls: Call[] = [];
+  const restoreRun = stubRun(calls);
+  const restoreSudo = stubNeedsSudo(false);
+  try {
+    const service = new BackupService();
+    await service.deleteBackup('scheduled-20260101-120000.tar.gz');
+    const rmCall = calls.find(c => c.bin === 'rm');
+    assert.ok(rmCall!.args.includes(`${BACKUP_DIR}/scheduled/scheduled-20260101-120000.tar.gz`));
+  } finally {
+    restoreRun();
+    restoreSudo();
+  }
+});
+
+test('restoreBackup() rejects a scheduled-* name whose backup file does not exist, via the same resolveBackupPath() path resolution', async () => {
+  const restoreRun = stubRun([]);
+  const restoreSudo = stubNeedsSudo(false);
+  const restoreAccess = stubModuleFn(fsPromisesDefault, 'access', async () => {
+    throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); // "not found" -- proves it looked in the RIGHT (scheduled) path and found nothing, not that it looked in the wrong path and got lucky
+  });
+  try {
+    const service = new BackupService();
+    await assert.rejects(
+      service.restoreBackup('scheduled-20260101-120000.tar.gz'),
+      /scheduled-20260101-120000\.tar\.gz not found/,
+    );
+  } finally {
+    restoreAccess();
+    restoreRun();
+    restoreSudo();
   }
 });
