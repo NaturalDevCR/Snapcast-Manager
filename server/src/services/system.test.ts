@@ -54,6 +54,7 @@ import * as systemdModule from '../platform/systemd';
 import * as snapclientInstancesModule from './snapclientInstances';
 import * as jobsModule from './jobs';
 import * as configModule from './config';
+import * as channels from './snapcastChannels';
 import { SystemService, selectSnapCtrlDownloadUrl } from './system';
 
 type RunFn = typeof execModule.run;
@@ -2854,7 +2855,6 @@ test('installPackage() generic apt branch (ffmpeg) performs no post-install serv
 });
 
 test('beta installation pins a release and preserves configuration', async () => {
-  const channels = require('./snapcastChannels');
   const tag = 'v0.35.0-naturaldevcr.beta.1';
   const asset = { name: 'snapserver_0.35.0~naturaldevcr.beta.1-1_arm64_bookworm.deb', size: 123, digest: `sha256:${'a'.repeat(64)}`, browser_download_url: `https://github.com/NaturalDevCR/snapcast/releases/download/${tag}/snapserver.deb` };
   const restorePrefs = stubModuleFn(channels, 'readChannels', async () => ({ snapserver: { channel: 'beta', tag } }));
@@ -2870,7 +2870,6 @@ test('beta installation pins a release and preserves configuration', async () =>
 });
 
 test('an incompatible beta cannot fall back to a different distro or official installer', async () => {
-  const channels = require('./snapcastChannels');
   const tag = 'v0.35.0-naturaldevcr.beta.1';
   const restorePrefs = stubModuleFn(channels, 'readChannels', async () => ({ snapserver: { channel: 'beta' } }));
   const restoreReleases = stubModuleFn(channels, 'fetchBetaReleases', async () => [{ tag_name: tag, assets: [] }]);
