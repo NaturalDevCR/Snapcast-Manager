@@ -17,7 +17,15 @@ async function setup(channel = 'official', releases: any[] = []) {
     if (url.includes('snapcast-releases')) return { releases };
     return {};
   });
-  const wrapper = mount(SnapcastChannelPicker, { props: { pkg: 'snapclient' }, global: { plugins: [pinia, createI18n({ legacy: false, locale: 'en', messages: { en: { common: enCommon } } })] } });
+  const wrapper = mount(SnapcastChannelPicker, {
+    props: { pkg: 'snapclient' },
+    global: {
+      plugins: [
+        pinia,
+        createI18n({ legacy: false, locale: 'en', messages: { en: { common: enCommon } } }),
+      ],
+    },
+  });
   await flushPromises();
   return { wrapper, system: useSystemStore() };
 }
@@ -26,14 +34,19 @@ describe('Snapcast installation channels', () => {
   it('defaults to official without querying beta releases', async () => {
     const { wrapper } = await setup();
     expect(wrapper.find('select').element.value).toBe('official');
-    expect(vi.mocked(fetchApi).mock.calls.some(([url]) => url.includes('snapcast-releases'))).toBe(false);
+    expect(vi.mocked(fetchApi).mock.calls.some(([url]) => url.includes('snapcast-releases'))).toBe(
+      false,
+    );
   });
   it('shows release notes and pins a selected beta', async () => {
     const { wrapper } = await setup('beta', [{ tag, name: 'Beta 1', notes: 'ALSA recovery' }]);
     expect(wrapper.text()).toContain('ALSA recovery');
     await wrapper.findAll('select')[1]!.setValue(tag);
     await flushPromises();
-    expect(fetchApi).toHaveBeenCalledWith('/system/snapcast-channels/snapclient', expect.objectContaining({ body: JSON.stringify({ channel: 'beta', tag }) }));
+    expect(fetchApi).toHaveBeenCalledWith(
+      '/system/snapcast-channels/snapclient',
+      expect.objectContaining({ body: JSON.stringify({ channel: 'beta', tag }) }),
+    );
   });
   it('switches to official and installs without clearing configuration', async () => {
     const { wrapper, system } = await setup('beta', [{ tag, notes: 'ALSA recovery' }]);
