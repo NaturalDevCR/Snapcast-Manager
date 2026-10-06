@@ -45,6 +45,13 @@ describe('Snapcast installation channels', () => {
     await flushPromises();
     expect(update).toHaveBeenCalledWith('snapclient', false);
   });
+  it('installs a beta on a new device through the same configuration-preserving path', async () => {
+    const { wrapper, system } = await setup('beta', [{ tag, notes: 'ALSA recovery' }]);
+    const update = vi.spyOn(system, 'updatePackage').mockResolvedValue();
+    await wrapper.find('button').trigger('click');
+    await flushPromises();
+    expect(update).toHaveBeenCalledWith('snapclient', false);
+  });
   it('does not offer installation when no compatible beta exists', async () => {
     const { wrapper } = await setup('beta');
     expect(wrapper.text()).toContain('No beta packages available');

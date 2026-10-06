@@ -46,8 +46,7 @@ async function install() {
   try {
     await save();
     // Always preserve configuration, including when returning to official.
-    if (system.installedPackages[props.pkg]) await system.updatePackage(props.pkg, false);
-    else await system.installPackage(props.pkg);
+    await system.updatePackage(props.pkg, false);
     installedVersion.value = (await fetchApi('/system/snapcast-channels')).installed?.[props.pkg] || '';
   } catch (err: any) { error.value = err.message; }
   finally { busy.value = false; }
