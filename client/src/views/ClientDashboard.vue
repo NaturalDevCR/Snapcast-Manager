@@ -6,6 +6,7 @@ import { useUIStore } from '../stores/ui';
 import { useSnapclientInstancesStore, type SnapclientInstance, type AlsaControl } from '../stores/snapclientInstances';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
+import SnapcastChannelPicker from '../components/SnapcastChannelPicker.vue';
 import ConfirmDestructive from '../components/ui/ConfirmDestructive.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import Button from '../components/ui/Button.vue';
@@ -235,6 +236,7 @@ onMounted(async () => {
         <Card :title="t('clientDashboard.snapclient')">
           <template #icon><span class="material-symbols-outlined">speaker</span></template>
           <div class="space-y-4">
+            <SnapcastChannelPicker pkg="snapclient" />
             <div class="flex items-center justify-between">
               <span class="text-sm font-semibold text-text-muted">{{ t('clientDashboard.installed') }}</span>
               <span :class="systemStore.installedPackages.snapclient ? 'text-[#00ff9d] drop-shadow-[0_0_5px_rgba(0,255,157,0.5)]' : 'text-[#ff3b30] drop-shadow-[0_0_5px_rgba(255,59,48,0.5)]'" class="text-sm font-black">

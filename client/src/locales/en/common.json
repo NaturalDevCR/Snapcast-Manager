@@ -3,5 +3,16 @@
   "cancel": "Cancel",
   "delete": "Delete",
   "close": "Close",
-  "loading": "Loading…"
+  "loading": "Loading…",
+  "snapcastChannel": "Installation channel",
+  "snapcastOfficial": "Official Snapcast",
+  "snapcastBeta": "NaturalDevCR beta",
+  "snapcastVersion": "Version",
+  "snapcastLatestBeta": "Latest beta",
+  "snapcastNoBeta": "No beta packages available for this device.",
+  "snapcastChanges": "Changes in this version",
+  "snapcastKeepConfig": "Install or switch versions while keeping your configuration.",
+  "snapcastInstallBeta": "Install beta",
+  "snapcastInstallOfficial": "Install official version",
+  "snapcastInstalledVersion": "Installed package"
 }

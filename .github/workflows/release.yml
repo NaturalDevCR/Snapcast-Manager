@@ -132,6 +132,7 @@ jobs:
           OUTPUT: CHANGELOG.md
 
       - name: Commit CHANGELOG.md
+        if: "!contains(github.ref_name, '-')"
         run: |
           # Regenerates CHANGELOG.md from this release's full conventional-
           # commit history (Task 75, requirement 2) and commits it back to
@@ -159,4 +160,5 @@ jobs:
           files: |
             snapcast-manager-release.zip
             snapcast-manager-release.zip.sha256
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true

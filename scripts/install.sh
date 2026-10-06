@@ -51,8 +51,16 @@ if [ -f "$SCRIPT_DIR/lib/verify-download.sh" ]; then
     source "$SCRIPT_DIR/lib/verify-download.sh"
 fi
 
-LATEST_RELEASE=$(curl -sL "https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/latest" | grep '"tag_name"' | head -1 | cut -d '"' -f 4)
-VERSION="${LATEST_RELEASE:-v0.3.11}"
+if [ -n "${SNAPCAST_MANAGER_VERSION:-}" ]; then
+    if [[ ! "$SNAPCAST_MANAGER_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+        echo "Invalid SNAPCAST_MANAGER_VERSION" >&2
+        exit 1
+    fi
+    VERSION="$SNAPCAST_MANAGER_VERSION"
+else
+    LATEST_RELEASE=$(curl -sL "https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/latest" | grep '"tag_name"' | head -1 | cut -d '"' -f 4)
+    VERSION="${LATEST_RELEASE:-v0.3.11}"
+fi
 APP_VERSION="$VERSION"
 
 # Colors for output

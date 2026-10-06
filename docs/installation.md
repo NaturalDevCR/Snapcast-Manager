@@ -300,3 +300,26 @@ you're upgrading from an older release and those still concern you.
   systemd step, `journalctl -u snapmanager -n 50 --no-pager`, which the
   installer runs automatically on a failed restart) is the primary
   diagnostic tool alongside it.
+
+## Snapcast beta packages
+
+The Snapserver and Snapclient package cards include an **Installation channel**
+selector. **Official Snapcast** is the default. **NaturalDevCR beta** lists
+published prereleases from `NaturalDevCR/snapcast` that have a package matching
+this device's Debian codename and architecture.
+
+Choose **Latest beta** to follow the newest compatible beta, or choose a specific
+version to keep it pinned. Open **Changes in this version** to see its release
+notes, then click **Install beta**. The choice is saved separately for Snapserver
+and Snapclient. Existing update buttons also use the saved channel and version.
+
+To return to upstream, choose **Official Snapcast** and click **Install official
+version**. This uses a package install rather than a clean reinstall, preserving
+configuration. Active managed Snapclient instances restart after installation to
+use the installed binary; stopped instances stay stopped.
+
+Beta packages currently support Debian/Raspberry Pi OS Bookworm and Trixie on
+amd64, arm64 and armhf. Incompatible packages are not offered. Downloads are
+checked against GitHub's asset size and SHA-256 digest before installation.
+Channel settings live in `data/snapcast-channels.json` alongside the Manager's
+persistent data. `SNAPCAST_CHANNELS_PATH` overrides that location.
