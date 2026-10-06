@@ -1,7 +1,7 @@
 {
   "name": "snapcast-manager",
   "private": true,
-  "version": "0.3.11",
+  "version": "0.3.12-beta.1",
   "license": "MIT",
   "scripts": {
     "bump:patch": "bash scripts/bump.sh patch",
