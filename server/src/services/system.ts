@@ -1,3 +1,4 @@
+import { readChannels, fetchBetaReleases, selectBetaAsset, SnapcastPackage } from './snapcastChannels';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -601,7 +602,58 @@ export class SystemService {
     return 'bookworm';
   }
 
+  async getSnapcastPackageVersion(pkg: SnapcastPackage): Promise<string> {
+    try {
+      const { stdout } = await run('dpkg-query', ['-W', '-f=${Version}', pkg]);
+      return stdout.trim() || 'unknown';
+    } catch { return 'unknown'; }
+  }
+
+  async getSnapcastReleases(pkg: SnapcastPackage) {
+    const { stdout } = await run('dpkg', ['--print-architecture']);
+    const arch = stdout.trim();
+    const distro = await this.getDistroCodename();
+    const releases = await fetchBetaReleases();
+    return releases.flatMap(release => {
+      try {
+        selectBetaAsset(release, pkg, arch, distro);
+        return [{ tag: release.tag_name, name: release.name, notes: release.body || '', url: release.html_url }];
+      } catch { return []; }
+    });
+  }
+
+  private async getSnapcastRelease(pkg: SnapcastPackage): Promise<any> {
+    const selection = (await readChannels())[pkg];
+    if (selection.channel === 'official') return this.getLatestGitHubRelease('badaix', 'snapcast');
+    const releases = await fetchBetaReleases();
+    let release;
+    if (selection.tag) release = releases.find(r => r.tag_name === selection.tag);
+    else {
+      const { stdout } = await run('dpkg', ['--print-architecture']);
+      const distro = await this.getDistroCodename();
+      release = releases.find(r => {
+        try { selectBetaAsset(r, pkg, stdout.trim(), distro); return true; }
+        catch { return false; }
+      });
+    }
+    if (!release) throw new Error('No published beta release available for the selected version');
+    return release;
+  }
+
+  private async installSelectedBeta(pkg: SnapcastPackage, clean: boolean): Promise<string | null> {
+    if ((await readChannels())[pkg].channel !== 'beta') return null;
+    const release = await this.getSnapcastRelease(pkg);
+    const { stdout } = await run('dpkg', ['--print-architecture']);
+    const asset = selectBetaAsset(release, pkg, stdout.trim(), await this.getDistroCodename());
+    jobService.log(`Installing ${pkg} beta ${release.tag_name} from NaturalDevCR/snapcast`);
+    const result = await this.executeDebUpdate(asset.browser_download_url, asset.name, clean, pkg, asset.size, asset.digest);
+    if (pkg === 'snapclient') await this.postSnapclientInstall();
+    return result;
+  }
+
   private async updateSnapserverFromGitHub(clean: boolean = false): Promise<string> {
+    const beta = await this.installSelectedBeta('snapserver', clean);
+    if (beta !== null) return beta;
     const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
     const { stdout: arch } = await run('dpkg', ['--print-architecture']);
     const archTrimmed = arch.trim();
@@ -633,6 +685,8 @@ export class SystemService {
   }
 
   private async updateSnapclientFromGitHub(clean: boolean = false): Promise<string> {
+    const beta = await this.installSelectedBeta('snapclient', clean);
+    if (beta !== null) return beta;
     const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
     const { stdout: arch } = await run('dpkg', ['--print-architecture']);
     const archTrimmed = arch.trim();
@@ -669,6 +723,12 @@ export class SystemService {
     await systemdControl('snapclient.service', 'disable').catch(() => {});
     // Disable the default package service; we manage per-instance services ourselves
     await snapclientInstanceService.postInstallSetup();
+    for (const instance of await snapclientInstanceService.listInstances()) {
+      if (instance.status === 'active') {
+        jobService.log(`Restarting snapclient instance ${instance.name} with the installed version...`);
+        await snapclientInstanceService.controlInstance(instance.id, 'restart');
+      }
+    }
   }
 
   /**
@@ -1050,7 +1110,7 @@ export class SystemService {
       }
 
       if (pkg === 'snapserver' || pkg === 'snapclient') {
-        const release = await this.getLatestGitHubRelease('badaix', 'snapcast');
+        const release = await this.getSnapcastRelease(pkg);
         return release.tag_name;
       }
 

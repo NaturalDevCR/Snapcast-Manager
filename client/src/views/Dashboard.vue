@@ -11,6 +11,7 @@ import { useEventSource } from '../composables/useEventSource';
 import { sseStatusBadge } from '../utils/sseStatus';
 import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
+import SnapcastChannelPicker from '../components/SnapcastChannelPicker.vue';
 import Badge from '../components/ui/Badge.vue';
 import ConfirmDestructive from '../components/ui/ConfirmDestructive.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
@@ -444,6 +445,7 @@ const openMympd = () => {
         <template #icon>
             <span class="material-symbols-outlined">router</span>
         </template>
+        <SnapcastChannelPicker pkg="snapserver" class="mb-4" />
         <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.snapserverInstalledLabel') }}</span>

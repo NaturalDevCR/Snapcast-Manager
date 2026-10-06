@@ -3,5 +3,16 @@
   "cancel": "Cancelar",
   "delete": "Eliminar",
   "close": "Cerrar",
-  "loading": "Cargando…"
+  "loading": "Cargando…",
+  "snapcastChannel": "Canal de instalación",
+  "snapcastOfficial": "Snapcast oficial",
+  "snapcastBeta": "Beta de NaturalDevCR",
+  "snapcastVersion": "Versión",
+  "snapcastLatestBeta": "Última beta",
+  "snapcastNoBeta": "No hay paquetes beta disponibles para este equipo.",
+  "snapcastChanges": "Cambios de esta versión",
+  "snapcastKeepConfig": "Instala o cambia de versión conservando tu configuración.",
+  "snapcastInstallBeta": "Instalar beta",
+  "snapcastInstallOfficial": "Instalar versión oficial",
+  "snapcastInstalledVersion": "Paquete instalado"
 }

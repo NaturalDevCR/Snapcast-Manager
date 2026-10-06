@@ -1,3 +1,4 @@
+import { readChannels, saveChannel, validateSelection } from '../services/snapcastChannels';
 import express, { Request, Response } from 'express';
 import { systemService } from '../services/system';
 import { configService } from '../services/config';
@@ -28,6 +29,37 @@ function startJob(res: Response, label: string, task: () => Promise<string>) {
         res.status(409).json({ error: error.message });
     }
 }
+
+router.get('/snapcast-channels', async (_req: Request, res: Response) => {
+    try {
+        const [channels, snapserver, snapclient] = await Promise.all([
+            readChannels(), systemService.getSnapcastPackageVersion('snapserver'), systemService.getSnapcastPackageVersion('snapclient'),
+        ]);
+        res.json({ ...channels, installed: { snapserver, snapclient } });
+    }
+    catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+router.get('/snapcast-releases/:pkg', async (req: Request, res: Response) => {
+    const pkg = req.params.pkg;
+    if (pkg !== 'snapserver' && pkg !== 'snapclient') return res.status(400).json({ error: 'Invalid package' });
+    try { res.json({ releases: await systemService.getSnapcastReleases(pkg) }); }
+    catch (error: any) { res.status(502).json({ error: error.message }); }
+});
+
+router.post('/snapcast-channels/:pkg', async (req: Request, res: Response) => {
+    const pkg = req.params.pkg;
+    if (pkg !== 'snapserver' && pkg !== 'snapclient') return res.status(400).json({ error: 'Invalid package' });
+    if (jobService.getCurrent()) return res.status(409).json({ error: 'Wait for the current job before changing channels' });
+    let selection;
+    try { selection = validateSelection(req.body); }
+    catch (error: any) { return res.status(400).json({ error: error.message }); }
+    try {
+        await saveChannel(pkg, selection);
+        systemService.invalidatePackageCache();
+        res.json(selection);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
 
 router.get('/dashboard', async (req: Request, res: Response) => {
     try {

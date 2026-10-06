@@ -39,6 +39,7 @@ import * as os from 'os';
 // own `import fs from 'fs'` reads from at call time.
 import fsDefault from 'fs';
 import { EventEmitter } from 'events';
+import { Readable } from 'stream';
 
 process.env.DB_PATH = path.join(os.tmpdir(), `system-download-test-${process.pid}-${Date.now()}.db`);
 process.env.JWT_SECRET = 'test-only-fixed-secret-for-system-download-test-ts';
@@ -113,7 +114,6 @@ test('GET /backups/download/:name streams a real, readable file with a 200', asy
   const restoreExists = stubModuleFn(fsDefault, 'existsSync', () => true);
   const restoreStat = stubModuleFn(fsDefault, 'statSync', () => ({ size: content.length }));
   const restoreCreateReadStream = stubModuleFn(fsDefault, 'createReadStream', () => {
-    const { Readable } = require('stream');
     return Readable.from([content]);
   });
   try {

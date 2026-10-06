@@ -54,6 +54,7 @@ import * as systemdModule from '../platform/systemd';
 import * as snapclientInstancesModule from './snapclientInstances';
 import * as jobsModule from './jobs';
 import * as configModule from './config';
+import * as channels from './snapcastChannels';
 import { SystemService, selectSnapCtrlDownloadUrl } from './system';
 
 type RunFn = typeof execModule.run;
@@ -2851,4 +2852,33 @@ test('installPackage() generic apt branch (ffmpeg) performs no post-install serv
     restoreRestoreBackup();
     restoreIsActive();
   }
+});
+
+test('beta installation pins a release and preserves configuration', async () => {
+  const tag = 'v0.35.0-naturaldevcr.beta.1';
+  const asset = { name: 'snapserver_0.35.0~naturaldevcr.beta.1-1_arm64_bookworm.deb', size: 123, digest: `sha256:${'a'.repeat(64)}`, browser_download_url: `https://github.com/NaturalDevCR/snapcast/releases/download/${tag}/snapserver.deb` };
+  const restorePrefs = stubModuleFn(channels, 'readChannels', async () => ({ snapserver: { channel: 'beta', tag } }));
+  const restoreReleases = stubModuleFn(channels, 'fetchBetaReleases', async () => [{ tag_name: tag, assets: [asset] }]);
+  const restoreRun = stubRun(async (bin: string) => ({ stdout: bin === 'dpkg' ? 'arm64' : 'bookworm', stderr: '' }));
+  const service = freshService();
+  const calls: any[] = [];
+  service.executeDebUpdate = async (...args: any[]) => { calls.push(args); return 'ok'; };
+  try {
+    assert.equal(await service.updateSnapserverFromGitHub(false), 'ok');
+    assert.deepEqual(calls, [[asset.browser_download_url, asset.name, false, 'snapserver', asset.size, asset.digest]]);
+  } finally { restorePrefs(); restoreReleases(); restoreRun(); }
+});
+
+test('an incompatible beta cannot fall back to a different distro or official installer', async () => {
+  const tag = 'v0.35.0-naturaldevcr.beta.1';
+  const restorePrefs = stubModuleFn(channels, 'readChannels', async () => ({ snapserver: { channel: 'beta' } }));
+  const restoreReleases = stubModuleFn(channels, 'fetchBetaReleases', async () => [{ tag_name: tag, assets: [] }]);
+  const restoreRun = stubRun(async (bin: string) => ({ stdout: bin === 'dpkg' ? 'arm64' : 'bookworm', stderr: '' }));
+  const service = freshService();
+  let installed = false;
+  service.executeDebUpdate = async () => { installed = true; };
+  try {
+    await assert.rejects(service.updateSnapserverFromGitHub(false), /No.*beta/);
+    assert.equal(installed, false);
+  } finally { restorePrefs(); restoreReleases(); restoreRun(); }
 });
