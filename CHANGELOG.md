@@ -8,6 +8,38 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.3.13] - 2026-10-07
+
+### 🐛 Bug Fixes
+
+- *(sudoers)* Grant /usr/bin/ss so watchdog connection kills stop prompting for a password
+- *(release)* Sync install.sh fallback version when the VERSION line is indented
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to v0.3.13
+## [0.3.12] - 2026-10-06
+
+### 🚀 Features
+
+- Add Snapcast beta installation channels
+
+### 🐛 Bug Fixes
+
+- Use package install path for channel changes
+- *(test)* Use imports accepted by the lint gate
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.11
+
+### 🎨 Styling
+
+- Format installation channel components
+
+### ⚙️ Miscellaneous Tasks
+
+- Release manager v0.3.12
 ## [0.3.11] - 2026-09-21
 
 ### 🐛 Bug Fixes
