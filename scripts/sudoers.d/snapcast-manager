@@ -172,4 +172,12 @@ snapmanager ALL=(root) NOPASSWD: /usr/bin/journalctl -u * -n * --no-pager
 # --checkpoint-action=exec=...". This is an accepted, disclosed limitation
 # of this design, exactly like the apt-get/dpkg and make gaps above -- not
 # fixed further in this pass. See SECURITY.md's "Privilege model" section.
-snapmanager ALL=(root) NOPASSWD: /usr/bin/apt-get, /usr/bin/dpkg, /usr/bin/wget, /usr/bin/mkdir, /usr/bin/chmod, /usr/bin/chown, /usr/bin/rm, /usr/bin/cp, /usr/bin/mv, /usr/bin/gpg, /usr/sbin/useradd, /usr/sbin/groupadd, /usr/sbin/usermod, /usr/bin/make, /usr/bin/tar, /bin/bash /opt/snapcast-manager/server/scripts/install-shairport-sync.sh, /usr/bin/systemd-analyze verify *, /usr/sbin/ss -K *, /usr/sbin/alsactl store
+#
+# Fix-pass note (`ss` path): the grant used to name ONLY `/usr/sbin/ss`, but
+# Debian/Ubuntu's iproute2 ships `ss` as `/bin/ss` (== `/usr/bin/ss` under
+# usrmerge), and sudo matches the PATH-resolved binary, not the bare name.
+# Every watchdog `killConnection()` (`sudo ss -K dst <ip> dport = <port>`)
+# therefore failed with "a password is required" and sudo mailed root on
+# each attempt. Both paths are listed so distros that put it in /usr/sbin
+# (Fedora/RHEL) keep working; a non-existent path in sudoers is harmless.
+snapmanager ALL=(root) NOPASSWD: /usr/bin/apt-get, /usr/bin/dpkg, /usr/bin/wget, /usr/bin/mkdir, /usr/bin/chmod, /usr/bin/chown, /usr/bin/rm, /usr/bin/cp, /usr/bin/mv, /usr/bin/gpg, /usr/sbin/useradd, /usr/sbin/groupadd, /usr/sbin/usermod, /usr/bin/make, /usr/bin/tar, /bin/bash /opt/snapcast-manager/server/scripts/install-shairport-sync.sh, /usr/bin/systemd-analyze verify *, /usr/bin/ss -K *, /usr/sbin/ss -K *, /usr/sbin/alsactl store
