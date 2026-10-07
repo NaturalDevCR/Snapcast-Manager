@@ -35,11 +35,16 @@ console.log(`  ✓ server/package.json → ${version}`);
 
 // ── scripts/install.sh ──────────────────────────────────────────────────────
 let sh = fs.readFileSync(installSh, 'utf8');
-sh = sh.replace(
-  /^VERSION="(?:v[0-9]+\.[0-9]+\.[0-9]+|\$\{LATEST_RELEASE:-v[0-9]+\.[0-9]+\.[0-9]+\})"$/m,
-  line => line.includes('LATEST_RELEASE')
-    ? `VERSION="\${LATEST_RELEASE:-v${version}}"`
-    : `VERSION="v${version}"`
+// Leading whitespace allowed: the fallback line lives inside an if/else
+// (SNAPCAST_MANAGER_VERSION override), so it is indented.
+const versionLine = /^([ \t]*)VERSION="(?:v[0-9]+\.[0-9]+\.[0-9]+|\$\{LATEST_RELEASE:-v[0-9]+\.[0-9]+\.[0-9]+\})"$/m;
+if (!versionLine.test(sh)) {
+  console.error('  ✗ scripts/install.sh: VERSION fallback line not found -- update sync-version.js');
+  process.exit(1);
+}
+sh = sh.replace(versionLine, (line, indent) => line.includes('LATEST_RELEASE')
+  ? `${indent}VERSION="\${LATEST_RELEASE:-v${version}}"`
+  : `${indent}VERSION="v${version}"`
 );
 fs.writeFileSync(installSh, sh);
 console.log(`  ✓ scripts/install.sh  → v${version}`);
