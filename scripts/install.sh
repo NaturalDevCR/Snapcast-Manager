@@ -59,7 +59,7 @@ if [ -n "${SNAPCAST_MANAGER_VERSION:-}" ]; then
     VERSION="$SNAPCAST_MANAGER_VERSION"
 else
     LATEST_RELEASE=$(curl -sL "https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/latest" | grep '"tag_name"' | head -1 | cut -d '"' -f 4)
-    VERSION="${LATEST_RELEASE:-v0.3.12}"
+    VERSION="${LATEST_RELEASE:-v0.3.13}"
 fi
 APP_VERSION="$VERSION"
 
