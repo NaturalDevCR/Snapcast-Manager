@@ -14,24 +14,24 @@
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.2.0",
     "pinia": "^3.0.4",
-    "prism-code-editor": "^5.1.0",
+    "prism-code-editor": "^5.4.0",
     "vue": "^3.5.43",
-    "vue-i18n": "^11.4.10",
+    "vue-i18n": "^11.4.13",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.18",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.10.1",
-    "@vitejs/plugin-vue": "^6.0.1",
-    "@vue/test-utils": "^2.4.11",
-    "@vue/tsconfig": "^0.8.1",
-    "autoprefixer": "^10.4.23",
-    "jsdom": "^30.0.1",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "@vue/test-utils": "^2.5.1",
+    "@vue/tsconfig": "^0.9.1",
+    "autoprefixer": "^10.6.1",
+    "jsdom": "^30.1.2",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
     "vitest": "^4.1.11",
-    "vue-tsc": "^3.1.4"
+    "vue-tsc": "^3.3.12"
   }
 }
