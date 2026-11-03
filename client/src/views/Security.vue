@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useUIStore } from '../stores/ui';
 import { fetchApi } from '../utils/api';
 import Layout from '../components/Layout.vue';
+import Button from '../components/ui/Button.vue';
 import PageHeader from '../components/ui/PageHeader.vue';
 import Card from '../components/Card.vue';
 
@@ -15,6 +16,16 @@ const newPassword = ref('');
 const confirmPassword = ref('');
 const isSavingPassword = ref(false);
 const isExporting = ref(false);
+
+// Only flag a mismatch once the confirmation has been typed, not while the
+// user is still filling in the first field.
+const passwordMismatch = computed(() => !!confirmPassword.value && newPassword.value !== confirmPassword.value);
+
+const passwordFields = computed(() => [
+  { id: 'current-password', model: currentPassword, label: t('security.currentPasswordLabel'), placeholder: t('security.currentPasswordPlaceholder'), autocomplete: 'current-password', invalid: false },
+  { id: 'new-password', model: newPassword, label: t('security.newPasswordLabel'), placeholder: t('security.newPasswordPlaceholder'), autocomplete: 'new-password', invalid: false },
+  { id: 'confirm-password', model: confirmPassword, label: t('security.confirmPasswordLabel'), placeholder: t('security.confirmPasswordPlaceholder'), autocomplete: 'new-password', invalid: passwordMismatch.value },
+]);
 
 const handleChangePassword = async () => {
   if (newPassword.value !== confirmPassword.value) {
@@ -91,80 +102,70 @@ const handleExportBackup = async () => {
 
 <template>
   <Layout>
-    <div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <PageHeader :title="t('security.title')" :description="t('security.subtitle')" />
+    <PageHeader :title="t('security.title')" :description="t('security.subtitle')" />
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <!-- Change Password -->
-        <Card :title="t('security.changePasswordTitle')">
-          <template #icon>
-            <span class="material-symbols-outlined text-[20px] text-danger">lock</span>
-          </template>
-          <div class="space-y-5">
-            <div>
-              <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-2">{{ t('security.currentPasswordLabel') }}</label>
-              <input v-model="currentPassword" type="password" :placeholder="t('security.currentPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-text-main placeholder:text-text-muted/60">
-            </div>
-            <div>
-              <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-2">{{ t('security.newPasswordLabel') }}</label>
-              <input v-model="newPassword" type="password" :placeholder="t('security.newPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-text-main placeholder:text-text-muted/60">
-            </div>
-            <div>
-              <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-2">{{ t('security.confirmPasswordLabel') }}</label>
-              <input v-model="confirmPassword" type="password" :placeholder="t('security.confirmPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-text-main placeholder:text-text-muted/60">
-            </div>
-            <button
-              @click="handleChangePassword"
-              :disabled="isSavingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword"
-              class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-danger text-white rounded-xl font-semibold text-xs hover:bg-danger border border-danger disabled:opacity-50 transition-all active:scale-95"
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Change Password -->
+      <Card :title="t('security.changePasswordTitle')">
+        <template #icon>
+          <span class="material-symbols-outlined text-[1.2rem]">lock</span>
+        </template>
+        <form class="space-y-4" @submit.prevent="handleChangePassword">
+          <div v-for="field in passwordFields" :key="field.id">
+            <label :for="field.id" class="block text-xs font-semibold text-text-muted mb-1.5">{{ field.label }}</label>
+            <input
+              :id="field.id"
+              v-model="field.model.value"
+              type="password"
+              :autocomplete="field.autocomplete"
+              :placeholder="field.placeholder"
+              :aria-invalid="field.invalid || undefined"
+              :class="field.invalid ? 'border-danger focus:ring-danger/30 focus:border-danger' : 'border-line focus:ring-brand-primary/30 focus:border-brand-primary'"
+              class="w-full text-sm px-3.5 py-2.5 bg-inset border rounded-xl focus:ring-2 outline-none transition-colors text-text-main placeholder:text-text-muted/60"
             >
-              <span v-if="isSavingPassword" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
-              <span>{{ t('security.updatePassword') }}</span>
-            </button>
           </div>
-        </Card>
+          <p v-if="passwordMismatch" class="text-xs text-danger" role="alert">{{ t('security.passwordMismatch') }}</p>
+          <Button
+            type="submit"
+            class="w-full"
+            :loading="isSavingPassword"
+            :disabled="!currentPassword || !newPassword || newPassword !== confirmPassword"
+          >{{ t('security.updatePassword') }}</Button>
+        </form>
+      </Card>
 
-        <!-- Export Backup -->
-        <Card :title="t('security.exportTitle')">
-          <template #icon>
-            <span class="material-symbols-outlined text-[20px] text-success">download</span>
-          </template>
-          <div class="space-y-5">
-            <p class="text-sm font-medium text-text-muted leading-relaxed">
-              <i18n-t keypath="security.exportDescription">
-                <template #archive><span class="text-success font-bold">.tar.gz</span></template>
+      <!-- Export Backup -->
+      <Card :title="t('security.exportTitle')">
+        <template #icon>
+          <span class="material-symbols-outlined text-[1.2rem]">download</span>
+        </template>
+        <div class="space-y-4">
+          <p class="text-sm text-text-muted leading-relaxed">
+            <i18n-t keypath="security.exportDescription">
+              <template #archive><code class="font-mono text-text-main">.tar.gz</code></template>
+            </i18n-t>
+          </p>
+          <ul class="text-sm text-text-main space-y-2">
+            <li class="flex items-center gap-2"><span class="material-symbols-outlined text-[1.1rem] text-success" aria-hidden="true">check_circle</span> {{ t('security.administratorAccount') }}</li>
+            <li class="flex items-center gap-2"><span class="material-symbols-outlined text-[1.1rem] text-success" aria-hidden="true">check_circle</span> {{ t('security.savedSnapshots') }}</li>
+            <li class="flex items-center gap-2"><span class="material-symbols-outlined text-[1.1rem] text-success" aria-hidden="true">check_circle</span> {{ t('security.snapserverConfig') }}</li>
+          </ul>
+
+          <div class="rounded-xl border border-info/25 bg-info/10 p-4">
+            <p class="text-xs font-semibold text-text-main">{{ t('security.restoreInstructions') }}</p>
+            <p class="text-xs text-text-muted mt-1 leading-relaxed">
+              <i18n-t keypath="security.restoreInstructionsBody">
+                <template #flag><code class="bg-inset px-1 py-0.5 rounded text-text-main font-mono border border-line">--restore /path/to/backup.tar.gz</code></template>
               </i18n-t>
             </p>
-            <ul class="text-xs font-semibold text-text-muted space-y-3 mb-6">
-              <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-brand-primary">security</span> {{ t('security.administratorAccount') }}</li>
-              <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-info">history</span> {{ t('security.savedSnapshots') }}</li>
-              <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-danger">tune</span> {{ t('security.snapserverConfig') }}</li>
-            </ul>
-
-            <div class="bg-warning/5 border border-warning/20 p-4 rounded-xl">
-              <p class="text-[10px] font-semibold text-warning uppercase tracking-wider">{{ t('security.restoreInstructions') }}</p>
-              <p class="text-xs text-warning/80 mt-1">
-                <i18n-t keypath="security.restoreInstructionsBody">
-                  <template #flag><code class="bg-black/40 px-1 py-0.5 rounded text-warning font-mono border border-warning/10">--restore /path/to/backup.tar.gz</code></template>
-                </i18n-t>
-              </p>
-            </div>
-
-            <button
-              @click="handleExportBackup"
-              :disabled="isExporting"
-              class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-success/10 text-success border border-success/30 rounded-xl font-semibold text-xs hover:bg-success hover:text-black disabled:opacity-50 transition-all active:scale-95 mt-4"
-            >
-              <span v-if="isExporting" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
-              <span v-else class="material-symbols-outlined text-[16px]">download</span>
-              <span>{{ t('security.downloadBackup') }}</span>
-            </button>
           </div>
-        </Card>
-      </div>
+
+          <Button variant="subtle" class="w-full" :loading="isExporting" @click="handleExportBackup">
+            <span v-if="!isExporting" class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">download</span>
+            {{ t('security.downloadBackup') }}
+          </Button>
+        </div>
+      </Card>
     </div>
   </Layout>
 </template>

@@ -23,5 +23,6 @@
   "changePasswordFailed": "Failed to change password",
   "backupDownloaded": "Backup downloaded successfully",
   "downloadBackupFailed": "Failed to download backup",
-  "exportFailed": "Export failed: {status}"
+  "exportFailed": "Export failed: {status}",
+  "passwordMismatch": "The new passwords don't match."
 }

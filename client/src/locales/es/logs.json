@@ -8,5 +8,6 @@
   "manager": "Manager",
   "mpd": "MPD",
   "consoleOutput": "Salida de Consola",
-  "fetchFailed": "Error al obtener los registros"
+  "fetchFailed": "Error al obtener los registros",
+  "empty": "Aún no hay entradas de registro para este servicio."
 }
