@@ -9,9 +9,23 @@ import {
 } from '../serverNav';
 
 describe('serverNavGroups', () => {
-  it('defines exactly the four task-based groups from the design spec', () => {
-    expect(serverNavGroups.map(g => g.key)).toEqual(['audio', 'sistema', 'configuracion', 'seguridad']);
-    expect(serverNavGroups.map(g => g.label)).toEqual(['Audio', 'Sistema', 'Configuración', 'Seguridad']);
+  // UI overhaul (2026-11): Security folded into Settings; group labels are
+  // rendered from i18n keys (they used to be hardcoded Spanish next to
+  // English item names).
+  it('defines the three task-based groups, each with an i18n label key', () => {
+    expect(serverNavGroups.map(g => g.key)).toEqual(['audio', 'sistema', 'configuracion']);
+    expect(serverNavGroups.map(g => g.labelKey)).toEqual([
+      'layout.nav.groupAudio',
+      'layout.nav.groupSystem',
+      'layout.nav.groupSettings',
+    ]);
+  });
+
+  it('gives every item i18n name/description keys under layout.nav', () => {
+    for (const item of serverNavItems) {
+      expect(item.nameKey).toMatch(/^layout\.nav\./);
+      expect(item.descriptionKey).toMatch(/^layout\.nav\./);
+    }
   });
 
   it('preserves every pre-existing route path exactly, with no additions or removals', () => {
@@ -30,9 +44,8 @@ describe('serverNavGroups', () => {
   it('groups items by task area', () => {
     const byKey = Object.fromEntries(serverNavGroups.map(g => [g.key, g.items.map(i => i.href)]));
     expect(byKey.audio).toEqual(['/pipe-sources']);
-    expect(byKey.sistema).toEqual(['/logs', '/watchdogs', '/diagnostics']);
-    expect(byKey.configuracion).toEqual(['/server', '/tools']);
-    expect(byKey.seguridad).toEqual(['/security']);
+    expect(byKey.sistema).toEqual(['/diagnostics', '/logs', '/watchdogs']);
+    expect(byKey.configuracion).toEqual(['/server', '/tools', '/security']);
   });
 
   // Task 63: the new self-diagnostics nav entry, added to the `sistema`
@@ -81,12 +94,13 @@ describe('isServerNavItemActive / isServerNavGroupActive', () => {
     const configGroup = serverNavGroups.find(g => g.key === 'configuracion')!;
     expect(isServerNavGroupActive(configGroup, '/tools')).toBe(true);
     expect(isServerNavGroupActive(configGroup, '/server')).toBe(true);
-    expect(isServerNavGroupActive(configGroup, '/security')).toBe(false);
+    expect(isServerNavGroupActive(configGroup, '/security')).toBe(true);
+    expect(isServerNavGroupActive(configGroup, '/logs')).toBe(false);
   });
 });
 
 describe('isAnyServerNavGroupActive', () => {
-  it('is true when on a route belonging to any of the four groups', () => {
+  it('is true when on a route belonging to any of the groups', () => {
     expect(isAnyServerNavGroupActive('/tools')).toBe(true);
     expect(isAnyServerNavGroupActive('/security')).toBe(true);
     expect(isAnyServerNavGroupActive('/watchdogs')).toBe(true);

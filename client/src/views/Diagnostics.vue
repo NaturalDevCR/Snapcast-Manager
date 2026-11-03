@@ -129,7 +129,7 @@ async function handleConfirmRepair() {
           <h1 class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
             {{ t('diagnostics.title') }}
           </h1>
-          <p class="text-zinc-400 mt-1 text-sm">
+          <p class="text-text-muted mt-1 text-sm">
             {{ t('diagnostics.subtitle') }}
           </p>
         </div>
@@ -137,7 +137,7 @@ async function handleConfirmRepair() {
           @click="handleRefresh"
           :disabled="store.loading"
           :aria-label="t('diagnostics.refreshAriaLabel')"
-          class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-all active:scale-95 disabled:opacity-50"
+          class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-inset hover:bg-line text-text-main border border-line transition-all active:scale-95 disabled:opacity-50"
         >
           <span class="material-symbols-outlined text-[1.1rem]" :class="{ 'animate-spin': store.loading }">refresh</span>
         </button>
@@ -177,7 +177,7 @@ async function handleConfirmRepair() {
       <!-- Still loading, nothing to show yet -- distinct from confirmed-empty
            above, same discipline as PipeSources.vue's loading/EmptyState
            split. -->
-      <div v-else-if="store.loading && sortedFindings.length === 0" class="flex items-center justify-center py-12 text-zinc-400 text-sm gap-2">
+      <div v-else-if="store.loading && sortedFindings.length === 0" class="flex items-center justify-center py-12 text-text-muted text-sm gap-2">
         <span class="material-symbols-outlined animate-spin text-[1rem]">sync</span>
         {{ t('diagnostics.running') }}
       </div>
@@ -187,7 +187,7 @@ async function handleConfirmRepair() {
         <div
           v-for="finding in sortedFindings"
           :key="finding.id"
-          class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between"
+          class="bg-brand-surface border border-line rounded-lg p-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between"
         >
           <div class="flex-1 min-w-0 space-y-1.5">
             <div class="flex items-center gap-2 flex-wrap">
@@ -195,12 +195,12 @@ async function handleConfirmRepair() {
                 <span class="material-symbols-outlined text-[0.85rem] mr-1">{{ SEVERITY_ICON[finding.severity] }}</span>
                 {{ finding.severity.toUpperCase() }}
               </Badge>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-800 text-zinc-400">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-inset text-text-muted">
                 {{ categoryLabel(finding.category) }}
               </span>
             </div>
-            <p class="text-sm text-zinc-300">{{ finding.message }}</p>
-            <p v-if="finding.repairAction?.kind === 'manual'" class="text-xs text-zinc-400 italic mt-1">
+            <p class="text-sm text-text-main">{{ finding.message }}</p>
+            <p v-if="finding.repairAction?.kind === 'manual'" class="text-xs text-text-muted italic mt-1">
               {{ finding.repairAction.instructions }}
             </p>
           </div>

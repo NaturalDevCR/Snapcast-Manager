@@ -64,6 +64,21 @@
   --color-text-muted: var(--text-muted);
   --color-brand-primary-text: var(--brand-primary-text);
   --color-terminal-muted: var(--terminal-muted);
+  /*
+   * UI overhaul (2026-11): semantic status + structural tokens. Views used to
+   * hardcode neon hex values (#00ff9d / #ff3b30 / #ffcc00) and Tailwind's
+   * *-400 shades for status text -- both are tuned for the dark theme only
+   * and drop to ~1.5-2:1 contrast on the light theme's white surfaces. These
+   * carry separate light/dark values (see :root / .dark below) so one class
+   * (`text-success`, `bg-danger/10`, `border-line`, ...) reads correctly in
+   * both themes.
+   */
+  --color-success: var(--status-success);
+  --color-warning: var(--status-warning);
+  --color-danger: var(--status-danger);
+  --color-info: var(--status-info);
+  --color-line: var(--line);
+  --color-inset: var(--inset);
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
@@ -123,6 +138,12 @@
      * passes there).
      */
     --terminal-muted: #1f2937;
+    --status-success: #047857; /* emerald-700 */
+    --status-warning: #b45309; /* amber-700 */
+    --status-danger: #dc2626; /* red-600 */
+    --status-info: #0369a1; /* sky-700 */
+    --line: rgb(0 0 0 / 0.08);
+    --inset: rgb(0 0 0 / 0.03);
   }
 
   /* Default / Server theme */
@@ -136,22 +157,31 @@
     --text-muted: #9ca3af;
     --brand-primary-text: #c084fc;
     --terminal-muted: #9ca3af;
+    --status-success: #34d399; /* emerald-400 */
+    --status-warning: #fbbf24; /* amber-400 */
+    --status-danger: #f87171; /* red-400 */
+    --status-info: #38bdf8; /* sky-400 */
+    --line: rgb(255 255 255 / 0.08);
+    --inset: rgb(255 255 255 / 0.03);
   }
 
   /* Client theme variant */
   .theme-client {
     --brand-bg: #f0fdfa; /* teal 50 */
     --brand-bg-rgb: 240 253 250;
-    --brand-primary: #0ea5e9; /* sky 500 */
-    --brand-primary-rgb: 14 165 233;
+    --brand-primary: #0284c7; /* sky 600: white button text stays >= 4.5:1 */
+    --brand-primary-rgb: 2 132 199;
+    /* Client mode used to inherit the server theme's PURPLE text token. */
+    --brand-primary-text: #0369a1; /* sky 700 */
   }
 
   .theme-client.dark, .dark .theme-client {
     --brand-bg: #0f172a; /* slate 900 */
     --brand-bg-rgb: 15 23 42;
-    --brand-primary: #0ea5e9; /* sky 500 */
-    --brand-primary-rgb: 14 165 233;
+    --brand-primary: #0284c7; /* sky 600 */
+    --brand-primary-rgb: 2 132 199;
     --brand-surface: #1e293b; /* slate 800 */
+    --brand-primary-text: #38bdf8; /* sky 400 */
   }
 }
 

@@ -61,7 +61,7 @@ watch(
       <div
         v-if="systemStore.jobLog.length > 0"
         ref="logContainer"
-        class="bg-black/90 text-emerald-400 font-mono text-xs leading-relaxed p-4 max-h-80 overflow-y-auto"
+        class="bg-black/90 text-success font-mono text-xs leading-relaxed p-4 max-h-80 overflow-y-auto"
       >
         <div v-for="(line, i) in systemStore.jobLog" :key="i" class="whitespace-pre-wrap break-all">{{ line }}</div>
       </div>

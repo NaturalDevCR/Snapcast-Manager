@@ -74,7 +74,7 @@ export const useSystemStore = defineStore('system', () => {
   async function checkInstalled(pkg: 'snapserver' | 'snapclient' | 'ffmpeg' | 'snap-ctrl' | 'shairport-sync' | 'mpd' | 'mympd') {
     try {
       const data = await fetchApi(`/system/installed/${pkg}`);
-      installedPackages.value[pkg] = data.installed;
+      if (typeof data?.installed === 'boolean') installedPackages.value[pkg] = data.installed;
     } catch (err) {
       console.error(err);
     }
@@ -295,6 +295,7 @@ export const useSystemStore = defineStore('system', () => {
     installedPackages,
     packageVersions,
     availableVersions,
+    checkInstalled,
     controlService,
     installPackage,
     updatePackage,

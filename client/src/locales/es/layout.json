@@ -13,5 +13,30 @@
   "sessionActive": "Sesión Activa",
   "signOut": "Cerrar sesión",
   "switchToLight": "Cambiar a modo claro",
-  "switchToDark": "Cambiar a modo oscuro"
+  "switchToDark": "Cambiar a modo oscuro",
+  "nav": {
+    "groupAudio": "Audio",
+    "groupSystem": "Sistema",
+    "groupSettings": "Configuración",
+    "sources": "Fuentes",
+    "sourcesDescription": "Radios y pipes de MPD",
+    "diagnostics": "Diagnóstico",
+    "diagnosticsDescription": "Chequeos y reparaciones",
+    "logs": "Registros",
+    "logsDescription": "Registros de servicios",
+    "watchdogs": "Watchdogs",
+    "watchdogsDescription": "Monitores de conexiones TCP",
+    "serverConfig": "Config. del servidor",
+    "serverConfigDescription": "Ajustes de snapserver.conf",
+    "tools": "Herramientas",
+    "toolsDescription": "Crontab, scripts y respaldos",
+    "security": "Seguridad",
+    "securityDescription": "Contraseña y respaldo completo"
+  },
+  "signedInAs": "Sesión de",
+  "language": "Idioma",
+  "theme": "Tema",
+  "version": "Versión {version}",
+  "viewOnGithub": "Ver en GitHub",
+  "primaryNav": "Navegación principal"
 }

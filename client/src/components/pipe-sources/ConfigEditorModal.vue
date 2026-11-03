@@ -92,23 +92,23 @@ defineExpose({ open });
           leave-from="opacity-100 scale-100"
           leave-to="opacity-0 scale-95"
         >
-          <DialogPanel class="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-3xl flex flex-col shadow-2xl" style="max-height: 85vh;">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-800 flex-shrink-0">
+          <DialogPanel class="bg-brand-surface border border-line rounded-xl w-full max-w-3xl flex flex-col shadow-2xl" style="max-height: 85vh;">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-line flex-shrink-0">
           <div>
-            <h3 class="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-              <span class="material-symbols-outlined text-[1rem] text-amber-400">description</span>
+            <h3 class="text-sm font-semibold text-text-main flex items-center gap-2">
+              <span class="material-symbols-outlined text-[1rem] text-warning">description</span>
               {{ configEditorPipe?.type === 'mpd' ? 'MPD audio_output block' : 'Systemd Service File' }}
               — {{ configEditorPipe?.name }}
             </h3>
-            <p class="text-xs text-zinc-400 mt-0.5 font-mono">{{ configFilePath }}</p>
+            <p class="text-xs text-text-muted mt-0.5 font-mono">{{ configFilePath }}</p>
           </div>
-          <button @click="showConfigEditor = false" class="text-zinc-500 hover:text-zinc-300 transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close config editor">
+          <button @click="showConfigEditor = false" class="text-text-muted hover:text-text-main transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close config editor">
             <span class="material-symbols-outlined text-[1.2rem]">close</span>
           </button>
         </div>
 
         <div class="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
-          <div v-if="loadingConfig" class="text-zinc-400 text-sm text-center py-8">Loading…</div>
+          <div v-if="loadingConfig" class="text-text-muted text-sm text-center py-8">Loading…</div>
           <template v-else>
             <p v-if="configEditorPipe?.type === 'mpd'" class="text-xs text-blue-300 bg-blue-500/5 border border-blue-500/20 rounded px-3 py-2">
               Editing only the <code>audio_output</code> block managed by Snapcast Manager. Other mpd.conf content is preserved.
@@ -119,14 +119,14 @@ defineExpose({ open });
             <textarea
               v-model="configContent"
               spellcheck="false"
-              class="flex-1 w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-xs text-zinc-200 font-mono leading-5 focus:border-amber-500 focus:outline-none resize-none min-h-0"
+              class="flex-1 w-full bg-brand-surface border border-line rounded px-4 py-3 text-xs text-text-main font-mono leading-5 focus:border-amber-500 focus:outline-none resize-none min-h-0"
               style="min-height: 300px;"
             ></textarea>
           </template>
         </div>
 
-        <div class="flex justify-end gap-3 px-5 py-4 border-t border-zinc-800 flex-shrink-0">
-          <button @click="showConfigEditor = false" class="px-4 py-2 border border-zinc-700 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 text-sm transition">
+        <div class="flex justify-end gap-3 px-5 py-4 border-t border-line flex-shrink-0">
+          <button @click="showConfigEditor = false" class="px-4 py-2 border border-line bg-inset text-text-main rounded hover:bg-line text-sm transition">
             Cancel
           </button>
           <button @click="saveConfigEditor" :disabled="savingConfig || loadingConfig"

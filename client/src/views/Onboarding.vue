@@ -30,14 +30,24 @@ const pipeSourcesStore = usePipeSourcesStore();
 const snapcastStore = useSnapcastStore();
 const router = useRouter();
 
+// A brand-new admin account starts at onboarding_step 0 (server/src/
+// auth.ts), but the template only had branches for steps 1-3 -- so the
+// wizard rendered a title and an empty progress bar and nothing else. Step
+// 0 ("not started") is shown as step 1.
+const currentStep = computed(() => Math.min(3, Math.max(1, onboardingStore.step)));
+
 const addEditDialog = ref<InstanceType<typeof AddEditPipeDialog> | null>(null);
 
 onMounted(async () => {
   await onboardingStore.fetchOnboarding();
+  // Step 1's "installed?" check reads installedPackages, which nothing on
+  // this view used to populate -- on a direct visit it always claimed
+  // snapserver was missing.
+  systemStore.checkInstalled('snapserver');
   if (pipeSourcesStore.pipes.length === 0) {
     await pipeSourcesStore.fetchPipes();
   }
-  if (onboardingStore.step === 2 && pipeSourcesStore.pipes.length === 0) {
+  if (currentStep.value === 2 && pipeSourcesStore.pipes.length === 0) {
     addEditDialog.value?.openAdd();
   }
 });
@@ -48,7 +58,7 @@ onMounted(async () => {
 // ref isn't populated until Vue has re-rendered for the new step -- a
 // default (pre-flush) watcher callback would run before that DOM update and
 // find `addEditDialog.value` still null.
-watch(() => onboardingStore.step, (step) => {
+watch(currentStep, (step) => {
   if (step === 2 && pipeSourcesStore.pipes.length === 0) {
     addEditDialog.value?.openAdd();
   }
@@ -123,22 +133,22 @@ async function skip() {
 
       <div class="flex items-center gap-2" :aria-label="t('onboarding.progressLabel')">
         <div v-for="n in 3" :key="n" class="flex-1 h-1 rounded-full"
-             :class="onboardingStore.step >= n ? 'bg-brand-primary' : 'bg-black/10 dark:bg-white/10'"></div>
+             :class="currentStep >= n ? 'bg-brand-primary' : 'bg-black/10 dark:bg-white/10'"></div>
       </div>
 
-      <div v-if="onboardingStore.step === 1" class="space-y-4">
+      <div v-if="currentStep === 1" class="space-y-4">
         <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step1Title') }}</h2>
         <p class="text-sm text-text-muted">{{ t('onboarding.step1Description') }}</p>
         <div v-if="!step1Done">
           <Button :loading="systemStore.loading" @click="handleInstallSnapserver">{{ t('onboarding.installSnapserver') }}</Button>
         </div>
         <div v-else class="space-y-3">
-          <p class="text-sm text-[#00ff9d]">{{ t('onboarding.step1Complete') }}</p>
+          <p class="text-sm text-success">{{ t('onboarding.step1Complete') }}</p>
           <Button @click="advanceTo(2)">{{ t('onboarding.next') }}</Button>
         </div>
       </div>
 
-      <div v-else-if="onboardingStore.step === 2" class="space-y-4">
+      <div v-else-if="currentStep === 2" class="space-y-4">
         <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step2Title') }}</h2>
         <p v-if="step2Done" class="text-sm text-text-muted">
           {{ t('onboarding.step2AlreadyHave', { count: pipeSourcesStore.pipes.length }) }}
@@ -147,7 +157,7 @@ async function skip() {
         <AddEditPipeDialog ref="addEditDialog" @saved="handlePipeSaved" />
       </div>
 
-      <div v-else-if="onboardingStore.step === 3" class="space-y-4">
+      <div v-else-if="currentStep === 3" class="space-y-4">
         <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step3Title') }}</h2>
         <div v-if="!firstGroupWithClient" class="space-y-2">
           <p class="text-sm text-text-muted">

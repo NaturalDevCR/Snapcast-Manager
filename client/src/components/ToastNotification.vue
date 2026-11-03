@@ -14,14 +14,14 @@ const typeConfigs = {
   success: {
     bg: 'bg-emerald-500/90 dark:bg-emerald-500/20',
     border: 'border-emerald-500/50',
-    text: 'text-white dark:text-emerald-400',
+    text: 'text-white dark:text-success',
     icon: CheckCircleIcon,
     glow: 'shadow-emerald-500/40'
   },
   error: {
     bg: 'bg-red-500/90 dark:bg-red-500/20',
     border: 'border-red-500/50',
-    text: 'text-white dark:text-red-400',
+    text: 'text-white dark:text-danger',
     icon: ExclamationCircleIcon,
     glow: 'shadow-red-500/40'
   },
@@ -35,7 +35,7 @@ const typeConfigs = {
   warning: {
     bg: 'bg-amber-500/90 dark:bg-amber-500/20',
     border: 'border-amber-500/50',
-    text: 'text-white dark:text-amber-400',
+    text: 'text-white dark:text-warning',
     icon: ExclamationTriangleIcon,
     glow: 'shadow-amber-500/40'
   }

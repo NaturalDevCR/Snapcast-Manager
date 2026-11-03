@@ -144,46 +144,46 @@ defineExpose({ open });
           leave-from="opacity-100 scale-100"
           leave-to="opacity-0 scale-95"
         >
-          <DialogPanel class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl shadow-2xl mb-8">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+          <DialogPanel class="bg-brand-surface border border-line rounded-xl w-full max-w-2xl shadow-2xl mb-8">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-line">
           <div>
-            <h3 class="text-base font-bold text-zinc-200">Import Existing Pipe Sources</h3>
-            <p class="text-xs text-zinc-400 mt-0.5">Discovers unmanaged <code class="bg-zinc-800 px-1 rounded">pipe://</code> sources in snapserver.conf and adopts them.</p>
+            <h3 class="text-base font-bold text-text-main">Import Existing Pipe Sources</h3>
+            <p class="text-xs text-text-muted mt-0.5">Discovers unmanaged <code class="bg-inset px-1 rounded">pipe://</code> sources in snapserver.conf and adopts them.</p>
           </div>
-          <button @click="showImportModal = false" class="text-zinc-500 hover:text-zinc-300 transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close import dialog">
+          <button @click="showImportModal = false" class="text-text-muted hover:text-text-main transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close import dialog">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
 
         <div class="p-6 space-y-4">
-          <div v-if="discovering" class="text-center py-8 text-zinc-400 text-sm">
+          <div v-if="discovering" class="text-center py-8 text-text-muted text-sm">
             <span class="material-symbols-outlined animate-spin inline-block mr-2 text-[1.2rem]">refresh</span>
             Scanning snapserver config…
           </div>
           <div v-else-if="discovered.length === 0" class="text-sm">
             <EmptyState icon="check_circle" title="No unmanaged pipe:// sources found" />
           </div>
-          <div v-else-if="pendingDiscovered.length === 0" class="text-center py-8 text-zinc-400 text-sm">
+          <div v-else-if="pendingDiscovered.length === 0" class="text-center py-8 text-text-muted text-sm">
             <span class="material-symbols-outlined text-3xl block mb-2 text-green-600">check_circle</span>
             All discovered sources have been imported.
           </div>
 
-          <div v-for="{ d, f } in discoveredWithForms" :key="d.fifoPath" class="border border-zinc-800 rounded-lg overflow-hidden">
+          <div v-for="{ d, f } in discoveredWithForms" :key="d.fifoPath" class="border border-line rounded-lg overflow-hidden">
             <!-- Item header -->
-            <div :class="['px-4 py-3 flex items-center justify-between', f.adopted ? 'bg-green-500/10' : 'bg-zinc-800/50']">
+            <div :class="['px-4 py-3 flex items-center justify-between', f.adopted ? 'bg-green-500/10' : 'bg-inset']">
               <div>
                 <div class="flex items-center gap-2">
-                  <span class="font-semibold text-sm text-zinc-200">{{ d.name }}</span>
+                  <span class="font-semibold text-sm text-text-main">{{ d.name }}</span>
                   <span :class="['px-2 py-0.5 rounded-full text-[10px] font-semibold', f.type === 'mpd' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300']">
                     {{ f.type === 'mpd' ? 'MPD' : 'Radio' }}
                   </span>
-                  <span v-if="f.adopted" class="text-xs text-green-400 font-medium">Imported</span>
+                  <span v-if="f.adopted" class="text-xs text-success font-medium">Imported</span>
                 </div>
-                <span class="text-xs font-mono text-zinc-400">{{ d.fifoPath }}</span>
+                <span class="text-xs font-mono text-text-muted">{{ d.fifoPath }}</span>
               </div>
               <div v-if="d.existingService" class="text-right">
-                <span class="text-xs text-zinc-400">{{ d.existingService.name }}</span>
-                <span :class="['ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold', d.existingService.isActive ? 'bg-green-500/20 text-green-400' : 'bg-zinc-700 text-zinc-300']">
+                <span class="text-xs text-text-muted">{{ d.existingService.name }}</span>
+                <span :class="['ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold', d.existingService.isActive ? 'bg-green-500/20 text-success' : 'bg-line text-text-main']">
                   {{ d.existingService.isActive ? 'active' : 'inactive' }}
                 </span>
               </div>
@@ -194,11 +194,11 @@ defineExpose({ open });
               <!-- Type override -->
               <div class="flex gap-2">
                 <button @click="f.type = 'radio'"
-                  :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'radio' ? 'border-purple-500 bg-purple-500/20 text-purple-300' : 'border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600']">
+                  :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'radio' ? 'border-purple-500 bg-purple-500/20 text-purple-300' : 'border-line bg-inset text-text-muted hover:border-line']">
                   Radio
                 </button>
                 <button @click="f.type = 'mpd'"
-                  :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'mpd' ? 'border-blue-500 bg-blue-500/20 text-blue-300' : 'border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600']">
+                  :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'mpd' ? 'border-blue-500 bg-blue-500/20 text-blue-300' : 'border-line bg-inset text-text-muted hover:border-line']">
                   MPD
                 </button>
               </div>
@@ -206,28 +206,28 @@ defineExpose({ open });
               <!-- Radio fields -->
               <template v-if="f.type === 'radio'">
                 <div>
-                  <label class="block text-xs text-zinc-400 mb-1">Stream URL <span class="text-red-400">*</span></label>
+                  <label class="block text-xs text-text-muted mb-1">Stream URL <span class="text-danger">*</span></label>
                   <input v-model="f.url" type="url" placeholder="https://…/radio.mp3"
-                    class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 font-mono focus:border-purple-500 focus:outline-none" />
-                  <p v-if="d.existingService?.url" class="text-[10px] text-zinc-400 mt-1">Auto-detected from existing service.</p>
+                    class="w-full bg-inset border border-line rounded px-3 py-2 text-sm text-text-main font-mono focus:border-purple-500 focus:outline-none" />
+                  <p v-if="d.existingService?.url" class="text-[10px] text-text-muted mt-1">Auto-detected from existing service.</p>
                 </div>
                 <div class="flex flex-wrap gap-x-4 gap-y-2 items-center">
-                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-300">
-                    <input type="checkbox" v-model="f.reconnect" class="rounded border-zinc-600 bg-zinc-800 text-purple-500" />
+                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-text-main">
+                    <input type="checkbox" v-model="f.reconnect" class="rounded border-line bg-inset text-purple-500" />
                     reconnect
                   </label>
-                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-300">
-                    <input type="checkbox" v-model="f.reconnectStreamed" class="rounded border-zinc-600 bg-zinc-800 text-purple-500" />
+                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-text-main">
+                    <input type="checkbox" v-model="f.reconnectStreamed" class="rounded border-line bg-inset text-purple-500" />
                     reconnect_streamed
                   </label>
-                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-300">
-                    <input type="checkbox" v-model="f.reconnectAtEof" class="rounded border-zinc-600 bg-zinc-800 text-purple-500" />
+                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-text-main">
+                    <input type="checkbox" v-model="f.reconnectAtEof" class="rounded border-line bg-inset text-purple-500" />
                     reconnect_at_eof
                   </label>
-                  <div class="flex items-center gap-2 text-xs text-zinc-400">
+                  <div class="flex items-center gap-2 text-xs text-text-muted">
                     delay_max
                     <input v-model.number="f.reconnectDelayMax" type="number" min="1" max="300"
-                      class="w-16 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-200 focus:border-purple-500 focus:outline-none" />s
+                      class="w-16 bg-inset border border-line rounded px-2 py-1 text-text-main focus:border-purple-500 focus:outline-none" />s
                   </div>
                 </div>
               </template>
@@ -248,8 +248,8 @@ defineExpose({ open });
           </div>
         </div>
 
-            <div class="px-6 py-4 border-t border-zinc-800 flex justify-end">
-              <button @click="showImportModal = false" class="px-4 py-2 border border-zinc-700 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 text-sm transition">
+            <div class="px-6 py-4 border-t border-line flex justify-end">
+              <button @click="showImportModal = false" class="px-4 py-2 border border-line bg-inset text-text-main rounded hover:bg-line text-sm transition">
                 Close
               </button>
             </div>

@@ -62,7 +62,7 @@ const handleSetup = async () => {
             <div class="relative bg-brand-surface/80 backdrop-blur-3xl shadow-2xl rounded-[2.5rem] p-8 md:p-14 border border-black/[0.04] dark:border-white/[0.04] animate-in fade-in zoom-in duration-1000">
                 <div class="text-center mb-12">
                      <div class="inline-flex items-center justify-center p-5 bg-brand-primary/10 rounded-3xl mb-8 border border-brand-primary/20 shadow-[inset_0_0_15px_rgba(166,13,242,0.1)]">
-                        <span class="material-symbols-outlined text-[3rem] text-brand-primary drop-shadow-[0_0_15px_rgba(166,13,242,0.4)]">rocket_launch</span>
+                        <span class="material-symbols-outlined text-[3rem] text-brand-primary">rocket_launch</span>
                      </div>
                      <h2 class="text-4xl font-black text-text-main tracking-tight leading-tight mb-4">
                         {{ t('setup.title') }}
@@ -127,7 +127,7 @@ const handleSetup = async () => {
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="w-full flex items-center justify-center py-5 px-8 bg-brand-primary hover:bg-[#8e0bc9] text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-[0_0_15px_rgba(166,13,242,0.4)] border border-brand-primary/50 hover:shadow-[0_0_25px_rgba(166,13,242,0.6)] transition-all hover:-translate-y-1 active:scale-[0.98] disabled:opacity-50"
+                        class="w-full flex items-center justify-center py-5 px-8 bg-brand-primary hover:bg-brand-primary text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] border border-brand-primary/50 transition-all hover:-translate-y-1 active:scale-[0.98] disabled:opacity-50"
                     >
                         <span v-if="loading" class="flex items-center gap-2">
                             <span class="material-symbols-outlined animate-spin text-[1.2rem]">sync</span>

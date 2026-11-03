@@ -155,7 +155,7 @@ function statusColor(status: string) {
   if (status === 'active') return 'bg-green-500';
   if (status === 'failed') return 'bg-red-500';
   if (status === 'activating') return 'bg-yellow-500';
-  return 'bg-zinc-600';
+  return 'bg-line';
 }
 
 function statusLabel(status: string) {
@@ -191,16 +191,16 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
           <h1 class="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
             {{ t('pipeSources.title') }}
           </h1>
-          <p class="text-zinc-400 mt-1 text-sm">
+          <p class="text-text-muted mt-1 text-sm">
             <i18n-t keypath="pipeSources.subtitle">
-              <template #pipePrefix><code class="text-xs bg-zinc-800 px-1 rounded">pipe://</code></template>
+              <template #pipePrefix><code class="text-xs bg-inset px-1 rounded">pipe://</code></template>
             </i18n-t>
           </p>
         </div>
         <div class="flex items-center gap-2">
           <button
             @click="importModal?.open()"
-            class="px-4 py-2 border border-zinc-700 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 text-sm font-medium transition flex items-center gap-2"
+            class="px-4 py-2 border border-line bg-inset text-text-main rounded hover:bg-line text-sm font-medium transition flex items-center gap-2"
           >
             <span class="material-symbols-outlined text-[1rem]">download</span>
             {{ t('pipeSources.importExisting') }}
@@ -244,7 +244,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
       </div>
 
       <!-- Zombie healthy -->
-      <div v-else-if="store.zombieCount !== null && !isZombieWarning" class="flex items-center gap-2 text-xs text-zinc-400">
+      <div v-else-if="store.zombieCount !== null && !isZombieWarning" class="flex items-center gap-2 text-xs text-text-muted">
         <span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
         {{ t('pipeSources.zombieHealthy', { count: store.zombieCount }) }}
       </div>
@@ -276,7 +276,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
 
       <!-- Empty state -->
       <div v-else-if="store.pipes.length === 0"
-        class="border border-dashed border-zinc-800 rounded-lg">
+        class="border border-dashed border-line rounded-lg">
         <EmptyState
           icon="sensors"
           :title="t('pipeSources.emptyTitle')"
@@ -298,7 +298,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
             <div class="flex items-start justify-between w-full gap-3">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <h2 class="text-base font-bold text-zinc-200 truncate">{{ pipe.name }}</h2>
+                  <h2 class="text-base font-bold text-text-main truncate">{{ pipe.name }}</h2>
                   <span :class="['px-2 py-0.5 rounded-full text-[10px] font-semibold', typeColor(pipe.type)]">
                     {{ typeLabel(pipe.type) }}
                   </span>
@@ -306,10 +306,10 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
                     {{ statusLabel(pipe.status) }}
                   </span>
                 </div>
-                <p v-if="pipe.type === 'radio'" class="text-xs text-zinc-400 font-mono mt-1 truncate" :title="pipe.url">
+                <p v-if="pipe.type === 'radio'" class="text-xs text-text-muted font-mono mt-1 truncate" :title="pipe.url">
                   {{ truncateUrl(pipe.url) }}
                 </p>
-                <p v-else class="text-xs text-zinc-400 mt-1">
+                <p v-else class="text-xs text-text-muted mt-1">
                   <i18n-t keypath="pipeSources.mpdAudioOutput">
                     <template #path><span class="font-mono">{{ pipe.fifoPath }}</span></template>
                   </i18n-t>
@@ -320,28 +320,28 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
               <div class="flex items-center gap-1 flex-shrink-0">
                 <button v-if="pipe.status !== 'active'" @click="control(pipe.id, 'start')"
                   :disabled="controllingId === pipe.id"
-                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-green-600/20 hover:bg-green-600/40 text-green-400 transition disabled:opacity-40" :title="t('pipeSources.start')"
+                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-green-600/20 hover:bg-green-600/40 text-success transition disabled:opacity-40" :title="t('pipeSources.start')"
                   :aria-label="`${t('pipeSources.start')} ${pipe.name}`">
                   <span class="material-symbols-outlined text-[1rem]">play_arrow</span>
                 </button>
                 <button v-if="pipe.status === 'active'" @click="control(pipe.id, 'stop')"
                   :disabled="controllingId === pipe.id"
-                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-red-600/20 hover:bg-red-600/40 text-red-400 transition disabled:opacity-40" :title="t('pipeSources.stop')"
+                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-red-600/20 hover:bg-red-600/40 text-danger transition disabled:opacity-40" :title="t('pipeSources.stop')"
                   :aria-label="`${t('pipeSources.stop')} ${pipe.name}`">
                   <span class="material-symbols-outlined text-[1rem]">stop</span>
                 </button>
                 <button @click="control(pipe.id, 'restart')" :disabled="controllingId === pipe.id"
-                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 transition disabled:opacity-40" :title="t('pipeSources.restart')"
+                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-line hover:bg-line text-text-main transition disabled:opacity-40" :title="t('pipeSources.restart')"
                   :aria-label="`${t('pipeSources.restart')} ${pipe.name}`">
                   <span class="material-symbols-outlined text-[1rem]">restart_alt</span>
                 </button>
                 <button @click="viewLogs(pipe)"
-                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-zinc-700/50 hover:bg-zinc-600/50 text-zinc-300 transition" :title="t('pipeSources.viewLogs')"
+                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-line hover:bg-line text-text-main transition" :title="t('pipeSources.viewLogs')"
                   :aria-label="`${t('pipeSources.viewLogsFor')} ${pipe.name}`">
                   <span class="material-symbols-outlined text-[1rem]">terminal</span>
                 </button>
                 <button @click="confirmDelete(pipe.id)"
-                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-zinc-700/50 hover:bg-red-600/30 text-zinc-500 hover:text-red-400 transition" :title="t('pipeSources.delete')"
+                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-line hover:bg-red-600/30 text-text-muted hover:text-danger transition" :title="t('pipeSources.delete')"
                   :aria-label="`${t('pipeSources.delete')} ${pipe.name}`">
                   <span class="material-symbols-outlined text-[1rem]">delete</span>
                 </button>
@@ -350,35 +350,35 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
           </template>
 
           <!-- Details -->
-          <div class="mt-3 space-y-2 text-xs text-zinc-400">
+          <div class="mt-3 space-y-2 text-xs text-text-muted">
             <div class="flex flex-wrap gap-x-4 gap-y-1">
               <span class="font-mono">
                 <i18n-t keypath="pipeSources.fifoLabel">
-                  <template #value><span class="text-zinc-400">{{ pipe.fifoPath }}</span></template>
+                  <template #value><span class="text-text-muted">{{ pipe.fifoPath }}</span></template>
                 </i18n-t>
               </span>
               <span class="font-mono">
                 <i18n-t keypath="pipeSources.serviceLabel">
-                  <template #value><span class="text-zinc-400">{{ pipe.serviceName }}</span></template>
+                  <template #value><span class="text-text-muted">{{ pipe.serviceName }}</span></template>
                 </i18n-t>
               </span>
             </div>
             <div v-if="pipe.type === 'radio'" class="flex flex-wrap gap-2 mt-1">
-              <span v-if="pipe.reconnect" class="px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">reconnect</span>
-              <span v-if="pipe.reconnectStreamed" class="px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">reconnect_streamed</span>
-              <span v-if="pipe.reconnectAtEof" class="px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">reconnect_at_eof</span>
-              <span class="px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">delay_max={{ pipe.reconnectDelayMax }}s</span>
-              <span class="px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">idle={{ pipe.idleThreshold }}ms</span>
+              <span v-if="pipe.reconnect" class="px-2 py-0.5 bg-inset rounded text-text-muted">reconnect</span>
+              <span v-if="pipe.reconnectStreamed" class="px-2 py-0.5 bg-inset rounded text-text-muted">reconnect_streamed</span>
+              <span v-if="pipe.reconnectAtEof" class="px-2 py-0.5 bg-inset rounded text-text-muted">reconnect_at_eof</span>
+              <span class="px-2 py-0.5 bg-inset rounded text-text-muted">delay_max={{ pipe.reconnectDelayMax }}s</span>
+              <span class="px-2 py-0.5 bg-inset rounded text-text-muted">idle={{ pipe.idleThreshold }}ms</span>
             </div>
             <div v-else class="flex flex-wrap gap-2 mt-1">
-              <span class="px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">idle={{ pipe.idleThreshold }}ms</span>
+              <span class="px-2 py-0.5 bg-inset rounded text-text-muted">idle={{ pipe.idleThreshold }}ms</span>
               <span class="px-2 py-0.5 bg-blue-900/40 rounded text-blue-400">{{ t('pipeSources.writesViaMpdConf') }}</span>
             </div>
           </div>
 
-          <div class="mt-4 pt-3 border-t border-zinc-800/80 flex flex-wrap gap-2">
+          <div class="mt-4 pt-3 border-t border-line flex flex-wrap gap-2">
             <button @click="addEditDialog?.openEdit(pipe)"
-              class="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition flex items-center gap-1.5">
+              class="px-3 py-1.5 rounded bg-inset hover:bg-line text-text-main text-xs font-medium transition flex items-center gap-1.5">
               <span class="material-symbols-outlined text-[1rem]">edit</span>
               {{ t('pipeSources.editSettings') }}
             </button>

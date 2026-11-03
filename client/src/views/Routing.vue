@@ -437,7 +437,7 @@ const updateVolume = (client: any, event: Event) => {
                   :stroke="draggingPath.color"
                   stroke-width="5"
                   stroke-linecap="round"
-                  class="cable-animated opacity-100 drop-shadow-[0_0_12px_rgba(255,255,255,0.4)] pointer-events-none" />
+                  class="cable-animated opacity-100 pointer-events-none" />
          </svg>
          
          <div class="relative z-20 flex flex-col lg:flex-row gap-8 lg:gap-16 xl:gap-24 w-full px-2 sm:px-4">
@@ -461,7 +461,7 @@ const updateVolume = (client: any, event: Event) => {
                              <div class="font-bold text-text-main text-[15px] truncate items-center flex gap-2">
                                 {{ getStreamLabel(stream) }}
                                 <div class="w-2 h-2 rounded-full shrink-0 transition-all duration-500"
-                                     :class="stream.status === 'playing' ? 'animate-pulse shadow-[0_0_8px_var(--stream-color)]' : 'opacity-40'"
+                                     :class="stream.status === 'playing' ? 'animate-pulse' : 'opacity-40'"
                                      :style="{ backgroundColor: getStreamColor(stream.id) }"></div>
                              </div>
                              <div class="text-[10px] font-bold text-text-muted mt-0.5 truncate uppercase tracking-widest">{{ stream.status }}</div>
@@ -477,7 +477,7 @@ const updateVolume = (client: any, event: Event) => {
                       <div :ref="setSourceRef(stream.id)"
                            @mousedown.prevent="startDrag(stream.id, $event)"
                            @touchstart.prevent="startDrag(stream.id, $event)"
-                           class="hidden lg:flex w-8 h-8 rounded-full bg-brand-surface border-[3px] items-center justify-center cursor-grab active:cursor-grabbing hover:scale-110 transition-transform shadow-[0_0_15px_rgba(0,0,0,0.5)] z-30 shrink-0 right-[-16px] absolute lg:right-[-16px]"
+                           class="hidden lg:flex w-8 h-8 rounded-full bg-brand-surface border-[3px] items-center justify-center cursor-grab active:cursor-grabbing hover:scale-110 transition-transform z-30 shrink-0 right-[-16px] absolute lg:right-[-16px]"
                            :style="{ borderColor: getStreamColor(stream.id) }"
                            :title="t('routing.dragToConnect')"
                            aria-hidden="true">
@@ -499,7 +499,7 @@ const updateVolume = (client: any, event: Event) => {
                       :ref="setZoneCardRef(group.id)"
                       class="bg-brand-surface/80 backdrop-blur-3xl border rounded-[1.5rem] shadow-xl transition-all duration-500 relative flex flex-col group/zone"
                       :class="[
-                         hoverZoneId === group.id ? 'border-brand-primary bg-brand-primary/5 scale-[1.02] shadow-[0_0_30px_rgba(59,130,246,0.15)] z-20' : 'border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10',
+                         hoverZoneId === group.id ? 'border-brand-primary bg-brand-primary/5 scale-[1.02] z-20' : 'border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10',
                          !group.stream_id ? 'border-red-500/20 shadow-red-500/5' : ''
                       ]">
                       
@@ -508,7 +508,7 @@ const updateVolume = (client: any, event: Event) => {
                            node above -- decorative/hidden from the a11y tree,
                            hidden on mobile alongside the SVG cable overlay. -->
                       <div :ref="setZoneRef(group.id)"
-                           class="hidden lg:flex w-10 h-10 rounded-full bg-brand-surface border-[3px] items-center justify-center transition-all duration-300 z-30 shrink-0 absolute left-[-20px] top-[20px] shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                           class="hidden lg:flex w-10 h-10 rounded-full bg-brand-surface border-[3px] items-center justify-center transition-all duration-300 z-30 shrink-0 absolute left-[-20px] top-[20px]"
                            :class="hoverZoneId === group.id ? 'scale-125' : ''"
                            :style="{ borderColor: group.stream_id ? getStreamColor(group.stream_id) : '#4b5563' }"
                            aria-hidden="true">
@@ -636,14 +636,14 @@ const updateVolume = (client: any, event: Event) => {
                               <div class="flex items-center gap-3 w-full sm:w-auto shrink-0 justify-end">
                                   <button @click="snapcastStore.setClientVolume(client.id, { percent: client.config.volume.percent, muted: !client.config.volume.muted })"
                                           class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl transition-all hover:bg-black/5 dark:hover:bg-white/5 border border-transparent"
-                                          :class="client.config.volume.muted ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-text-muted hover:text-text-main hover:border-black/10 dark:hover:border-white/10'"
+                                          :class="client.config.volume.muted ? 'text-danger bg-danger/10 border-danger/20' : 'text-text-muted hover:text-text-main hover:border-black/10 dark:hover:border-white/10'"
                                           :aria-label="client.config.volume.muted ? t('routing.unmuteClient', { name: client.config.name || client.host.name || t('routing.client') }) : t('routing.muteClient', { name: client.config.name || client.host.name || t('routing.client') })">
                                       <span class="material-symbols-outlined text-[18px]">{{ client.config.volume.muted ? 'volume_off' : 'volume_up' }}</span>
                                   </button>
                                   <div class="flex items-center gap-3">
                                       <input type="range" class="w-full sm:w-28 h-2 bg-black/40 shadow-inner rounded-full appearance-none cursor-pointer accent-brand-primary hover:accent-brand-primary/80 transition-all" 
                                              min="0" max="100" v-model="client.config.volume.percent" @change="updateVolume(client, $event)">
-                                      <span class="text-[11px] font-black tracking-wider w-10 text-right" :class="client.config.volume.muted ? 'text-red-400' : 'text-text-muted'">
+                                      <span class="text-[11px] font-black tracking-wider w-10 text-right" :class="client.config.volume.muted ? 'text-danger' : 'text-text-muted'">
                                           {{ client.config.volume.muted ? t('routing.muted') : client.config.volume.percent + '%' }}
                                       </span>
                                   </div>

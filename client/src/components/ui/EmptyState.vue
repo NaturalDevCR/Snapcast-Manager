@@ -3,8 +3,8 @@
 //
 // Extracts the "no data yet" pattern that already existed ad hoc, pre-token,
 // in a couple of views — e.g. PipeSources.vue's
-// `<span class="material-symbols-outlined text-4xl text-zinc-700 mb-3
-// block">sensors</span><p class="text-zinc-500">No pipe sources
+// `<span class="material-symbols-outlined text-4xl text-text-muted mb-3
+// block">sensors</span><p class="text-text-muted">No pipe sources
 // configured.</p>` and ClientDashboard.vue's `text-white/20` "No instances
 // configured" block — into a token-driven, reusable component matching that
 // same visual language (large muted icon, bold/black title, centered).

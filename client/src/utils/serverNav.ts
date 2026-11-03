@@ -1,4 +1,7 @@
 // Task 30: navigation reorganization for Layout.vue's server-mode nav.
+// UI overhaul (2026-11): the four groups are now three (Security folded into
+// Settings) and every item is rendered directly in the sidebar instead of
+// behind a "Menu" dropdown.
 //
 // Replaces the previously-flat six-item "System" dropdown with four
 // task-based groups, per
@@ -16,11 +19,18 @@ export interface ServerNavItem {
   href: string;
   icon: string;
   description: string;
+  // UI overhaul (2026-11): i18n keys under `layout.nav.*`. `name` /
+  // `description` stay as English fallbacks for non-Vue consumers/tests,
+  // but the layout renders these keys so the nav follows the EN/ES switch
+  // (it used to mix hardcoded Spanish group labels with English items).
+  nameKey: string;
+  descriptionKey: string;
 }
 
 export interface ServerNavGroup {
   key: string;
   label: string;
+  labelKey: string;
   items: ServerNavItem[];
 }
 
@@ -28,34 +38,31 @@ export const serverNavGroups: ServerNavGroup[] = [
   {
     key: 'audio',
     label: 'Audio',
+    labelKey: 'layout.nav.groupAudio',
     items: [
-      { name: 'Pipe Sources', href: '/pipe-sources', icon: 'sensors', description: 'Radio & MPD pipe sources' },
+      { name: 'Sources', href: '/pipe-sources', icon: 'sensors', description: 'Radio & MPD pipe sources', nameKey: 'layout.nav.sources', descriptionKey: 'layout.nav.sourcesDescription' },
     ],
   },
   {
     key: 'sistema',
-    label: 'Sistema',
+    label: 'System',
+    labelKey: 'layout.nav.groupSystem',
     items: [
-      { name: 'Logs', href: '/logs', icon: 'terminal', description: 'Service logs' },
-      { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart', description: 'Service monitors' },
       // Task 63: self-diagnostics UI (Stage 5, item 5.5, part 2/2), consuming
       // GET /api/diagnostics (Task 62).
-      { name: 'Diagnostics', href: '/diagnostics', icon: 'health_and_safety', description: 'Self-diagnostics & repairs' },
+      { name: 'Diagnostics', href: '/diagnostics', icon: 'health_and_safety', description: 'Self-diagnostics & repairs', nameKey: 'layout.nav.diagnostics', descriptionKey: 'layout.nav.diagnosticsDescription' },
+      { name: 'Logs', href: '/logs', icon: 'terminal', description: 'Service logs', nameKey: 'layout.nav.logs', descriptionKey: 'layout.nav.logsDescription' },
+      { name: 'Watchdogs', href: '/watchdogs', icon: 'monitor_heart', description: 'Service monitors', nameKey: 'layout.nav.watchdogs', descriptionKey: 'layout.nav.watchdogsDescription' },
     ],
   },
   {
     key: 'configuracion',
-    label: 'Configuración',
+    label: 'Settings',
+    labelKey: 'layout.nav.groupSettings',
     items: [
-      { name: 'Server Config', href: '/server', icon: 'settings', description: 'Snapserver settings' },
-      { name: 'Tools', href: '/tools', icon: 'build_circle', description: 'Crontab, scripts & MPD' },
-    ],
-  },
-  {
-    key: 'seguridad',
-    label: 'Seguridad',
-    items: [
-      { name: 'Security', href: '/security', icon: 'security', description: 'Admin access' },
+      { name: 'Server Config', href: '/server', icon: 'tune', description: 'Snapserver settings', nameKey: 'layout.nav.serverConfig', descriptionKey: 'layout.nav.serverConfigDescription' },
+      { name: 'Tools', href: '/tools', icon: 'build', description: 'Crontab, scripts & backups', nameKey: 'layout.nav.tools', descriptionKey: 'layout.nav.toolsDescription' },
+      { name: 'Security', href: '/security', icon: 'shield_lock', description: 'Admin access', nameKey: 'layout.nav.security', descriptionKey: 'layout.nav.securityDescription' },
     ],
   },
 ];
@@ -82,7 +89,7 @@ export function isServerNavGroupActive(group: ServerNavGroup, currentPath: strin
   return group.items.some(item => isServerNavItemActive(item, currentPath));
 }
 
-// True when the current route is inside ANY of the four grouped-menu
+// True when the current route is inside ANY of the grouped-menu
 // items -- drives the dropdown trigger button's (desktop) / collapsible
 // header's (mobile) active highlighting, matching the old flat
 // isSystemActive's intent.

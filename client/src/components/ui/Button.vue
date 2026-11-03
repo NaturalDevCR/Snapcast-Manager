@@ -22,7 +22,7 @@
 import { computed } from 'vue';
 
 export interface ButtonProps {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'subtle' | 'danger' | 'danger-subtle' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
   loading?: boolean;
@@ -43,11 +43,13 @@ const isDisabled = computed(() => props.disabled || props.loading);
 
 const variantClasses: Record<NonNullable<ButtonProps['variant']>, string> = {
   primary:
-    'bg-brand-primary hover:bg-brand-primary/80 text-white border border-brand-primary/50 shadow-lg shadow-brand-primary/20',
+    'bg-brand-primary hover:bg-brand-primary/85 text-white border border-transparent shadow-sm',
   secondary:
     'bg-transparent hover:bg-brand-primary/10 text-brand-primary-text border border-brand-primary/40',
   danger:
-    'bg-red-600 hover:bg-red-500 text-white border border-red-500/50 shadow-lg shadow-red-500/20',
+    'bg-red-600 hover:bg-red-500 text-white border border-transparent shadow-sm',
+  subtle: 'bg-inset hover:bg-line text-text-main border border-line',
+  'danger-subtle': 'bg-danger/10 hover:bg-danger/15 text-danger border border-danger/20',
   ghost: 'bg-transparent hover:bg-brand-primary/10 text-text-main border border-transparent',
 };
 
@@ -58,7 +60,7 @@ const sizeClasses: Record<NonNullable<ButtonProps['size']>, string> = {
 };
 
 const classes = computed(() => [
-  'inline-flex items-center justify-center rounded-xl font-black uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/50',
+  'inline-flex items-center justify-center rounded-xl font-semibold transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/50',
   variantClasses[props.variant],
   sizeClasses[props.size],
 ]);

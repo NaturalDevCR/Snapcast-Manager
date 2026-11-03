@@ -170,7 +170,7 @@ const handleExportBackup = async () => {
       <!-- Page Header -->
       <div class="flex items-center justify-between">
           <div>
-              <h2 class="text-xl font-black text-text-main uppercase tracking-wider dark:drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Raw Editor</h2>
+              <h2 class="text-xl font-black text-text-main uppercase tracking-wider dark:">Raw Editor</h2>
               <p class="text-[11px] font-bold text-text-muted uppercase tracking-widest mt-1">
                   Directly modify the <code class="bg-brand-primary/20 px-1.5 py-0.5 rounded text-brand-primary text-[10px] font-mono border border-brand-primary/10">snapserver.conf</code> for advanced control.
               </p>
@@ -208,7 +208,7 @@ const handleExportBackup = async () => {
       <!-- Footer Actions -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div class="flex items-start sm:items-center space-x-2 text-amber-500 text-xs font-bold uppercase tracking-widest bg-amber-500/5 px-4 py-3 rounded-xl border border-amber-500/10 w-full sm:w-auto">
-              <span class="material-symbols-outlined text-[16px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)] mt-0.5 sm:mt-0">warning</span>
+              <span class="material-symbols-outlined text-[16px] mt-0.5 sm:mt-0">warning</span>
               <span class="leading-relaxed">Warning: Restart required after applying changes to configuration.</span>
           </div>
           <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">

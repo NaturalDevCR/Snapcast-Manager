@@ -188,7 +188,7 @@ const handleSave = () => {
                 :class="[
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                     activeTab === 'standard'
-                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
+                    ? 'bg-brand-primary text-white'
                     : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                 ]"
               >
@@ -203,7 +203,7 @@ const handleSave = () => {
                 :class="[
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                     activeTab === 'expert'
-                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
+                    ? 'bg-brand-primary text-white'
                     : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                 ]"
               >
@@ -218,7 +218,7 @@ const handleSave = () => {
                 :class="[
                     'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
                     activeTab === 'snapshots'
-                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
+                    ? 'bg-brand-primary text-white'
                     : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                 ]"
               >
@@ -235,7 +235,7 @@ const handleSave = () => {
               <button 
                   @click="handleSave" 
                   :disabled="configStore.loading"
-                  class="w-full md:w-auto flex items-center justify-center space-x-3 px-8 py-3 rounded-2xl shadow-[0_0_20px_rgba(166,13,242,0.4)] text-[11px] font-black text-white bg-brand-primary hover:bg-[#b526ff] hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 transition-all duration-300 border border-black/10 dark:border-white/10 uppercase tracking-[0.2em]"
+                  class="w-full md:w-auto flex items-center justify-center space-x-3 px-8 py-3 rounded-2xl text-[11px] font-black text-white bg-brand-primary hover:bg-brand-primary hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 transition-all duration-300 border border-black/10 dark:border-white/10 uppercase tracking-[0.2em]"
               >
                   <span v-if="configStore.loading" class="material-symbols-outlined text-[18px] animate-spin">sync</span>
                   <span v-else class="material-symbols-outlined text-[18px]">save</span>
