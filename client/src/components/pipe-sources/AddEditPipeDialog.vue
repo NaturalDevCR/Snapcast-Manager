@@ -155,7 +155,7 @@ defineExpose({ openAdd, openEdit });
               <button
                 @click="form.type = 'radio'"
                 :disabled="!!editingId"
-                :class="['flex-1 py-2 rounded border text-sm font-medium transition', form.type === 'radio' ? 'border-purple-500 bg-purple-500/20 text-purple-300' : 'border-line bg-inset text-text-muted hover:border-line']"
+                :class="['flex-1 py-2 rounded border text-sm font-medium transition', form.type === 'radio' ? 'border-brand-primary bg-brand-primary/20 text-brand-primary-text' : 'border-line bg-inset text-text-muted hover:border-line']"
               >
                 <span class="material-symbols-outlined text-[1rem] mr-1 align-middle">radio</span>
                 Radio Stream
@@ -163,7 +163,7 @@ defineExpose({ openAdd, openEdit });
               <button
                 @click="form.type = 'mpd'"
                 :disabled="!!editingId"
-                :class="['flex-1 py-2 rounded border text-sm font-medium transition', form.type === 'mpd' ? 'border-blue-500 bg-blue-500/20 text-blue-300' : 'border-line bg-inset text-text-muted hover:border-line']"
+                :class="['flex-1 py-2 rounded border text-sm font-medium transition', form.type === 'mpd' ? 'border-info bg-info/20 text-info' : 'border-line bg-inset text-text-muted hover:border-line']"
               >
                 <span class="material-symbols-outlined text-[1rem] mr-1 align-middle">music_note</span>
                 MPD Output
@@ -181,7 +181,7 @@ defineExpose({ openAdd, openEdit });
               v-model="form.name"
               type="text"
               placeholder="e.g. Radio Gym"
-              class="w-full bg-inset border border-line rounded px-3 py-2 text-sm text-text-main focus:border-purple-500 focus:outline-none"
+              class="w-full bg-inset border border-line rounded px-3 py-2 text-sm text-text-main focus:border-brand-primary focus:outline-none"
             />
             <p v-if="editingId" class="text-xs text-text-muted mt-1">Renaming will migrate the FIFO path and recreate the service file automatically.</p>
           </div>
@@ -194,7 +194,7 @@ defineExpose({ openAdd, openEdit });
                 v-model="form.url"
                 type="url"
                 placeholder="https://your-server.com/listen/station/radio.mp3"
-                class="w-full bg-inset border border-line rounded px-3 py-2 text-sm text-text-main font-mono focus:border-purple-500 focus:outline-none"
+                class="w-full bg-inset border border-line rounded px-3 py-2 text-sm text-text-main font-mono focus:border-brand-primary focus:outline-none"
               />
             </div>
 
@@ -202,15 +202,15 @@ defineExpose({ openAdd, openEdit });
               <label class="block text-xs text-text-muted mb-2">ffmpeg Reconnect Options</label>
               <div class="space-y-2 pl-1">
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" v-model="form.reconnect" class="rounded border-line bg-inset text-purple-500 focus:ring-purple-500" />
+                  <input type="checkbox" v-model="form.reconnect" class="rounded border-line bg-inset text-brand-primary-text focus:ring-purple-500" />
                   <span class="text-sm text-text-main"><code class="text-xs bg-inset px-1 rounded">-reconnect</code> — reconnect on network errors</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" v-model="form.reconnectStreamed" class="rounded border-line bg-inset text-purple-500 focus:ring-purple-500" />
+                  <input type="checkbox" v-model="form.reconnectStreamed" class="rounded border-line bg-inset text-brand-primary-text focus:ring-purple-500" />
                   <span class="text-sm text-text-main"><code class="text-xs bg-inset px-1 rounded">-reconnect_streamed</code> — reconnect on stream interrupts</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" v-model="form.reconnectAtEof" class="rounded border-line bg-inset text-purple-500 focus:ring-purple-500" />
+                  <input type="checkbox" v-model="form.reconnectAtEof" class="rounded border-line bg-inset text-brand-primary-text focus:ring-purple-500" />
                   <span class="text-sm text-text-main"><code class="text-xs bg-inset px-1 rounded">-reconnect_at_eof</code> — reconnect on HTTP EOF (needed for AzuraCast)</span>
                 </label>
               </div>
@@ -219,12 +219,12 @@ defineExpose({ openAdd, openEdit });
             <div>
               <label class="block text-xs text-text-muted mb-1">Reconnect Delay Max (s)</label>
               <input v-model.number="form.reconnectDelayMax" type="number" min="1" max="300"
-                class="w-32 bg-inset border border-line rounded px-3 py-2 text-sm text-text-main focus:border-purple-500 focus:outline-none" />
+                class="w-32 bg-inset border border-line rounded px-3 py-2 text-sm text-text-main focus:border-brand-primary focus:outline-none" />
             </div>
           </template>
 
           <!-- MPD info -->
-          <div v-else class="p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg text-xs text-blue-300 space-y-1">
+          <div v-else class="p-3 bg-info/5 border border-info/20 rounded-lg text-xs text-info space-y-1">
             <p class="font-medium">MPD audio_output block will be added to mpd.conf:</p>
             <pre class="text-[10px] text-text-muted bg-brand-surface rounded p-2 leading-4">audio_output {
   type    "fifo"
@@ -238,14 +238,14 @@ defineExpose({ openAdd, openEdit });
           <div>
             <label class="block text-xs text-text-muted mb-1">Idle Threshold (ms)</label>
             <input v-model.number="form.idleThreshold" type="number" min="1000" max="60000"
-              class="w-32 bg-inset border border-line rounded px-3 py-2 text-sm text-text-main focus:border-purple-500 focus:outline-none" />
+              class="w-32 bg-inset border border-line rounded px-3 py-2 text-sm text-text-main focus:border-brand-primary focus:outline-none" />
             <p class="text-xs text-text-muted mt-1">How long silence before snapserver marks the source idle.</p>
           </div>
 
           <!-- Enabled toggle -->
           <label class="flex items-center gap-3 cursor-pointer">
             <button @click="form.enabled = !form.enabled"
-              :class="form.enabled ? 'bg-purple-600' : 'bg-line'"
+              :class="form.enabled ? 'bg-brand-primary' : 'bg-line'"
               class="relative inline-flex h-5 w-10 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200"
               :aria-label="form.enabled ? 'Disable on save' : 'Enable on save'">
               <span :class="form.enabled ? 'translate-x-5' : 'translate-x-0'"

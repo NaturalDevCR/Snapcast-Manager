@@ -142,7 +142,7 @@ async function handleConfirmRepair() {
            looking like an all-clear result. -->
       <div
         v-if="!store.loading && store.error && sortedFindings.length === 0"
-        class="border border-dashed border-red-800/40 rounded-lg"
+        class="border border-dashed border-danger/40 rounded-lg"
       >
         <EmptyState
           icon="error"
@@ -156,7 +156,7 @@ async function handleConfirmRepair() {
            that renders this. -->
       <div
         v-else-if="!store.loading && sortedFindings.length === 0"
-        class="border border-dashed border-emerald-800/40 rounded-lg"
+        class="border border-dashed border-success/40 rounded-lg"
       >
         <EmptyState
           icon="check_circle"
@@ -201,7 +201,7 @@ async function handleConfirmRepair() {
               v-if="finding.repairAction?.kind === 'endpoint'"
               @click="openRepairConfirm(finding)"
               :disabled="applying"
-              class="px-3 py-1.5 rounded bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 text-xs font-medium transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-3 py-1.5 rounded bg-success/20 hover:bg-success/35 text-success text-xs font-medium transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span class="material-symbols-outlined text-[1rem]">build</span>
               {{ t('diagnostics.repair') }}

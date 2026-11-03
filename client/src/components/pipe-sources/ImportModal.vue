@@ -164,17 +164,17 @@ defineExpose({ open });
             <EmptyState icon="check_circle" title="No unmanaged pipe:// sources found" />
           </div>
           <div v-else-if="pendingDiscovered.length === 0" class="text-center py-8 text-text-muted text-sm">
-            <span class="material-symbols-outlined text-3xl block mb-2 text-green-600">check_circle</span>
+            <span class="material-symbols-outlined text-3xl block mb-2 text-success">check_circle</span>
             All discovered sources have been imported.
           </div>
 
           <div v-for="{ d, f } in discoveredWithForms" :key="d.fifoPath" class="border border-line rounded-lg overflow-hidden">
             <!-- Item header -->
-            <div :class="['px-4 py-3 flex items-center justify-between', f.adopted ? 'bg-green-500/10' : 'bg-inset']">
+            <div :class="['px-4 py-3 flex items-center justify-between', f.adopted ? 'bg-success/10' : 'bg-inset']">
               <div>
                 <div class="flex items-center gap-2">
                   <span class="font-semibold text-sm text-text-main">{{ d.name }}</span>
-                  <span :class="['px-2 py-0.5 rounded-full text-[10px] font-semibold', f.type === 'mpd' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300']">
+                  <span :class="['px-2 py-0.5 rounded-full text-[10px] font-semibold', f.type === 'mpd' ? 'bg-info/20 text-info' : 'bg-brand-primary/20 text-brand-primary-text']">
                     {{ f.type === 'mpd' ? 'MPD' : 'Radio' }}
                   </span>
                   <span v-if="f.adopted" class="text-xs text-success font-medium">Imported</span>
@@ -183,7 +183,7 @@ defineExpose({ open });
               </div>
               <div v-if="d.existingService" class="text-right">
                 <span class="text-xs text-text-muted">{{ d.existingService.name }}</span>
-                <span :class="['ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold', d.existingService.isActive ? 'bg-green-500/20 text-success' : 'bg-line text-text-main']">
+                <span :class="['ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold', d.existingService.isActive ? 'bg-success/20 text-success' : 'bg-line text-text-main']">
                   {{ d.existingService.isActive ? 'active' : 'inactive' }}
                 </span>
               </div>
@@ -194,11 +194,11 @@ defineExpose({ open });
               <!-- Type override -->
               <div class="flex gap-2">
                 <button @click="f.type = 'radio'"
-                  :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'radio' ? 'border-purple-500 bg-purple-500/20 text-purple-300' : 'border-line bg-inset text-text-muted hover:border-line']">
+                  :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'radio' ? 'border-brand-primary bg-brand-primary/20 text-brand-primary-text' : 'border-line bg-inset text-text-muted hover:border-line']">
                   Radio
                 </button>
                 <button @click="f.type = 'mpd'"
-                  :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'mpd' ? 'border-blue-500 bg-blue-500/20 text-blue-300' : 'border-line bg-inset text-text-muted hover:border-line']">
+                  :class="['flex-1 py-1.5 rounded border text-xs font-medium transition', f.type === 'mpd' ? 'border-info bg-info/20 text-info' : 'border-line bg-inset text-text-muted hover:border-line']">
                   MPD
                 </button>
               </div>
@@ -208,38 +208,38 @@ defineExpose({ open });
                 <div>
                   <label class="block text-xs text-text-muted mb-1">Stream URL <span class="text-danger">*</span></label>
                   <input v-model="f.url" type="url" placeholder="https://…/radio.mp3"
-                    class="w-full bg-inset border border-line rounded px-3 py-2 text-sm text-text-main font-mono focus:border-purple-500 focus:outline-none" />
+                    class="w-full bg-inset border border-line rounded px-3 py-2 text-sm text-text-main font-mono focus:border-brand-primary focus:outline-none" />
                   <p v-if="d.existingService?.url" class="text-[10px] text-text-muted mt-1">Auto-detected from existing service.</p>
                 </div>
                 <div class="flex flex-wrap gap-x-4 gap-y-2 items-center">
                   <label class="flex items-center gap-1.5 cursor-pointer text-xs text-text-main">
-                    <input type="checkbox" v-model="f.reconnect" class="rounded border-line bg-inset text-purple-500" />
+                    <input type="checkbox" v-model="f.reconnect" class="rounded border-line bg-inset text-brand-primary-text" />
                     reconnect
                   </label>
                   <label class="flex items-center gap-1.5 cursor-pointer text-xs text-text-main">
-                    <input type="checkbox" v-model="f.reconnectStreamed" class="rounded border-line bg-inset text-purple-500" />
+                    <input type="checkbox" v-model="f.reconnectStreamed" class="rounded border-line bg-inset text-brand-primary-text" />
                     reconnect_streamed
                   </label>
                   <label class="flex items-center gap-1.5 cursor-pointer text-xs text-text-main">
-                    <input type="checkbox" v-model="f.reconnectAtEof" class="rounded border-line bg-inset text-purple-500" />
+                    <input type="checkbox" v-model="f.reconnectAtEof" class="rounded border-line bg-inset text-brand-primary-text" />
                     reconnect_at_eof
                   </label>
                   <div class="flex items-center gap-2 text-xs text-text-muted">
                     delay_max
                     <input v-model.number="f.reconnectDelayMax" type="number" min="1" max="300"
-                      class="w-16 bg-inset border border-line rounded px-2 py-1 text-text-main focus:border-purple-500 focus:outline-none" />s
+                      class="w-16 bg-inset border border-line rounded px-2 py-1 text-text-main focus:border-brand-primary focus:outline-none" />s
                   </div>
                 </div>
               </template>
 
               <!-- MPD info -->
-              <div v-else class="text-xs text-blue-300 bg-blue-500/5 border border-blue-500/20 rounded p-3">
+              <div v-else class="text-xs text-info bg-info/5 border border-info/20 rounded p-3">
                 This FIFO was detected in mpd.conf. It will be registered as an MPD source — no service changes needed.
               </div>
 
               <div class="flex justify-end">
                 <button @click="adoptPipe(d)" :disabled="f.adopting"
-                  class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded font-medium transition disabled:opacity-50 flex items-center gap-2">
+                  class="px-4 py-2 bg-brand-primary hover:bg-brand-primary text-white text-sm rounded font-medium transition disabled:opacity-50 flex items-center gap-2">
                   <span v-if="f.adopting" class="material-symbols-outlined animate-spin text-[1rem]">refresh</span>
                   {{ f.adopting ? 'Importing…' : 'Import' }}
                 </button>

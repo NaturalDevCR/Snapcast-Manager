@@ -207,7 +207,7 @@ const handleExportBackup = async () => {
 
       <!-- Footer Actions -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div class="flex items-start sm:items-center space-x-2 text-amber-500 text-xs font-bold bg-amber-500/5 px-4 py-3 rounded-xl border border-amber-500/10 w-full sm:w-auto">
+          <div class="flex items-start sm:items-center space-x-2 text-warning text-xs font-bold bg-warning/5 px-4 py-3 rounded-xl border border-warning/10 w-full sm:w-auto">
               <span class="material-symbols-outlined text-[16px] mt-0.5 sm:mt-0">warning</span>
               <span class="leading-relaxed">Warning: Restart required after applying changes to configuration.</span>
           </div>

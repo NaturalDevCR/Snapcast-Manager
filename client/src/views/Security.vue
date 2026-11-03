@@ -144,11 +144,11 @@ const handleExportBackup = async () => {
               <li class="flex items-center"><span class="material-symbols-outlined text-[16px] mr-2 text-danger">tune</span> {{ t('security.snapserverConfig') }}</li>
             </ul>
 
-            <div class="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl">
-              <p class="text-[10px] font-semibold text-amber-500 uppercase tracking-wider">{{ t('security.restoreInstructions') }}</p>
+            <div class="bg-warning/5 border border-warning/20 p-4 rounded-xl">
+              <p class="text-[10px] font-semibold text-warning uppercase tracking-wider">{{ t('security.restoreInstructions') }}</p>
               <p class="text-xs text-warning/80 mt-1">
                 <i18n-t keypath="security.restoreInstructionsBody">
-                  <template #flag><code class="bg-black/40 px-1 py-0.5 rounded text-amber-300 font-mono border border-amber-500/10">--restore /path/to/backup.tar.gz</code></template>
+                  <template #flag><code class="bg-black/40 px-1 py-0.5 rounded text-warning font-mono border border-warning/10">--restore /path/to/backup.tar.gz</code></template>
                 </i18n-t>
               </p>
             </div>

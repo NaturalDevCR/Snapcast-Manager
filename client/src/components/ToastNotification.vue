@@ -12,7 +12,7 @@ const uiStore = useUIStore();
 
 const typeConfigs = {
   success: {
-    bg: 'bg-emerald-500/90 dark:bg-emerald-500/20',
+    bg: 'bg-success/90 dark:bg-success/20',
     border: 'border-emerald-500/50',
     text: 'text-white dark:text-success',
     icon: CheckCircleIcon,
@@ -33,8 +33,8 @@ const typeConfigs = {
     glow: 'shadow-indigo-500/40'
   },
   warning: {
-    bg: 'bg-amber-500/90 dark:bg-amber-500/20',
-    border: 'border-amber-500/50',
+    bg: 'bg-warning/90 dark:bg-warning/20',
+    border: 'border-warning/50',
     text: 'text-white dark:text-warning',
     icon: ExclamationTriangleIcon,
     glow: 'shadow-amber-500/40'

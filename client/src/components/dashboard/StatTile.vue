@@ -58,9 +58,9 @@ const valueClass = computed(
         aria-hidden="true"
       >arrow_forward</span>
     </div>
-    <div class="flex items-center gap-2 min-w-0">
-      <span class="w-2 h-2 rounded-full flex-shrink-0" :class="dotClass" aria-hidden="true"></span>
-      <span class="text-lg font-semibold leading-tight truncate" :class="valueClass">{{ value }}</span>
+    <div class="flex items-start gap-2 min-w-0">
+      <span class="w-2 h-2 mt-2 rounded-full flex-shrink-0" :class="dotClass" aria-hidden="true"></span>
+      <span class="text-base sm:text-lg font-semibold leading-tight line-clamp-2" :class="valueClass">{{ value }}</span>
     </div>
     <p v-if="detail" class="-mt-2 text-xs text-text-muted truncate">{{ detail }}</p>
   </component>

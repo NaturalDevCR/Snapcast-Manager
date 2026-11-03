@@ -51,7 +51,7 @@ const handleSetup = async () => {
     <div class="min-h-screen bg-brand-bg flex items-center justify-center p-6 transition-colors duration-500">
         <!-- Background Accents -->
         <div class="fixed inset-0 overflow-hidden pointer-events-none">
-            <div class="absolute -top-[15%] -right-[5%] w-[50%] h-[50%] bg-indigo-600/10 blur-[120px] rounded-full"></div>
+            <div class="absolute -top-[15%] -right-[5%] w-[50%] h-[50%] bg-brand-primary/10 blur-[120px] rounded-full"></div>
             <div class="absolute -bottom-[10%] -left-[10%] w-[40%] h-[40%] bg-brand-primary/10 blur-[120px] rounded-full"></div>
         </div>
 

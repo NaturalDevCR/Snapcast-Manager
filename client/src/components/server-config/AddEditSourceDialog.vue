@@ -385,7 +385,7 @@ defineExpose({ openAdd, openEdit });
                   <div>
                     <span class="text-xs font-semibold text-brand-primary">{{ selectedTemplate.label }}</span>
                     <p class="text-[10px] text-brand-primary/70 mt-1">{{ selectedTemplate.description }}</p>
-                    <p v-if="selectedTemplate.fixedSampleFormat" class="text-[10px] text-amber-500/80 mt-2 font-semibold tracking-wider uppercase">
+                    <p v-if="selectedTemplate.fixedSampleFormat" class="text-[10px] text-warning/80 mt-2 font-semibold tracking-wider uppercase">
                       <span class="mr-1">⚠</span> Fixed sample format: {{ selectedTemplate.fixedSampleFormat }}
                     </p>
                   </div>
@@ -470,7 +470,7 @@ defineExpose({ openAdd, openEdit });
                         <span class="flex-1 text-sm font-bold" :class="idx === 0 ? 'text-success' : 'text-text-muted'">{{ srcName }}</span>
                         <!-- Priority label -->
                         <span v-if="idx === 0" class="text-[10px] font-semibold uppercase tracking-wider text-success/70 px-2 py-0.5 bg-success/10 rounded border border-success/20">Primary</span>
-                        <span v-else-if="idx === metaSelectedSources.length - 1" class="text-[10px] font-semibold uppercase tracking-wider text-amber-500/70 px-2 py-0.5 bg-amber-500/10 rounded border border-amber-500/20">Fallback</span>
+                        <span v-else-if="idx === metaSelectedSources.length - 1" class="text-[10px] font-semibold uppercase tracking-wider text-warning/70 px-2 py-0.5 bg-warning/10 rounded border border-warning/20">Fallback</span>
                         <!-- Move buttons -->
                         <button
                           @click="moveMetaSource(idx, 'up')"
@@ -503,11 +503,11 @@ defineExpose({ openAdd, openEdit });
                   </div>
 
                   <!-- Tip -->
-                  <div class="p-3 bg-amber-500/5 border border-amber-500/15 rounded-xl">
+                  <div class="p-3 bg-warning/5 border border-warning/15 rounded-xl">
                     <div class="flex items-start space-x-2">
-                      <span class="material-symbols-outlined text-[14px] text-amber-500 mt-0.5 flex-shrink-0">tips_and_updates</span>
+                      <span class="material-symbols-outlined text-[14px] text-warning mt-0.5 flex-shrink-0">tips_and_updates</span>
                       <p class="text-[10px] text-warning/80 leading-relaxed">
-                        <strong class="text-amber-500">Tip:</strong> Use <code class="bg-black/40 px-1 py-0.5 rounded text-amber-300 font-mono border border-amber-500/10">codec=null</code> on sources that should <em>only</em> feed meta-streams and not appear as standalone streams for clients.
+                        <strong class="text-warning">Tip:</strong> Use <code class="bg-black/40 px-1 py-0.5 rounded text-warning font-mono border border-warning/10">codec=null</code> on sources that should <em>only</em> feed meta-streams and not appear as standalone streams for clients.
                       </p>
                     </div>
                   </div>

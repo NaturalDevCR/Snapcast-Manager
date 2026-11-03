@@ -222,7 +222,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
             </p>
           </div>
           <button @click="restartSnapserver" :disabled="restarting"
-            class="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs rounded font-medium transition disabled:opacity-50">
+            class="px-3 py-1.5 bg-warning/15 hover:bg-warning/25 text-warning border border-warning/30 text-xs rounded-lg font-semibold transition-colors disabled:opacity-50 self-start sm:self-auto">
             {{ restarting ? t('pipeSources.restarting') : t('pipeSources.restartSnapserver') }}
           </button>
         </div>
@@ -230,7 +230,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
 
       <!-- Zombie healthy -->
       <div v-else-if="store.zombieCount !== null && !isZombieWarning" class="flex items-center gap-2 text-xs text-text-muted">
-        <span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+        <span class="w-2 h-2 rounded-full bg-success inline-block"></span>
         {{ t('pipeSources.zombieHealthy', { count: store.zombieCount }) }}
       </div>
 

@@ -110,10 +110,10 @@ defineExpose({ open });
         <div class="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
           <div v-if="loadingConfig" class="text-text-muted text-sm text-center py-8">Loading…</div>
           <template v-else>
-            <p v-if="configEditorPipe?.type === 'mpd'" class="text-xs text-blue-300 bg-blue-500/5 border border-blue-500/20 rounded px-3 py-2">
+            <p v-if="configEditorPipe?.type === 'mpd'" class="text-xs text-info bg-info/5 border border-info/20 rounded px-3 py-2">
               Editing only the <code>audio_output</code> block managed by Snapcast Manager. Other mpd.conf content is preserved.
             </p>
-            <p v-else class="text-xs text-amber-300 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2">
+            <p v-else class="text-xs text-warning bg-warning/5 border border-warning/20 rounded px-3 py-2">
               Changes are written directly to the service file and trigger a <code>daemon-reload</code> + restart. Be careful with syntax.
             </p>
             <textarea
