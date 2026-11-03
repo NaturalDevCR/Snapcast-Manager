@@ -121,10 +121,10 @@ onUnmounted(() => {
         </template>
       </div>
 
-      <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+      <div class="bg-brand-surface/80 border border-line rounded-2xl shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-line bg-inset flex items-center space-x-3">
           <span class="material-symbols-outlined text-text-muted text-[1.2rem]">terminal</span>
-          <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('logs.consoleOutput') }}</span>
+          <span class="text-sm font-semibold text-text-main">{{ t('logs.consoleOutput') }}</span>
           <span v-if="activeService.startsWith('snapclient-')" class="ml-auto text-[10px] font-mono text-brand-primary">
             snapclient-manager-{{ activeService.replace('snapclient-', '') }}.service
           </span>

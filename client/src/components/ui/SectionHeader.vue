@@ -36,7 +36,7 @@ withDefaults(defineProps<SectionHeaderProps>(), {
 <template>
   <div class="flex items-start justify-between gap-4">
     <div>
-      <p v-if="eyebrow" class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-1">
+      <p v-if="eyebrow" class="text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em] mb-1">
         {{ eyebrow }}
       </p>
       <h2 class="text-base font-semibold text-text-main">{{ title }}</h2>

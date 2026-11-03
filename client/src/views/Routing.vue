@@ -446,7 +446,7 @@ const updateVolume = (client: any, event: Event) => {
              
              <!-- SOURCES COLUMN (Left) -->
              <div class="w-full lg:w-1/2 flex flex-col gap-3 order-2 lg:order-1">
-                 <h2 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1 flex items-center gap-2 px-1">
+                 <h2 class="text-xs font-semibold text-text-muted mb-1 flex items-center gap-2 px-1">
                     <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">input</span> {{ t('routing.virtualSources') }}
                  </h2>
                  <div v-for="stream in snapcastStore.status?.streams || []" :key="stream.id"
@@ -493,7 +493,7 @@ const updateVolume = (client: any, event: Event) => {
              
              <!-- ZONES COLUMN (Right) -->
              <div class="w-full lg:w-1/2 flex flex-col gap-3 order-1 lg:order-2">
-                 <h2 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1 flex items-center gap-2 px-1">
+                 <h2 class="text-xs font-semibold text-text-muted mb-1 flex items-center gap-2 px-1">
                     <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">speaker_group</span> {{ t('routing.outputZones') }}
                  </h2>
                  

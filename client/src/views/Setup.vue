@@ -64,7 +64,7 @@ const handleSetup = async () => {
                      <div class="inline-flex items-center justify-center p-5 bg-brand-primary/10 rounded-3xl mb-8 border border-brand-primary/20 shadow-[inset_0_0_15px_rgba(166,13,242,0.1)]">
                         <span class="material-symbols-outlined text-[3rem] text-brand-primary">rocket_launch</span>
                      </div>
-                     <h2 class="text-4xl font-black text-text-main tracking-tight leading-tight mb-4">
+                     <h2 class="text-4xl font-semibold text-text-main tracking-tight leading-tight mb-4">
                         {{ t('setup.title') }}
                     </h2>
                     <p class="text-slate-400 font-medium text-lg">
@@ -75,7 +75,7 @@ const handleSetup = async () => {
                 <form class="space-y-8" @submit.prevent="handleSetup">
                     <div class="space-y-5">
                         <div class="group/input">
-                            <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.usernameLabel') }}</label>
+                            <label class="text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.usernameLabel') }}</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                     <span class="material-symbols-outlined text-text-muted group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">person_add</span>
@@ -92,7 +92,7 @@ const handleSetup = async () => {
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div class="group/input">
-                                <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.passwordLabel') }}</label>
+                                <label class="text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.passwordLabel') }}</label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                         <span class="material-symbols-outlined text-text-muted group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">lock</span>
@@ -107,7 +107,7 @@ const handleSetup = async () => {
                                 </div>
                             </div>
                             <div class="group/input">
-                                <label class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.confirmLabel') }}</label>
+                                <label class="text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em] mb-2 block px-2 group-focus-within/input:text-brand-primary transition-colors">{{ t('setup.confirmLabel') }}</label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                         <span class="material-symbols-outlined text-text-muted group-focus-within/input:text-brand-primary transition-colors text-[1.2rem]">check_circle</span>
@@ -127,7 +127,7 @@ const handleSetup = async () => {
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="w-full flex items-center justify-center py-5 px-8 bg-brand-primary hover:bg-brand-primary text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] border border-brand-primary/50 transition-all hover:-translate-y-1 active:scale-[0.98] disabled:opacity-50"
+                        class="w-full flex items-center justify-center py-5 px-8 bg-brand-primary hover:bg-brand-primary text-white rounded-2xl font-semibold text-sm tracking-[0.2em] border border-brand-primary/50 transition-all hover:-translate-y-1 active:scale-[0.98] disabled:opacity-50"
                     >
                         <span v-if="loading" class="flex items-center gap-2">
                             <span class="material-symbols-outlined animate-spin text-[1.2rem]">sync</span>
@@ -136,7 +136,7 @@ const handleSetup = async () => {
                         <span v-else>{{ t('setup.submit') }}</span>
                     </button>
 
-                    <p class="text-center text-[10px] font-bold text-text-muted uppercase tracking-widest leading-relaxed px-4">
+                    <p class="text-center text-[10px] font-bold text-text-muted uppercase tracking-wider leading-relaxed px-4">
                         {{ t('setup.footer') }}
                     </p>
                 </form>

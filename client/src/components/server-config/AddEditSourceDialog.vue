@@ -345,7 +345,7 @@ defineExpose({ openAdd, openEdit });
           <!-- Header -->
           <div class="sticky top-0 bg-brand-bg/90 backdrop-blur-sm border-b border-line px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
             <div>
-              <h3 class="text-sm font-black text-text-main uppercase tracking-widest dark:">{{ isEditingSource ? 'Edit Audio Source' : 'Add Audio Source' }}</h3>
+              <h3 class="text-sm font-semibold text-text-main dark:">{{ isEditingSource ? 'Edit Audio Source' : 'Add Audio Source' }}</h3>
               <p class="text-[10px] text-text-muted mt-0.5">{{ isEditingSource ? 'Modify the source parameters' : 'Select a source type and configure its parameters' }}</p>
             </div>
             <button @click="showAddSourceDialog = false" class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-600 dark:text-gray-500 hover:text-text-main rounded-lg hover:bg-inset transition-all" aria-label="Close">
@@ -366,7 +366,7 @@ defineExpose({ openAdd, openEdit });
                   <div class="p-2 bg-inset border border-line rounded-lg group-hover:bg-brand-primary/20 group-hover:border-brand-primary/30 transition-colors mb-2 shadow-[inset_0_0_10px_rgba(255,255,255,0.05)] group-hover:shadow-[inset_0_0_15px_rgba(166,13,242,0.3)]">
                     <span class="material-symbols-outlined text-[24px] text-text-muted group-hover:text-brand-primary transition-colors">queue_music</span>
                   </div>
-                  <span class="text-xs font-black uppercase tracking-wider text-text-main group-hover:text-gray-900 dark:group-hover:text-text-main">{{ tmpl.label }}</span>
+                  <span class="text-xs font-semibold text-text-main group-hover:text-gray-900 dark:group-hover:text-text-main">{{ tmpl.label }}</span>
                   <span class="text-[9px] text-text-muted mt-1 leading-tight group-hover:text-gray-600 dark:group-hover:text-gray-400">{{ tmpl.description.split('.')[0] }}</span>
                 </button>
               </div>
@@ -374,7 +374,7 @@ defineExpose({ openAdd, openEdit });
 
             <!-- Step 2: Parameter Form -->
             <div v-else-if="selectedTemplate">
-              <button @click="selectedSourceType = ''" class="text-[10px] font-black text-brand-primary uppercase tracking-widest mb-4 hover:text-brand-primary hover: transition-all flex items-center">
+              <button @click="selectedSourceType = ''" class="text-[10px] font-semibold text-brand-primary uppercase tracking-wider mb-4 hover:text-brand-primary hover: transition-all flex items-center">
                 <span class="material-symbols-outlined text-[14px] mr-1">arrow_back</span>
                 Back to source types
               </button>
@@ -383,9 +383,9 @@ defineExpose({ openAdd, openEdit });
                 <div class="flex items-start space-x-3">
                   <span class="material-symbols-outlined text-[20px] text-brand-primary flex-shrink-0 mt-0.5">info</span>
                   <div>
-                    <span class="text-xs font-black text-brand-primary uppercase tracking-widest">{{ selectedTemplate.label }}</span>
+                    <span class="text-xs font-semibold text-brand-primary">{{ selectedTemplate.label }}</span>
                     <p class="text-[10px] text-brand-primary/70 mt-1">{{ selectedTemplate.description }}</p>
-                    <p v-if="selectedTemplate.fixedSampleFormat" class="text-[10px] text-amber-500/80 mt-2 font-black tracking-widest uppercase">
+                    <p v-if="selectedTemplate.fixedSampleFormat" class="text-[10px] text-amber-500/80 mt-2 font-semibold tracking-wider uppercase">
                       <span class="mr-1">⚠</span> Fixed sample format: {{ selectedTemplate.fixedSampleFormat }}
                     </p>
                   </div>
@@ -395,7 +395,7 @@ defineExpose({ openAdd, openEdit });
               <div class="space-y-4">
                 <!-- Path (non-meta only) -->
                 <div v-if="!selectedTemplate.isMeta">
-                  <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">
+                  <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-1.5">
                     Path / Host
                   </label>
                   <input
@@ -409,7 +409,7 @@ defineExpose({ openAdd, openEdit });
                 <div v-if="selectedTemplate.isMeta" class="space-y-4">
                   <!-- Available Sources -->
                   <div>
-                    <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">
+                    <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-2">
                       <span class="material-symbols-outlined text-[12px] align-middle mr-1">library_music</span>
                       Available Sources
                     </label>
@@ -444,14 +444,14 @@ defineExpose({ openAdd, openEdit });
 
                   <!-- Selected Sources (priority order) -->
                   <div>
-                    <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">
+                    <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-2">
                       <span class="material-symbols-outlined text-[12px] align-middle mr-1">sort</span>
                       Priority Chain
                       <span class="text-[9px] text-text-muted font-semibold normal-case tracking-normal ml-1">— first = highest priority (active), last = fallback</span>
                     </label>
                     <div v-if="metaSelectedSources.length === 0" class="text-center py-6 border border-dashed border-line rounded-xl bg-black/20">
                       <span class="material-symbols-outlined text-[24px] text-text-muted">playlist_add</span>
-                      <p class="text-[10px] text-text-muted mt-1 font-bold uppercase tracking-widest">Click sources above to add them</p>
+                      <p class="text-[10px] text-text-muted mt-1 font-bold uppercase tracking-wider">Click sources above to add them</p>
                     </div>
                     <div v-else class="space-y-2">
                       <div
@@ -462,20 +462,15 @@ defineExpose({ openAdd, openEdit });
                       >
                         <!-- Priority badge -->
                         <span
-                          :class="[
-                            'flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-black',
-                            idx === 0
-                              ? 'bg-success/20 text-success border border-success/30'
-                              : 'bg-inset text-text-muted border border-line'
-                          ]"
+                          :class="[ 'flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-semibold', idx === 0 ? 'bg-success/20 text-success border border-success/30' : 'bg-inset text-text-muted border border-line' ]"
                         >
                           {{ idx + 1 }}
                         </span>
                         <!-- Name -->
                         <span class="flex-1 text-sm font-bold" :class="idx === 0 ? 'text-success' : 'text-text-muted'">{{ srcName }}</span>
                         <!-- Priority label -->
-                        <span v-if="idx === 0" class="text-[8px] font-black uppercase tracking-widest text-success/70 px-2 py-0.5 bg-success/10 rounded border border-success/20">Primary</span>
-                        <span v-else-if="idx === metaSelectedSources.length - 1" class="text-[8px] font-black uppercase tracking-widest text-amber-500/70 px-2 py-0.5 bg-amber-500/10 rounded border border-amber-500/20">Fallback</span>
+                        <span v-if="idx === 0" class="text-[10px] font-semibold uppercase tracking-wider text-success/70 px-2 py-0.5 bg-success/10 rounded border border-success/20">Primary</span>
+                        <span v-else-if="idx === metaSelectedSources.length - 1" class="text-[10px] font-semibold uppercase tracking-wider text-amber-500/70 px-2 py-0.5 bg-amber-500/10 rounded border border-amber-500/20">Fallback</span>
                         <!-- Move buttons -->
                         <button
                           @click="moveMetaSource(idx, 'up')"
@@ -520,7 +515,7 @@ defineExpose({ openAdd, openEdit });
 
                 <!-- Parameters -->
                 <div v-for="param in selectedTemplate.params" :key="param.key">
-                  <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">
+                  <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-1.5">
                     {{ param.label }}
                     <span v-if="param.required" class="text-danger ml-0.5">*</span>
                   </label>
@@ -538,7 +533,7 @@ defineExpose({ openAdd, openEdit });
                     >
                       <span :class="[sourceFormParams[param.key] === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200']" />
                     </button>
-                    <span class="ml-3 text-xs text-text-muted font-bold uppercase tracking-widest">
+                    <span class="ml-3 text-xs text-text-muted font-bold">
                       {{ sourceFormParams[param.key] === 'true' ? 'Yes' : 'No' }}
                     </span>
                   </div>
@@ -575,18 +570,18 @@ defineExpose({ openAdd, openEdit });
 
               <!-- URI Preview -->
               <div class="mt-6 p-4 bg-black/50 rounded-xl border border-line">
-                <label class="text-[9px] font-black text-text-muted uppercase tracking-widest block mb-2">Generated URI</label>
+                <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-2">Generated URI</label>
                 <code class="text-[11px] text-info font-mono break-all leading-relaxed">{{ buildSourceUri() }}</code>
               </div>
 
               <!-- Actions -->
               <div class="flex justify-end space-x-3 mt-6">
-                <button @click="showAddSourceDialog = false" class="px-5 py-2.5 text-xs font-black text-text-muted uppercase tracking-widest hover:text-text-main transition-colors">
+                <button @click="showAddSourceDialog = false" class="px-5 py-2.5 text-xs font-semibold text-text-muted hover:text-text-main transition-colors">
                   Cancel
                 </button>
                 <button
                   @click="addSourceFromTemplate"
-                  class="px-6 py-2.5 bg-brand-primary text-white border border-brand-primary/50 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-brand-primary active:scale-95 transition-all"
+                  class="px-6 py-2.5 bg-brand-primary text-white border border-brand-primary/50 rounded-xl text-xs font-semibold hover:bg-brand-primary active:scale-95 transition-all"
                 >
                   {{ isEditingSource ? 'Update Source' : 'Add Source' }}
                 </button>

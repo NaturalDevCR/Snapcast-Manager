@@ -46,7 +46,7 @@ watch(
     >
       <div class="flex items-center gap-3 px-5 py-4 border-b border-line">
         <span class="material-symbols-outlined animate-spin text-brand-primary text-2xl shrink-0">sync</span>
-        <span class="text-sm font-bold text-text-main tracking-widest uppercase truncate">
+        <span class="text-sm font-bold text-text-main truncate">
           {{ systemStore.loadingMessage || t('dashboard.loadingFallback') }}
         </span>
       </div>

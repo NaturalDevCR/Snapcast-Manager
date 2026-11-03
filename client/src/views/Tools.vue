@@ -387,35 +387,35 @@ onMounted(() => {
 
       <!-- ─── Crontab Editor ───────────────────────────────────────────── -->
       <div v-if="activeTab === 'crontab'" class="space-y-4">
-        <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+        <div class="bg-brand-surface/80 border border-line rounded-2xl shadow-sm overflow-hidden">
           <div class="px-6 py-4 border-b border-line bg-inset flex items-center justify-between">
             <div class="flex items-center space-x-3">
               <span class="material-symbols-outlined text-text-muted text-[1.2rem]">schedule</span>
-              <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('tools.crontabEditor') }}</span>
+              <span class="text-sm font-semibold text-text-main">{{ t('tools.crontabEditor') }}</span>
             </div>
             <div class="flex items-center gap-3">
               <button @click="loadCrontab" :disabled="crontabLoading"
-                class="inline-flex items-center px-3 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+                class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 disabled:opacity-50">
                 <span class="material-symbols-outlined text-[1rem] mr-1" :class="{'animate-spin': crontabLoading}">sync</span>
                 {{ t('tools.reload') }}
               </button>
               <button @click="saveCrontab" :disabled="crontabLoading"
-                class="inline-flex items-center px-4 py-1.5 text-xs font-black bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl transition-all active:scale-95 uppercase tracking-widest border border-brand-primary/50 disabled:opacity-50">
+                class="inline-flex items-center px-4 py-1.5 text-xs font-semibold bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl transition-all active:scale-95 border border-brand-primary/50 disabled:opacity-50">
                 <span class="material-symbols-outlined text-[1rem] mr-1">save</span>
                 {{ t('tools.save') }}
               </button>
             </div>
           </div>
           <div class="p-4">
-            <p class="text-[10px] font-mono text-terminal-muted mb-3 leading-relaxed">
-              <i18n-t keypath="tools.crontabFormatLabel"><template #fields><span class="text-terminal-muted">min hour day month weekday command</span></template></i18n-t>&nbsp;&nbsp;
-              <i18n-t keypath="tools.crontabExampleLabel"><template #example><span class="text-terminal-muted">*/5 * * * * /path/to/script.sh</span></template></i18n-t>
+            <p class="text-[10px] font-mono text-text-muted mb-3 leading-relaxed">
+              <i18n-t keypath="tools.crontabFormatLabel"><template #fields><span class="text-text-muted">min hour day month weekday command</span></template></i18n-t>&nbsp;&nbsp;
+              <i18n-t keypath="tools.crontabExampleLabel"><template #example><span class="text-text-muted">*/5 * * * * /path/to/script.sh</span></template></i18n-t>
             </p>
             <textarea
               v-model="crontabContent"
               rows="18"
               spellcheck="false"
-              class="w-full bg-black/60 border border-line rounded-xl text-sm font-mono text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
+              class="w-full bg-inset border border-line rounded-xl text-sm font-mono text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
               placeholder="# No crontab entries yet&#10;# min hour day month weekday command"
             ></textarea>
           </div>
@@ -427,9 +427,9 @@ onMounted(() => {
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
           <!-- Script List -->
-          <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+          <div class="bg-brand-surface/80 border border-line rounded-2xl shadow-sm overflow-hidden">
             <div class="px-5 py-4 border-b border-line bg-inset flex items-center justify-between">
-              <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('tools.tabScripts') }}</span>
+              <span class="text-sm font-semibold text-text-main">{{ t('tools.tabScripts') }}</span>
               <button @click="showAddForm = !showAddForm"
                 class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary rounded-lg transition-all"
                 :aria-label="showAddForm ? t('tools.cancelAddScript') : t('tools.addScript')">
@@ -440,18 +440,18 @@ onMounted(() => {
             <!-- Add Form -->
             <div v-if="showAddForm" class="p-4 border-b border-line bg-brand-primary/5 space-y-3">
               <input v-model="newScriptLabel" type="text" :placeholder="t('tools.labelPlaceholder')"
-                class="w-full bg-black/60 border border-line rounded-xl text-xs font-mono text-text-main px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
+                class="w-full bg-inset border border-line rounded-xl text-xs font-mono text-text-main px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
               <input v-model="newScriptPath" type="text" placeholder="/path/to/script.sh"
-                class="w-full bg-black/60 border border-line rounded-xl text-xs font-mono text-text-main px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
+                class="w-full bg-inset border border-line rounded-xl text-xs font-mono text-text-main px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
               <button @click="addScriptPath"
-                class="w-full px-3 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 border border-brand-primary/50">
+                class="w-full px-3 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-semibold transition-all active:scale-95 border border-brand-primary/50">
                 {{ t('tools.addScriptButton') }}
               </button>
             </div>
 
             <!-- Script Items -->
             <div class="divide-y divide-white/5">
-              <div v-if="scriptPaths.length === 0" class="px-5 py-8 text-center text-terminal-muted text-xs font-bold uppercase tracking-widest">
+              <div v-if="scriptPaths.length === 0" class="px-5 py-8 text-center text-text-muted text-sm">
                 {{ t('tools.noScriptsYet') }}
               </div>
               <div v-for="script in scriptPaths" :key="script.id"
@@ -459,8 +459,8 @@ onMounted(() => {
                 :class="['flex items-center justify-between px-5 py-3.5 cursor-pointer transition-all group',
                   selectedScript?.id === script.id ? 'bg-brand-primary/10 border-l-2 border-brand-primary' : 'hover:bg-inset']">
                 <div class="min-w-0 mr-2">
-                  <p class="text-xs font-black text-text-main truncate">{{ script.label }}</p>
-                  <p class="text-[10px] font-mono text-terminal-muted truncate mt-0.5">{{ script.path }}</p>
+                  <p class="text-xs font-semibold text-text-main truncate">{{ script.label }}</p>
+                  <p class="text-[10px] font-mono text-text-muted truncate mt-0.5">{{ script.path }}</p>
                 </div>
                 <button @click.stop="confirmRemoveScript(script.id)"
                   class="opacity-0 group-hover:opacity-100 p-1 min-w-[40px] min-h-[40px] flex items-center justify-center text-danger hover:bg-danger/10 rounded-lg transition-all flex-shrink-0"
@@ -472,36 +472,36 @@ onMounted(() => {
           </div>
 
           <!-- Script Editor Panel -->
-          <div class="lg:col-span-2 bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+          <div class="lg:col-span-2 bg-brand-surface/80 border border-line rounded-2xl shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-line bg-inset flex items-center justify-between">
               <div class="flex items-center space-x-3">
                 <span class="material-symbols-outlined text-text-muted text-[1.2rem]">code</span>
-                <span class="text-sm font-black text-text-main uppercase tracking-widest">
+                <span class="text-sm font-semibold text-text-main">
                   {{ selectedScript ? selectedScript.label : t('tools.selectAScript') }}
                 </span>
-                <span v-if="selectedScript" class="text-[10px] font-mono text-terminal-muted truncate max-w-[200px]">{{ selectedScript.path }}</span>
+                <span v-if="selectedScript" class="text-[10px] font-mono text-text-muted truncate max-w-[200px]">{{ selectedScript.path }}</span>
               </div>
               <button v-if="selectedScript" @click="saveScript" :disabled="scriptLoading"
-                class="inline-flex items-center px-4 py-1.5 text-xs font-black bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl transition-all active:scale-95 uppercase tracking-widest border border-brand-primary/50 disabled:opacity-50">
+                class="inline-flex items-center px-4 py-1.5 text-xs font-semibold bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl transition-all active:scale-95 border border-brand-primary/50 disabled:opacity-50">
                 <span class="material-symbols-outlined text-[1rem] mr-1">save</span>
                 {{ t('tools.save') }}
               </button>
             </div>
             <div class="p-4">
-              <div v-if="!selectedScript" class="flex flex-col items-center justify-center py-20 text-terminal-muted">
+              <div v-if="!selectedScript" class="flex flex-col items-center justify-center py-20 text-text-muted">
                 <span class="material-symbols-outlined text-4xl mb-3">code_off</span>
-                <p class="text-xs font-black uppercase tracking-widest">{{ t('tools.selectScriptFromList') }}</p>
+                <p class="text-xs font-semibold">{{ t('tools.selectScriptFromList') }}</p>
               </div>
-              <div v-else-if="scriptLoading" class="flex items-center justify-center py-20 text-terminal-muted">
+              <div v-else-if="scriptLoading" class="flex items-center justify-center py-20 text-text-muted">
                 <span class="material-symbols-outlined animate-spin mr-2">sync</span>
-                <span class="text-xs font-black uppercase tracking-widest">{{ t('tools.loading') }}</span>
+                <span class="text-xs font-semibold">{{ t('tools.loading') }}</span>
               </div>
               <textarea
                 v-else
                 v-model="scriptContent"
                 rows="22"
                 spellcheck="false"
-                class="w-full bg-black/60 border border-line rounded-xl text-sm font-mono text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
+                class="w-full bg-inset border border-line rounded-xl text-sm font-mono text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
                 placeholder="#!/bin/bash&#10;# Script content..."
               ></textarea>
             </div>
@@ -511,26 +511,26 @@ onMounted(() => {
 
       <!-- ─── MPD Config Editor ───────────────────────────────────────── -->
       <div v-if="activeTab === 'mpd-config'" class="space-y-4">
-        <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+        <div class="bg-brand-surface/80 border border-line rounded-2xl shadow-sm overflow-hidden">
           <div class="px-6 py-4 border-b border-line bg-inset flex items-center justify-between">
             <div class="flex items-center space-x-3">
               <span class="material-symbols-outlined text-text-muted text-[1.2rem]">queue_music</span>
-              <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('tools.tabMpdConfig') }}</span>
-              <span class="text-[10px] font-mono text-terminal-muted">/etc/mpd.conf</span>
+              <span class="text-sm font-semibold text-text-main">{{ t('tools.tabMpdConfig') }}</span>
+              <span class="text-[10px] font-mono text-text-muted">/etc/mpd.conf</span>
             </div>
             <div class="flex items-center gap-3">
               <button v-if="systemStore.installedPackages['mympd'] && systemStore.mympdRunning" @click="openMympd"
-                class="inline-flex items-center px-3 py-1.5 text-xs font-black text-success hover:bg-success/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
+                class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-success hover:bg-success/10 rounded-xl transition-all active:scale-95">
                 <span class="material-symbols-outlined text-[1rem] mr-1">open_in_new</span>
                 {{ t('tools.openMympd') }}
               </button>
               <button @click="loadMpdConfig" :disabled="mpdConfigLoading"
-                class="inline-flex items-center px-3 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+                class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 disabled:opacity-50">
                 <span class="material-symbols-outlined text-[1rem] mr-1" :class="{'animate-spin': mpdConfigLoading}">sync</span>
                 {{ t('tools.reload') }}
               </button>
               <button @click="saveMpdConfig" :disabled="mpdConfigLoading"
-                class="inline-flex items-center px-4 py-1.5 text-xs font-black bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl transition-all active:scale-95 uppercase tracking-widest border border-brand-primary/50 disabled:opacity-50">
+                class="inline-flex items-center px-4 py-1.5 text-xs font-semibold bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl transition-all active:scale-95 border border-brand-primary/50 disabled:opacity-50">
                 <span class="material-symbols-outlined text-[1rem] mr-1">save</span>
                 {{ t('tools.save') }}
               </button>
@@ -539,11 +539,11 @@ onMounted(() => {
           <div class="p-4">
             <div class="flex items-center gap-2 mb-3 p-3 bg-warning/5 border border-warning/20 rounded-xl">
               <span class="material-symbols-outlined text-warning text-[1rem]">info</span>
-              <p class="text-[10px] font-bold text-warning uppercase tracking-wide">
+              <p class="text-[10px] font-bold text-warning uppercase tracking-wider">
                 {{ t('tools.restartMpdHint') }}
               </p>
               <button @click="systemStore.controlService('restart', 'mpd')" :disabled="systemStore.loading"
-                class="ml-auto px-3 py-1 bg-warning/10 hover:bg-warning/20 text-warning border border-warning/20 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all active:scale-95 disabled:opacity-50">
+                class="ml-auto px-3 py-1 bg-warning/10 hover:bg-warning/20 text-warning border border-warning/20 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50">
                 {{ t('tools.restartMpd') }}
               </button>
             </div>
@@ -551,7 +551,7 @@ onMounted(() => {
               v-model="mpdConfigContent"
               rows="28"
               spellcheck="false"
-              class="w-full bg-black/60 border border-line rounded-xl text-sm font-mono text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
+              class="w-full bg-inset border border-line rounded-xl text-sm font-mono text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
               placeholder="# /etc/mpd.conf&#10;# MPD configuration file"
             ></textarea>
           </div>
@@ -560,30 +560,30 @@ onMounted(() => {
 
       <!-- ─── Backups ─────────────────────────────────────────────────── -->
       <div v-if="activeTab === 'backups'" class="space-y-4">
-        <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+        <div class="bg-brand-surface/80 border border-line rounded-2xl shadow-sm overflow-hidden">
           <div class="px-6 py-4 border-b border-line bg-inset flex items-center space-x-3">
             <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">event_repeat</span>
-            <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('tools.scheduledBackups') }}</span>
+            <span class="text-sm font-semibold text-text-main">{{ t('tools.scheduledBackups') }}</span>
           </div>
           <div class="p-4 space-y-4">
-            <p class="text-[10px] font-mono text-terminal-muted leading-relaxed">
+            <p class="text-[10px] font-mono text-text-muted leading-relaxed">
               {{ t('tools.scheduledBackupsDescription') }}
             </p>
-            <label class="flex items-center gap-2 text-xs font-black text-text-main uppercase tracking-widest">
+            <label class="flex items-center gap-2 text-xs font-semibold text-text-main">
               <input type="checkbox" v-model="schedule.enabled" class="w-4 h-4" />
               {{ t('tools.scheduleEnabled') }}
             </label>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleFrequency') }}</label>
-                <select v-model="schedule.frequency" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-text-main">
+                <label class="block text-xs font-semibold text-text-muted mb-1">{{ t('tools.scheduleFrequency') }}</label>
+                <select v-model="schedule.frequency" class="w-full bg-inset border border-line rounded-xl px-3 py-2 text-xs text-text-main">
                   <option value="daily">{{ t('tools.scheduleFrequencyDaily') }}</option>
                   <option value="weekly">{{ t('tools.scheduleFrequencyWeekly') }}</option>
                 </select>
               </div>
               <div v-if="schedule.frequency === 'weekly'">
-                <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleDayOfWeek') }}</label>
-                <select v-model.number="schedule.dayOfWeek" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-text-main">
+                <label class="block text-xs font-semibold text-text-muted mb-1">{{ t('tools.scheduleDayOfWeek') }}</label>
+                <select v-model.number="schedule.dayOfWeek" class="w-full bg-inset border border-line rounded-xl px-3 py-2 text-xs text-text-main">
                   <option :value="0">{{ t('tools.scheduleDaySunday') }}</option>
                   <option :value="1">{{ t('tools.scheduleDayMonday') }}</option>
                   <option :value="2">{{ t('tools.scheduleDayTuesday') }}</option>
@@ -594,80 +594,80 @@ onMounted(() => {
                 </select>
               </div>
               <div>
-                <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleTime') }}</label>
-                <input type="time" v-model="schedule.time" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-text-main" />
+                <label class="block text-xs font-semibold text-text-muted mb-1">{{ t('tools.scheduleTime') }}</label>
+                <input type="time" v-model="schedule.time" class="w-full bg-inset border border-line rounded-xl px-3 py-2 text-xs text-text-main" />
               </div>
               <div>
-                <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleRetainCount') }}</label>
-                <input type="number" min="1" v-model.number="schedule.retainCount" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-text-main" />
+                <label class="block text-xs font-semibold text-text-muted mb-1">{{ t('tools.scheduleRetainCount') }}</label>
+                <input type="number" min="1" v-model.number="schedule.retainCount" class="w-full bg-inset border border-line rounded-xl px-3 py-2 text-xs text-text-main" />
               </div>
             </div>
-            <p class="text-[10px] font-mono text-terminal-muted">
+            <p class="text-[10px] font-mono text-text-muted">
               {{ t('tools.scheduleLastRun') }}: {{ schedule.lastRunAt ? formatDate(schedule.lastRunAt) : t('tools.scheduleNeverRun') }}
               ·
               {{ t('tools.scheduleNextRun') }}: {{ schedule.nextRunAt ? formatDate(schedule.nextRunAt) : t('tools.scheduleNeverRun') }}
             </p>
             <div class="flex items-center gap-2">
               <button @click="saveSchedule" :disabled="scheduleSaving"
-                class="inline-flex items-center px-3 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 border border-brand-primary/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+                class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/10 border border-brand-primary/20 rounded-xl transition-all active:scale-95 disabled:opacity-50">
                 {{ t('tools.scheduleSave') }}
               </button>
               <button @click="runScheduleNow" :disabled="scheduleRunning"
-                class="inline-flex items-center px-3 py-1.5 text-xs font-black text-text-main hover:bg-black/5 dark:hover:bg-white/10 border border-black/20 dark:border-white/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+                class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-text-main hover:bg-inset border border-line rounded-xl transition-all active:scale-95 disabled:opacity-50">
                 {{ t('tools.scheduleRunNow') }}
               </button>
             </div>
           </div>
         </div>
 
-        <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+        <div class="bg-brand-surface/80 border border-line rounded-2xl shadow-sm overflow-hidden">
           <div class="px-6 py-4 border-b border-line bg-inset flex items-center justify-between">
             <div class="flex items-center space-x-3">
               <span class="material-symbols-outlined text-text-muted text-[1.2rem]">settings_backup_restore</span>
-              <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('tools.configurationBackups') }}</span>
+              <span class="text-sm font-semibold text-text-main">{{ t('tools.configurationBackups') }}</span>
             </div>
             <button @click="loadBackups" :disabled="backupsLoading"
-              class="inline-flex items-center px-3 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+              class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 disabled:opacity-50">
               <span class="material-symbols-outlined text-[1rem] mr-1" :class="{'animate-spin': backupsLoading}">sync</span>
               {{ t('tools.reload') }}
             </button>
           </div>
           <div class="p-4">
-            <p class="text-[10px] font-mono text-terminal-muted mb-3 leading-relaxed">
+            <p class="text-[10px] font-mono text-text-muted mb-3 leading-relaxed">
               {{ t('tools.backupsDescription') }}
             </p>
-            <div v-if="backups.length === 0 && !backupsLoading" class="px-5 py-10 text-center text-terminal-muted text-xs font-bold uppercase tracking-widest">
+            <div v-if="backups.length === 0 && !backupsLoading" class="px-5 py-10 text-center text-text-muted text-sm">
               {{ t('tools.noBackupsYet') }}
             </div>
             <div v-else class="divide-y divide-white/5">
               <div v-for="backup in backups" :key="backup.name"
                 class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 hover:bg-inset transition-all rounded-xl">
                 <div class="min-w-0">
-                  <p class="text-xs font-black text-text-main truncate font-mono">
+                  <p class="text-xs font-semibold text-text-main truncate font-mono">
                     {{ backup.name }}
-                    <span class="ml-2 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest"
-                      :class="backup.type === 'scheduled' ? 'bg-brand-primary/20 text-brand-primary' : 'bg-white/10 text-terminal-muted'">
+                    <span class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
+                      :class="backup.type === 'scheduled' ? 'bg-brand-primary/20 text-brand-primary' : 'bg-inset text-text-muted'">
                       {{ backup.type === 'scheduled' ? t('tools.backupTypeScheduled') : t('tools.backupTypePreUpdate') }}
                     </span>
                   </p>
-                  <p class="text-[10px] font-mono text-terminal-muted mt-0.5">
+                  <p class="text-[10px] font-mono text-text-muted mt-0.5">
                     {{ formatDate(backup.mtime) }} · {{ formatSize(backup.size) }}
                     <span v-if="backup.components.length"> · {{ backup.components.join(', ') }}</span>
                   </p>
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
                   <button @click="downloadBackup(backup)"
-                    class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-brand-primary hover:bg-brand-primary/10 border border-brand-primary/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
+                    class="inline-flex items-center px-3 py-1.5 text-[10px] font-semibold text-brand-primary hover:bg-brand-primary/10 border border-brand-primary/20 rounded-xl transition-all active:scale-95 uppercase tracking-wider">
                     <span class="material-symbols-outlined text-[0.9rem] mr-1">download</span>
                     {{ t('tools.download') }}
                   </button>
                   <button @click="confirmRestoreBackup(backup)" :disabled="backupsLoading"
-                    class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-warning hover:bg-warning/10 border border-warning/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+                    class="inline-flex items-center px-3 py-1.5 text-[10px] font-semibold text-warning hover:bg-warning/10 border border-warning/20 rounded-xl transition-all active:scale-95 uppercase tracking-wider disabled:opacity-50">
                     <span class="material-symbols-outlined text-[0.9rem] mr-1">restore</span>
                     {{ t('tools.restore') }}
                   </button>
                   <button @click="confirmDeleteBackup(backup)"
-                    class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-danger hover:bg-danger/10 border border-danger/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest">
+                    class="inline-flex items-center px-3 py-1.5 text-[10px] font-semibold text-danger hover:bg-danger/10 border border-danger/20 rounded-xl transition-all active:scale-95 uppercase tracking-wider">
                     <span class="material-symbols-outlined text-[0.9rem] mr-1">delete</span>
                     {{ t('tools.delete') }}
                   </button>

@@ -68,7 +68,7 @@ const typeConfigs = {
             <component :is="typeConfigs[toast.type].icon" class="h-6 w-6" :class="typeConfigs[toast.type].text" />
         </div>
         
-        <div class="flex-1 text-xs font-black uppercase tracking-widest" :class="typeConfigs[toast.type].text">
+        <div class="flex-1 text-xs font-semibold" :class="typeConfigs[toast.type].text">
           {{ toast.message }}
         </div>
 

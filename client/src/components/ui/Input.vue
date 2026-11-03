@@ -52,7 +52,7 @@ function onInput(event: Event) {
     <label
       v-if="label"
       :for="inputId"
-      class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-1.5"
+      class="block text-xs font-bold text-text-muted mb-1.5"
     >
       {{ label }}
     </label>

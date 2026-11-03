@@ -102,24 +102,24 @@ const handleExportBackup = async () => {
           </template>
           <div class="space-y-5">
             <div>
-              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.currentPasswordLabel') }}</label>
+              <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-2">{{ t('security.currentPasswordLabel') }}</label>
               <input v-model="currentPassword" type="password" :placeholder="t('security.currentPasswordPlaceholder')"
                 class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-text-main placeholder:text-text-muted/60">
             </div>
             <div>
-              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.newPasswordLabel') }}</label>
+              <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-2">{{ t('security.newPasswordLabel') }}</label>
               <input v-model="newPassword" type="password" :placeholder="t('security.newPasswordPlaceholder')"
                 class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-text-main placeholder:text-text-muted/60">
             </div>
             <div>
-              <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.confirmPasswordLabel') }}</label>
+              <label class="text-[10px] font-semibold text-text-muted uppercase tracking-wider block mb-2">{{ t('security.confirmPasswordLabel') }}</label>
               <input v-model="confirmPassword" type="password" :placeholder="t('security.confirmPasswordPlaceholder')"
                 class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-text-main placeholder:text-text-muted/60">
             </div>
             <button
               @click="handleChangePassword"
               :disabled="isSavingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword"
-              class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-danger text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-danger border border-danger disabled:opacity-50 transition-all active:scale-95"
+              class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-danger text-white rounded-xl font-semibold text-xs hover:bg-danger border border-danger disabled:opacity-50 transition-all active:scale-95"
             >
               <span v-if="isSavingPassword" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
               <span>{{ t('security.updatePassword') }}</span>
@@ -145,7 +145,7 @@ const handleExportBackup = async () => {
             </ul>
 
             <div class="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl">
-              <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest">{{ t('security.restoreInstructions') }}</p>
+              <p class="text-[10px] font-semibold text-amber-500 uppercase tracking-wider">{{ t('security.restoreInstructions') }}</p>
               <p class="text-xs text-warning/80 mt-1">
                 <i18n-t keypath="security.restoreInstructionsBody">
                   <template #flag><code class="bg-black/40 px-1 py-0.5 rounded text-amber-300 font-mono border border-amber-500/10">--restore /path/to/backup.tar.gz</code></template>
@@ -156,7 +156,7 @@ const handleExportBackup = async () => {
             <button
               @click="handleExportBackup"
               :disabled="isExporting"
-              class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-success/10 text-success border border-success/30 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-success hover:text-black disabled:opacity-50 transition-all active:scale-95 mt-4"
+              class="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-success/10 text-success border border-success/30 rounded-xl font-semibold text-xs hover:bg-success hover:text-black disabled:opacity-50 transition-all active:scale-95 mt-4"
             >
               <span v-if="isExporting" class="material-symbols-outlined text-[16px] animate-spin">sync</span>
               <span v-else class="material-symbols-outlined text-[16px]">download</span>

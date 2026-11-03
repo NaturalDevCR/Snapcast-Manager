@@ -41,10 +41,10 @@ const handleLogin = async () => {
            <div class="inline-flex items-center justify-center w-20 h-20 mb-6 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 shadow-xl shadow-brand-primary/20">
               <span class="material-symbols-outlined text-4xl text-brand-primary">settings_input_antenna</span>
            </div>
-           <h2 class="text-3xl font-black text-text-main tracking-tight leading-tight">
+           <h2 class="text-3xl font-semibold text-text-main tracking-tight leading-tight">
             {{ t('login.title') }}
           </h2>
-          <p class="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-text-muted">{{ t('login.subtitle') }}</p>
+          <p class="mt-2 text-xs font-bold tracking-[0.2em] text-text-muted">{{ t('login.subtitle') }}</p>
         </div>
 
         <form class="space-y-6" @submit.prevent="handleLogin">
@@ -80,7 +80,7 @@ const handleLogin = async () => {
           <button 
             type="submit" 
             :disabled="loading"
-            class="group w-full flex items-center justify-center py-4 px-6 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-brand-primary/30 border border-brand-primary/50 transition-all active:scale-[0.98] disabled:opacity-50"
+            class="group w-full flex items-center justify-center py-4 px-6 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-semibold text-xs tracking-[0.2em] shadow-xl shadow-brand-primary/30 border border-brand-primary/50 transition-all active:scale-[0.98] disabled:opacity-50"
           >
             <span v-if="loading" class="animate-pulse flex items-center gap-2"><span class="material-symbols-outlined animate-spin text-lg">sync</span>{{ t('login.authenticating') }}</span>
             <div v-else class="flex items-center">

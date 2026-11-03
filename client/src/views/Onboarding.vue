@@ -125,8 +125,8 @@ async function skip() {
     <JobLogPanel />
     <div class="max-w-2xl mx-auto py-12 space-y-8">
       <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-black text-text-main">{{ t('onboarding.getStarted') }}</h1>
-        <button @click="skip" class="text-xs font-bold text-text-muted hover:text-text-main uppercase tracking-widest">
+        <h1 class="text-2xl font-semibold text-text-main">{{ t('onboarding.getStarted') }}</h1>
+        <button @click="skip" class="text-xs font-bold text-text-muted hover:text-text-main">
           {{ t('onboarding.skip') }}
         </button>
       </div>

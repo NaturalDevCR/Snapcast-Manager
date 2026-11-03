@@ -592,7 +592,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
   <div class="mt-8 mb-24 flex justify-center">
       <button @click="emit('reset-requested')" class="py-3 px-6 border border-line rounded-xl text-text-muted hover:text-danger hover:bg-danger/10 hover:border-danger/20 transition-all flex items-center space-x-2">
           <span class="material-symbols-outlined text-[16px]">restart_alt</span>
-          <span class="text-[10px] font-black uppercase tracking-widest">Reset Configuration to Default</span>
+          <span class="text-[10px] font-semibold uppercase tracking-wider">Reset Configuration to Default</span>
       </button>
   </div>
 
