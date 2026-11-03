@@ -2,8 +2,8 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Layout from '../components/Layout.vue';
+import Badge from '../components/ui/Badge.vue';
 import PageHeader from '../components/ui/PageHeader.vue';
-import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import Button from '../components/ui/Button.vue';
@@ -152,11 +152,11 @@ function viewLogs(pipe: PipeSource) {
 const importModal = ref<InstanceType<typeof ImportModal> | null>(null);
 
 // ---- helpers ----
-function statusColor(status: string) {
-  if (status === 'active') return 'bg-green-500';
-  if (status === 'failed') return 'bg-red-500';
-  if (status === 'activating') return 'bg-yellow-500';
-  return 'bg-line';
+function statusVariant(status: string): 'success' | 'danger' | 'warning' | 'neutral' {
+  if (status === 'active') return 'success';
+  if (status === 'failed') return 'danger';
+  if (status === 'activating') return 'warning';
+  return 'neutral';
 }
 
 function statusLabel(status: string) {
@@ -169,10 +169,6 @@ function statusLabel(status: string) {
 
 function typeLabel(type: PipeSourceType) {
   return type === 'mpd' ? t('pipeSources.typeMpd') : t('pipeSources.typeRadio');
-}
-
-function typeColor(type: PipeSourceType) {
-  return type === 'mpd' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300';
 }
 
 function truncateUrl(url: string, max = 52) {
@@ -282,107 +278,100 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
 
       <!-- Source cards -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <Card v-for="pipe in store.pipes" :key="pipe.id" class="relative">
-          <template #header>
-            <div class="flex items-start justify-between w-full gap-3">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <h2 class="text-base font-bold text-text-main truncate">{{ pipe.name }}</h2>
-                  <span :class="['px-2 py-0.5 rounded-full text-[10px] font-semibold', typeColor(pipe.type)]">
-                    {{ typeLabel(pipe.type) }}
-                  </span>
-                  <span :class="['px-2 py-0.5 rounded-full text-[10px] font-semibold text-white', statusColor(pipe.status)]">
-                    {{ statusLabel(pipe.status) }}
-                  </span>
-                </div>
-                <p v-if="pipe.type === 'radio'" class="text-xs text-text-muted font-mono mt-1 truncate" :title="pipe.url">
-                  {{ truncateUrl(pipe.url) }}
-                </p>
-                <p v-else class="text-xs text-text-muted mt-1">
-                  <i18n-t keypath="pipeSources.mpdAudioOutput">
-                    <template #path><span class="font-mono">{{ pipe.fifoPath }}</span></template>
-                  </i18n-t>
-                </p>
+        <!-- Each card used Card.vue's (non-existent) #header slot, so the
+             source name, type/status badges and the start/stop/restart/
+             logs/delete controls never rendered. Plain markup here instead. -->
+        <article v-for="pipe in store.pipes" :key="pipe.id" class="flex flex-col rounded-2xl border border-line bg-brand-surface/80 p-5 shadow-sm">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h2 class="text-base font-bold text-text-main truncate">{{ pipe.name }}</h2>
+                <Badge :variant="pipe.type === 'mpd' ? 'neutral' : 'brand'" size="sm">{{ typeLabel(pipe.type) }}</Badge>
+                <Badge :variant="statusVariant(pipe.status)" size="sm">{{ statusLabel(pipe.status) }}</Badge>
               </div>
-
-              <!-- Controls -->
-              <div class="flex items-center gap-1 flex-shrink-0">
-                <button v-if="pipe.status !== 'active'" @click="control(pipe.id, 'start')"
-                  :disabled="controllingId === pipe.id"
-                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-green-600/20 hover:bg-green-600/40 text-success transition disabled:opacity-40" :title="t('pipeSources.start')"
-                  :aria-label="`${t('pipeSources.start')} ${pipe.name}`">
-                  <span class="material-symbols-outlined text-[1rem]">play_arrow</span>
-                </button>
-                <button v-if="pipe.status === 'active'" @click="control(pipe.id, 'stop')"
-                  :disabled="controllingId === pipe.id"
-                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-red-600/20 hover:bg-red-600/40 text-danger transition disabled:opacity-40" :title="t('pipeSources.stop')"
-                  :aria-label="`${t('pipeSources.stop')} ${pipe.name}`">
-                  <span class="material-symbols-outlined text-[1rem]">stop</span>
-                </button>
-                <button @click="control(pipe.id, 'restart')" :disabled="controllingId === pipe.id"
-                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-line hover:bg-line text-text-main transition disabled:opacity-40" :title="t('pipeSources.restart')"
-                  :aria-label="`${t('pipeSources.restart')} ${pipe.name}`">
-                  <span class="material-symbols-outlined text-[1rem]">restart_alt</span>
-                </button>
-                <button @click="viewLogs(pipe)"
-                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-line hover:bg-line text-text-main transition" :title="t('pipeSources.viewLogs')"
-                  :aria-label="`${t('pipeSources.viewLogsFor')} ${pipe.name}`">
-                  <span class="material-symbols-outlined text-[1rem]">terminal</span>
-                </button>
-                <button @click="confirmDelete(pipe.id)"
-                  class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded bg-line hover:bg-red-600/30 text-text-muted hover:text-danger transition" :title="t('pipeSources.delete')"
-                  :aria-label="`${t('pipeSources.delete')} ${pipe.name}`">
-                  <span class="material-symbols-outlined text-[1rem]">delete</span>
-                </button>
-              </div>
+              <p v-if="pipe.type === 'radio'" class="text-xs text-text-muted font-mono mt-1 truncate" :title="pipe.url">
+                {{ truncateUrl(pipe.url) }}
+              </p>
+              <p v-else class="text-xs text-text-muted mt-1">
+                <i18n-t keypath="pipeSources.mpdAudioOutput">
+                  <template #path><span class="font-mono">{{ pipe.fifoPath }}</span></template>
+                </i18n-t>
+              </p>
             </div>
-          </template>
+
+            <!-- Controls -->
+            <div class="flex items-center gap-0.5 flex-shrink-0">
+              <button v-if="pipe.status !== 'active'" @click="control(pipe.id, 'start')"
+                :disabled="controllingId === pipe.id"
+                class="w-9 h-9 flex items-center justify-center rounded-lg text-success hover:bg-success/10 transition-colors disabled:opacity-40" :title="t('pipeSources.start')"
+                :aria-label="`${t('pipeSources.start')} ${pipe.name}`">
+                <span class="material-symbols-outlined text-[1.15rem]" aria-hidden="true">play_arrow</span>
+              </button>
+              <button v-if="pipe.status === 'active'" @click="control(pipe.id, 'stop')"
+                :disabled="controllingId === pipe.id"
+                class="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-text-main hover:bg-inset transition-colors disabled:opacity-40" :title="t('pipeSources.stop')"
+                :aria-label="`${t('pipeSources.stop')} ${pipe.name}`">
+                <span class="material-symbols-outlined text-[1.15rem]" aria-hidden="true">stop</span>
+              </button>
+              <button @click="control(pipe.id, 'restart')" :disabled="controllingId === pipe.id"
+                class="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-text-main hover:bg-inset transition-colors disabled:opacity-40" :title="t('pipeSources.restart')"
+                :aria-label="`${t('pipeSources.restart')} ${pipe.name}`">
+                <span class="material-symbols-outlined text-[1.15rem]" aria-hidden="true">restart_alt</span>
+              </button>
+              <button @click="viewLogs(pipe)"
+                class="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-text-main hover:bg-inset transition-colors" :title="t('pipeSources.viewLogs')"
+                :aria-label="`${t('pipeSources.viewLogsFor')} ${pipe.name}`">
+                <span class="material-symbols-outlined text-[1.15rem]" aria-hidden="true">terminal</span>
+              </button>
+              <button @click="confirmDelete(pipe.id)"
+                class="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors" :title="t('pipeSources.delete')"
+                :aria-label="`${t('pipeSources.delete')} ${pipe.name}`">
+                <span class="material-symbols-outlined text-[1.15rem]" aria-hidden="true">delete</span>
+              </button>
+            </div>
+          </div>
 
           <!-- Details -->
           <div class="mt-3 space-y-2 text-xs text-text-muted">
-            <div class="flex flex-wrap gap-x-4 gap-y-1">
-              <span class="font-mono">
+            <div class="flex flex-wrap gap-x-4 gap-y-1 font-mono">
+              <span>
                 <i18n-t keypath="pipeSources.fifoLabel">
-                  <template #value><span class="text-text-muted">{{ pipe.fifoPath }}</span></template>
+                  <template #value><span class="text-text-main">{{ pipe.fifoPath }}</span></template>
                 </i18n-t>
               </span>
-              <span class="font-mono">
+              <span>
                 <i18n-t keypath="pipeSources.serviceLabel">
-                  <template #value><span class="text-text-muted">{{ pipe.serviceName }}</span></template>
+                  <template #value><span class="text-text-main">{{ pipe.serviceName }}</span></template>
                 </i18n-t>
               </span>
             </div>
-            <div v-if="pipe.type === 'radio'" class="flex flex-wrap gap-2 mt-1">
-              <span v-if="pipe.reconnect" class="px-2 py-0.5 bg-inset rounded text-text-muted">reconnect</span>
-              <span v-if="pipe.reconnectStreamed" class="px-2 py-0.5 bg-inset rounded text-text-muted">reconnect_streamed</span>
-              <span v-if="pipe.reconnectAtEof" class="px-2 py-0.5 bg-inset rounded text-text-muted">reconnect_at_eof</span>
-              <span class="px-2 py-0.5 bg-inset rounded text-text-muted">delay_max={{ pipe.reconnectDelayMax }}s</span>
-              <span class="px-2 py-0.5 bg-inset rounded text-text-muted">idle={{ pipe.idleThreshold }}ms</span>
-            </div>
-            <div v-else class="flex flex-wrap gap-2 mt-1">
-              <span class="px-2 py-0.5 bg-inset rounded text-text-muted">idle={{ pipe.idleThreshold }}ms</span>
-              <span class="px-2 py-0.5 bg-blue-900/40 rounded text-blue-400">{{ t('pipeSources.writesViaMpdConf') }}</span>
+            <div class="flex flex-wrap gap-1.5">
+              <template v-if="pipe.type === 'radio'">
+                <span v-if="pipe.reconnect" class="px-2 py-0.5 bg-inset border border-line rounded-md font-mono">reconnect</span>
+                <span v-if="pipe.reconnectStreamed" class="px-2 py-0.5 bg-inset border border-line rounded-md font-mono">reconnect_streamed</span>
+                <span v-if="pipe.reconnectAtEof" class="px-2 py-0.5 bg-inset border border-line rounded-md font-mono">reconnect_at_eof</span>
+                <span class="px-2 py-0.5 bg-inset border border-line rounded-md font-mono">delay_max={{ pipe.reconnectDelayMax }}s</span>
+              </template>
+              <span class="px-2 py-0.5 bg-inset border border-line rounded-md font-mono">idle={{ pipe.idleThreshold }}ms</span>
+              <span v-if="pipe.type !== 'radio'" class="px-2 py-0.5 bg-info/10 border border-info/20 rounded-md text-info">{{ t('pipeSources.writesViaMpdConf') }}</span>
             </div>
           </div>
 
-          <div class="mt-4 pt-3 border-t border-line flex flex-wrap gap-2">
-            <button @click="addEditDialog?.openEdit(pipe)"
-              class="px-3 py-1.5 rounded bg-inset hover:bg-line text-text-main text-xs font-medium transition flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[1rem]">edit</span>
+          <div class="mt-auto pt-4 flex flex-wrap gap-2">
+            <Button size="sm" variant="subtle" @click="addEditDialog?.openEdit(pipe)">
+              <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">edit</span>
               {{ t('pipeSources.editSettings') }}
-            </button>
-            <button @click="regenerateService(pipe)" :disabled="regeneratingId === pipe.id"
-              class="px-3 py-1.5 rounded bg-purple-600/20 hover:bg-purple-600/35 text-purple-300 text-xs font-medium transition disabled:opacity-50 flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[1rem]" :class="{ 'animate-spin': regeneratingId === pipe.id }">sync</span>
+            </Button>
+            <Button size="sm" variant="subtle" :loading="regeneratingId === pipe.id" @click="regenerateService(pipe)">
+              <span v-if="regeneratingId !== pipe.id" class="material-symbols-outlined text-[1rem]" aria-hidden="true">sync</span>
               {{ regeneratingId === pipe.id ? t('pipeSources.regenerating') : (pipe.type === 'radio' ? t('pipeSources.regenerateService') : t('pipeSources.regenerateMpd')) }}
-            </button>
-            <button @click="configEditorModal?.open(pipe)"
-              class="px-3 py-1.5 rounded bg-amber-600/15 hover:bg-amber-600/30 text-amber-300 text-xs font-medium transition flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[1rem]">description</span>
+            </Button>
+            <Button size="sm" variant="ghost" @click="configEditorModal?.open(pipe)">
+              <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">description</span>
               {{ pipe.type === 'radio' ? t('pipeSources.serviceFile') : t('pipeSources.mpdBlock') }}
-            </button>
+            </Button>
           </div>
-        </Card>
+        </article>
       </div>
 
     </div>

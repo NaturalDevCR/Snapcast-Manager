@@ -1,9 +1,9 @@
 {
   "title": "Snapcast Manager",
-  "subtitle": "Secure Network Authentication",
+  "subtitle": "Sign in to manage your Snapcast system.",
   "usernamePlaceholder": "Username",
   "passwordPlaceholder": "Password",
-  "authenticating": "Authenticating...",
+  "authenticating": "Signing in…",
   "signIn": "Sign In",
   "welcomeBack": "Welcome back!",
   "authFailed": "Authentication failed"

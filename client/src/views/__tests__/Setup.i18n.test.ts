@@ -6,15 +6,15 @@ import { useUIStore } from '../../stores/ui';
 describe('Setup.vue i18n', () => {
   it('renders English copy by default', async () => {
     const wrapper = await mountSmokeTest(Setup, '/setup');
-    expect(wrapper.text()).toContain('System Ignition');
-    expect(wrapper.text()).toContain('Complete Setup & Launch');
+    expect(wrapper.text()).toContain('Welcome to Snapcast Manager');
+    expect(wrapper.text()).toContain('Create account');
   });
 
   it('renders Spanish copy when useUIStore().locale is "es"', async () => {
     const wrapper = await mountSmokeTest(Setup, '/setup');
     useUIStore().setLocale('es');
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toContain('Ignición del Sistema');
-    expect(wrapper.text()).toContain('Completar Configuración y Lanzar');
+    expect(wrapper.text()).toContain('Bienvenido a Snapcast Manager');
+    expect(wrapper.text()).toContain('Crear cuenta');
   });
 });
