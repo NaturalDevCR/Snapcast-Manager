@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nextTick } from 'vue';
 import Watchdogs from '../Watchdogs.vue';
 import { mountSmokeTest } from '../../test/mountView';
-import { useWatchdogStore } from '../../stores/watchdog';
+import { useWatchdogStore, type Watchdog } from '../../stores/watchdog';
 import { useUIStore } from '../../stores/ui';
 
 describe('Watchdogs.vue', () => {
@@ -28,8 +28,8 @@ describe('Watchdogs.vue', () => {
   it('renders each watchdog name with its toggle and delete controls', async () => {
     const wrapper = await mountSmokeTest(Watchdogs, '/watchdogs');
     useWatchdogStore().watchdogs = [
-      { id: 'w1', name: 'Living Room TCP', ports: [4953], enabled: true, autoKillDuplicates: false },
-    ] as any;
+      { id: 'w1', name: 'Living Room TCP', ports: [4953], enabled: true, autoKillDuplicates: false } as Watchdog,
+    ];
     await nextTick();
 
     expect(wrapper.text()).toContain('Living Room TCP');
@@ -41,8 +41,8 @@ describe('Watchdogs.vue', () => {
   it('opens the delete confirmation when the delete button is clicked', async () => {
     const wrapper = await mountSmokeTest(Watchdogs, '/watchdogs');
     useWatchdogStore().watchdogs = [
-      { id: 'w1', name: 'Living Room TCP', ports: [4953], enabled: true, autoKillDuplicates: false },
-    ] as any;
+      { id: 'w1', name: 'Living Room TCP', ports: [4953], enabled: true, autoKillDuplicates: false } as Watchdog,
+    ];
     await nextTick();
 
     const del = wrapper.findAll('button').find((b) => b.attributes('aria-label') === 'Delete Living Room TCP');

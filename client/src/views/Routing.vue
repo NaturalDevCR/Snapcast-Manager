@@ -6,7 +6,7 @@ import Skeleton from '../components/ui/Skeleton.vue';
 import PageHeader from '../components/ui/PageHeader.vue';
 import Button from '../components/ui/Button.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
-import { useSnapcastStore } from '../stores/snapcast';
+import { useSnapcastStore, type SnapcastGroup } from '../stores/snapcast';
 import { useEventSource } from '../composables/useEventSource';
 import { sseStatusBadge } from '../utils/sseStatus';
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
@@ -299,17 +299,19 @@ const getStreamLabel = (stream: any) => {
 // opaque group id). Snapcast's own clients name an unnamed group after its
 // members, which is what people actually recognise -- do the same, and only
 // fall back to the id when the group has no clients at all.
-const getZoneLabel = (group: any) => {
+type ZoneLike = Pick<SnapcastGroup, 'id' | 'name' | 'clients'> | undefined;
+
+const getZoneLabel = (group: ZoneLike) => {
     const name = group?.name;
     if (name) return name;
     const memberNames = (group?.clients || [])
-        .map((c: any) => c.config?.name || c.host?.name)
+        .map((c) => c.config?.name || c.host?.name)
         .filter(Boolean);
     if (memberNames.length) return memberNames.join(' + ');
     return t('routing.zoneFallback', { id: (group?.id || '').slice(0, 4) });
 };
 
-const onlineCount = (group: any) => (group?.clients || []).filter((c: any) => c.connected).length;
+const onlineCount = (group: ZoneLike) => (group?.clients || []).filter((c) => c.connected).length;
 
 // Task 34: keyboard/screen-reader-usable alternative to the mouse/touch
 // "cable" drag gesture above. Every zone gets a <Select> listing all

@@ -97,7 +97,10 @@ const snapserverTile = computed<{ value: string; tone: StatTone }>(() => {
 const snapserverVersion = computed(() => {
   const v = systemStore.packageVersions.snapserver;
   if (v && v !== 'unknown') return v;
-  return (snapcastStore.status as any)?.server?.snapserver?.version as string | undefined;
+  // Server.GetStatus reports it as server.snapserver.version (the store's
+  // SnapcastStatus type predates that field).
+  const server = snapcastStore.status?.server as { snapserver?: { version?: string } } | undefined;
+  return server?.snapserver?.version;
 });
 
 const streams = computed(() => snapcastStore.status?.streams ?? []);

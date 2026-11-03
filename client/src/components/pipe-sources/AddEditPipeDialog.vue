@@ -260,7 +260,7 @@ defineExpose({ openAdd, openEdit });
             Cancel
           </button>
           <button @click="saveDialog" :disabled="saving"
-            class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded hover:opacity-90 text-sm font-medium transition disabled:opacity-50">
+            class="px-4 py-2 bg-brand-primary hover:bg-brand-primary/85 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50">
             {{ saving ? 'Saving…' : (editingId ? 'Update' : 'Create') }}
           </button>
         </div>

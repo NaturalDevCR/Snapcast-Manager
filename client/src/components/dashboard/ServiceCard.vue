@@ -59,23 +59,33 @@ const { t } = useI18n({ useScope: 'global' });
 
 const hasService = computed(() => props.serviceStatus !== undefined);
 
-const status = computed<{ label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }>(() => {
-  if (!props.installed) return { label: t('dashboard.statusNotInstalled'), variant: 'neutral' };
-  if (!hasService.value) return { label: t('dashboard.statusInstalled'), variant: 'success' };
-  if (props.serviceStatus === 'active') return { label: t('dashboard.statusRunning'), variant: 'success' };
-  if (props.serviceStatus === 'failed') return { label: t('dashboard.statusFailed'), variant: 'danger' };
-  return { label: t('dashboard.statusStopped'), variant: 'warning' };
-});
+const status = computed<{ label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }>(
+  () => {
+    if (!props.installed) return { label: t('dashboard.statusNotInstalled'), variant: 'neutral' };
+    if (!hasService.value) return { label: t('dashboard.statusInstalled'), variant: 'success' };
+    if (props.serviceStatus === 'active')
+      return { label: t('dashboard.statusRunning'), variant: 'success' };
+    if (props.serviceStatus === 'failed')
+      return { label: t('dashboard.statusFailed'), variant: 'danger' };
+    return { label: t('dashboard.statusStopped'), variant: 'warning' };
+  },
+);
 
 const knownAvailable = computed(
   () => !!props.availableVersion && props.availableVersion !== 'unknown',
 );
 
 const updateAvailable = computed(
-  () => props.installed && knownAvailable.value && !!props.version && props.version !== props.availableVersion,
+  () =>
+    props.installed &&
+    knownAvailable.value &&
+    !!props.version &&
+    props.version !== props.availableVersion,
 );
 
-const showVersion = computed(() => props.installed && !!props.version && props.version !== 'unknown');
+const showVersion = computed(
+  () => props.installed && !!props.version && props.version !== 'unknown',
+);
 const isRunning = computed(() => props.serviceStatus === 'active');
 const hasMenu = computed(() => props.installed && (props.canReinstall || props.canUninstall));
 </script>
@@ -85,7 +95,9 @@ const hasMenu = computed(() => props.installed && (props.canReinstall || props.c
     <div class="flex items-start gap-3">
       <div
         class="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0"
-        :class="installed ? 'bg-brand-primary/10 text-brand-primary-text' : 'bg-inset text-text-muted'"
+        :class="
+          installed ? 'bg-brand-primary/10 text-brand-primary-text' : 'bg-inset text-text-muted'
+        "
       >
         <span class="material-symbols-outlined text-[1.3rem]" aria-hidden="true">{{ icon }}</span>
       </div>
@@ -121,14 +133,12 @@ const hasMenu = computed(() => props.installed && (props.canReinstall || props.c
         size="sm"
         :loading="busy"
         @click="emit('install')"
-      >{{ t('dashboard.installButton', { name }) }}</Button>
+        >{{ t('dashboard.installButton', { name }) }}</Button
+      >
 
-      <Button
-        v-if="updateAvailable"
-        size="sm"
-        :disabled="busy"
-        @click="emit('update')"
-      >{{ t('dashboard.updateToButton', { version: availableVersion }) }}</Button>
+      <Button v-if="updateAvailable" size="sm" :disabled="busy" @click="emit('update')">{{
+        t('dashboard.updateToButton', { version: availableVersion })
+      }}</Button>
 
       <template v-if="installed && hasService">
         <Button
@@ -185,20 +195,32 @@ const hasMenu = computed(() => props.installed && (props.canReinstall || props.c
             <MenuItem v-if="canReinstall" v-slot="{ active }">
               <button
                 type="button"
-                :class="[active ? 'bg-inset' : '', 'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-main']"
+                :class="[
+                  active ? 'bg-inset' : '',
+                  'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-main',
+                ]"
                 @click="emit('reinstall')"
               >
-                <span class="material-symbols-outlined text-[1.1rem] text-text-muted" aria-hidden="true">refresh</span>
+                <span
+                  class="material-symbols-outlined text-[1.1rem] text-text-muted"
+                  aria-hidden="true"
+                  >refresh</span
+                >
                 {{ t('dashboard.cleanReinstallLabel') }}
               </button>
             </MenuItem>
             <MenuItem v-if="canUninstall" v-slot="{ active }">
               <button
                 type="button"
-                :class="[active ? 'bg-danger/10' : '', 'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-danger']"
+                :class="[
+                  active ? 'bg-danger/10' : '',
+                  'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-danger',
+                ]"
                 @click="emit('uninstall')"
               >
-                <span class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">delete</span>
+                <span class="material-symbols-outlined text-[1.1rem]" aria-hidden="true"
+                  >delete</span
+                >
                 {{ t('dashboard.uninstallLabel') }}
               </button>
             </MenuItem>

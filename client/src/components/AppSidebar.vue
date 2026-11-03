@@ -27,7 +27,9 @@ const systemStore = useSystemStore();
 const uiStore = useUIStore();
 
 const isClientMode = computed(
-  () => route.path.startsWith('/client') || (route.path === '/logs' && route.query.filter === 'snapclient'),
+  () =>
+    route.path.startsWith('/client') ||
+    (route.path === '/logs' && route.query.filter === 'snapclient'),
 );
 
 interface NavLink {
@@ -41,7 +43,13 @@ interface NavLink {
 const primaryLinks = computed<NavLink[]>(() =>
   isClientMode.value
     ? [
-        { key: 'client', label: t('layout.dashboard'), icon: 'speaker', to: '/client', active: route.path === '/client' },
+        {
+          key: 'client',
+          label: t('layout.dashboard'),
+          icon: 'speaker',
+          to: '/client',
+          active: route.path === '/client',
+        },
         {
           key: 'client-logs',
           label: t('layout.logs'),
@@ -51,8 +59,20 @@ const primaryLinks = computed<NavLink[]>(() =>
         },
       ]
     : [
-        { key: 'dashboard', label: t('layout.dashboard'), icon: 'space_dashboard', to: '/', active: route.path === '/' },
-        { key: 'routing', label: t('layout.audioMatrix'), icon: 'hub', to: '/routing', active: isNavHrefActive(route.path, '/routing') },
+        {
+          key: 'dashboard',
+          label: t('layout.dashboard'),
+          icon: 'space_dashboard',
+          to: '/',
+          active: route.path === '/',
+        },
+        {
+          key: 'routing',
+          label: t('layout.audioMatrix'),
+          icon: 'hub',
+          to: '/routing',
+          active: isNavHrefActive(route.path, '/routing'),
+        },
       ],
 );
 
@@ -90,7 +110,11 @@ const linkClass = (active: boolean) => [
     <!-- Brand -->
     <div class="flex items-center justify-between gap-3 px-4 h-16 flex-shrink-0">
       <router-link to="/" class="flex items-center gap-2.5 min-w-0" @click="emit('navigate')">
-        <img src="../assets/logo.png" alt="" class="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+        <img
+          src="../assets/logo.png"
+          alt=""
+          class="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+        />
         <span class="text-[15px] font-bold tracking-tight text-text-main truncate">
           Snapcast <span class="text-brand-primary-text">Manager</span>
         </span>
@@ -115,7 +139,7 @@ const linkClass = (active: boolean) => [
         :aria-label="`${t('layout.server')} / ${t('layout.client')}`"
       >
         <button
-          v-for="mode in (['server', 'client'] as const)"
+          v-for="mode in ['server', 'client'] as const"
           :key="mode"
           type="button"
           :aria-pressed="mode === 'client' ? isClientMode : !isClientMode"
@@ -127,13 +151,22 @@ const linkClass = (active: boolean) => [
           ]"
           @click="switchMode(mode)"
         >
-          <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">{{ mode === 'server' ? 'dns' : 'speaker' }}</span>
+          <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">{{
+            mode === 'server' ? 'dns' : 'speaker'
+          }}</span>
           {{ mode === 'server' ? t('layout.server') : t('layout.client') }}
         </button>
       </div>
-      <div v-else class="flex items-center gap-2 rounded-lg bg-inset border border-line px-3 py-2 text-xs font-semibold text-text-muted">
-        <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">{{ systemStore.snapcastMode === 'client' ? 'speaker' : 'dns' }}</span>
-        {{ systemStore.snapcastMode === 'client' ? t('layout.clientMode') : t('layout.serverMode') }}
+      <div
+        v-else
+        class="flex items-center gap-2 rounded-lg bg-inset border border-line px-3 py-2 text-xs font-semibold text-text-muted"
+      >
+        <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">{{
+          systemStore.snapcastMode === 'client' ? 'speaker' : 'dns'
+        }}</span>
+        {{
+          systemStore.snapcastMode === 'client' ? t('layout.clientMode') : t('layout.serverMode')
+        }}
       </div>
     </div>
 
@@ -152,13 +185,16 @@ const linkClass = (active: boolean) => [
             class="material-symbols-outlined text-[1.25rem]"
             :class="link.active ? 'text-brand-primary-text' : ''"
             aria-hidden="true"
-          >{{ link.icon }}</span>
+            >{{ link.icon }}</span
+          >
           {{ link.label }}
         </router-link>
       </div>
 
       <div v-for="group in groups" :key="group.key" class="space-y-0.5">
-        <p class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted/80">{{ group.label }}</p>
+        <p class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted/80">
+          {{ group.label }}
+        </p>
         <router-link
           v-for="link in group.links"
           :key="link.key"
@@ -171,7 +207,8 @@ const linkClass = (active: boolean) => [
             class="material-symbols-outlined text-[1.25rem]"
             :class="link.active ? 'text-brand-primary-text' : ''"
             aria-hidden="true"
-          >{{ link.icon }}</span>
+            >{{ link.icon }}</span
+          >
           {{ link.label }}
         </router-link>
       </div>
@@ -180,16 +217,26 @@ const linkClass = (active: boolean) => [
     <!-- Footer: preferences + account -->
     <div class="border-t border-line p-3 space-y-3 flex-shrink-0">
       <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center rounded-lg bg-inset border border-line p-0.5 text-xs font-semibold" role="group" :aria-label="t('layout.language')">
+        <div
+          class="flex items-center rounded-lg bg-inset border border-line p-0.5 text-xs font-semibold"
+          role="group"
+          :aria-label="t('layout.language')"
+        >
           <button
-            v-for="loc in (['en', 'es'] as const)"
+            v-for="loc in ['en', 'es'] as const"
             :key="loc"
             type="button"
             :aria-pressed="uiStore.locale === loc"
-            :class="uiStore.locale === loc ? 'bg-brand-surface text-text-main shadow-sm' : 'text-text-muted hover:text-text-main'"
+            :class="
+              uiStore.locale === loc
+                ? 'bg-brand-surface text-text-main shadow-sm'
+                : 'text-text-muted hover:text-text-main'
+            "
             class="rounded-md px-2.5 py-1 transition-colors"
             @click="uiStore.setLocale(loc)"
-          >{{ loc.toUpperCase() }}</button>
+          >
+            {{ loc.toUpperCase() }}
+          </button>
         </div>
         <button
           type="button"
@@ -198,21 +245,28 @@ const linkClass = (active: boolean) => [
           :aria-label="uiStore.isDark ? t('layout.switchToLight') : t('layout.switchToDark')"
           @click="uiStore.toggleTheme()"
         >
-          <span class="material-symbols-outlined text-[1.15rem]" aria-hidden="true">{{ uiStore.isDark ? 'light_mode' : 'dark_mode' }}</span>
+          <span class="material-symbols-outlined text-[1.15rem]" aria-hidden="true">{{
+            uiStore.isDark ? 'light_mode' : 'dark_mode'
+          }}</span>
         </button>
       </div>
 
       <div class="flex items-center justify-between gap-2 rounded-lg px-1">
         <div class="min-w-0">
           <p class="text-[11px] text-text-muted leading-tight">{{ t('layout.signedInAs') }}</p>
-          <p class="text-sm font-semibold text-text-main truncate">{{ authStore.user?.username || t('layout.admin') }}</p>
+          <p class="text-sm font-semibold text-text-main truncate">
+            {{ authStore.user?.username || t('layout.admin') }}
+          </p>
         </div>
         <button
           type="button"
           class="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
           :title="t('layout.signOut')"
           :aria-label="t('layout.signOut')"
-          @click="authStore.logout(); emit('navigate')"
+          @click="
+            authStore.logout();
+            emit('navigate');
+          "
         >
           <span class="material-symbols-outlined text-[1.15rem]" aria-hidden="true">logout</span>
         </button>
@@ -227,7 +281,9 @@ const linkClass = (active: boolean) => [
         <span>{{ t('layout.version', { version }) }}</span>
         <span class="inline-flex items-center gap-1">
           {{ t('layout.viewOnGithub') }}
-          <span class="material-symbols-outlined text-[0.9rem]" aria-hidden="true">open_in_new</span>
+          <span class="material-symbols-outlined text-[0.9rem]" aria-hidden="true"
+            >open_in_new</span
+          >
         </span>
       </a>
     </div>
