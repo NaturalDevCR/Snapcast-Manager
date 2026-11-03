@@ -74,7 +74,7 @@ const typeConfigs = {
 
         <button
           @click="uiStore.removeToast(toast.id)"
-          class="ml-4 flex-shrink-0 p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          class="ml-4 flex-shrink-0 p-1 rounded-lg hover:bg-line transition-colors"
           :class="typeConfigs[toast.type].text"
           aria-label="Dismiss notification"
         >

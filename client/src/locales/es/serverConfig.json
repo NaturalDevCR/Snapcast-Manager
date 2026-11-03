@@ -5,7 +5,7 @@
   "tabExpertSub": "Archivo INI en bruto",
   "tabSnapshots": "Instantáneas",
   "tabSnapshotsSub": "Historial de versiones",
-  "saveConfiguration": "Guardar configuración",
+  "saveConfiguration": "Guardar cambios",
   "restartDialogTitle": "¿Reiniciar Snapserver?",
   "restartDialogMessage": "¡Configuración guardada! ¿Reiniciar ahora para aplicar los cambios?",
   "restartDialogConfirm": "Reiniciar ahora",
@@ -17,5 +17,8 @@
   "restartFailedToast": "Error al reiniciar: {message}",
   "resetSuccessToast": "Configuración restablecida a los valores predeterminados",
   "resetFailedToast": "Error al restablecer la configuración: {message}",
-  "resetError": "Error al restablecer"
+  "resetError": "Error al restablecer",
+  "title": "Configuración del servidor",
+  "subtitle": "Edita snapserver.conf con el editor visual o como INI. Los cambios guardados se aplican tras reiniciar.",
+  "usingDefault": "Predeterminado"
 }

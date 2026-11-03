@@ -7,6 +7,7 @@ import { useUIStore } from '../stores/ui';
 import { useSnapclientInstancesStore } from '../stores/snapclientInstances';
 
 import Layout from '../components/Layout.vue';
+import PageHeader from '../components/ui/PageHeader.vue';
 import Skeleton from '../components/ui/Skeleton.vue';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -62,63 +63,57 @@ onUnmounted(() => {
 <template>
   <Layout>
     <div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <!-- Header -->
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 class="text-3xl font-black text-text-main tracking-tight dark:">{{ t('logs.title') }}</h1>
-          <p class="text-text-muted font-medium mt-1">{{ t('logs.subtitle') }}</p>
-        </div>
-        <div class="flex items-center space-x-4 bg-black/40 p-2 rounded-2xl border border-black/5 dark:border-white/5 shadow-inner backdrop-blur-md">
-          <label class="flex items-center cursor-pointer group px-3">
-            <div class="relative inline-flex items-center">
+      <PageHeader :title="t('logs.title')" :description="t('logs.subtitle')">
+        <template #actions>
+          <label class="inline-flex items-center gap-2.5 cursor-pointer rounded-xl border border-line bg-inset px-3 py-2">
+            <span class="relative inline-flex items-center">
               <input type="checkbox" v-model="autoRefresh" class="sr-only peer">
-              <div class="w-10 h-5 bg-black/10 dark:bg-white/10 peer-focus:outline-none peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all border-black/5 dark:border-white/5 peer-checked:bg-brand-primary rounded-full"></div>
-              <span class="ml-3 text-xs font-black text-terminal-muted uppercase tracking-widest group-hover:text-brand-primary transition-colors">{{ t('logs.liveUpdate') }}</span>
-            </div>
+              <span class="w-9 h-5 bg-line rounded-full peer-checked:bg-brand-primary transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-primary/50"></span>
+            </span>
+            <span class="text-sm font-medium text-text-main">{{ t('logs.liveUpdate') }}</span>
           </label>
-          <div class="h-6 w-px bg-black/10 dark:bg-white/10"></div>
-          <button @click="fetchLogs" class="inline-flex items-center px-4 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest group">
-            <span class="material-symbols-outlined text-[1.1rem] mr-2 transition-transform" :class="{'animate-spin': autoRefresh, 'group-hover:rotate-180': !autoRefresh}">sync</span>
+          <button @click="fetchLogs" class="inline-flex items-center gap-2 rounded-xl border border-line bg-inset px-3.5 py-2 text-sm font-semibold text-text-main hover:bg-line transition-colors">
+            <span class="material-symbols-outlined text-[1.1rem]" :class="{ 'animate-spin': autoRefresh }" aria-hidden="true">sync</span>
             {{ t('logs.syncNow') }}
           </button>
-        </div>
-      </div>
+        </template>
+      </PageHeader>
 
       <!-- Service Selector -->
       <div class="flex flex-wrap gap-2">
         <!-- Server services -->
         <button @click="switchService('snapserver')"
-          :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'snapserver' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50' : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+          :class="['flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold text-sm transition-colors border',
+            activeService === 'snapserver' ? 'bg-brand-primary/10 text-brand-primary-text border-brand-primary/30' : 'bg-inset text-text-muted border-line hover:border-brand-primary/30 hover:text-text-main']">
           <span class="material-symbols-outlined text-[1.1rem]">router</span>
           <span>{{ t('logs.snapserver') }}</span>
         </button>
         <button @click="switchService('shairport-sync')"
-          :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'shairport-sync' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50' : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+          :class="['flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold text-sm transition-colors border',
+            activeService === 'shairport-sync' ? 'bg-brand-primary/10 text-brand-primary-text border-brand-primary/30' : 'bg-inset text-text-muted border-line hover:border-brand-primary/30 hover:text-text-main']">
           <span class="material-symbols-outlined text-[1.1rem]">cast</span>
           <span>{{ t('logs.airplay') }}</span>
         </button>
         <button @click="switchService('snapmanager')"
-          :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'snapmanager' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50' : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+          :class="['flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold text-sm transition-colors border',
+            activeService === 'snapmanager' ? 'bg-brand-primary/10 text-brand-primary-text border-brand-primary/30' : 'bg-inset text-text-muted border-line hover:border-brand-primary/30 hover:text-text-main']">
           <span class="material-symbols-outlined text-[1.1rem]">dashboard_customize</span>
           <span>{{ t('logs.manager') }}</span>
         </button>
         <button v-if="systemStore.installedPackages['mpd']" @click="switchService('mpd')"
-          :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-            activeService === 'mpd' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50' : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+          :class="['flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold text-sm transition-colors border',
+            activeService === 'mpd' ? 'bg-brand-primary/10 text-brand-primary-text border-brand-primary/30' : 'bg-inset text-text-muted border-line hover:border-brand-primary/30 hover:text-text-main']">
           <span class="material-symbols-outlined text-[1.1rem]">queue_music</span>
           <span>{{ t('logs.mpd') }}</span>
         </button>
 
         <!-- Snapclient instance buttons (shown when instances exist) -->
         <template v-if="instanceStore.instances.length > 0">
-          <div class="w-px h-10 bg-black/10 dark:bg-white/10 self-center mx-1"></div>
+          <div class="w-px h-10 bg-line self-center mx-1"></div>
           <button v-for="inst in instanceStore.instances" :key="inst.id"
             @click="switchService('snapclient-' + inst.id)"
-            :class="['flex items-center space-x-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
-              activeService === 'snapclient-' + inst.id ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50' : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+            :class="['flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold text-sm transition-colors border',
+              activeService === 'snapclient-' + inst.id ? 'bg-brand-primary/10 text-brand-primary-text border-brand-primary/30' : 'bg-inset text-text-muted border-line hover:border-brand-primary/30 hover:text-text-main']">
             <span class="material-symbols-outlined text-[1.1rem]">speaker</span>
             <span>{{ inst.name }}</span>
             <span :class="inst.status === 'active' ? 'bg-success' : 'bg-danger'" class="w-1.5 h-1.5 rounded-full"></span>
@@ -126,10 +121,10 @@ onUnmounted(() => {
         </template>
       </div>
 
-      <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
-        <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center space-x-3">
+      <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-line bg-inset flex items-center space-x-3">
           <span class="material-symbols-outlined text-text-muted text-[1.2rem]">terminal</span>
-          <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('logs.consoleOutput') }}</span>
+          <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('logs.consoleOutput') }}</span>
           <span v-if="activeService.startsWith('snapclient-')" class="ml-auto text-[10px] font-mono text-brand-primary">
             snapclient-manager-{{ activeService.replace('snapclient-', '') }}.service
           </span>

@@ -12,6 +12,7 @@
 // `localParsedConfig`/`enabledProperties` objects the parent holds, not
 // just that the UI reacts locally.
 import { describe, expect, it } from 'vitest';
+import { createTestI18n } from '../../../test/mountView';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick, ref } from 'vue';
@@ -149,7 +150,7 @@ function mountTab(opts: {
   const sourceTemplates = ref<any[]>(SOURCE_TEMPLATES);
 
   const wrapper = mount(StandardTab, {
-    global: { plugins: [pinia] },
+    global: { plugins: [pinia, createTestI18n()] },
     attachTo: document.body,
     props: {
       localParsedConfig: localParsedConfig.value,

@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Layout from '../components/Layout.vue';
+import PageHeader from '../components/ui/PageHeader.vue';
 import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
@@ -185,52 +186,40 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
   <Layout>
     <div class="space-y-6">
 
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-            {{ t('pipeSources.title') }}
-          </h1>
-          <p class="text-text-muted mt-1 text-sm">
-            <i18n-t keypath="pipeSources.subtitle">
-              <template #pipePrefix><code class="text-xs bg-inset px-1 rounded">pipe://</code></template>
-            </i18n-t>
-          </p>
-        </div>
-        <div class="flex items-center gap-2">
-          <button
-            @click="importModal?.open()"
-            class="px-4 py-2 border border-line bg-inset text-text-main rounded hover:bg-line text-sm font-medium transition flex items-center gap-2"
-          >
-            <span class="material-symbols-outlined text-[1rem]">download</span>
+      <PageHeader :title="t('pipeSources.title')">
+        <template #actions>
+          <Button variant="subtle" @click="importModal?.open()">
+            <span class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">download</span>
             {{ t('pipeSources.importExisting') }}
-          </button>
-          <button
-            @click="addEditDialog?.openAdd()"
-            class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded hover:opacity-90 text-sm font-medium shadow transition flex items-center gap-2"
-          >
-            <span class="material-symbols-outlined text-[1rem]">add</span>
+          </Button>
+          <Button @click="addEditDialog?.openAdd()">
+            <span class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">add</span>
             {{ t('pipeSources.addSource') }}
-          </button>
-        </div>
-      </div>
+          </Button>
+        </template>
+      </PageHeader>
+      <p class="-mt-4 mb-2 text-sm text-text-muted max-w-2xl">
+        <i18n-t keypath="pipeSources.subtitle">
+          <template #pipePrefix><code class="text-xs bg-inset px-1 rounded">pipe://</code></template>
+        </i18n-t>
+      </p>
 
       <!-- Banners -->
       <div v-if="needsRestart || isZombieWarning" class="space-y-2">
-        <div v-if="needsRestart" class="flex items-center justify-between p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+        <div v-if="needsRestart" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-info/10 border border-info/30 rounded-xl">
           <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-blue-400">info</span>
-            <p class="text-sm text-blue-300">{{ t('pipeSources.restartBanner') }}</p>
+            <span class="material-symbols-outlined text-info">info</span>
+            <p class="text-sm text-text-main">{{ t('pipeSources.restartBanner') }}</p>
           </div>
           <button @click="restartSnapserver" :disabled="restarting"
-            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded font-medium transition disabled:opacity-50">
+            class="px-3 py-1.5 bg-brand-primary hover:bg-brand-primary/85 text-white text-xs rounded-lg font-semibold transition-colors disabled:opacity-50 self-start sm:self-auto">
             {{ restarting ? t('pipeSources.restarting') : t('pipeSources.restartSnapserver') }}
           </button>
         </div>
-        <div v-if="isZombieWarning" class="flex items-center justify-between p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+        <div v-if="isZombieWarning" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-warning/10 border border-warning/30 rounded-xl">
           <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-orange-400">warning</span>
-            <p class="text-sm text-orange-300">
+            <span class="material-symbols-outlined text-warning">warning</span>
+            <p class="text-sm text-text-main">
               <i18n-t keypath="pipeSources.zombieWarning">
                 <template #count><strong>{{ store.zombieCount }}</strong></template>
               </i18n-t>
@@ -260,7 +249,7 @@ const isZombieWarning = computed(() => (store.zombieCount ?? 0) > 100);
            that. -->
       <div v-if="store.loading && store.pipes.length === 0"
         class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <div v-for="n in 2" :key="n" class="bg-brand-surface/80 border border-black/[0.04] dark:border-white/[0.04] rounded-[2rem] p-6 sm:p-8 space-y-4">
+        <div v-for="n in 2" :key="n" class="bg-brand-surface/80 border border-line rounded-[2rem] p-6 sm:p-8 space-y-4">
           <div class="flex items-center gap-2">
             <Skeleton variant="text" width="40%" height="20px" />
             <Skeleton variant="text" width="15%" height="18px" />

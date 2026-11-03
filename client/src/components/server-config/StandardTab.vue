@@ -236,14 +236,14 @@ const updateSourceAtIndex = (idx: number, value: string) => {
 
 <template>
   <!-- Section Sub-Tabs -->
-  <div class="relative border-b border-black/10 dark:border-white/10 flex overflow-x-auto flex-nowrap no-scrollbar">
+  <div class="relative border-b border-line flex overflow-x-auto flex-nowrap no-scrollbar">
       <button
         v-for="sKey in orderedSections"
         :key="sKey"
         @click="activeSection = sKey"
         :class="[
-            'relative flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-200 flex-shrink-0',
-            activeSection === sKey ? 'text-brand-primary' : 'text-text-muted hover:text-gray-700 dark:hover:text-gray-300'
+            'relative flex items-center gap-2 px-4 py-3 text-sm font-semibold whitespace-nowrap transition-colors flex-shrink-0',
+            activeSection === sKey ? 'text-brand-primary-text' : 'text-text-muted hover:text-text-main'
         ]"
       >
           <span
@@ -266,14 +266,14 @@ const updateSourceAtIndex = (idx: number, value: string) => {
           <div class="flex items-center space-x-3">
             <span class="material-symbols-outlined text-[20px] text-brand-primary">{{ sectionIcons[activeSection] || 'tune' }}</span>
             <div>
-              <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest dark:">{{ currentSectionMeta.label }}</span>
-              <p class="text-[10px] font-semibold text-text-muted mt-0.5">{{ currentSectionMeta.description }}</p>
+              <span class="text-sm font-bold text-text-main">{{ currentSectionMeta.label }}</span>
+              <p class="text-xs text-text-muted mt-0.5">{{ currentSectionMeta.description }}</p>
             </div>
           </div>
       </template>
       <template #action>
           <div v-if="activeSection !== 'stream'" class="flex items-center space-x-2">
-              <button @click="triggerAddProperty(activeSection)" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-brand-primary hover:text-white hover:bg-brand-primary border border-brand-primary/30 rounded-lg transition-all uppercase tracking-widest shadow-[inset_0_0_10px_rgba(166,13,242,0.1)]" title="Add custom property">
+              <button @click="triggerAddProperty(activeSection)" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-text-main bg-inset hover:bg-line rounded-lg transition-colors border border-line" title="Add custom property">
                 <span class="material-symbols-outlined text-[14px] mr-1">add</span>
                 Custom
               </button>
@@ -286,16 +286,16 @@ const updateSourceAtIndex = (idx: number, value: string) => {
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center space-x-2">
                 <span class="material-symbols-outlined text-[18px] text-success">queue_music</span>
-                <h3 class="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-widest">Audio Sources</h3>
-                <span v-if="availableSourceNames.length" class="px-2 py-0.5 bg-success/10 text-success border border-success/20 text-[10px] font-black rounded-full">{{ availableSourceNames.length }}</span>
+                <h3 class="text-sm font-semibold text-text-main">Audio Sources</h3>
+                <span v-if="availableSourceNames.length" class="px-2 py-0.5 bg-success/10 text-success border border-success/20 text-[11px] font-semibold rounded-full">{{ availableSourceNames.length }}</span>
               </div>
-              <button @click="addEditSourceDialog?.openAdd()" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-success hover:bg-success/10 hover:text-white rounded-lg transition-all uppercase tracking-widest border border-success/30 shadow-[inset_0_0_10px_rgba(0,255,157,0.1)]">
+              <button @click="addEditSourceDialog?.openAdd()" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-text-main bg-inset hover:bg-line rounded-lg transition-colors border border-line">
                 <span class="material-symbols-outlined text-[14px] mr-1">add</span>
                 Add Source
               </button>
             </div>
 
-            <div v-if="!localParsedConfig.stream?.source" class="border border-dashed border-black/10 dark:border-white/10 rounded-xl bg-black/20">
+            <div v-if="!localParsedConfig.stream?.source" class="border border-dashed border-line rounded-xl bg-inset">
               <!-- No CTA here: the "Add Source" button is already visible directly
                    above this empty state in the section header (Task 33). -->
               <EmptyState
@@ -307,11 +307,11 @@ const updateSourceAtIndex = (idx: number, value: string) => {
 
             <div v-else class="space-y-3">
               <div v-for="(_item, idx) in (Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source : [localParsedConfig.stream.source])" :key="idx"
-                class="rounded-xl border border-black/5 dark:border-white/5 bg-black/30 overflow-hidden shadow-sm hover:border-brand-primary/30 transition-colors">
+                class="rounded-xl border border-line bg-brand-surface overflow-hidden shadow-sm hover:border-brand-primary/30 transition-colors">
                 <!-- Source header with name badge -->
-                <div class="flex items-center justify-between px-3 py-2 bg-black/5 dark:bg-white/5 border-b border-black/5 dark:border-white/5">
+                <div class="flex items-center justify-between px-3 py-2 bg-inset border-b border-line">
                   <div class="flex items-center space-x-2">
-                    <span class="px-2 py-0.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 text-[10px] font-black uppercase tracking-widest rounded-md">
+                    <span class="px-2 py-0.5 bg-brand-primary/10 text-brand-primary-text border border-brand-primary/20 text-[10px] font-bold uppercase tracking-wider rounded-md">
                       {{ getSourceType(Array.isArray(localParsedConfig.stream.source) ? localParsedConfig.stream.source[idx] : localParsedConfig.stream.source) }}
                     </span>
                     <span class="text-sm font-bold text-text-main">
@@ -333,13 +333,13 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     v-if="Array.isArray(localParsedConfig.stream.source)"
                     :value="localParsedConfig.stream.source[idx]"
                     @input="updateSourceAtIndex(idx as number, ($event.target as HTMLInputElement).value)"
-                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600"
+                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-text-main placeholder:text-text-muted/60"
                   />
                   <input
                     v-else
                     :value="localParsedConfig.stream.source"
                     @input="setPropertyValue('stream', 'source', ($event.target as HTMLInputElement).value)"
-                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600"
+                    class="w-full text-xs font-mono font-medium px-4 py-2 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-text-main placeholder:text-text-muted/60"
                   />
                 </div>
               </div>
@@ -347,16 +347,16 @@ const updateSourceAtIndex = (idx: number, value: string) => {
           </div>
 
           <!-- ==== DIVIDER ==== -->
-          <div class="border-t border-black/5 dark:border-white/5 my-8"></div>
+          <div class="border-t border-line my-8"></div>
 
           <!-- ==== SUB-SECTION 2: Stream Settings ==== -->
           <div>
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center space-x-2">
                 <span class="material-symbols-outlined text-[18px] text-info">tune</span>
-                <h3 class="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-widest">Stream Settings</h3>
+                <h3 class="text-sm font-semibold text-text-main">Stream Settings</h3>
               </div>
-              <button @click="triggerAddProperty('stream')" class="inline-flex items-center px-3 py-1.5 text-[10px] font-black text-info hover:text-white hover:bg-info/10 border border-info/30 rounded-lg transition-all uppercase tracking-widest shadow-[inset_0_0_10px_rgba(0,212,255,0.1)]" title="Add custom property">
+              <button @click="triggerAddProperty('stream')" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-text-main bg-inset hover:bg-line rounded-lg transition-colors border border-line" title="Add custom property">
                 <span class="material-symbols-outlined text-[14px] mr-1">add</span>
                 Custom
               </button>
@@ -367,8 +367,8 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                 :class="[
                   'grid grid-cols-1 md:grid-cols-12 gap-3 items-start py-3 px-4 rounded-xl transition-all -mx-4',
                   isPropertyEnabled('stream', key)
-                    ? 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
-                    : 'opacity-40 hover:opacity-60'
+                    ? 'hover:bg-inset'
+                    : ''
                 ]">
                 <!-- Enable/Disable Toggle -->
                 <div class="md:col-span-1 flex items-center pt-1">
@@ -376,7 +376,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     @click="toggleProperty('stream', key)"
                     :class="[
                       'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
-                      isPropertyEnabled('stream', key) ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                      isPropertyEnabled('stream', key) ? 'bg-brand-primary' : 'bg-line'
                     ]"
                     :title="isPropertyEnabled('stream', key) ? 'Disable this property' : 'Enable this property'"
                     :aria-label="`${isPropertyEnabled('stream', key) ? 'Disable' : 'Enable'} ${getMetaForKey('stream', key)?.label || key}`"
@@ -387,15 +387,15 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                 <!-- Label Column -->
                 <div class="md:col-span-3">
                   <div class="flex flex-col min-w-0">
-                    <label class="text-[11px] font-black text-slate-300 uppercase tracking-wide">
+                    <label class="text-sm font-semibold text-text-main">
                       {{ getMetaForKey('stream', key)?.label || key }}
                     </label>
                     <span v-if="getMetaForKey('stream', key)?.description"
-                      class="text-[10px] text-slate-400 leading-snug mt-0.5">
+                      class="text-xs text-text-muted leading-snug mt-0.5">
                       {{ getMetaForKey('stream', key)?.description }}
                     </span>
-                    <span v-if="getMetaForKey('stream', key)?.default !== undefined"
-                      class="text-[9px] text-indigo-400/70 dark:text-indigo-500/70 mt-0.5 font-mono">
+                    <span v-if="getMetaForKey('stream', key)?.default !== undefined && isPropertyEnabled('stream', key)"
+                      class="text-[11px] text-text-muted/80 mt-1 font-mono">
                       default: {{ getMetaForKey('stream', key)?.default }}
                     </span>
                   </div>
@@ -407,20 +407,20 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     <select
                       :value="getPropertyValue('stream', key)"
                       @change="setPropertyValue('stream', key, ($event.target as HTMLSelectElement).value)"
-                      class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white appearance-none pr-10"
+                      class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-text-main appearance-none pr-10"
                     >
                       <option value="">(auto — first non-meta source)</option>
                       <option v-for="sName in availableSourceNames" :key="sName" :value="sName">
                         {{ sName }}
                       </option>
                     </select>
-                    <ChevronDownIcon class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <ChevronDownIcon class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                   </div>
 
                   <!-- DISABLED property: show default as read-only -->
                   <div v-else-if="!isPropertyEnabled('stream', key)" class="py-1">
-                    <span class="text-xs text-slate-400 font-mono">
-                      {{ getMetaForKey('stream', key)?.default ?? '(empty)' }}
+                    <span class="inline-flex items-center gap-1.5 text-xs text-text-muted font-mono italic">
+                      <span class="not-italic font-sans text-[11px] rounded border border-line px-1.5 py-0.5">{{ $t('serverConfig.usingDefault') }}</span> {{ getMetaForKey('stream', key)?.default ?? '(empty)' }}
                     </span>
                   </div>
 
@@ -429,14 +429,14 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     <button
                       @click="setPropertyValue('stream', key, String(getPropertyValue('stream', key)) === 'true' ? 'false' : 'true')"
                       :class="[
-                        'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 dark:focus:ring-offset-slate-900',
-                        String(getPropertyValue('stream', key)) === 'true' ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                        'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 focus:ring-offset-brand-surface',
+                        String(getPropertyValue('stream', key)) === 'true' ? 'bg-brand-primary' : 'bg-line'
                       ]"
                       :aria-label="`${String(getPropertyValue('stream', key)) === 'true' ? 'Disable' : 'Enable'} ${getMetaForKey('stream', key)?.label || key}`"
                     >
                       <span :class="[String(getPropertyValue('stream', key)) === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                     </button>
-                    <span class="ml-3 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                    <span class="ml-3 text-sm text-text-muted">
                       {{ String(getPropertyValue('stream', key)) === 'true' ? 'Enabled' : 'Disabled' }}
                     </span>
                   </div>
@@ -446,13 +446,13 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     <select
                       :value="getPropertyValue('stream', key)"
                       @change="setPropertyValue('stream', key, ($event.target as HTMLSelectElement).value)"
-                      class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white appearance-none pr-10"
+                      class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-text-main appearance-none pr-10"
                     >
                       <option v-for="opt in getMetaForKey('stream', key)?.options" :key="opt" :value="opt">
                         {{ opt || '(auto)' }}
                       </option>
                     </select>
-                    <ChevronDownIcon class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <ChevronDownIcon class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                   </div>
 
                   <!-- Number Input -->
@@ -462,7 +462,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     :value="getPropertyValue('stream', key)"
                     @input="setPropertyValue('stream', key, ($event.target as HTMLInputElement).value)"
                     :placeholder="String(getMetaForKey('stream', key)?.default ?? '')"
-                    class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                    class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-text-main"
                   />
 
                   <!-- Default Text Input -->
@@ -471,7 +471,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     :value="getPropertyValue('stream', key)"
                     @input="setPropertyValue('stream', key, ($event.target as HTMLInputElement).value)"
                     :placeholder="String(getMetaForKey('stream', key)?.default ?? '')"
-                    class="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                    class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-text-main"
                   />
                 </div>
               </div>
@@ -481,16 +481,16 @@ const updateSourceAtIndex = (idx: number, value: string) => {
 
       <!-- ==== NON-STREAM SECTIONS: Standard property loop ==== -->
       <div v-else class="space-y-1">
-          <div v-if="allPropertyKeys.length === 0" class="text-center py-12 border border-dashed border-black/10 dark:border-white/10 rounded-xl bg-black/20">
-              <p class="text-xs font-black text-text-muted uppercase tracking-widest">No properties available for this section</p>
+          <div v-if="allPropertyKeys.length === 0" class="text-center py-12 border border-dashed border-line rounded-xl bg-inset">
+              <p class="text-sm text-text-muted">No properties available for this section</p>
           </div>
 
           <div v-for="key in allPropertyKeys" :key="key"
             :class="[
               'grid grid-cols-1 md:grid-cols-12 gap-3 items-start py-3 px-4 rounded-xl transition-all -mx-4',
               isPropertyEnabled(activeSection, key)
-                ? 'hover:bg-black/5 dark:hover:bg-white/5'
-                : 'opacity-40 hover:opacity-60'
+                ? 'hover:bg-inset'
+                : ''
             ]">
 
               <!-- Enable/Disable Toggle (col 1) -->
@@ -499,7 +499,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                   @click="toggleProperty(activeSection, key)"
                   :class="[
                     'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
-                    isPropertyEnabled(activeSection, key) ? 'bg-brand-primary' : 'bg-gray-700'
+                    isPropertyEnabled(activeSection, key) ? 'bg-brand-primary' : 'bg-line'
                   ]"
                   :title="isPropertyEnabled(activeSection, key) ? 'Disable this property' : 'Enable this property'"
                   :aria-label="`${isPropertyEnabled(activeSection, key) ? 'Disable' : 'Enable'} ${getMetaForKey(activeSection, key)?.label || key}`"
@@ -511,15 +511,15 @@ const updateSourceAtIndex = (idx: number, value: string) => {
               <!-- Label Column (col 2-4) -->
               <div class="md:col-span-3">
                   <div class="flex flex-col min-w-0">
-                    <label class="text-[11px] font-black text-text-muted uppercase tracking-wide">
+                    <label class="text-sm font-semibold text-text-main">
                       {{ getMetaForKey(activeSection, key)?.label || key }}
                     </label>
                     <span v-if="getMetaForKey(activeSection, key)?.description"
-                      class="text-[10px] text-text-muted leading-snug mt-0.5">
+                      class="text-xs text-text-muted leading-snug mt-0.5">
                       {{ getMetaForKey(activeSection, key)?.description }}
                     </span>
-                    <span v-if="getMetaForKey(activeSection, key)?.default !== undefined"
-                      class="text-[9px] text-info/70 mt-0.5 font-mono">
+                    <span v-if="getMetaForKey(activeSection, key)?.default !== undefined && isPropertyEnabled(activeSection, key)"
+                      class="text-[11px] text-text-muted/80 mt-1 font-mono">
                       default: {{ getMetaForKey(activeSection, key)?.default }}
                     </span>
                   </div>
@@ -529,8 +529,8 @@ const updateSourceAtIndex = (idx: number, value: string) => {
               <div class="md:col-span-8">
                   <!-- DISABLED property: show default as read-only -->
                   <div v-if="!isPropertyEnabled(activeSection, key)" class="py-1">
-                    <span class="text-xs text-text-muted font-mono">
-                      {{ getMetaForKey(activeSection, key)?.default ?? '(empty)' }}
+                    <span class="inline-flex items-center gap-1.5 text-xs text-text-muted font-mono italic">
+                      <span class="not-italic font-sans text-[11px] rounded border border-line px-1.5 py-0.5">{{ $t('serverConfig.usingDefault') }}</span> {{ getMetaForKey(activeSection, key)?.default ?? '(empty)' }}
                     </span>
                   </div>
 
@@ -539,14 +539,14 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     <button
                       @click="setPropertyValue(activeSection, key, String(getPropertyValue(activeSection, key)) === 'true' ? 'false' : 'true')"
                       :class="[
-                        'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 focus:ring-offset-black',
-                        String(getPropertyValue(activeSection, key)) === 'true' ? 'bg-brand-primary' : 'bg-gray-700'
+                        'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 focus:ring-offset-brand-surface',
+                        String(getPropertyValue(activeSection, key)) === 'true' ? 'bg-brand-primary' : 'bg-line'
                       ]"
                       :aria-label="`${String(getPropertyValue(activeSection, key)) === 'true' ? 'Disable' : 'Enable'} ${getMetaForKey(activeSection, key)?.label || key}`"
                     >
                       <span :class="[String(getPropertyValue(activeSection, key)) === 'true' ? 'translate-x-5' : 'translate-x-0', 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out']" />
                     </button>
-                    <span class="ml-3 text-xs text-text-muted font-bold uppercase tracking-widest">
+                    <span class="ml-3 text-sm text-text-muted">
                       {{ String(getPropertyValue(activeSection, key)) === 'true' ? 'Enabled' : 'Disabled' }}
                     </span>
                   </div>
@@ -556,9 +556,9 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     <select
                       :value="getPropertyValue(activeSection, key)"
                       @change="setPropertyValue(activeSection, key, ($event.target as HTMLSelectElement).value)"
-                      class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-800 dark:text-text-main appearance-none pr-10"
+                      class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-text-main appearance-none pr-10"
                     >
-                      <option v-for="opt in getMetaForKey(activeSection, key)?.options" :key="opt" :value="opt" class="bg-black text-white">
+                      <option v-for="opt in getMetaForKey(activeSection, key)?.options" :key="opt" :value="opt">
                         {{ opt || '(auto)' }}
                       </option>
                     </select>
@@ -572,7 +572,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     :value="getPropertyValue(activeSection, key)"
                     @input="setPropertyValue(activeSection, key, ($event.target as HTMLInputElement).value)"
                     :placeholder="String(getMetaForKey(activeSection, key)?.default ?? '')"
-                    class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-800 dark:text-text-main placeholder-gray-400 dark:placeholder-gray-600"
+                    class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-text-main placeholder:text-text-muted/60"
                   />
 
                   <!-- Default Text Input -->
@@ -581,7 +581,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
                     :value="getPropertyValue(activeSection, key)"
                     @input="setPropertyValue(activeSection, key, ($event.target as HTMLInputElement).value)"
                     :placeholder="String(getMetaForKey(activeSection, key)?.default ?? '')"
-                    class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-gray-800 dark:text-text-main placeholder-gray-400 dark:placeholder-gray-600"
+                    class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all text-text-main placeholder:text-text-muted/60"
                   />
               </div>
           </div>
@@ -590,7 +590,7 @@ const updateSourceAtIndex = (idx: number, value: string) => {
 
   <!-- Bottom Actions -->
   <div class="mt-8 mb-24 flex justify-center">
-      <button @click="emit('reset-requested')" class="py-3 px-6 border border-black/5 dark:border-white/5 rounded-xl text-text-muted hover:text-danger hover:bg-danger/10 hover:border-danger/20 transition-all flex items-center space-x-2">
+      <button @click="emit('reset-requested')" class="py-3 px-6 border border-line rounded-xl text-text-muted hover:text-danger hover:bg-danger/10 hover:border-danger/20 transition-all flex items-center space-x-2">
           <span class="material-symbols-outlined text-[16px]">restart_alt</span>
           <span class="text-[10px] font-black uppercase tracking-widest">Reset Configuration to Default</span>
       </button>

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useUIStore } from '../stores/ui';
 import { fetchApi } from '../utils/api';
 import Layout from '../components/Layout.vue';
+import PageHeader from '../components/ui/PageHeader.vue';
 import Card from '../components/Card.vue';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -91,11 +92,7 @@ const handleExportBackup = async () => {
 <template>
   <Layout>
     <div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <!-- Header -->
-      <div>
-        <h1 class="text-3xl font-black text-text-main tracking-tight dark:">{{ t('security.title') }}</h1>
-        <p class="text-text-muted font-medium mt-1">{{ t('security.subtitle') }}</p>
-      </div>
+      <PageHeader :title="t('security.title')" :description="t('security.subtitle')" />
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <!-- Change Password -->
@@ -107,17 +104,17 @@ const handleExportBackup = async () => {
             <div>
               <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.currentPasswordLabel') }}</label>
               <input v-model="currentPassword" type="password" :placeholder="t('security.currentPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600">
+                class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-text-main placeholder:text-text-muted/60">
             </div>
             <div>
               <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.newPasswordLabel') }}</label>
               <input v-model="newPassword" type="password" :placeholder="t('security.newPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600">
+                class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-text-main placeholder:text-text-muted/60">
             </div>
             <div>
               <label class="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-2">{{ t('security.confirmPasswordLabel') }}</label>
               <input v-model="confirmPassword" type="password" :placeholder="t('security.confirmPasswordPlaceholder')"
-                class="w-full text-sm font-medium px-4 py-2.5 bg-black/40 border border-black/5 dark:border-white/5 rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600">
+                class="w-full text-sm font-medium px-4 py-2.5 bg-inset border border-line rounded-xl focus:ring-2 focus:ring-danger/30 focus:border-danger outline-none transition-all text-text-main placeholder:text-text-muted/60">
             </div>
             <button
               @click="handleChangePassword"

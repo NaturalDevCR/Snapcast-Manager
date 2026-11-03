@@ -11,6 +11,8 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Layout from '../components/Layout.vue';
+import PageHeader from '../components/ui/PageHeader.vue';
+import Button from '../components/ui/Button.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import Badge from '../components/ui/Badge.vue';
@@ -123,25 +125,14 @@ async function handleConfirmRepair() {
 <template>
   <Layout>
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
-            {{ t('diagnostics.title') }}
-          </h1>
-          <p class="text-text-muted mt-1 text-sm">
-            {{ t('diagnostics.subtitle') }}
-          </p>
-        </div>
-        <button
-          @click="handleRefresh"
-          :disabled="store.loading"
-          :aria-label="t('diagnostics.refreshAriaLabel')"
-          class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-inset hover:bg-line text-text-main border border-line transition-all active:scale-95 disabled:opacity-50"
-        >
-          <span class="material-symbols-outlined text-[1.1rem]" :class="{ 'animate-spin': store.loading }">refresh</span>
-        </button>
-      </div>
+      <PageHeader :title="t('diagnostics.title')" :description="t('diagnostics.subtitle')">
+        <template #actions>
+          <Button variant="subtle" :loading="store.loading" :aria-label="t('diagnostics.refreshAriaLabel')" @click="handleRefresh">
+            <span v-if="!store.loading" class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">refresh</span>
+            {{ t('diagnostics.refresh') }}
+          </Button>
+        </template>
+      </PageHeader>
 
       <!-- Fetch failure: MUST be visually distinct from "confirmed healthy" --
            a diagnostics tool that goes quiet on a network/auth error and

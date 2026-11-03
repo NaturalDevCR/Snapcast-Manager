@@ -5,6 +5,7 @@ import { fetchApi } from '../utils/api';
 import { useUIStore } from '../stores/ui';
 import { useSystemStore } from '../stores/system';
 import Layout from '../components/Layout.vue';
+import PageHeader from '../components/ui/PageHeader.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ConfirmDestructive from '../components/ui/ConfirmDestructive.vue';
 
@@ -346,45 +347,39 @@ onMounted(() => {
   <Layout>
     <div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-      <!-- Header -->
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 class="text-3xl font-black text-text-main tracking-tight dark:">{{ t('tools.title') }}</h1>
-          <p class="text-text-muted font-medium mt-1">{{ t('tools.subtitle') }}</p>
-        </div>
-      </div>
+      <PageHeader :title="t('tools.title')" :description="t('tools.subtitle')" />
 
       <!-- Tabs -->
       <div class="flex flex-wrap gap-2">
         <button @click="switchTab('crontab')"
-          :class="['flex items-center space-x-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
+          :class="['flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold text-sm transition-colors border',
             activeTab === 'crontab'
-              ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50'
-              : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+              ? 'bg-brand-primary/10 text-brand-primary-text border-brand-primary/30'
+              : 'bg-inset text-text-muted border-line hover:border-brand-primary/30 hover:text-text-main']">
           <span class="material-symbols-outlined text-[1.1rem]">schedule</span>
           <span>{{ t('tools.tabCrontab') }}</span>
         </button>
         <button @click="switchTab('scripts')"
-          :class="['flex items-center space-x-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
+          :class="['flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold text-sm transition-colors border',
             activeTab === 'scripts'
-              ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50'
-              : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+              ? 'bg-brand-primary/10 text-brand-primary-text border-brand-primary/30'
+              : 'bg-inset text-text-muted border-line hover:border-brand-primary/30 hover:text-text-main']">
           <span class="material-symbols-outlined text-[1.1rem]">code</span>
           <span>{{ t('tools.tabScripts') }}</span>
         </button>
         <button v-if="systemStore.installedPackages['mpd']" @click="switchTab('mpd-config')"
-          :class="['flex items-center space-x-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
+          :class="['flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold text-sm transition-colors border',
             activeTab === 'mpd-config'
-              ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50'
-              : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+              ? 'bg-brand-primary/10 text-brand-primary-text border-brand-primary/30'
+              : 'bg-inset text-text-muted border-line hover:border-brand-primary/30 hover:text-text-main']">
           <span class="material-symbols-outlined text-[1.1rem]">queue_music</span>
           <span>{{ t('tools.tabMpdConfig') }}</span>
         </button>
         <button @click="switchTab('backups')"
-          :class="['flex items-center space-x-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border',
+          :class="['flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold text-sm transition-colors border',
             activeTab === 'backups'
-              ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/50'
-              : 'bg-black/40 text-terminal-muted border-black/5 dark:border-white/5 hover:border-brand-primary/30 hover:text-gray-300']">
+              ? 'bg-brand-primary/10 text-brand-primary-text border-brand-primary/30'
+              : 'bg-inset text-text-muted border-line hover:border-brand-primary/30 hover:text-text-main']">
           <span class="material-symbols-outlined text-[1.1rem]">settings_backup_restore</span>
           <span>{{ t('tools.tabBackups') }}</span>
         </button>
@@ -392,11 +387,11 @@ onMounted(() => {
 
       <!-- ─── Crontab Editor ───────────────────────────────────────────── -->
       <div v-if="activeTab === 'crontab'" class="space-y-4">
-        <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
-          <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
+        <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+          <div class="px-6 py-4 border-b border-line bg-inset flex items-center justify-between">
             <div class="flex items-center space-x-3">
               <span class="material-symbols-outlined text-text-muted text-[1.2rem]">schedule</span>
-              <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('tools.crontabEditor') }}</span>
+              <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('tools.crontabEditor') }}</span>
             </div>
             <div class="flex items-center gap-3">
               <button @click="loadCrontab" :disabled="crontabLoading"
@@ -420,7 +415,7 @@ onMounted(() => {
               v-model="crontabContent"
               rows="18"
               spellcheck="false"
-              class="w-full bg-black/60 border border-black/5 dark:border-white/5 rounded-xl text-sm font-mono text-gray-800 dark:text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
+              class="w-full bg-black/60 border border-line rounded-xl text-sm font-mono text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
               placeholder="# No crontab entries yet&#10;# min hour day month weekday command"
             ></textarea>
           </div>
@@ -432,9 +427,9 @@ onMounted(() => {
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
           <!-- Script List -->
-          <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
-            <div class="px-5 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
-              <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('tools.tabScripts') }}</span>
+          <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+            <div class="px-5 py-4 border-b border-line bg-inset flex items-center justify-between">
+              <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('tools.tabScripts') }}</span>
               <button @click="showAddForm = !showAddForm"
                 class="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary rounded-lg transition-all"
                 :aria-label="showAddForm ? t('tools.cancelAddScript') : t('tools.addScript')">
@@ -443,11 +438,11 @@ onMounted(() => {
             </div>
 
             <!-- Add Form -->
-            <div v-if="showAddForm" class="p-4 border-b border-black/5 dark:border-white/5 bg-brand-primary/5 space-y-3">
+            <div v-if="showAddForm" class="p-4 border-b border-line bg-brand-primary/5 space-y-3">
               <input v-model="newScriptLabel" type="text" :placeholder="t('tools.labelPlaceholder')"
-                class="w-full bg-black/60 border border-black/10 dark:border-white/10 rounded-xl text-xs font-mono text-gray-800 dark:text-text-main px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
+                class="w-full bg-black/60 border border-line rounded-xl text-xs font-mono text-text-main px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
               <input v-model="newScriptPath" type="text" placeholder="/path/to/script.sh"
-                class="w-full bg-black/60 border border-black/10 dark:border-white/10 rounded-xl text-xs font-mono text-gray-800 dark:text-text-main px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
+                class="w-full bg-black/60 border border-line rounded-xl text-xs font-mono text-text-main px-3 py-2 focus:outline-none focus:border-brand-primary/50" />
               <button @click="addScriptPath"
                 class="w-full px-3 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 border border-brand-primary/50">
                 {{ t('tools.addScriptButton') }}
@@ -462,9 +457,9 @@ onMounted(() => {
               <div v-for="script in scriptPaths" :key="script.id"
                 @click="selectScript(script)"
                 :class="['flex items-center justify-between px-5 py-3.5 cursor-pointer transition-all group',
-                  selectedScript?.id === script.id ? 'bg-brand-primary/10 border-l-2 border-brand-primary' : 'hover:bg-black/5 dark:hover:bg-white/5']">
+                  selectedScript?.id === script.id ? 'bg-brand-primary/10 border-l-2 border-brand-primary' : 'hover:bg-inset']">
                 <div class="min-w-0 mr-2">
-                  <p class="text-xs font-black text-gray-900 dark:text-white truncate">{{ script.label }}</p>
+                  <p class="text-xs font-black text-text-main truncate">{{ script.label }}</p>
                   <p class="text-[10px] font-mono text-terminal-muted truncate mt-0.5">{{ script.path }}</p>
                 </div>
                 <button @click.stop="confirmRemoveScript(script.id)"
@@ -477,11 +472,11 @@ onMounted(() => {
           </div>
 
           <!-- Script Editor Panel -->
-          <div class="lg:col-span-2 bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
-            <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
+          <div class="lg:col-span-2 bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+            <div class="px-6 py-4 border-b border-line bg-inset flex items-center justify-between">
               <div class="flex items-center space-x-3">
                 <span class="material-symbols-outlined text-text-muted text-[1.2rem]">code</span>
-                <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">
+                <span class="text-sm font-black text-text-main uppercase tracking-widest">
                   {{ selectedScript ? selectedScript.label : t('tools.selectAScript') }}
                 </span>
                 <span v-if="selectedScript" class="text-[10px] font-mono text-terminal-muted truncate max-w-[200px]">{{ selectedScript.path }}</span>
@@ -506,7 +501,7 @@ onMounted(() => {
                 v-model="scriptContent"
                 rows="22"
                 spellcheck="false"
-                class="w-full bg-black/60 border border-black/5 dark:border-white/5 rounded-xl text-sm font-mono text-gray-800 dark:text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
+                class="w-full bg-black/60 border border-line rounded-xl text-sm font-mono text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
                 placeholder="#!/bin/bash&#10;# Script content..."
               ></textarea>
             </div>
@@ -516,11 +511,11 @@ onMounted(() => {
 
       <!-- ─── MPD Config Editor ───────────────────────────────────────── -->
       <div v-if="activeTab === 'mpd-config'" class="space-y-4">
-        <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
-          <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
+        <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+          <div class="px-6 py-4 border-b border-line bg-inset flex items-center justify-between">
             <div class="flex items-center space-x-3">
               <span class="material-symbols-outlined text-text-muted text-[1.2rem]">queue_music</span>
-              <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('tools.tabMpdConfig') }}</span>
+              <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('tools.tabMpdConfig') }}</span>
               <span class="text-[10px] font-mono text-terminal-muted">/etc/mpd.conf</span>
             </div>
             <div class="flex items-center gap-3">
@@ -556,7 +551,7 @@ onMounted(() => {
               v-model="mpdConfigContent"
               rows="28"
               spellcheck="false"
-              class="w-full bg-black/60 border border-black/5 dark:border-white/5 rounded-xl text-sm font-mono text-gray-800 dark:text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
+              class="w-full bg-black/60 border border-line rounded-xl text-sm font-mono text-text-main p-4 focus:outline-none focus:border-brand-primary/50 resize-none leading-relaxed"
               placeholder="# /etc/mpd.conf&#10;# MPD configuration file"
             ></textarea>
           </div>
@@ -565,30 +560,30 @@ onMounted(() => {
 
       <!-- ─── Backups ─────────────────────────────────────────────────── -->
       <div v-if="activeTab === 'backups'" class="space-y-4">
-        <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
-          <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center space-x-3">
+        <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+          <div class="px-6 py-4 border-b border-line bg-inset flex items-center space-x-3">
             <span class="material-symbols-outlined text-gray-500 text-[1.2rem]">event_repeat</span>
-            <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('tools.scheduledBackups') }}</span>
+            <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('tools.scheduledBackups') }}</span>
           </div>
           <div class="p-4 space-y-4">
             <p class="text-[10px] font-mono text-terminal-muted leading-relaxed">
               {{ t('tools.scheduledBackupsDescription') }}
             </p>
-            <label class="flex items-center gap-2 text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">
+            <label class="flex items-center gap-2 text-xs font-black text-text-main uppercase tracking-widest">
               <input type="checkbox" v-model="schedule.enabled" class="w-4 h-4" />
               {{ t('tools.scheduleEnabled') }}
             </label>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleFrequency') }}</label>
-                <select v-model="schedule.frequency" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white">
+                <select v-model="schedule.frequency" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-text-main">
                   <option value="daily">{{ t('tools.scheduleFrequencyDaily') }}</option>
                   <option value="weekly">{{ t('tools.scheduleFrequencyWeekly') }}</option>
                 </select>
               </div>
               <div v-if="schedule.frequency === 'weekly'">
                 <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleDayOfWeek') }}</label>
-                <select v-model.number="schedule.dayOfWeek" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white">
+                <select v-model.number="schedule.dayOfWeek" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-text-main">
                   <option :value="0">{{ t('tools.scheduleDaySunday') }}</option>
                   <option :value="1">{{ t('tools.scheduleDayMonday') }}</option>
                   <option :value="2">{{ t('tools.scheduleDayTuesday') }}</option>
@@ -600,11 +595,11 @@ onMounted(() => {
               </div>
               <div>
                 <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleTime') }}</label>
-                <input type="time" v-model="schedule.time" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                <input type="time" v-model="schedule.time" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-text-main" />
               </div>
               <div>
                 <label class="block text-[10px] font-black text-terminal-muted uppercase tracking-widest mb-1">{{ t('tools.scheduleRetainCount') }}</label>
-                <input type="number" min="1" v-model.number="schedule.retainCount" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                <input type="number" min="1" v-model.number="schedule.retainCount" class="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-text-main" />
               </div>
             </div>
             <p class="text-[10px] font-mono text-terminal-muted">
@@ -618,18 +613,18 @@ onMounted(() => {
                 {{ t('tools.scheduleSave') }}
               </button>
               <button @click="runScheduleNow" :disabled="scheduleRunning"
-                class="inline-flex items-center px-3 py-1.5 text-xs font-black text-gray-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 border border-black/20 dark:border-white/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+                class="inline-flex items-center px-3 py-1.5 text-xs font-black text-text-main hover:bg-black/5 dark:hover:bg-white/10 border border-black/20 dark:border-white/20 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
                 {{ t('tools.scheduleRunNow') }}
               </button>
             </div>
           </div>
         </div>
 
-        <div class="bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl backdrop-blur-md overflow-hidden">
-          <div class="px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex items-center justify-between">
+        <div class="bg-black/40 border border-line rounded-2xl backdrop-blur-md overflow-hidden">
+          <div class="px-6 py-4 border-b border-line bg-inset flex items-center justify-between">
             <div class="flex items-center space-x-3">
               <span class="material-symbols-outlined text-text-muted text-[1.2rem]">settings_backup_restore</span>
-              <span class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{{ t('tools.configurationBackups') }}</span>
+              <span class="text-sm font-black text-text-main uppercase tracking-widest">{{ t('tools.configurationBackups') }}</span>
             </div>
             <button @click="loadBackups" :disabled="backupsLoading"
               class="inline-flex items-center px-3 py-1.5 text-xs font-black text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
@@ -646,9 +641,9 @@ onMounted(() => {
             </div>
             <div v-else class="divide-y divide-white/5">
               <div v-for="backup in backups" :key="backup.name"
-                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 hover:bg-black/5 dark:hover:bg-white/5 transition-all rounded-xl">
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 hover:bg-inset transition-all rounded-xl">
                 <div class="min-w-0">
-                  <p class="text-xs font-black text-gray-900 dark:text-white truncate font-mono">
+                  <p class="text-xs font-black text-text-main truncate font-mono">
                     {{ backup.name }}
                     <span class="ml-2 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest"
                       :class="backup.type === 'scheduled' ? 'bg-brand-primary/20 text-brand-primary' : 'bg-white/10 text-terminal-muted'">

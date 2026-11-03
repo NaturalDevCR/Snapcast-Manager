@@ -16,10 +16,11 @@ describe('ServerConfig.vue', () => {
     await nextTick();
 
     expect(wrapper.text()).toContain('Estándar');
-    expect(wrapper.text()).toContain('Editor visual');
+    // Tab sub-labels moved into each tab's title tooltip (UI overhaul).
+    expect(wrapper.find('[title="Editor visual"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('Experto');
-    expect(wrapper.text()).toContain('Archivo INI en bruto');
+    expect(wrapper.find('[title="Archivo INI en bruto"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('Instantáneas');
-    expect(wrapper.text()).toContain('Guardar configuración');
+    expect(wrapper.text()).toContain('Guardar cambios');
   });
 });

@@ -44,7 +44,7 @@ watch(
     <div
       class="bg-brand-surface/95 rounded-2xl shadow-2xl border border-brand-primary/20 backdrop-blur-xl w-full max-w-2xl animate-in fade-in zoom-in duration-300 overflow-hidden"
     >
-      <div class="flex items-center gap-3 px-5 py-4 border-b border-black/5 dark:border-white/5">
+      <div class="flex items-center gap-3 px-5 py-4 border-b border-line">
         <span class="material-symbols-outlined animate-spin text-brand-primary text-2xl shrink-0">sync</span>
         <span class="text-sm font-bold text-text-main tracking-widest uppercase truncate">
           {{ systemStore.loadingMessage || t('dashboard.loadingFallback') }}

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useWatchdogStore } from '../stores/watchdog';
 import { useUIStore } from '../stores/ui';
 import Layout from '../components/Layout.vue';
+import PageHeader from '../components/ui/PageHeader.vue';
 import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
@@ -158,21 +159,18 @@ function formatBytes(bytes?: number) {
 <template>
   <Layout>
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">{{ t('watchdogs.title') }}</h1>
-          <p class="text-text-muted mt-1">{{ t('watchdogs.subtitle') }}</p>
-        </div>
-        <div class="flex space-x-3">
-          <button @click="showExpertMode = true" class="px-4 py-2 border border-line bg-inset text-text-main rounded hover:bg-line text-sm font-medium transition flex items-center">
+      <PageHeader :title="t('watchdogs.title')" :description="t('watchdogs.subtitle')">
+        <template #actions>
+          <Button variant="subtle" @click="showExpertMode = true">
+            <span class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">code</span>
             {{ t('watchdogs.manualEdit') }}
-          </button>
-          <button @click="showAddDialog = true" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded hover:opacity-90 text-sm font-medium shadow transition flex items-center">
-            <span>{{ t('watchdogs.addWatchdog') }}</span>
-          </button>
-        </div>
-      </div>
+          </Button>
+          <Button @click="showAddDialog = true">
+            <span class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">add</span>
+            {{ t('watchdogs.addWatchdog') }}
+          </Button>
+        </template>
+      </PageHeader>
 
       <!-- Empty State -->
       <div v-if="watchdogStore.watchdogs.length === 0" class="border border-dashed border-line rounded-lg">
