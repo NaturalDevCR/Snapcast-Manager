@@ -39,8 +39,8 @@ withDefaults(defineProps<SectionHeaderProps>(), {
       <p v-if="eyebrow" class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-1">
         {{ eyebrow }}
       </p>
-      <h2 class="text-sm font-bold text-text-main uppercase tracking-widest">{{ title }}</h2>
-      <p v-if="description" class="text-xs text-text-muted normal-case tracking-normal font-medium mt-1.5">
+      <h2 class="text-base font-semibold text-text-main">{{ title }}</h2>
+      <p v-if="description" class="text-sm text-text-muted mt-0.5">
         {{ description }}
       </p>
     </div>

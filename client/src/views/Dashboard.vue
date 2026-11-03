@@ -1,5 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+// Dashboard.vue -- UI overhaul (2026-11).
+//
+// Reorganized around the questions an admin opens this page with, in order:
+//   1. "Is it working?"  -- a row of status tiles (snapserver, streams,
+//      clients, diagnostics), each linking to the page that explains it.
+//   2. "What's playing / who's connected?" -- streams + clients lists, next
+//      to the detailed health checks.
+//   3. "Manage the software" -- one ServiceCard per package.
+//   4. "This manager" -- version + Node.js runtime, demoted to the bottom.
+//
+// Removed: the "Core Engine" card, whose "System Normal / Operational /
+// Health 100%" was hardcoded and shown even while snapserver was down; the
+// "Management Core" card's hardcoded "Everything is synced" message and
+// permanently-disabled "UI up to date" button.
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSystemStore } from '../stores/system';
 import { useUIStore } from '../stores/ui';
@@ -13,9 +27,14 @@ import Layout from '../components/Layout.vue';
 import Card from '../components/Card.vue';
 import SnapcastChannelPicker from '../components/SnapcastChannelPicker.vue';
 import Badge from '../components/ui/Badge.vue';
+import Button from '../components/ui/Button.vue';
+import PageHeader from '../components/ui/PageHeader.vue';
+import SectionHeader from '../components/ui/SectionHeader.vue';
 import ConfirmDestructive from '../components/ui/ConfirmDestructive.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import JobLogPanel from '../components/JobLogPanel.vue';
+import StatTile, { type StatTone } from '../components/dashboard/StatTile.vue';
+import ServiceCard from '../components/dashboard/ServiceCard.vue';
 import { version } from '../../package.json';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -26,106 +45,165 @@ const onboardingStore = useOnboardingStore();
 const healthStore = useHealthStore();
 const diagnosticsStore = useDiagnosticsStore();
 
-// Task 29: snapcast state updates now arrive via the app-wide SSE
-// connection (Task 28, connected/disconnected by App.vue) instead of this
-// view polling `snapcastStore.fetchStatus()` on its own timer -- see
-// useEventSource.ts's applySnapcastUpdate(), which writes to the exact same
-// `snapcastStore.status` field this view already reads. The live/
-// reconnecting indicator below surfaces that connection's own status.
+// Task 29: snapcast state arrives via the app-wide SSE connection (Task 28)
+// rather than this view polling; the badge in the header surfaces that
+// connection's own status.
 const sse = useEventSource();
+const liveBadge = computed(() => sseStatusBadge(sse.status.value));
 
-const selectedNodeVersion = ref('20');
+const selectedNodeVersion = ref('22');
 
 onMounted(async () => {
-  await systemStore.refreshAll();
-  systemStore.fetchMympdInfo();
-  // Task 50: resume-onboarding banner below reads onboardingStore.step/
-  // dismissed -- Onboarding.vue also calls fetchOnboarding() on its own
-  // mount, but that's a separate visit; Dashboard needs its own fetch so
-  // the banner is correct on a fresh Dashboard load too (Pinia stores are
-  // singletons, so this doesn't double up with -- or fight -- that other
-  // call, it's just the same store being kept in sync from both views).
-  onboardingStore.fetchOnboarding();
-
-  // Auto-select current installed Node.js version
-  if (systemStore.packageVersions.node) {
-    const match = systemStore.packageVersions.node.match(/v?(\d+)/);
-    if (match && match[1]) {
-      selectedNodeVersion.value = match[1];
-    }
-  }
-
-  // Fast first paint before the SSE connection's first `snapcast` event
-  // arrives -- the connection is app-wide/shared, so it may already be
-  // connected and have fresh data by the time this view mounts, but this
-  // explicit fetch is a safety net for that initial window.
+  // Fire the independent fetches together instead of awaiting the (slow)
+  // package scan before anything else starts.
   snapcastStore.fetchStatus();
-
-  // Task 58: compact health panel below reads healthStore.detail, backed
-  // by the authenticated GET /api/health/detail (Task 57). No polling --
-  // fetched once on mount plus whenever the panel's own refresh button is
-  // clicked (handleHealthRefresh below).
   healthStore.fetchHealthDetail();
-
-  // Task 63: self-diagnostics summary badge below the Health Panel, backed
-  // by the authenticated GET /api/diagnostics (Task 62). Same no-polling
-  // discipline as the health panel above -- fetched once on mount, no
-  // refresh control here (the full list + manual refresh lives on
-  // Diagnostics.vue, which this badge links to).
   diagnosticsStore.fetchDiagnostics();
+  onboardingStore.fetchOnboarding();
+  systemStore.fetchMympdInfo();
+  await systemStore.refreshAll();
+
+  const match = systemStore.packageVersions.node?.match(/v?(\d+)/);
+  if (match?.[1]) selectedNodeVersion.value = match[1];
 });
+
+// The health panel used to be fetched once on mount, so its "RPC
+// disconnected" could sit next to live stream data for as long as the page
+// stayed open. Re-check whenever SSE reports snapserver coming or going.
+const rpcLive = computed(() => !!snapcastStore.status);
+watch(rpcLive, () => healthStore.fetchHealthDetail());
 
 const handleHealthRefresh = () => {
   healthStore.fetchHealthDetail();
 };
 
-// Task 58: disk.freePercent is only present on the success branch of the
-// backend's discriminated union (disk.error on the failure branch) -- this
-// mirrors that shape rather than assuming the success fields are always set.
+const refreshEverything = () => {
+  systemStore.refreshAll();
+  healthStore.fetchHealthDetail();
+  diagnosticsStore.fetchDiagnostics();
+  snapcastStore.fetchStatus();
+};
+
+// ── Status tiles ────────────────────────────────────────────────────────
+const snapserverTile = computed<{ value: string; tone: StatTone }>(() => {
+  const systemdActive = healthStore.detail?.snapserver?.systemdActive ?? systemStore.snapserverStatus === 'active';
+  if (rpcLive.value) return { value: t('dashboard.snapserverStateRunning'), tone: 'success' };
+  if (systemdActive) return { value: t('dashboard.snapserverStateNotResponding'), tone: 'warning' };
+  if (!healthStore.detail && systemStore.loading) return { value: t('dashboard.snapserverStateChecking'), tone: 'neutral' };
+  if (!systemStore.installedPackages.snapserver) return { value: t('dashboard.snapserverStateNotInstalled'), tone: 'neutral' };
+  return { value: t('dashboard.snapserverStateOffline'), tone: 'danger' };
+});
+
+const snapserverVersion = computed(() => {
+  const v = systemStore.packageVersions.snapserver;
+  if (v && v !== 'unknown') return v;
+  return (snapcastStore.status as any)?.server?.snapserver?.version as string | undefined;
+});
+
+const streams = computed(() => snapcastStore.status?.streams ?? []);
+const playingCount = computed(() => streams.value.filter((s) => s.status === 'playing').length);
+
+const allClients = computed(() =>
+  (snapcastStore.status?.groups ?? [])
+    .flatMap((g) => g.clients)
+    .slice()
+    .sort((a, b) => Number(b.connected) - Number(a.connected)),
+);
+const onlineCount = computed(() => allClients.value.filter((c) => c.connected).length);
+
+const diagnosticsTile = computed<{ value: string; tone: StatTone; to?: string }>(() => {
+  if (diagnosticsStore.error) return { value: t('dashboard.diagnosticsUnknown'), tone: 'neutral', to: '/diagnostics' };
+  const count = diagnosticsStore.findings.length;
+  if (count > 0) {
+    const hasError = diagnosticsStore.findings.some((f) => f.severity === 'error');
+    return { value: t('dashboard.diagnosticsIssuesFound', { count }), tone: hasError ? 'danger' : 'warning', to: '/diagnostics' };
+  }
+  return { value: t('dashboard.diagnosticsAllClear'), tone: 'success' };
+});
+
+// ── Health panel ────────────────────────────────────────────────────────
+// disk.freePercent is only present on the success branch of the backend's
+// discriminated union (disk.error on the failure branch).
 const diskFreePercent = computed(() => {
   const disk = healthStore.detail?.disk;
   return disk && 'freePercent' in disk ? disk.freePercent : null;
 });
 
+const healthRows = computed(() => {
+  const d = healthStore.detail;
+  if (!d) return [];
+  return [
+    {
+      key: 'systemd',
+      label: t('dashboard.healthSystemdLabel'),
+      ok: d.snapserver?.systemdActive,
+      value: d.snapserver?.systemdActive ? t('dashboard.healthActiveStatus') : t('dashboard.healthInactiveStatus'),
+    },
+    {
+      key: 'rpc',
+      label: t('dashboard.healthRpcLabel'),
+      ok: d.snapserver?.rpcConnected,
+      value: d.snapserver?.rpcConnected ? t('dashboard.healthConnectedStatus') : t('dashboard.healthDisconnectedStatus'),
+    },
+    {
+      key: 'config',
+      label: t('dashboard.healthConfigLabel'),
+      ok: d.config?.parseable,
+      value: d.config?.parseable ? t('dashboard.healthConfigParseableStatus') : t('dashboard.healthConfigErrorStatus'),
+      detail: d.config && !d.config.parseable ? d.config.error : undefined,
+    },
+    {
+      key: 'disk',
+      label: t('dashboard.healthDiskLabel'),
+      ok: diskFreePercent.value === null ? undefined : diskFreePercent.value >= 10,
+      value:
+        diskFreePercent.value !== null
+          ? t('dashboard.healthDiskFreeValue', { percent: diskFreePercent.value })
+          : t('dashboard.healthDiskUnknownStatus'),
+    },
+    {
+      key: 'permissions',
+      label: t('dashboard.healthPermissionsLabel'),
+      ok: d.permissions?.snapshotsDirWritable,
+      value: d.permissions?.snapshotsDirWritable ? t('dashboard.healthWritableYes') : t('dashboard.healthWritableNo'),
+    },
+  ];
+});
+
+// ── Package actions ─────────────────────────────────────────────────────
 type UpdatablePackage = 'snapserver' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'mpd' | 'mympd';
 type UninstallablePackage = 'shairport-sync' | 'mpd' | 'mympd';
+type ServicePackage = 'snapserver' | 'shairport-sync' | 'mpd' | 'mympd';
 
-// ── Clean reinstall (destructive: deletes config first) ─────────────────
+// Clean reinstall (destructive: deletes config first)
 const showConfirmReinstall = ref(false);
 const pendingReinstallPkg = ref<UpdatablePackage | null>(null);
 
-const handleUpdate = (pkg: UpdatablePackage, clean: boolean = false) => {
-  if (clean) {
-    pendingReinstallPkg.value = pkg;
-    showConfirmReinstall.value = true;
-    return;
-  }
-  performUpdate(pkg, false);
+const askReinstall = (pkg: UpdatablePackage) => {
+  pendingReinstallPkg.value = pkg;
+  showConfirmReinstall.value = true;
 };
 
 const performUpdate = async (pkg: UpdatablePackage, clean: boolean) => {
   try {
     await systemStore.updatePackage(pkg, clean);
     uiStore.showToast(
-      clean
-        ? t('dashboard.packageReinstalledSuccess', { pkg })
-        : t('dashboard.packageUpdatedSuccess', { pkg }),
+      clean ? t('dashboard.packageReinstalledSuccess', { pkg }) : t('dashboard.packageUpdatedSuccess', { pkg }),
       'success',
     );
   } catch (err: any) {
     uiStore.showToast(
-      (clean ? t('dashboard.packageReinstallFailed', { pkg }) : t('dashboard.packageUpdateFailed', { pkg })) +
-        err.message,
+      (clean ? t('dashboard.packageReinstallFailed', { pkg }) : t('dashboard.packageUpdateFailed', { pkg })) + err.message,
       'error',
     );
   }
 };
 
-// ── Uninstall (destructive: removes binaries and service files) ─────────
+// Uninstall (destructive: removes binaries and service files)
 const showConfirmUninstall = ref(false);
 const pendingUninstallPkg = ref<UninstallablePackage | null>(null);
 
-const handleUninstall = (pkg: UninstallablePackage) => {
+const askUninstall = (pkg: UninstallablePackage) => {
   pendingUninstallPkg.value = pkg;
   showConfirmUninstall.value = true;
 };
@@ -136,7 +214,7 @@ const performUninstall = async () => {
   try {
     await systemStore.uninstallPackage(pkg);
     uiStore.showToast(t('dashboard.packageUninstalledSuccess', { pkg }), 'success');
-    await systemStore.refreshAll(); // Refresh status
+    await systemStore.refreshAll();
   } catch (err: any) {
     uiStore.showToast(t('dashboard.packageUninstallFailed', { pkg }) + err.message, 'error');
   } finally {
@@ -144,658 +222,418 @@ const performUninstall = async () => {
   }
 };
 
-// ── Update Node.js (disruptive, NOT data-destructive: no deletion) ──────
+const control = (service: ServicePackage, action: 'start' | 'stop' | 'restart') =>
+  systemStore.controlService(action, service);
+
+// Update Node.js (disruptive, NOT data-destructive)
 const showConfirmUpdateNode = ref(false);
 
-const triggerUpdateNodeJs = () => {
-  showConfirmUpdateNode.value = true;
+const handleUpdateNodeJs = async () => {
+  try {
+    await systemStore.updateNodeJs(selectedNodeVersion.value);
+    uiStore.showToast(t('dashboard.nodeUpdateInitiatedSuccess', { version: selectedNodeVersion.value }), 'success');
+  } catch (err: any) {
+    uiStore.showToast(t('dashboard.nodeUpdateFailed') + err.message, 'error');
+  }
 };
 
-const handleUpdateNodeJs = async () => {
-    try {
-        await systemStore.updateNodeJs(selectedNodeVersion.value);
-        uiStore.showToast(
-          t('dashboard.nodeUpdateInitiatedSuccess', { version: selectedNodeVersion.value }),
-          'success',
-        );
-    } catch (err: any) {
-        uiStore.showToast(t('dashboard.nodeUpdateFailed') + err.message, 'error');
-    }
-};
+const nodeMajor = computed(() => systemStore.packageVersions.node?.match(/v?(\d+)/)?.[1] ?? null);
 
 const openMympd = () => {
-    window.open(systemStore.mympdUrl, '_blank', 'noopener');
+  window.open(systemStore.mympdUrl, '_blank', 'noopener');
 };
 
+const isServerMode = computed(() => systemStore.snapcastMode !== 'client');
 </script>
 
 <template>
   <Layout>
-    <div class="relative min-h-[60vh] space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <!-- Header Section -->
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div class="flex items-center gap-3">
-            <h1 class="text-3xl font-black tracking-tight text-text-main">{{ t('dashboard.headerTitle') }}</h1>
-            <Badge :variant="sseStatusBadge(sse.status.value).variant" size="sm">{{ sseStatusBadge(sse.status.value).label }}</Badge>
-          </div>
-          <p class="text-text-muted font-medium mt-1">{{ t('dashboard.headerSubtitle') }}</p>
-        </div>
-        <button @click="systemStore.refreshAll()" :disabled="systemStore.loading" class="inline-flex items-center px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-brand-primary/30 active:scale-95 disabled:opacity-50 group border border-brand-primary/50">
-          <span class="material-symbols-outlined text-[1.2rem] mr-2 transition-transform" :class="{'animate-spin': systemStore.loading, 'group-hover:rotate-180': !systemStore.loading}">refresh</span>
-          {{ t('dashboard.syncAllButton') }}
-        </button>
-      </div>
+    <PageHeader :title="t('dashboard.headerTitle')" :description="t('dashboard.headerSubtitle')">
+      <template #badge>
+        <Badge :variant="liveBadge.variant" size="sm">{{ liveBadge.label }}</Badge>
+      </template>
+      <template #actions>
+        <Button variant="subtle" :loading="systemStore.loading" @click="refreshEverything">
+          <span v-if="!systemStore.loading" class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">refresh</span>
+          {{ t('dashboard.refreshButton') }}
+        </Button>
+      </template>
+    </PageHeader>
 
-      <!-- Resume-onboarding banner (Task 50): visible whenever the wizard
-           hasn't reached step 3 (complete) and the admin hasn't dismissed
-           it. Dismissible via the wizard's own "Skip for now"/completion
-           flow, not from here -- clicking through resumes at whatever step
-           onboardingStore.step already holds. -->
-      <div v-if="onboardingStore.step < 3 && !onboardingStore.dismissed"
-           class="flex items-center justify-between p-4 bg-brand-primary/10 border border-brand-primary/30 rounded-lg">
-        <span class="text-sm font-bold text-text-main">{{ t('dashboard.resumeBannerText') }}</span>
-        <router-link to="/onboarding" class="text-xs font-black text-brand-primary uppercase tracking-widest hover:underline">
+    <div class="space-y-8">
+      <!-- Resume-onboarding banner (Task 50) -->
+      <div
+        v-if="onboardingStore.step < 3 && !onboardingStore.dismissed"
+        class="flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl border border-brand-primary/30 bg-brand-primary/10 p-4 sm:p-5"
+      >
+        <div class="flex items-start gap-3 flex-1 min-w-0">
+          <span class="material-symbols-outlined text-brand-primary-text" aria-hidden="true">rocket_launch</span>
+          <div>
+            <p class="text-sm font-semibold text-text-main">{{ t('dashboard.resumeBannerTitle') }}</p>
+            <p class="text-sm text-text-muted mt-0.5">{{ t('dashboard.resumeBannerText') }}</p>
+          </div>
+        </div>
+        <router-link
+          to="/onboarding"
+          class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-4 py-2 text-sm font-semibold text-white hover:bg-brand-primary/85 transition-colors flex-shrink-0"
+        >
           {{ t('dashboard.resumeBannerLink') }}
+          <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">arrow_forward</span>
         </router-link>
       </div>
 
-      <!-- Health Panel (Task 58): compact, always-visible summary of the
-           5 checks GET /api/health/detail (Task 57) reports. systemd
-           active-state and RPC-connected-state are deliberately shown as
-           two distinct signals per the backend's own design -- a service
-           can be systemd-active but not yet RPC-connected (or vice versa)
-           during a restart. -->
-      <Card :title="t('dashboard.healthPanelTitle')">
-        <template #icon>
-          <span class="material-symbols-outlined text-xl">monitor_heart</span>
-        </template>
-        <template #action>
-          <button
-            @click="handleHealthRefresh"
-            :disabled="healthStore.loading"
-            :aria-label="t('dashboard.healthRefreshAria')"
-            class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-text-muted hover:text-text-main border border-black/[0.05] dark:border-white/[0.05] transition-all active:scale-95 disabled:opacity-50"
-          >
-            <span class="material-symbols-outlined text-[1rem]" :class="{ 'animate-spin': healthStore.loading }">refresh</span>
-          </button>
-        </template>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col space-y-1">
-            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthSystemdLabel') }}</span>
-            <span :class="healthStore.detail?.snapserver?.systemdActive ? 'text-success' : 'text-danger'" class="text-xs font-black uppercase tracking-wide">
-              {{ healthStore.detail?.snapserver?.systemdActive ? t('dashboard.healthActiveStatus') : t('dashboard.healthInactiveStatus') }}
-            </span>
-          </div>
-          <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col space-y-1">
-            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthRpcLabel') }}</span>
-            <span :class="healthStore.detail?.snapserver?.rpcConnected ? 'text-success' : 'text-danger'" class="text-xs font-black uppercase tracking-wide">
-              {{ healthStore.detail?.snapserver?.rpcConnected ? t('dashboard.healthConnectedStatus') : t('dashboard.healthDisconnectedStatus') }}
-            </span>
-          </div>
-          <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col space-y-1">
-            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthDiskLabel') }}</span>
-            <span :class="diskFreePercent !== null && diskFreePercent < 10 ? 'text-danger' : 'text-success'" class="text-xs font-black uppercase tracking-wide">
-              {{ diskFreePercent !== null ? t('dashboard.healthDiskFreeValue', { percent: diskFreePercent }) : t('dashboard.healthDiskUnknownStatus') }}
-            </span>
-          </div>
-          <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col space-y-1">
-            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthPermissionsLabel') }}</span>
-            <span :class="healthStore.detail?.permissions?.snapshotsDirWritable ? 'text-success' : 'text-danger'" class="text-xs font-black uppercase tracking-wide">
-              {{ healthStore.detail?.permissions?.snapshotsDirWritable ? t('dashboard.healthWritableYes') : t('dashboard.healthWritableNo') }}
-            </span>
-          </div>
-          <div class="col-span-2 sm:col-span-4 p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col space-y-1">
-            <div class="flex items-center justify-between">
-              <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthConfigLabel') }}</span>
-              <span :class="healthStore.detail?.config?.parseable ? 'text-success' : 'text-danger'" class="text-xs font-black uppercase tracking-wide">
-                {{ healthStore.detail?.config?.parseable ? t('dashboard.healthConfigParseableStatus') : t('dashboard.healthConfigErrorStatus') }}
-              </span>
-            </div>
-            <p v-if="healthStore.detail?.config && !healthStore.detail.config.parseable" class="text-[10px] font-mono text-danger/80">
-              {{ healthStore.detail.config.error }}
-            </p>
-          </div>
-        </div>
+      <!-- 1. At a glance -->
+      <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <StatTile
+          v-if="isServerMode"
+          :label="t('dashboard.statSnapserver')"
+          icon="dns"
+          :value="snapserverTile.value"
+          :tone="snapserverTile.tone"
+          :detail="snapserverVersion ? `v${snapserverVersion.replace(/^v/, '')}` : undefined"
+          to="/server"
+        />
+        <StatTile
+          v-if="isServerMode"
+          :label="t('dashboard.statStreams')"
+          icon="graphic_eq"
+          :value="t('dashboard.streamsPlaying', { playing: playingCount })"
+          :tone="playingCount > 0 ? 'success' : 'neutral'"
+          :detail="t('dashboard.outOfTotal', { total: streams.length })"
+          to="/pipe-sources"
+        />
+        <StatTile
+          v-if="isServerMode"
+          :label="t('dashboard.statClients')"
+          icon="speaker_group"
+          :value="t('dashboard.clientsOnline', { online: onlineCount })"
+          :tone="!rpcLive ? 'neutral' : onlineCount > 0 ? 'success' : 'warning'"
+          :detail="t('dashboard.outOfTotal', { total: allClients.length })"
+          to="/routing"
+        />
+        <StatTile
+          :label="t('dashboard.statDiagnostics')"
+          icon="health_and_safety"
+          :value="diagnosticsTile.value"
+          :tone="diagnosticsTile.tone"
+          :detail="diagnosticsTile.to ? t('dashboard.diagnosticsReview') : undefined"
+          :to="diagnosticsTile.to"
+        />
+      </section>
 
-        <!-- Diagnostics summary badge (Task 63): honest indicator linking to
-             the full self-diagnostics view, not a duplicate list here. A
-             failed fetch (diagnosticsStore.error set) must NOT collapse into
-             the same "all clear" state a genuine 0-findings result shows --
-             that would silently reassure an admin during exactly the kind of
-             connectivity/auth problem this panel exists to surface (see
-             Task 63 review). -->
-        <div class="mt-3 pt-3 border-t border-black/5 dark:border-white/5">
-          <router-link
-            v-if="diagnosticsStore.error"
-            to="/diagnostics"
-            class="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-text-main transition-colors"
-          >
-            <span class="material-symbols-outlined text-[1rem]">help</span>
-            {{ t('dashboard.diagnosticsUnknown') }}
-          </router-link>
-          <router-link
-            v-else-if="diagnosticsStore.findings.length > 0"
-            to="/diagnostics"
-            class="inline-flex items-center gap-1.5 text-xs font-bold text-warning hover:text-warning/80 transition-colors"
-          >
-            <span class="material-symbols-outlined text-[1rem]">warning</span>
-            {{ t('dashboard.diagnosticsIssuesFound', { count: diagnosticsStore.findings.length }) }}
-          </router-link>
-          <span v-else class="inline-flex items-center gap-1.5 text-xs font-bold text-success">
-            <span class="material-symbols-outlined text-[1rem]">check_circle</span>
-            {{ t('dashboard.diagnosticsAllClear') }}
-          </span>
-        </div>
-      </Card>
-
-      <!-- Loading overlay + full job log window (JobLogPanel.vue) -->
+      <!-- Loading overlay + full job log window -->
       <JobLogPanel />
 
-
-      <!-- Enhanced Snapcast Live Metrics -->
-      <div v-if="snapcastStore.status && systemStore.snapcastMode !== 'client'" class="space-y-6">
-        <div class="flex items-center space-x-3 px-2">
-            <div class="w-2 h-2 rounded-full bg-success animate-pulse"></div>
-            <h2 class="text-[10px] font-black text-text-muted uppercase tracking-[0.4em]">{{ t('dashboard.liveMetricsHeading') }}</h2>
-        </div>
-        
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
-            <!-- Streams Card -->
+      <!-- 2. Live: streams, clients, health -->
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <template v-if="isServerMode">
+          <template v-if="snapcastStore.status">
             <Card :title="t('dashboard.streamsCardTitle')">
-                <template #icon>
-                    <span class="material-symbols-outlined text-xl">music_note</span>
-                </template>
-                <div class="flex flex-col">
-                    <div class="flex items-baseline space-x-2 mb-4">
-                        <span class="text-5xl font-black text-text-main tracking-tighter">
-                            {{ snapcastStore.status.streams.length }}
-                        </span>
-                        <span class="text-[10px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.streamsAvailableLabel') }}</span>
-                    </div>
-                    
-                    <div class="space-y-2 max-h-[140px] overflow-y-auto pr-2 custom-scrollbar">
-                        <div v-for="stream in snapcastStore.status.streams" :key="stream.id"
-                             class="group/item flex items-center justify-between p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] hover:border-brand-primary/30 transition-all duration-300">
-                            <div class="flex items-center space-x-3 min-w-0">
-                                <div class="w-1.5 h-1.5 rounded-full transition-colors" :class="stream.status === 'playing' ? 'bg-success' : 'bg-black/10 dark:bg-white/10'"></div>
-                                <span class="text-xs font-semibold text-text-main/70 truncate group-hover/item:text-text-main transition-colors" :title="stream.id">
-                                    {{ stream.uri?.query?.name || stream.id }}
-                                </span>
-                            </div>
-                            <span :class="stream.status === 'playing' ? 'text-success bg-success/10 border-success/20' : 'text-text-muted bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10'"
-                                  class="px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider transition-all">
-                                {{ stream.status }}
-                            </span>
-                        </div>
-                        <div v-if="snapcastStore.status.streams.length === 0" class="flex flex-col items-center justify-center py-6 text-text-muted/40 italic">
-                            <span class="material-symbols-outlined text-2xl mb-1">music_off</span>
-                            <span class="text-[10px] uppercase font-black tracking-widest">{{ t('dashboard.streamsEmpty') }}</span>
-                        </div>
-                    </div>
-                </div>
-            </Card>
-
-            <!-- Clients Card -->
-            <Card :title="t('dashboard.clientsCardTitle')">
-                <template #icon>
-                    <span class="material-symbols-outlined text-xl">sensors</span>
-                </template>
-                <div class="flex flex-col">
-                    <div class="flex items-baseline space-x-2 mb-4">
-                        <span class="text-5xl font-black text-text-main tracking-tighter">
-                            {{ snapcastStore.status.groups.reduce((acc, g) => acc + g.clients.filter(c => c.connected).length, 0) }}
-                        </span>
-                        <span class="text-[10px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.clientsConnectedLabel') }}</span>
-                    </div>
-
-                    <div class="space-y-2 max-h-[140px] overflow-y-auto pr-2 custom-scrollbar">
-                        <template v-for="group in snapcastStore.status.groups" :key="group.id">
-                            <div v-for="client in group.clients.filter(c => c.connected)" :key="client.id" 
-                                 class="group/item flex items-center justify-between p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] hover:border-brand-primary/30 transition-all duration-300">
-                                <div class="flex flex-col min-w-0">
-                                    <span class="text-xs font-semibold text-text-main/70 truncate group-hover/item:text-text-main transition-colors">
-                                        {{ client.config.name || client.host.name }}
-                                    </span>
-                                    <span class="text-[9px] text-text-muted font-mono mt-0.5">{{ client.host.ip }}</span>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <div class="h-1 w-12 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
-                                        <div class="h-full bg-brand-primary transition-all duration-500" :style="{ width: client.config.volume.percent + '%', opacity: client.config.volume.muted ? 0.2 : 1 }"></div>
-                                    </div>
-                                    <span :class="client.config.volume.muted ? 'text-danger' : 'text-brand-primary'" class="text-[9px] font-black w-6 text-right">
-                                        {{ client.config.volume.muted ? t('dashboard.volumeMutedLabel') : client.config.volume.percent }}
-                                    </span>
-                                </div>
-                            </div>
-                        </template>
-                        <div v-if="snapcastStore.status.groups.reduce((acc, g) => acc + g.clients.filter(c => c.connected).length, 0) === 0"
-                             class="flex flex-col items-center justify-center py-6 text-text-muted/40 italic">
-                            <span class="material-symbols-outlined text-2xl mb-1">link_off</span>
-                            <span class="text-[10px] uppercase font-black tracking-widest">{{ t('dashboard.clientsEmpty') }}</span>
-                        </div>
-                    </div>
-                </div>
-            </Card>
-
-            <!-- Server State Card -->
-            <Card :title="t('dashboard.coreEngineCardTitle')">
-                <template #icon>
-                    <span class="material-symbols-outlined text-xl">settings_input_component</span>
-                </template>
-                <div class="space-y-4">
-                    <!-- Master Status Indicator -->
-                    <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="relative flex h-2.5 w-2.5">
-                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-40"></span>
-                                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-success"></span>
-                            </div>
-                            <span class="text-xs font-bold text-text-main uppercase tracking-widest">{{ t('dashboard.systemNormalLabel') }}</span>
-                        </div>
-                        <span class="text-[10px] font-semibold text-success uppercase tracking-widest">{{ t('dashboard.operationalLabel') }}</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col items-center justify-center text-center space-y-1">
-                            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.versionLabel') }}</span>
-                            <span class="text-xs font-mono font-semibold text-brand-primary group-hover:text-text-main transition-colors">
-                                {{ systemStore.packageVersions.snapserver || (snapcastStore.status ? snapcastStore.status.server.version : '...') }}
-                            </span>
-                        </div>
-                        <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.05] dark:border-white/[0.05] flex flex-col items-center justify-center text-center space-y-1">
-                            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.groupsLabel') }}</span>
-                            <span class="text-xs font-semibold text-text-main">
-                                {{ snapcastStore.status.groups.length }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="pt-1">
-                        <div class="flex justify-between items-center mb-1.5 px-1">
-                            <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.healthLabel') }}</span>
-                            <span class="text-[9px] font-bold text-success">100%</span>
-                        </div>
-                        <div class="h-1 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
-                            <div class="h-full bg-brand-primary w-full"></div>
-                        </div>
-                    </div>
-                </div>
-            </Card>
-        </div>
-      </div>
-      
-      <!-- System/Daemon Offline State -->
-      <div v-else-if="!snapcastStore.loading && snapcastStore.error" class="bg-danger/10 border border-danger/30 rounded-2xl p-8 text-center backdrop-blur-xl">
-          <span class="material-symbols-outlined text-[3rem] text-danger mb-4">cloud_off</span>
-          <h3 class="text-sm font-black text-text-main uppercase tracking-[0.2em] mb-2">{{ t('dashboard.snapserverOfflineTitle') }}</h3>
-          <p class="text-xs text-text-muted max-w-md mx-auto">{{ snapcastStore.error }}</p>
-      </div>
-
-      <div class="border-t border-black/5 dark:border-white/5 my-10"></div>
-
-      <!-- System Services Category -->
-      <div class="flex items-center space-x-2 px-1 mb-4">
-          <span class="material-symbols-outlined text-brand-primary">settings_system_daydream</span>
-          <h2 class="text-sm font-bold text-text-main uppercase tracking-widest">{{ t('dashboard.coreServicesHeading') }}</h2>
-      </div>
-
-      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-12">
-      <Card v-if="systemStore.snapcastMode !== 'client'" :title="t('dashboard.snapserverCardTitle')">
-        <template #icon>
-            <span class="material-symbols-outlined">router</span>
-        </template>
-        <SnapcastChannelPicker pkg="snapserver" class="mb-4" />
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.snapserverInstalledLabel') }}</span>
-                <span :class="systemStore.installedPackages.snapserver ? 'text-success' : 'text-danger'" class="text-sm font-black">
-                    {{ systemStore.installedPackages.snapserver ? t('dashboard.snapserverInstalledYes') : t('dashboard.snapserverInstalledNo') }}
-                </span>
-            </div>
-            <div class="flex items-center justify-between" v-if="systemStore.installedPackages.snapserver">
-                 <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.statusLabel') }}</span>
-                 <span :class="systemStore.snapserverStatus === 'active' ? 'text-success bg-success/10 border-success/20' : 'text-warning bg-warning/10 border-warning/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
-                     {{ systemStore.snapserverStatus }}
-                 </span>
-            </div>
-            <div class="flex flex-col" v-if="systemStore.installedPackages.snapserver">
-                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">{{ t('dashboard.versionLabel') }}</span>
-                    <span class="text-xs font-mono font-bold text-text-muted">{{ systemStore.packageVersions.snapserver || '...' }}</span>
-                 </div>
-                 <div v-if="systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' && systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver"
-                       class="mt-2 bg-warning/10 border border-warning/20 text-warning text-[10px] px-3 py-2 rounded-xl font-black flex items-center justify-between">
-                     <span>{{ t('dashboard.newVersionAvailable', { version: systemStore.availableVersions.snapserver }) }}</span>
-                     <span class="w-2 h-2 rounded-full bg-warning animate-pulse"></span>
-                 </div>
-                 <div v-else-if="systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown'"
-                       class="mt-2 bg-success/5 border border-success/20 text-success text-[10px] px-3 py-1.5 rounded-xl font-black font-sans uppercase tracking-[0.2em] text-center">
-                     {{ t('dashboard.upToDateLabel') }}
-                 </div>
-            </div>
-
-            <div class="pt-4 flex flex-col space-y-3 border-t border-black/5 dark:border-white/5" v-if="systemStore.installedPackages.snapserver">
-                <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'snapserver')" class="px-3 py-2.5 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-text-main border border-black/5 dark:border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
-                    <button v-if="systemStore.snapserverStatus === 'active'" @click="systemStore.controlService('stop', 'snapserver')" class="px-3 py-2.5 bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.stopButton') }}</button>
-                    <button v-else @click="systemStore.controlService('start', 'snapserver')" class="px-3 py-2.5 bg-success/10 hover:bg-success/20 text-success border border-success/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.startButton') }}</button>
-                </div>
-                <button @click="handleUpdate('snapserver', systemStore.packageVersions.snapserver === systemStore.availableVersions.snapserver || systemStore.availableVersions.snapserver === 'unknown')"
-                        :class="[
-                            'w-full px-4 py-3 rounded-xl text-xs font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 uppercase',
-                            systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown'
-                            ? 'bg-brand-primary text-white border border-brand-primary/50 shadow-xl shadow-brand-primary/30 hover:shadow-brand-primary/50 hover:bg-brand-primary/80'
-                            : 'bg-black/40 text-gray-600 dark:text-gray-400 hover:bg-black/10 dark:hover:bg-white/10 hover:text-text-main border border-black/5 dark:border-white/5'
-                        ]"
-                        :disabled="systemStore.loading">
-                    {{ systemStore.packageVersions.snapserver !== systemStore.availableVersions.snapserver && systemStore.availableVersions.snapserver !== 'unknown' ? t('dashboard.installUpdateButton') : t('dashboard.cleanReinstallLabel') }}
-                </button>
-            </div>
-            <div class="pt-4 border-t border-black/5 dark:border-white/5" v-else>
-                 <button @click="systemStore.installPackage('snapserver')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black tracking-widest uppercase text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.installSnapserverButton') }}</button>
-            </div>
-        </div>
-      </Card>
-
-
-      <Card :title="t('dashboard.runtimeCardTitle')">
-        <template #icon>
-            <span class="material-symbols-outlined">javascript</span>
-        </template>
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.nodeJsLabel') }}</span>
-                <span class="text-success font-black text-sm tracking-widest leading-none">
-                    {{ systemStore.packageVersions.node || t('dashboard.nodeUnknownLabel') }}
-                </span>
-            </div>
-            <div class="flex flex-col">
-                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">{{ t('dashboard.engineVersionLabel') }}</span>
-                    <span class="text-xs font-mono font-bold text-text-muted">{{ systemStore.packageVersions.node || '...' }}</span>
-                 </div>
-
-                 <div class="mt-4 space-y-3">
-                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest block border-b border-black/5 dark:border-white/5 pb-2">{{ t('dashboard.selectLtsLabel') }}</span>
-                    <div class="grid grid-cols-3 gap-3">
-                        <button v-for="v in ['18', '20', '22']" :key="v"
-                                @click="selectedNodeVersion = v"
-                                :class="[
-                                    'py-2.5 rounded-xl text-xs font-black transition-all border',
-                                    selectedNodeVersion === v
-                                    ? 'bg-success/10 border-success/30 text-success'
-                                    : 'bg-black/40 border-black/5 dark:border-white/5 text-gray-600 dark:text-gray-400 hover:border-black/20 dark:hover:border-white/20 hover:text-gray-300'
-                                ]"
-                        >
-                            v{{ v }}
-                        </button>
-                    </div>
-                 </div>
-            </div>
-            <div class="pt-5 border-t border-black/5 dark:border-white/5">
-                 <button @click="triggerUpdateNodeJs" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.updateNodeButton', { version: selectedNodeVersion }) }}
-                 </button>
-            </div>
-        </div>
-      </Card>
-
-      <Card :title="t('dashboard.managementCoreCardTitle')">
-        <template #icon>
-            <span class="material-symbols-outlined">dashboard_customize</span>
-        </template>
-        <div class="space-y-4 h-full flex flex-col">
-            <div class="flex flex-col space-y-2 flex-grow">
-                <span class="text-[10px] font-bold text-text-muted uppercase tracking-widest">{{ t('dashboard.appVersionLabel') }}</span>
-                <span class="text-3xl font-black text-text-main">v{{ version }}</span>
-            </div>
-            <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-inner shadow-brand-primary/10 mt-auto mb-4">
-                <p class="text-[10px] font-bold text-brand-primary leading-relaxed text-center tracking-widest uppercase">{{ t('dashboard.syncedMessage', { version }) }}</p>
-            </div>
-            <div class="pt-4 border-t border-black/5 dark:border-white/5">
-                 <button disabled class="w-full px-4 py-3 bg-black/40 text-text-muted rounded-xl font-black text-xs uppercase tracking-widest cursor-default border border-black/5 dark:border-white/5">
-                    {{ t('dashboard.uiUpToDateButton') }}
-                 </button>
-            </div>
-        </div>
-      </Card>
-
-      </div>
-
-      <!-- Audio Plugins & Remotes Category -->
-      <div class="flex items-center space-x-2 px-1 mb-4 mt-12">
-          <span class="material-symbols-outlined text-brand-primary">settings_input_antenna</span>
-          <h2 class="text-sm font-bold text-text-main uppercase tracking-widest">{{ t('dashboard.audioPluginsHeading') }}</h2>
-      </div>
-
-      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <Card v-if="systemStore.snapcastMode !== 'client'" :title="t('dashboard.snapCtrlCardTitle')">
-        <template #icon>
-            <span class="material-symbols-outlined">api</span>
-        </template>
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.statusLabel') }}</span>
-                <span :class="systemStore.installedPackages['snap-ctrl'] ? 'text-success bg-success/10 border-success/20' : 'text-warning bg-warning/10 border-warning/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
-                    {{ systemStore.installedPackages['snap-ctrl'] ? t('dashboard.installedBadge') : t('dashboard.notInstalledBadge') }}
-                </span>
-            </div>
-            <div class="flex flex-col">
-                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">{{ t('dashboard.versionLabel') }}</span>
-                    <span class="text-xs font-mono font-bold text-text-muted">{{ systemStore.packageVersions['snap-ctrl'] || '...' }}</span>
-                 </div>
-                 <div v-if="systemStore.availableVersions['snap-ctrl'] && systemStore.availableVersions['snap-ctrl'] !== 'unknown' && systemStore.packageVersions['snap-ctrl'] !== systemStore.availableVersions['snap-ctrl']"
-                       class="mt-2 bg-warning/10 border border-warning/20 text-warning text-[10px] px-3 py-2 rounded-xl font-black flex items-center justify-between">
-                     <span>{{ t('dashboard.updateReadyLabel') }}</span>
-                     <span class="w-2 h-2 rounded-full bg-warning animate-pulse"></span>
-                 </div>
-            </div>
-            <p class="text-[11px] font-medium text-text-muted leading-relaxed">{{ t('dashboard.snapCtrlDescription') }}</p>
-            <div class="pt-3 border-t border-black/5 dark:border-white/5">
-                 <button @click="handleUpdate('snap-ctrl')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ systemStore.installedPackages['snap-ctrl'] ? t('dashboard.updateInterfaceButton') : t('dashboard.installInterfaceButton') }}
-                 </button>
-            </div>
-            <p v-if="systemStore.installedPackages['snap-ctrl']" class="text-[10px] font-black text-center text-text-muted uppercase tracking-widest">
-                {{ t('dashboard.snapCtrlPort') }}
-            </p>
-        </div>
-      </Card>
-
-      <Card :title="t('dashboard.ffmpegCardTitle')">
-        <template #icon>
-            <span class="material-symbols-outlined">movie_creation</span>
-        </template>
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.toolkitLabel') }}</span>
-                <span :class="systemStore.installedPackages.ffmpeg ? 'text-success' : 'text-danger'" class="text-sm font-black">
-                    {{ systemStore.installedPackages.ffmpeg ? t('dashboard.readyLabel') : t('dashboard.absentLabel') }}
-                </span>
-            </div>
-            <div class="flex flex-col" v-if="systemStore.installedPackages.ffmpeg">
-                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-text-muted uppercase tracking-widest">{{ t('dashboard.versionInfoLabel') }}</span>
-                    <span class="text-xs font-mono font-bold text-text-muted truncate max-w-[150px]">{{ systemStore.packageVersions.ffmpeg || '...' }}</span>
-                 </div>
-            </div>
-            <div class="pt-3 border-t border-black/5 dark:border-white/5" v-if="!systemStore.installedPackages.ffmpeg">
-                 <button @click="systemStore.installPackage('ffmpeg')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.installFfmpegButton') }}
-                 </button>
-            </div>
-            <div class="pt-4 flex flex-col space-y-4 border-t border-black/5 dark:border-white/5" v-else>
-                <div class="p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl shadow-inner shadow-brand-primary/10">
-                    <p class="text-[10px] font-bold text-brand-primary uppercase tracking-widest leading-relaxed text-center">{{ t('dashboard.ffmpegDescription') }}</p>
-                </div>
-                <button @click="handleUpdate('ffmpeg')" class="w-full px-4 py-3 bg-black/40 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 hover:text-text-main border border-black/5 dark:border-white/5 transition-all text-xs font-bold uppercase tracking-widest active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.refreshPackagesButton') }}</button>
-            </div>
-        </div>
-      </Card>
-
-      <Card :title="t('dashboard.airplayCardTitle')">
-        <template #icon>
-            <span class="material-symbols-outlined">cast</span>
-        </template>
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.receiverLabel') }}</span>
-                <span :class="systemStore.installedPackages['shairport-sync'] ? 'text-success' : 'text-danger'" class="text-sm font-black">
-                    {{ systemStore.installedPackages['shairport-sync'] ? t('dashboard.enabledLabel') : t('dashboard.disabledLabel') }}
-                </span>
-            </div>
-            <div class="flex items-center justify-between" v-if="systemStore.installedPackages['shairport-sync']">
-                 <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.statusLabel') }}</span>
-                 <span :class="systemStore.shairportSyncStatus === 'active' ? 'text-success bg-success/10 border-success/20' : 'text-warning bg-warning/10 border-warning/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
-                     {{ systemStore.shairportSyncStatus }}
-                 </span>
-            </div>
-            <div class="flex items-center justify-between" v-if="systemStore.packageVersions['shairport-sync']">
-                  <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.versionLabel') }}</span>
-                  <span class="text-sm font-bold text-text-main">
-                      {{ systemStore.packageVersions['shairport-sync'] }}
+              <template #icon><span class="material-symbols-outlined text-[1.2rem]">graphic_eq</span></template>
+              <ul v-if="streams.length" class="-my-1 divide-y divide-line">
+                <li v-for="stream in streams" :key="stream.id" class="flex items-center justify-between gap-3 py-2.5">
+                  <span class="flex items-center gap-2.5 min-w-0">
+                    <span
+                      class="w-2 h-2 rounded-full flex-shrink-0"
+                      :class="stream.status === 'playing' ? 'bg-success' : 'bg-text-muted/40'"
+                      aria-hidden="true"
+                    ></span>
+                    <span class="text-sm text-text-main truncate" :title="stream.id">{{ stream.uri?.query?.name || stream.id }}</span>
                   </span>
-             </div>
-            <div class="pt-4 flex flex-col space-y-3 border-t border-black/5 dark:border-white/5" v-if="systemStore.installedPackages['shairport-sync']">
-                <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'shairport-sync')" class="px-3 py-2.5 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-text-main border border-black/5 dark:border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
-                    <button v-if="systemStore.shairportSyncStatus === 'active'" @click="systemStore.controlService('stop', 'shairport-sync')" class="px-3 py-2.5 bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.stopButton') }}</button>
-                    <button v-else @click="systemStore.controlService('start', 'shairport-sync')" class="px-3 py-2.5 bg-success/10 hover:bg-success/20 text-success border border-success/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.startButton') }}</button>
-                </div>
-                <button @click="handleUpdate('shairport-sync')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.updateShairportButton') }}
-                </button>
-                <button @click="handleUninstall('shairport-sync')" class="w-full px-4 py-3 bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.uninstallAirplayButton') }}
-                </button>
-            </div>
-            <div class="pt-4 border-t border-black/5 dark:border-white/5" v-else>
-                 <button @click="systemStore.installPackage('shairport-sync')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.installAirplayButton') }}
-                 </button>
-            </div>
-        </div>
-      </Card>
+                  <Badge :variant="stream.status === 'playing' ? 'success' : 'neutral'" size="sm">
+                    {{ stream.status === 'playing' ? t('dashboard.streamPlaying') : t('dashboard.streamIdle') }}
+                  </Badge>
+                </li>
+              </ul>
+              <div v-else class="flex flex-col items-start gap-2 text-sm text-text-muted">
+                {{ t('dashboard.streamsEmpty') }}
+                <router-link to="/pipe-sources" class="font-semibold text-brand-primary-text hover:underline">{{ t('dashboard.addSourceLink') }}</router-link>
+              </div>
+            </Card>
 
-      <!-- MPD Card -->
-      <Card :title="t('dashboard.mpdCardTitle')">
-        <template #icon>
-            <span class="material-symbols-outlined">queue_music</span>
+            <Card :title="t('dashboard.clientsCardTitle')">
+              <template #icon><span class="material-symbols-outlined text-[1.2rem]">speaker_group</span></template>
+              <template #action>
+                <router-link to="/routing" class="text-xs font-semibold text-brand-primary-text hover:underline">{{ t('dashboard.openMatrixLink') }}</router-link>
+              </template>
+              <ul v-if="allClients.length" class="-my-1 divide-y divide-line">
+                <li
+                  v-for="client in allClients"
+                  :key="client.id"
+                  class="flex items-center justify-between gap-3 py-2.5"
+                  :class="client.connected ? '' : 'opacity-60'"
+                >
+                  <div class="min-w-0">
+                    <p class="text-sm text-text-main truncate">{{ client.config.name || client.host.name }}</p>
+                    <p class="text-[11px] text-text-muted font-mono">{{ client.host.ip }}</p>
+                  </div>
+                  <span v-if="!client.connected" class="text-xs text-text-muted">{{ t('dashboard.clientOffline') }}</span>
+                  <span v-else-if="client.config.volume.muted" class="inline-flex items-center gap-1 text-xs text-text-muted">
+                    <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">volume_off</span>
+                    {{ t('dashboard.volumeMutedLabel') }}
+                  </span>
+                  <span v-else class="flex items-center gap-2">
+                    <span class="h-1.5 w-16 rounded-full bg-line overflow-hidden" aria-hidden="true">
+                      <span class="block h-full bg-brand-primary" :style="{ width: client.config.volume.percent + '%' }"></span>
+                    </span>
+                    <span class="text-xs tabular-nums text-text-muted w-9 text-right">{{ client.config.volume.percent }}%</span>
+                  </span>
+                </li>
+              </ul>
+              <p v-else class="text-sm text-text-muted">{{ t('dashboard.clientsEmpty') }}</p>
+            </Card>
+          </template>
+
+          <!-- Snapserver unreachable -->
+          <div
+            v-else-if="!snapcastStore.loading"
+            class="lg:col-span-2 flex flex-col items-center justify-center text-center gap-2 rounded-2xl border border-dashed border-line bg-brand-surface/50 p-8"
+          >
+            <span class="material-symbols-outlined text-3xl text-text-muted" aria-hidden="true">cloud_off</span>
+            <h3 class="text-sm font-semibold text-text-main">{{ t('dashboard.snapserverOfflineTitle') }}</h3>
+            <p class="text-sm text-text-muted max-w-md">{{ t('dashboard.snapserverOfflineHint') }}</p>
+            <p v-if="snapcastStore.error" class="text-xs font-mono text-text-muted/80 max-w-md break-words">{{ snapcastStore.error }}</p>
+          </div>
         </template>
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.musicPlayerDaemonLabel') }}</span>
-                <span :class="systemStore.installedPackages['mpd'] ? 'text-success' : 'text-danger'" class="text-sm font-black">
-                    {{ systemStore.installedPackages['mpd'] ? t('dashboard.installedBadge') : t('dashboard.notInstalledBadge') }}
-                </span>
+
+        <Card :title="t('dashboard.healthPanelTitle')">
+          <template #icon><span class="material-symbols-outlined text-[1.2rem]">monitor_heart</span></template>
+          <template #action>
+            <button
+              type="button"
+              :disabled="healthStore.loading"
+              :aria-label="t('dashboard.healthRefreshAria')"
+              class="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text-main hover:bg-inset transition-colors disabled:opacity-50"
+              @click="handleHealthRefresh"
+            >
+              <span class="material-symbols-outlined text-[1.1rem]" :class="{ 'animate-spin': healthStore.loading }">refresh</span>
+            </button>
+          </template>
+          <dl v-if="healthRows.length" class="-my-1 divide-y divide-line">
+            <div v-for="row in healthRows" :key="row.key" class="py-2.5">
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-sm text-text-muted">{{ row.label }}</dt>
+                <dd
+                  class="flex items-center gap-1.5 text-sm font-medium whitespace-nowrap"
+                  :class="row.ok === undefined ? 'text-text-muted' : row.ok ? 'text-text-main' : 'text-danger'"
+                >
+                  <span
+                    class="material-symbols-outlined text-[1rem]"
+                    :class="row.ok === undefined ? 'text-text-muted' : row.ok ? 'text-success' : 'text-danger'"
+                    aria-hidden="true"
+                  >{{ row.ok === undefined ? 'help' : row.ok ? 'check_circle' : 'error' }}</span>
+                  {{ row.value }}
+                </dd>
+              </div>
+              <p v-if="row.detail" class="mt-1 text-xs font-mono text-danger/90 break-words">{{ row.detail }}</p>
             </div>
-            <div class="flex items-center justify-between" v-if="systemStore.installedPackages['mpd']">
-                 <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.statusLabel') }}</span>
-                 <span :class="systemStore.mpdStatus === 'active' ? 'text-success bg-success/10 border-success/20' : 'text-warning bg-warning/10 border-warning/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
-                     {{ systemStore.mpdStatus }}
-                 </span>
-            </div>
-            <div class="flex items-center justify-between" v-if="systemStore.packageVersions['mpd']">
-                  <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.versionLabel') }}</span>
-                  <span class="text-sm font-bold text-text-main">{{ systemStore.packageVersions['mpd'] }}</span>
-            </div>
-            <div class="pt-4 flex flex-col space-y-3 border-t border-black/5 dark:border-white/5" v-if="systemStore.installedPackages['mpd']">
-                <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'mpd')" class="px-3 py-2.5 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-text-main border border-black/5 dark:border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
-                    <button v-if="systemStore.mpdStatus === 'active'" @click="systemStore.controlService('stop', 'mpd')" class="px-3 py-2.5 bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.stopButton') }}</button>
-                    <button v-else @click="systemStore.controlService('start', 'mpd')" class="px-3 py-2.5 bg-success/10 hover:bg-success/20 text-success border border-success/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.startButton') }}</button>
-                </div>
-                <button @click="handleUpdate('mpd')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.updateMpdButton') }}
-                </button>
-                <button @click="handleUninstall('mpd')" class="w-full px-4 py-3 bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.uninstallMpdButton') }}
-                </button>
-            </div>
-            <div class="pt-4 border-t border-black/5 dark:border-white/5" v-else>
-                 <button @click="systemStore.installPackage('mpd')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.installMpdButton') }}
-                 </button>
-            </div>
+          </dl>
+          <div v-else class="space-y-3" aria-hidden="true">
+            <div v-for="n in 5" :key="n" class="h-4 rounded bg-inset animate-pulse"></div>
+          </div>
+        </Card>
+      </section>
+
+      <!-- 3. Services -->
+      <section class="space-y-4">
+        <SectionHeader :title="t('dashboard.servicesHeading')" :description="t('dashboard.servicesDescription')" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <ServiceCard
+            v-if="isServerMode"
+            :name="t('dashboard.snapserverCardTitle')"
+            icon="dns"
+            :description="t('dashboard.snapserverDescription')"
+            :installed="systemStore.installedPackages.snapserver"
+            :service-status="systemStore.snapserverStatus"
+            :version="systemStore.packageVersions.snapserver"
+            :available-version="systemStore.availableVersions.snapserver"
+            :busy="systemStore.loading"
+            can-reinstall
+            @install="systemStore.installPackage('snapserver')"
+            @update="performUpdate('snapserver', false)"
+            @reinstall="askReinstall('snapserver')"
+            @control="(a) => control('snapserver', a)"
+          >
+            <details class="group rounded-xl border border-line bg-inset">
+              <summary class="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold text-text-muted hover:text-text-main">
+                {{ t('dashboard.releaseChannelLabel') }}
+                <span class="material-symbols-outlined text-[1rem] transition-transform group-open:rotate-180" aria-hidden="true">expand_more</span>
+              </summary>
+              <div class="px-3 pb-3">
+                <SnapcastChannelPicker pkg="snapserver" />
+              </div>
+            </details>
+          </ServiceCard>
+
+          <ServiceCard
+            :name="t('dashboard.airplayCardTitle')"
+            icon="cast"
+            :description="t('dashboard.airplayDescription')"
+            :installed="systemStore.installedPackages['shairport-sync']"
+            :service-status="systemStore.shairportSyncStatus"
+            :version="systemStore.packageVersions['shairport-sync']"
+            :available-version="systemStore.availableVersions['shairport-sync']"
+            :busy="systemStore.loading"
+            can-uninstall
+            @install="systemStore.installPackage('shairport-sync')"
+            @update="performUpdate('shairport-sync', false)"
+            @uninstall="askUninstall('shairport-sync')"
+            @control="(a) => control('shairport-sync', a)"
+          />
+
+          <ServiceCard
+            :name="t('dashboard.mpdCardTitle')"
+            icon="queue_music"
+            :description="t('dashboard.mpdDescription')"
+            :installed="systemStore.installedPackages.mpd"
+            :service-status="systemStore.mpdStatus"
+            :version="systemStore.packageVersions.mpd"
+            :available-version="systemStore.availableVersions.mpd"
+            :busy="systemStore.loading"
+            can-uninstall
+            @install="systemStore.installPackage('mpd')"
+            @update="performUpdate('mpd', false)"
+            @uninstall="askUninstall('mpd')"
+            @control="(a) => control('mpd', a)"
+          />
+
+          <ServiceCard
+            :name="t('dashboard.mympdCardTitle')"
+            icon="library_music"
+            :description="t('dashboard.mympdDescription', { port: systemStore.mympdPort })"
+            :installed="systemStore.installedPackages.mympd"
+            :service-status="systemStore.mympdStatus"
+            :version="systemStore.packageVersions.mympd"
+            :available-version="systemStore.availableVersions.mympd"
+            :busy="systemStore.loading"
+            can-uninstall
+            @install="systemStore.installPackage('mympd')"
+            @update="performUpdate('mympd', false)"
+            @uninstall="askUninstall('mympd')"
+            @control="(a) => control('mympd', a)"
+          >
+            <template v-if="systemStore.installedPackages.mympd && systemStore.mympdRunning" #actions>
+              <Button size="sm" variant="secondary" @click="openMympd">
+                <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">open_in_new</span>
+                {{ t('dashboard.openMympdButton') }}
+              </Button>
+            </template>
+          </ServiceCard>
+
+          <ServiceCard
+            :name="t('dashboard.ffmpegCardTitle')"
+            icon="movie"
+            :description="t('dashboard.ffmpegDescription')"
+            :installed="systemStore.installedPackages.ffmpeg"
+            :version="systemStore.packageVersions.ffmpeg"
+            :available-version="systemStore.availableVersions.ffmpeg"
+            :busy="systemStore.loading"
+            @install="systemStore.installPackage('ffmpeg')"
+            @update="performUpdate('ffmpeg', false)"
+          />
+
+          <ServiceCard
+            v-if="isServerMode"
+            :name="t('dashboard.snapCtrlCardTitle')"
+            icon="settings_remote"
+            :description="t('dashboard.snapCtrlDescription')"
+            :installed="systemStore.installedPackages['snap-ctrl']"
+            :version="systemStore.packageVersions['snap-ctrl']"
+            :available-version="systemStore.availableVersions['snap-ctrl']"
+            :busy="systemStore.loading"
+            @install="performUpdate('snap-ctrl', false)"
+            @update="performUpdate('snap-ctrl', false)"
+          />
         </div>
-      </Card>
+      </section>
 
-      <!-- myMPD Card -->
-      <Card :title="t('dashboard.mympdCardTitle')">
-        <template #icon>
-            <span class="material-symbols-outlined">library_music</span>
-        </template>
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.webMusicClientLabel') }}</span>
-                <span :class="systemStore.installedPackages['mympd'] ? 'text-success' : 'text-danger'" class="text-sm font-black">
-                    {{ systemStore.installedPackages['mympd'] ? t('dashboard.installedBadge') : t('dashboard.notInstalledBadge') }}
-                </span>
+      <!-- 4. This manager -->
+      <section class="space-y-4">
+        <SectionHeader :title="t('dashboard.systemHeading')" :description="t('dashboard.systemDescription')" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="rounded-2xl border border-line bg-brand-surface/80 p-5 shadow-sm flex flex-col gap-3">
+            <div class="flex items-center gap-3">
+              <img src="../assets/logo.png" alt="" class="w-10 h-10 rounded-xl object-cover" />
+              <div>
+                <h3 class="text-sm font-bold text-text-main">{{ t('dashboard.managerCardTitle') }}</h3>
+                <p class="text-xs text-text-muted">
+                  {{ t('dashboard.appVersionLabel') }}: <span class="font-mono text-text-main">v{{ version }}</span>
+                </p>
+              </div>
             </div>
-            <div class="flex items-center justify-between" v-if="systemStore.installedPackages['mympd']">
-                 <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.statusLabel') }}</span>
-                 <span :class="systemStore.mympdStatus === 'active' ? 'text-success bg-success/10 border-success/20' : 'text-warning bg-warning/10 border-warning/20'" class="px-2.5 py-1 rounded-lg text-[9px] border font-black uppercase tracking-widest">
-                     {{ systemStore.mympdStatus }}
-                 </span>
+            <a
+              href="https://github.com/NaturalDevCR/Snapcast-Manager/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-primary-text hover:underline"
+            >
+              {{ t('dashboard.releaseNotesLink') }}
+              <span class="material-symbols-outlined text-[0.95rem]" aria-hidden="true">open_in_new</span>
+            </a>
+          </div>
+
+          <div class="rounded-2xl border border-line bg-brand-surface/80 p-5 shadow-sm flex flex-col gap-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h3 class="text-sm font-bold text-text-main">{{ t('dashboard.runtimeCardTitle') }}</h3>
+                <p class="text-xs text-text-muted">
+                  {{ t('dashboard.nodeCurrentLabel') }}:
+                  <span class="font-mono text-text-main">{{ systemStore.packageVersions.node || t('dashboard.nodeUnknownLabel') }}</span>
+                </p>
+              </div>
+              <span class="material-symbols-outlined text-text-muted" aria-hidden="true">javascript</span>
             </div>
-            <div class="flex items-center justify-between" v-if="systemStore.packageVersions['mympd']">
-                  <span class="text-sm font-semibold text-text-muted">{{ t('dashboard.versionLabel') }}</span>
-                  <span class="text-sm font-bold text-text-main">{{ systemStore.packageVersions['mympd'] }}</span>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex rounded-lg border border-line bg-inset p-0.5" role="radiogroup" :aria-label="t('dashboard.selectLtsLabel')">
+                <button
+                  v-for="v in ['20', '22', '24']"
+                  :key="v"
+                  type="button"
+                  role="radio"
+                  :aria-checked="selectedNodeVersion === v"
+                  :class="selectedNodeVersion === v ? 'bg-brand-surface text-text-main shadow-sm' : 'text-text-muted hover:text-text-main'"
+                  class="rounded-md px-3 py-1 text-xs font-semibold transition-colors"
+                  @click="selectedNodeVersion = v"
+                >v{{ v }}</button>
+              </div>
+              <Button
+                size="sm"
+                variant="subtle"
+                :disabled="systemStore.loading || selectedNodeVersion === nodeMajor"
+                @click="showConfirmUpdateNode = true"
+              >{{ t('dashboard.updateNodeButton', { version: selectedNodeVersion }) }}</Button>
             </div>
-            <div class="pt-4 flex flex-col space-y-3 border-t border-black/5 dark:border-white/5" v-if="systemStore.installedPackages['mympd']">
-                <button v-if="systemStore.mympdRunning" @click="openMympd" class="w-full px-4 py-3 bg-success/10 hover:bg-success/20 text-success border border-success/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95">
-                    <span class="material-symbols-outlined text-[1rem] mr-1 align-middle">open_in_new</span>{{ t('dashboard.openMympdButton') }}
-                </button>
-                <div class="grid grid-cols-2 gap-3">
-                    <button @click="systemStore.controlService('restart', 'mympd')" class="px-3 py-2.5 bg-black/40 hover:bg-black/10 dark:hover:bg-white/10 text-text-main border border-black/5 dark:border-white/5 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.restartButton') }}</button>
-                    <button v-if="systemStore.mympdStatus === 'active'" @click="systemStore.controlService('stop', 'mympd')" class="px-3 py-2.5 bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.stopButton') }}</button>
-                    <button v-else @click="systemStore.controlService('start', 'mympd')" class="px-3 py-2.5 bg-success/10 hover:bg-success/20 text-success border border-success/20 rounded-xl transition-all text-xs font-bold active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">{{ t('dashboard.startButton') }}</button>
-                </div>
-                <button @click="handleUpdate('mympd')" class="w-full px-4 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.updateMympdButton') }}
-                </button>
-                <button @click="handleUninstall('mympd')" class="w-full px-4 py-3 bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.uninstallMympdButton') }}
-                </button>
-            </div>
-            <div class="pt-4 border-t border-black/5 dark:border-white/5" v-else>
-                 <button @click="systemStore.installPackage('mympd')" class="w-full px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black uppercase tracking-widest text-xs border border-brand-primary/50 shadow-xl shadow-brand-primary/30 transition-all active:scale-95 disabled:opacity-50" :disabled="systemStore.loading">
-                    {{ t('dashboard.installMympdButton') }}
-                 </button>
-            </div>
+            <p class="text-xs text-text-muted">{{ t('dashboard.nodeHint') }}</p>
+          </div>
         </div>
-      </Card>
+      </section>
+    </div>
 
-      </div>
+    <!-- Destructive-action confirmations (Task 31) -->
+    <ConfirmDestructive
+      v-model="showConfirmReinstall"
+      :title="t('dashboard.reinstallButton')"
+      :message="t('dashboard.reinstallConfirmMessage', { pkg: pendingReinstallPkg ?? '' })"
+      :entity-name="pendingReinstallPkg ?? ''"
+      :confirm-label="t('dashboard.reinstallConfirmLabel')"
+      @confirm="performUpdate(pendingReinstallPkg!, true)"
+    />
 
-      <!-- ── Destructive-action confirmations (Task 31) ─────────────────── -->
-      <ConfirmDestructive
-        v-model="showConfirmReinstall"
-        :title="t('dashboard.cleanReinstallLabel')"
-        :message="t('dashboard.reinstallConfirmMessage', { pkg: pendingReinstallPkg ?? '' })"
-        :entity-name="pendingReinstallPkg ?? ''"
-        :confirm-label="t('dashboard.reinstallConfirmLabel')"
-        @confirm="performUpdate(pendingReinstallPkg!, true)"
-      />
+    <ConfirmDestructive
+      v-model="showConfirmUninstall"
+      :title="t('dashboard.uninstallLabel')"
+      :message="t('dashboard.uninstallConfirmMessage', { pkg: pendingUninstallPkg ?? '' })"
+      :entity-name="pendingUninstallPkg ?? ''"
+      :confirm-label="t('dashboard.uninstallLabel')"
+      @confirm="performUninstall"
+    />
 
-      <ConfirmDestructive
-        v-model="showConfirmUninstall"
-        :title="t('dashboard.uninstallLabel')"
-        :message="t('dashboard.uninstallConfirmMessage', { pkg: pendingUninstallPkg ?? '' })"
-        :entity-name="pendingUninstallPkg ?? ''"
-        :confirm-label="t('dashboard.uninstallLabel')"
-        @confirm="performUninstall"
-      />
-
-      <ConfirmDialog
-        v-model="showConfirmUpdateNode"
-        :title="t('dashboard.updateNodeDialogTitle')"
-        :message="t('dashboard.updateNodeConfirmMessage', { version: selectedNodeVersion })"
-        :confirm-text="t('dashboard.updateConfirmLabel')"
-        @confirm="handleUpdateNodeJs"
-      />
-  </div>
-</Layout>
+    <ConfirmDialog
+      v-model="showConfirmUpdateNode"
+      :title="t('dashboard.updateNodeDialogTitle')"
+      :message="t('dashboard.updateNodeConfirmMessage', { version: selectedNodeVersion })"
+      :confirm-text="t('dashboard.updateConfirmLabel')"
+      @confirm="handleUpdateNodeJs"
+    />
+  </Layout>
 </template>
