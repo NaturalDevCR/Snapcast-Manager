@@ -1,10 +1,10 @@
 {
   "title": "Snapcast Manager",
-  "subtitle": "Autenticación Segura de Red",
+  "subtitle": "Inicia sesión para administrar tu sistema Snapcast.",
   "usernamePlaceholder": "Usuario",
   "passwordPlaceholder": "Contraseña",
-  "authenticating": "Autenticando...",
-  "signIn": "Iniciar Sesión",
+  "authenticating": "Iniciando sesión…",
+  "signIn": "Iniciar sesión",
   "welcomeBack": "¡Bienvenido de nuevo!",
   "authFailed": "Error de autenticación"
 }

@@ -71,19 +71,19 @@ defineExpose({ open });
           leave-from="opacity-100 scale-100"
           leave-to="opacity-0 scale-95"
         >
-          <DialogPanel class="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-3xl h-[70vh] flex flex-col shadow-2xl">
-            <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-              <h3 class="text-sm font-semibold text-zinc-200">
+          <DialogPanel class="bg-brand-surface border border-line rounded-xl w-full max-w-3xl h-[70vh] flex flex-col shadow-2xl">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+              <h3 class="text-sm font-semibold text-text-main">
                 <span class="material-symbols-outlined text-[1rem] mr-1 align-middle">terminal</span>
                 Logs — {{ logsTitle }}
               </h3>
-              <button @click="showLogs = false" class="text-zinc-500 hover:text-zinc-300 transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close logs">
+              <button @click="showLogs = false" class="text-text-muted hover:text-text-main transition min-w-[40px] min-h-[40px] flex items-center justify-center" aria-label="Close logs">
                 <span class="material-symbols-outlined text-[1.2rem]">close</span>
               </button>
             </div>
             <div class="flex-1 overflow-y-auto p-4">
-              <div v-if="loadingLogs" class="text-zinc-400 text-sm text-center py-8">Loading logs…</div>
-              <pre v-else class="text-xs text-zinc-300 font-mono whitespace-pre-wrap leading-5">{{ logsContent || 'No log output.' }}</pre>
+              <div v-if="loadingLogs" class="text-text-muted text-sm text-center py-8">Loading logs…</div>
+              <pre v-else class="text-xs text-text-main font-mono whitespace-pre-wrap leading-5">{{ logsContent || 'No log output.' }}</pre>
             </div>
           </DialogPanel>
         </TransitionChild>

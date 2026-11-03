@@ -10,7 +10,7 @@
         leave-from="opacity-100"
         leave-to="opacity-0"
       >
-        <div class="fixed inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity" />
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" />
       </TransitionChild>
 
       <div class="fixed inset-0 z-10 overflow-y-auto">
@@ -24,24 +24,24 @@
             leave-from="opacity-100 translate-y-0 sm:scale-100"
             leave-to="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
           >
-            <DialogPanel class="relative transform overflow-hidden rounded-2xl bg-slate-800 border border-slate-700 p-6 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+            <DialogPanel class="relative transform overflow-hidden rounded-2xl bg-brand-surface border border-line p-6 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
               <div class="sm:flex sm:items-start">
-                <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary-900/30 text-primary-500 sm:mx-0 sm:h-10 sm:w-10">
+                <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary-text sm:mx-0 sm:h-10 sm:w-10">
                   <PencilSquareIcon class="h-6 w-6" aria-hidden="true" />
                 </div>
                 <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-                  <DialogTitle as="h3" class="text-lg font-semibold leading-6 text-white">
+                  <DialogTitle as="h3" class="text-lg font-semibold leading-6 text-text-main">
                     {{ title }}
                   </DialogTitle>
                   <div class="mt-2">
-                    <p class="text-sm text-slate-400 mb-4">
+                    <p class="text-sm text-text-muted mb-4">
                       {{ message }}
                     </p>
                     <input
                       ref="inputRef"
                       v-model="inputValue"
                       type="text"
-                      class="block w-full rounded-xl border-0 py-2.5 bg-slate-900 text-white shadow-sm ring-1 ring-inset ring-slate-700 placeholder:text-slate-500 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm sm:leading-6"
+                      class="block w-full rounded-xl border-0 py-2.5 bg-inset px-3 text-text-main ring-1 ring-inset ring-line placeholder:text-text-muted focus:ring-2 focus:ring-inset focus:ring-brand-primary sm:text-sm sm:leading-6"
                       :placeholder="placeholder"
                       @keyup.enter="confirm"
                     />
@@ -51,7 +51,7 @@
               <div class="mt-6 sm:mt-6 sm:flex sm:flex-row-reverse gap-3">
                 <button
                   type="button"
-                  class="inline-flex w-full justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 sm:w-auto transition-all"
+                  class="inline-flex w-full justify-center rounded-xl bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-primary/85 sm:w-auto transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   :disabled="!inputValue"
                   @click="confirm"
                 >
@@ -59,7 +59,7 @@
                 </button>
                 <button
                   type="button"
-                  class="mt-3 inline-flex w-full justify-center rounded-xl bg-slate-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-slate-600 hover:bg-slate-600 sm:mt-0 sm:w-auto transition-all"
+                  class="mt-3 inline-flex w-full justify-center rounded-xl bg-inset px-4 py-2.5 text-sm font-semibold text-text-main ring-1 ring-inset ring-line hover:bg-line sm:mt-0 sm:w-auto transition-all"
                   @click="$emit('update:modelValue', false)"
                 >
                   {{ cancelText }}

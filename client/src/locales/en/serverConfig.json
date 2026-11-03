@@ -5,7 +5,7 @@
   "tabExpertSub": "Raw INI file",
   "tabSnapshots": "Snapshots",
   "tabSnapshotsSub": "Version history",
-  "saveConfiguration": "Save Configuration",
+  "saveConfiguration": "Save changes",
   "restartDialogTitle": "Restart Snapserver?",
   "restartDialogMessage": "Configuration saved! Restart now to apply changes?",
   "restartDialogConfirm": "Restart Now",
@@ -17,5 +17,8 @@
   "restartFailedToast": "Failed to restart: {message}",
   "resetSuccessToast": "Configuration reset to defaults",
   "resetFailedToast": "Failed to reset configuration: {message}",
-  "resetError": "Failed to reset"
+  "resetError": "Failed to reset",
+  "title": "Server config",
+  "subtitle": "Edit snapserver.conf with a visual editor or as raw INI. Saved changes apply after a restart.",
+  "usingDefault": "Default"
 }

@@ -44,6 +44,13 @@ describe('PipeSources.vue', () => {
     for (const button of iconOnlyButtons) {
       expect(button.getAttribute('aria-label')).toBeTruthy();
     }
+
+    // UI overhaul regression: these per-source controls used to sit in a
+    // non-existent Card #header slot and never rendered at all.
+    expect(wrapper.text()).toContain('Radio Gym');
+    const labels = iconOnlyButtons.map((b) => b.getAttribute('aria-label'));
+    expect(labels).toContain('Stop Radio Gym');
+    expect(labels).toContain('Delete Radio Gym');
   });
 
   // Task 33: with no pipe sources, EmptyState.vue renders in place of the

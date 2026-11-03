@@ -20,8 +20,8 @@ describe('ClientDashboard.vue', () => {
 
     expect(wrapper.text()).toContain('Panel de Clientes');
     expect(wrapper.text()).toContain('Administra instancias de receptor de audio Snapclient.');
-    expect(wrapper.text()).toContain('SINCRONIZAR TODO');
-    expect(wrapper.text()).toContain('Instalado');
+    expect(wrapper.text()).toContain('Actualizar');
+    expect(wrapper.text()).toContain('No instalado');
   });
 
   // Task 31: instance deletion used to call window.confirm() directly. It

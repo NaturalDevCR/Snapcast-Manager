@@ -13,5 +13,30 @@
   "sessionActive": "Session Active",
   "signOut": "Sign out",
   "switchToLight": "Switch to light mode",
-  "switchToDark": "Switch to dark mode"
+  "switchToDark": "Switch to dark mode",
+  "nav": {
+    "groupAudio": "Audio",
+    "groupSystem": "System",
+    "groupSettings": "Settings",
+    "sources": "Sources",
+    "sourcesDescription": "Radio streams & MPD pipes",
+    "diagnostics": "Diagnostics",
+    "diagnosticsDescription": "Self-checks & repairs",
+    "logs": "Logs",
+    "logsDescription": "Service logs",
+    "watchdogs": "Watchdogs",
+    "watchdogsDescription": "TCP connection monitors",
+    "serverConfig": "Server config",
+    "serverConfigDescription": "snapserver.conf settings",
+    "tools": "Tools",
+    "toolsDescription": "Crontab, scripts & backups",
+    "security": "Security",
+    "securityDescription": "Password & full backup"
+  },
+  "signedInAs": "Signed in as",
+  "language": "Language",
+  "theme": "Theme",
+  "version": "Version {version}",
+  "viewOnGithub": "View on GitHub",
+  "primaryNav": "Main navigation"
 }

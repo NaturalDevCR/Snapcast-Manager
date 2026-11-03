@@ -99,7 +99,7 @@ function onConfirm() {
     <div class="space-y-4">
       <p v-if="message" class="text-sm text-text-muted">{{ message }}</p>
       <p class="text-sm text-text-muted">
-        Type <span class="font-black text-text-main">{{ entityName }}</span> to confirm.
+        Type <span class="font-semibold text-text-main">{{ entityName }}</span> to confirm.
       </p>
       <Input v-model="typedName" label="Confirmation" :placeholder="entityName" />
     </div>

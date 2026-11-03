@@ -44,9 +44,9 @@ watch(
     <div
       class="bg-brand-surface/95 rounded-2xl shadow-2xl border border-brand-primary/20 backdrop-blur-xl w-full max-w-2xl animate-in fade-in zoom-in duration-300 overflow-hidden"
     >
-      <div class="flex items-center gap-3 px-5 py-4 border-b border-black/5 dark:border-white/5">
+      <div class="flex items-center gap-3 px-5 py-4 border-b border-line">
         <span class="material-symbols-outlined animate-spin text-brand-primary text-2xl shrink-0">sync</span>
-        <span class="text-sm font-bold text-text-main tracking-widest uppercase truncate">
+        <span class="text-sm font-bold text-text-main truncate">
           {{ systemStore.loadingMessage || t('dashboard.loadingFallback') }}
         </span>
       </div>
@@ -61,7 +61,7 @@ watch(
       <div
         v-if="systemStore.jobLog.length > 0"
         ref="logContainer"
-        class="bg-black/90 text-emerald-400 font-mono text-xs leading-relaxed p-4 max-h-80 overflow-y-auto"
+        class="bg-black/90 text-success font-mono text-xs leading-relaxed p-4 max-h-80 overflow-y-auto"
       >
         <div v-for="(line, i) in systemStore.jobLog" :key="i" class="whitespace-pre-wrap break-all">{{ line }}</div>
       </div>

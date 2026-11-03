@@ -31,20 +31,17 @@ const handleLogin = async () => {
   <div class="min-h-screen bg-brand-bg flex items-center justify-center p-6 transition-colors duration-500">
     <!-- Background Accents -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none">
-        <div class="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] bg-brand-primary/20 blur-[140px] rounded-full"></div>
-        <div class="absolute -bottom-[20%] -right-[10%] w-[60%] h-[60%] bg-indigo-500/10 blur-[140px] rounded-full"></div>
-    </div>
+        <div class="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] bg-brand-primary/10 blur-[140px] rounded-full"></div>
+            </div>
 
     <div class="max-w-md w-full relative group">
-      <div class="relative bg-brand-surface/80 backdrop-blur-3xl shadow-2xl shadow-brand-primary/10 rounded-[2.5rem] p-8 md:p-12 border border-black/[0.04] dark:border-white/[0.04] animate-in fade-in zoom-in duration-700">
+      <div class="relative bg-brand-surface/80 backdrop-blur-3xl shadow-2xl shadow-brand-primary/10 rounded-3xl p-8 md:p-12 border border-line animate-in fade-in zoom-in duration-700">
         <div class="text-center mb-8">
-           <div class="inline-flex items-center justify-center w-20 h-20 mb-6 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 shadow-xl shadow-brand-primary/20">
-              <span class="material-symbols-outlined text-4xl text-brand-primary">settings_input_antenna</span>
-           </div>
-           <h2 class="text-3xl font-black text-text-main tracking-tight leading-tight">
+           <img src="../assets/logo.png" alt="" class="mx-auto w-16 h-16 mb-5 rounded-2xl object-cover shadow-lg shadow-brand-primary/20" />
+           <h1 class="text-2xl font-bold text-text-main tracking-tight">
             {{ t('login.title') }}
-          </h2>
-          <p class="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-text-muted">{{ t('login.subtitle') }}</p>
+          </h1>
+          <p class="mt-1.5 text-sm text-text-muted">{{ t('login.subtitle') }}</p>
         </div>
 
         <form class="space-y-6" @submit.prevent="handleLogin">
@@ -58,7 +55,9 @@ const handleLogin = async () => {
                 type="text" 
                 required 
                 v-model="username" 
-                class="block w-full pl-11 pr-4 py-3 bg-black/20 border border-black/10 dark:border-white/10 rounded-xl text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-medium"
+                autocomplete="username"
+                :aria-label="t('login.usernamePlaceholder')"
+                class="block w-full pl-11 pr-4 py-3 bg-inset border border-line rounded-xl text-sm text-text-main placeholder:text-text-muted/70 focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-medium"
                 :placeholder="t('login.usernamePlaceholder')"
               >
             </div>
@@ -71,7 +70,9 @@ const handleLogin = async () => {
                 type="password" 
                 required 
                 v-model="password"
-                class="block w-full pl-11 pr-4 py-3 bg-black/20 border border-black/10 dark:border-white/10 rounded-xl text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-medium"
+                autocomplete="current-password"
+                :aria-label="t('login.passwordPlaceholder')"
+                class="block w-full pl-11 pr-4 py-3 bg-inset border border-line rounded-xl text-sm text-text-main placeholder:text-text-muted/70 focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 outline-none transition-all font-medium"
                 :placeholder="t('login.passwordPlaceholder')"
               >
             </div>
@@ -80,7 +81,7 @@ const handleLogin = async () => {
           <button 
             type="submit" 
             :disabled="loading"
-            class="group w-full flex items-center justify-center py-4 px-6 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-brand-primary/30 border border-brand-primary/50 transition-all active:scale-[0.98] disabled:opacity-50"
+            class="group w-full flex items-center justify-center py-3 px-6 bg-brand-primary hover:bg-brand-primary/85 text-white rounded-xl font-semibold text-sm shadow-sm transition-all active:scale-[0.98] disabled:opacity-50"
           >
             <span v-if="loading" class="animate-pulse flex items-center gap-2"><span class="material-symbols-outlined animate-spin text-lg">sync</span>{{ t('login.authenticating') }}</span>
             <div v-else class="flex items-center">

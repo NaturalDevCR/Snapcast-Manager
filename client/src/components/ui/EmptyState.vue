@@ -3,8 +3,8 @@
 //
 // Extracts the "no data yet" pattern that already existed ad hoc, pre-token,
 // in a couple of views — e.g. PipeSources.vue's
-// `<span class="material-symbols-outlined text-4xl text-zinc-700 mb-3
-// block">sensors</span><p class="text-zinc-500">No pipe sources
+// `<span class="material-symbols-outlined text-4xl text-text-muted mb-3
+// block">sensors</span><p class="text-text-muted">No pipe sources
 // configured.</p>` and ClientDashboard.vue's `text-white/20` "No instances
 // configured" block — into a token-driven, reusable component matching that
 // same visual language (large muted icon, bold/black title, centered).
@@ -30,7 +30,7 @@ withDefaults(defineProps<EmptyStateProps>(), {
 <template>
   <div class="flex flex-col items-center justify-center text-center py-12 px-6">
     <span class="material-symbols-outlined text-4xl text-text-muted/50 mb-3" aria-hidden="true">{{ icon }}</span>
-    <h3 class="text-sm font-black text-text-main uppercase tracking-widest">{{ title }}</h3>
+    <h3 class="text-base font-semibold text-text-main">{{ title }}</h3>
     <p v-if="description" class="text-sm text-text-muted mt-2 max-w-sm">{{ description }}</p>
     <div v-if="$slots.action" class="mt-6">
       <slot name="action" />

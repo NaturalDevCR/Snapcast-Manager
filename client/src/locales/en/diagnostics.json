@@ -15,5 +15,6 @@
   "categoryOrphanedUnit": "Orphaned Unit",
   "categoryFifoNoProducer": "FIFO Without Producer",
   "categorySnapserverDown": "Snapserver Down",
-  "categoryPortOccupied": "Port Occupied"
+  "categoryPortOccupied": "Port Occupied",
+  "refresh": "Refresh"
 }

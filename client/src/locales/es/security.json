@@ -23,5 +23,6 @@
   "changePasswordFailed": "Error al cambiar la contraseña",
   "backupDownloaded": "Respaldo descargado correctamente",
   "downloadBackupFailed": "Error al descargar el respaldo",
-  "exportFailed": "Error al exportar: {status}"
+  "exportFailed": "Error al exportar: {status}",
+  "passwordMismatch": "Las contraseñas nuevas no coinciden."
 }

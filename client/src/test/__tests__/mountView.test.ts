@@ -26,7 +26,7 @@ describe('mountSmokeTest() locale isolation across tests in the same file', () =
     const wrapper = await mountSmokeTest(Login, '/login');
     useUIStore().setLocale('es');
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toContain('Iniciar Sesión');
+    expect(wrapper.text()).toContain('Iniciar sesión');
   });
 
   it('does not leak into a later, unrelated fresh mount in the same file', async () => {
@@ -35,6 +35,6 @@ describe('mountSmokeTest() locale isolation across tests in the same file', () =
     // singleton.
     const wrapper = await mountSmokeTest(Login, '/login');
     expect(wrapper.text()).toContain('Sign In');
-    expect(wrapper.text()).not.toContain('Iniciar Sesión');
+    expect(wrapper.text()).not.toContain('Iniciar sesión');
   });
 });

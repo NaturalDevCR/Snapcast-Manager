@@ -1,16 +1,16 @@
 {
   "title": "Client Dashboard",
   "subtitle": "Manage Snapclient audio receiver instances.",
-  "syncAll": "SYNC ALL",
+  "syncAll": "Refresh",
   "syncing": "Syncing...",
   "snapclientPackage": "Snapclient Package",
   "snapclient": "Snapclient",
   "installed": "Installed",
-  "yes": "YES",
+  "yes": "Yes",
   "no": "NO",
   "version": "Version",
-  "newVersion": "NEW VERSION: {version}",
-  "upToDate": "UP TO DATE",
+  "newVersion": "New version: {version}",
+  "upToDate": "Up to date",
   "installUpdate": "Install Update",
   "cleanReinstall": "Clean Reinstall",
   "uninstall": "Uninstall",
@@ -66,5 +66,7 @@
   "snapclientUpdated": "snapclient updated successfully!",
   "failedToast": "Failed: ",
   "snapclientUninstalled": "snapclient uninstalled successfully!",
-  "alsaError": "ALSA error: "
+  "alsaError": "ALSA error: ",
+  "snapclientDescription": "Plays a Snapcast stream through this device's sound card. Run one instance per audio output.",
+  "outputInstancesDescription": "Each instance sends one snapserver stream to one sound card."
 }

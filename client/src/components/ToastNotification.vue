@@ -12,16 +12,16 @@ const uiStore = useUIStore();
 
 const typeConfigs = {
   success: {
-    bg: 'bg-emerald-500/90 dark:bg-emerald-500/20',
+    bg: 'bg-success/90 dark:bg-success/20',
     border: 'border-emerald-500/50',
-    text: 'text-white dark:text-emerald-400',
+    text: 'text-white dark:text-success',
     icon: CheckCircleIcon,
     glow: 'shadow-emerald-500/40'
   },
   error: {
     bg: 'bg-red-500/90 dark:bg-red-500/20',
     border: 'border-red-500/50',
-    text: 'text-white dark:text-red-400',
+    text: 'text-white dark:text-danger',
     icon: ExclamationCircleIcon,
     glow: 'shadow-red-500/40'
   },
@@ -33,9 +33,9 @@ const typeConfigs = {
     glow: 'shadow-indigo-500/40'
   },
   warning: {
-    bg: 'bg-amber-500/90 dark:bg-amber-500/20',
-    border: 'border-amber-500/50',
-    text: 'text-white dark:text-amber-400',
+    bg: 'bg-warning/90 dark:bg-warning/20',
+    border: 'border-warning/50',
+    text: 'text-white dark:text-warning',
     icon: ExclamationTriangleIcon,
     glow: 'shadow-amber-500/40'
   }
@@ -68,13 +68,13 @@ const typeConfigs = {
             <component :is="typeConfigs[toast.type].icon" class="h-6 w-6" :class="typeConfigs[toast.type].text" />
         </div>
         
-        <div class="flex-1 text-xs font-black uppercase tracking-widest" :class="typeConfigs[toast.type].text">
+        <div class="flex-1 text-xs font-semibold" :class="typeConfigs[toast.type].text">
           {{ toast.message }}
         </div>
 
         <button
           @click="uiStore.removeToast(toast.id)"
-          class="ml-4 flex-shrink-0 p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          class="ml-4 flex-shrink-0 p-1 rounded-lg hover:bg-line transition-colors"
           :class="typeConfigs[toast.type].text"
           aria-label="Dismiss notification"
         >

@@ -1,28 +1,37 @@
 <script setup lang="ts">
+// Card.vue -- generic content panel.
+//
+// UI overhaul (2026-11): this used to carry a hover glow + icon scale on
+// every card, which made static, non-clickable panels look interactive, and
+// its header stacked vertically below `sm`, pushing action buttons (e.g. the
+// health panel's refresh) onto their own line under the title on phones.
+// The header now always stays a single row, and `subtitle` gives a slot for
+// a one-line description without each view hand-rolling one.
 defineProps<{
   title?: string;
+  subtitle?: string;
 }>();
 </script>
 
 <template>
-  <div class="bg-brand-surface/80 backdrop-blur-3xl border border-black/[0.04] dark:border-white/[0.04] rounded-[2rem] shadow-2xl transition-all duration-500 hover:border-brand-primary/40 hover:shadow-brand-primary/20 relative overflow-hidden group">
-    
-    <div v-if="title || $slots.title" class="px-6 py-5 border-b border-black/[0.04] dark:border-white/[0.04] bg-black/[0.01] dark:bg-white/[0.01] flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-      <div class="flex items-center gap-4">
-        <div v-if="$slots.icon" class="flex items-center justify-center text-brand-primary bg-brand-primary/10 w-12 h-12 rounded-2xl border border-brand-primary/20 shadow-lg shadow-brand-primary/10 group-hover:scale-110 group-hover:shadow-brand-primary/30 transition-all duration-500">
-            <slot name="icon"></slot>
+  <div class="bg-brand-surface/80 backdrop-blur-xl border border-line rounded-2xl shadow-sm relative overflow-hidden flex flex-col">
+    <div v-if="title || $slots.title" class="px-5 py-4 border-b border-line flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div v-if="$slots.icon" class="flex items-center justify-center text-brand-primary-text bg-brand-primary/10 w-9 h-9 rounded-xl flex-shrink-0">
+          <slot name="icon"></slot>
         </div>
-        <div>
-            <h3 v-if="title" class="text-sm font-black text-text-main tracking-wide">{{ title }}</h3>
-            <slot v-else name="title"></slot>
+        <div class="min-w-0">
+          <h3 v-if="title" class="text-sm font-bold text-text-main truncate">{{ title }}</h3>
+          <slot v-else name="title"></slot>
+          <p v-if="subtitle" class="text-xs text-text-muted truncate">{{ subtitle }}</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-          <slot name="action"></slot>
+      <div v-if="$slots.action" class="flex items-center gap-2 flex-shrink-0">
+        <slot name="action"></slot>
       </div>
     </div>
-    
-    <div class="p-6 sm:p-8 relative z-10">
+
+    <div class="p-5 flex-1 flex flex-col">
       <slot></slot>
     </div>
   </div>

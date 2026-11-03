@@ -87,13 +87,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-3 rounded-xl border border-black/10 dark:border-white/10 p-3">
-    <label class="block text-sm font-semibold">
+  <div class="space-y-3 pt-1">
+    <label class="block text-xs font-semibold text-text-muted">
       {{ t('common.snapcastChannel') }}
       <select
         v-model="channel"
         :disabled="busy || system.loading"
-        class="mt-1 w-full rounded-lg bg-white dark:bg-gray-900 p-2"
+        class="mt-1 w-full rounded-lg border border-line bg-brand-surface px-2.5 py-2 text-sm text-text-main"
         @change="changeChannel"
       >
         <option value="official">{{ t('common.snapcastOfficial') }}</option>
@@ -101,12 +101,12 @@ onMounted(async () => {
       </select>
     </label>
     <template v-if="channel === 'beta'">
-      <label class="block text-sm">
+      <label class="block text-xs font-semibold text-text-muted">
         {{ t('common.snapcastVersion') }}
         <select
           v-model="tag"
           :disabled="busy || system.loading"
-          class="mt-1 w-full rounded-lg bg-white dark:bg-gray-900 p-2"
+          class="mt-1 w-full rounded-lg border border-line bg-brand-surface px-2.5 py-2 text-sm text-text-main"
           @change="changeVersion"
         >
           <option value="">{{ t('common.snapcastLatestBeta') }}</option>
@@ -128,11 +128,11 @@ onMounted(async () => {
       {{ t('common.snapcastInstalledVersion') }}: {{ installedVersion }}
     </p>
     <p class="text-xs text-text-muted">{{ t('common.snapcastKeepConfig') }}</p>
-    <p v-if="error" role="alert" class="text-xs text-red-500">{{ error }}</p>
+    <p v-if="error" role="alert" class="text-xs text-danger">{{ error }}</p>
     <button
       type="button"
       :disabled="busy || system.loading || !ready"
-      class="w-full rounded-lg bg-brand-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+      class="w-full rounded-lg border border-line bg-brand-surface px-3 py-2 text-sm font-semibold text-text-main hover:bg-line disabled:opacity-50 transition-colors"
       @click="install"
     >
       {{ t(channel === 'beta' ? 'common.snapcastInstallBeta' : 'common.snapcastInstallOfficial') }}

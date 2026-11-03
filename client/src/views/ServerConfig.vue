@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useConfigStore } from '../stores/config';
@@ -8,6 +8,8 @@ import { useSystemStore } from '../stores/system';
 import { useUIStore } from '../stores/ui';
 import { fetchApi } from '../utils/api';
 import Layout from '../components/Layout.vue';
+import PageHeader from '../components/ui/PageHeader.vue';
+import Button from '../components/ui/Button.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import SnapshotsPanel from '../components/server-config/SnapshotsPanel.vue';
 import StandardTab from '../components/server-config/StandardTab.vue';
@@ -176,72 +178,43 @@ const handleSave = () => {
         saveRaw();
     }
 };
+
+const configTabs = computed(() => [
+  { key: 'standard' as const, icon: 'tune', label: t('serverConfig.tabStandard'), hint: t('serverConfig.tabStandardSub') },
+  { key: 'expert' as const, icon: 'code', label: t('serverConfig.tabExpert'), hint: t('serverConfig.tabExpertSub') },
+  { key: 'snapshots' as const, icon: 'history', label: t('serverConfig.tabSnapshots'), hint: t('serverConfig.tabSnapshotsSub') },
+]);
 </script>
 
 <template>
   <Layout>
-      <!-- Main Tabs Navigation & Actions -->
-      <div class="sticky top-[57px] z-30 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 p-2 bg-brand-bg/60 backdrop-blur-xl border border-black/5 dark:border-white/5 rounded-3xl shadow-2xl">
-          <div class="flex overflow-x-auto flex-nowrap space-x-2 bg-black/40 p-1.5 rounded-2xl w-fit max-w-full border border-black/10 dark:border-white/10">
+      <PageHeader :title="t('serverConfig.title')" :description="t('serverConfig.subtitle')" />
+
+      <!-- Tabs + Save: sticky so Save stays reachable while scrolling long forms -->
+      <div class="sticky top-14 lg:top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-10 mb-6 px-4 sm:px-6 lg:px-10 py-3 bg-brand-bg/85 backdrop-blur-xl border-b border-line flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex overflow-x-auto no-scrollbar gap-1 rounded-xl border border-line bg-inset p-1 w-fit max-w-full" role="tablist">
               <button
-                @click="activeTab = 'standard'"
+                v-for="tab in configTabs"
+                :key="tab.key"
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === tab.key"
+                :title="tab.hint"
+                @click="activeTab = tab.key"
                 :class="[
-                    'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                    activeTab === 'standard'
-                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+                    'flex items-center gap-2 px-3.5 py-1.5 rounded-lg whitespace-nowrap text-sm font-semibold transition-colors',
+                    activeTab === tab.key ? 'bg-brand-surface text-text-main shadow-sm' : 'text-text-muted hover:text-text-main'
                 ]"
               >
-                  <span class="material-symbols-outlined text-[18px]">tune</span>
-                  <div class="flex flex-col items-start">
-                    <span>{{ t('serverConfig.tabStandard') }}</span>
-                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">{{ t('serverConfig.tabStandardSub') }}</span>
-                  </div>
-              </button>
-              <button
-                @click="activeTab = 'expert'"
-                :class="[
-                    'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                    activeTab === 'expert'
-                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
-                ]"
-              >
-                  <span class="material-symbols-outlined text-[18px]">code</span>
-                  <div class="flex flex-col items-start">
-                    <span>{{ t('serverConfig.tabExpert') }}</span>
-                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">{{ t('serverConfig.tabExpertSub') }}</span>
-                  </div>
-              </button>
-              <button
-                @click="activeTab = 'snapshots'"
-                :class="[
-                    'flex items-center space-x-2 px-5 py-2.5 font-bold rounded-xl whitespace-nowrap transition-all duration-300 text-sm tracking-widest uppercase',
-                    activeTab === 'snapshots'
-                    ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(166,13,242,0.4)]'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
-                ]"
-              >
-                  <span class="material-symbols-outlined text-[18px]">history</span>
-                  <div class="flex flex-col items-start">
-                    <span>{{ t('serverConfig.tabSnapshots') }}</span>
-                    <span class="text-[9px] font-normal normal-case tracking-normal opacity-60">{{ t('serverConfig.tabSnapshotsSub') }}</span>
-                  </div>
+                  <span class="material-symbols-outlined text-[18px]" aria-hidden="true">{{ tab.icon }}</span>
+                  {{ tab.label }}
               </button>
           </div>
 
-          <!-- Quick Actions (Save) -->
-          <div v-if="activeTab === 'standard' || activeTab === 'expert'" class="flex items-center px-2">
-              <button 
-                  @click="handleSave" 
-                  :disabled="configStore.loading"
-                  class="w-full md:w-auto flex items-center justify-center space-x-3 px-8 py-3 rounded-2xl shadow-[0_0_20px_rgba(166,13,242,0.4)] text-[11px] font-black text-white bg-brand-primary hover:bg-[#b526ff] hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 transition-all duration-300 border border-black/10 dark:border-white/10 uppercase tracking-[0.2em]"
-              >
-                  <span v-if="configStore.loading" class="material-symbols-outlined text-[18px] animate-spin">sync</span>
-                  <span v-else class="material-symbols-outlined text-[18px]">save</span>
-                  <span>{{ t('serverConfig.saveConfiguration') }}</span>
-              </button>
-          </div>
+          <Button v-if="activeTab === 'standard' || activeTab === 'expert'" :loading="configStore.loading" @click="handleSave">
+              <span v-if="!configStore.loading" class="material-symbols-outlined text-[18px]" aria-hidden="true">save</span>
+              {{ t('serverConfig.saveConfiguration') }}
+          </Button>
       </div>
 
       <!-- ==================== STANDARD TAB ==================== -->

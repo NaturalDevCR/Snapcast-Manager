@@ -45,7 +45,7 @@ import { useUIStore } from '../stores/ui';
 // never leak locale state between each other; always defaults to 'en' so
 // every EXISTING English-text assertion in this codebase's smoke tests
 // keeps passing unchanged (spec §"Testing").
-function createTestI18n() {
+export function createTestI18n() {
   return createI18n({
     legacy: false,
     locale: 'en',

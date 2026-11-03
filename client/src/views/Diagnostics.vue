@@ -11,6 +11,8 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Layout from '../components/Layout.vue';
+import PageHeader from '../components/ui/PageHeader.vue';
+import Button from '../components/ui/Button.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import Badge from '../components/ui/Badge.vue';
@@ -123,25 +125,14 @@ async function handleConfirmRepair() {
 <template>
   <Layout>
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
-            {{ t('diagnostics.title') }}
-          </h1>
-          <p class="text-zinc-400 mt-1 text-sm">
-            {{ t('diagnostics.subtitle') }}
-          </p>
-        </div>
-        <button
-          @click="handleRefresh"
-          :disabled="store.loading"
-          :aria-label="t('diagnostics.refreshAriaLabel')"
-          class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-all active:scale-95 disabled:opacity-50"
-        >
-          <span class="material-symbols-outlined text-[1.1rem]" :class="{ 'animate-spin': store.loading }">refresh</span>
-        </button>
-      </div>
+      <PageHeader :title="t('diagnostics.title')" :description="t('diagnostics.subtitle')">
+        <template #actions>
+          <Button variant="subtle" :loading="store.loading" :aria-label="t('diagnostics.refreshAriaLabel')" @click="handleRefresh">
+            <span v-if="!store.loading" class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">refresh</span>
+            {{ t('diagnostics.refresh') }}
+          </Button>
+        </template>
+      </PageHeader>
 
       <!-- Fetch failure: MUST be visually distinct from "confirmed healthy" --
            a diagnostics tool that goes quiet on a network/auth error and
@@ -151,7 +142,7 @@ async function handleConfirmRepair() {
            looking like an all-clear result. -->
       <div
         v-if="!store.loading && store.error && sortedFindings.length === 0"
-        class="border border-dashed border-red-800/40 rounded-lg"
+        class="border border-dashed border-danger/40 rounded-lg"
       >
         <EmptyState
           icon="error"
@@ -165,7 +156,7 @@ async function handleConfirmRepair() {
            that renders this. -->
       <div
         v-else-if="!store.loading && sortedFindings.length === 0"
-        class="border border-dashed border-emerald-800/40 rounded-lg"
+        class="border border-dashed border-success/40 rounded-lg"
       >
         <EmptyState
           icon="check_circle"
@@ -177,7 +168,7 @@ async function handleConfirmRepair() {
       <!-- Still loading, nothing to show yet -- distinct from confirmed-empty
            above, same discipline as PipeSources.vue's loading/EmptyState
            split. -->
-      <div v-else-if="store.loading && sortedFindings.length === 0" class="flex items-center justify-center py-12 text-zinc-400 text-sm gap-2">
+      <div v-else-if="store.loading && sortedFindings.length === 0" class="flex items-center justify-center py-12 text-text-muted text-sm gap-2">
         <span class="material-symbols-outlined animate-spin text-[1rem]">sync</span>
         {{ t('diagnostics.running') }}
       </div>
@@ -187,7 +178,7 @@ async function handleConfirmRepair() {
         <div
           v-for="finding in sortedFindings"
           :key="finding.id"
-          class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between"
+          class="bg-brand-surface border border-line rounded-lg p-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between"
         >
           <div class="flex-1 min-w-0 space-y-1.5">
             <div class="flex items-center gap-2 flex-wrap">
@@ -195,12 +186,12 @@ async function handleConfirmRepair() {
                 <span class="material-symbols-outlined text-[0.85rem] mr-1">{{ SEVERITY_ICON[finding.severity] }}</span>
                 {{ finding.severity.toUpperCase() }}
               </Badge>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-800 text-zinc-400">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-inset text-text-muted">
                 {{ categoryLabel(finding.category) }}
               </span>
             </div>
-            <p class="text-sm text-zinc-300">{{ finding.message }}</p>
-            <p v-if="finding.repairAction?.kind === 'manual'" class="text-xs text-zinc-400 italic mt-1">
+            <p class="text-sm text-text-main">{{ finding.message }}</p>
+            <p v-if="finding.repairAction?.kind === 'manual'" class="text-xs text-text-muted italic mt-1">
               {{ finding.repairAction.instructions }}
             </p>
           </div>
@@ -210,7 +201,7 @@ async function handleConfirmRepair() {
               v-if="finding.repairAction?.kind === 'endpoint'"
               @click="openRepairConfirm(finding)"
               :disabled="applying"
-              class="px-3 py-1.5 rounded bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 text-xs font-medium transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-3 py-1.5 rounded bg-success/20 hover:bg-success/35 text-success text-xs font-medium transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span class="material-symbols-outlined text-[1rem]">build</span>
               {{ t('diagnostics.repair') }}

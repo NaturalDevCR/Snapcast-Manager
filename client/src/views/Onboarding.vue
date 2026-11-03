@@ -30,14 +30,24 @@ const pipeSourcesStore = usePipeSourcesStore();
 const snapcastStore = useSnapcastStore();
 const router = useRouter();
 
+// A brand-new admin account starts at onboarding_step 0 (server/src/
+// auth.ts), but the template only had branches for steps 1-3 -- so the
+// wizard rendered a title and an empty progress bar and nothing else. Step
+// 0 ("not started") is shown as step 1.
+const currentStep = computed(() => Math.min(3, Math.max(1, onboardingStore.step)));
+
 const addEditDialog = ref<InstanceType<typeof AddEditPipeDialog> | null>(null);
 
 onMounted(async () => {
   await onboardingStore.fetchOnboarding();
+  // Step 1's "installed?" check reads installedPackages, which nothing on
+  // this view used to populate -- on a direct visit it always claimed
+  // snapserver was missing.
+  systemStore.checkInstalled('snapserver');
   if (pipeSourcesStore.pipes.length === 0) {
     await pipeSourcesStore.fetchPipes();
   }
-  if (onboardingStore.step === 2 && pipeSourcesStore.pipes.length === 0) {
+  if (currentStep.value === 2 && pipeSourcesStore.pipes.length === 0) {
     addEditDialog.value?.openAdd();
   }
 });
@@ -48,7 +58,7 @@ onMounted(async () => {
 // ref isn't populated until Vue has re-rendered for the new step -- a
 // default (pre-flush) watcher callback would run before that DOM update and
 // find `addEditDialog.value` still null.
-watch(() => onboardingStore.step, (step) => {
+watch(currentStep, (step) => {
   if (step === 2 && pipeSourcesStore.pipes.length === 0) {
     addEditDialog.value?.openAdd();
   }
@@ -113,59 +123,95 @@ async function skip() {
 <template>
   <Layout>
     <JobLogPanel />
-    <div class="max-w-2xl mx-auto py-12 space-y-8">
-      <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-black text-text-main">{{ t('onboarding.getStarted') }}</h1>
-        <button @click="skip" class="text-xs font-bold text-text-muted hover:text-text-main uppercase tracking-widest">
+    <div class="max-w-2xl mx-auto sm:py-6 space-y-6">
+      <div class="flex items-center justify-between gap-4">
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-text-main">{{ t('onboarding.getStarted') }}</h1>
+        <button @click="skip" class="text-sm font-medium text-text-muted hover:text-text-main">
           {{ t('onboarding.skip') }}
         </button>
       </div>
 
-      <div class="flex items-center gap-2" :aria-label="t('onboarding.progressLabel')">
-        <div v-for="n in 3" :key="n" class="flex-1 h-1 rounded-full"
-             :class="onboardingStore.step >= n ? 'bg-brand-primary' : 'bg-black/10 dark:bg-white/10'"></div>
-      </div>
+      <!-- Stepper (was three unlabeled bars) -->
+      <ol class="grid grid-cols-3 gap-2" :aria-label="t('onboarding.progressLabel')">
+        <li v-for="n in 3" :key="n" class="flex flex-col gap-2" :aria-current="currentStep === n ? 'step' : undefined">
+          <span class="h-1 rounded-full" :class="currentStep >= n ? 'bg-brand-primary' : 'bg-line'"></span>
+          <span class="flex items-center gap-1.5 text-xs font-medium" :class="currentStep === n ? 'text-text-main' : 'text-text-muted'">
+            <span
+              class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold flex-shrink-0"
+              :class="currentStep > n ? 'bg-success/15 text-success' : currentStep === n ? 'bg-brand-primary text-white' : 'bg-inset text-text-muted border border-line'"
+            >
+              <span v-if="currentStep > n" class="material-symbols-outlined text-[14px]" aria-hidden="true">check</span>
+              <template v-else>{{ n }}</template>
+            </span>
+            <span class="truncate">{{ t(`onboarding.stepShort${n}`) }}</span>
+          </span>
+        </li>
+      </ol>
 
-      <div v-if="onboardingStore.step === 1" class="space-y-4">
-        <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step1Title') }}</h2>
-        <p class="text-sm text-text-muted">{{ t('onboarding.step1Description') }}</p>
-        <div v-if="!step1Done">
-          <Button :loading="systemStore.loading" @click="handleInstallSnapserver">{{ t('onboarding.installSnapserver') }}</Button>
-        </div>
-        <div v-else class="space-y-3">
-          <p class="text-sm text-[#00ff9d]">{{ t('onboarding.step1Complete') }}</p>
-          <Button @click="advanceTo(2)">{{ t('onboarding.next') }}</Button>
-        </div>
-      </div>
+      <section class="rounded-2xl border border-line bg-brand-surface/80 p-5 sm:p-6 shadow-sm space-y-4">
+        <template v-if="currentStep === 1">
+          <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step1Title') }}</h2>
+          <p class="text-sm text-text-muted">{{ t('onboarding.step1Description') }}</p>
+          <div v-if="!step1Done">
+            <Button :loading="systemStore.loading" @click="handleInstallSnapserver">{{ t('onboarding.installSnapserver') }}</Button>
+          </div>
+          <div v-else class="space-y-4">
+            <p class="flex items-center gap-2 text-sm text-success">
+              <span class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">check_circle</span>
+              {{ t('onboarding.step1Complete') }}
+            </p>
+            <Button @click="advanceTo(2)">{{ t('onboarding.next') }}</Button>
+          </div>
+        </template>
 
-      <div v-else-if="onboardingStore.step === 2" class="space-y-4">
-        <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step2Title') }}</h2>
-        <p v-if="step2Done" class="text-sm text-text-muted">
-          {{ t('onboarding.step2AlreadyHave', { count: pipeSourcesStore.pipes.length }) }}
-        </p>
-        <Button v-if="step2Done" @click="advanceTo(3)">{{ t('onboarding.next') }}</Button>
-        <AddEditPipeDialog ref="addEditDialog" @saved="handlePipeSaved" />
-      </div>
+        <template v-else-if="currentStep === 2">
+          <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step2Title') }}</h2>
+          <template v-if="step2Done">
+            <p class="text-sm text-text-muted">
+              {{ t('onboarding.step2AlreadyHave', { count: pipeSourcesStore.pipes.length }) }}
+            </p>
+            <Button @click="advanceTo(3)">{{ t('onboarding.next') }}</Button>
+          </template>
+          <!-- Closing the dialog used to leave this step with no way to
+               reopen it. -->
+          <template v-else>
+            <p class="text-sm text-text-muted">{{ t('onboarding.step2Description') }}</p>
+            <Button @click="addEditDialog?.openAdd()">
+              <span class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">add</span>
+              {{ t('onboarding.addSourceButton') }}
+            </Button>
+          </template>
+          <AddEditPipeDialog ref="addEditDialog" @saved="handlePipeSaved" />
+        </template>
 
-      <div v-else-if="onboardingStore.step === 3" class="space-y-4">
-        <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step3Title') }}</h2>
-        <div v-if="!firstGroupWithClient" class="space-y-2">
-          <p class="text-sm text-text-muted">
-            {{ t('onboarding.step3Waiting') }}
-          </p>
-        </div>
-        <div v-else class="space-y-3">
-          <p class="text-sm text-text-muted">
-            {{ t('onboarding.step3ZoneReady', { zoneName: zoneDisplayName }) }}
-          </p>
-          <Select
-            :model-value="firstGroupWithClient.stream_id"
-            :options="streamSelectOptions"
-            :placeholder="t('onboarding.chooseSourcePlaceholder')"
-            @update:model-value="handleZoneAssignment"
-          />
-        </div>
-      </div>
+        <template v-else-if="currentStep === 3">
+          <h2 class="text-lg font-bold text-text-main">{{ t('onboarding.step3Title') }}</h2>
+          <div v-if="!firstGroupWithClient" class="space-y-3">
+            <p class="flex items-start gap-2.5 text-sm text-text-muted">
+              <span class="relative mt-1.5 flex h-2 w-2 flex-shrink-0" aria-hidden="true">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-primary opacity-60"></span>
+                <span class="relative inline-flex h-2 w-2 rounded-full bg-brand-primary"></span>
+              </span>
+              {{ t('onboarding.step3Waiting') }}
+            </p>
+            <router-link to="/client" class="inline-flex items-center gap-1 text-sm font-semibold text-brand-primary-text hover:underline">
+              {{ t('onboarding.useLocalClient') }}
+              <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">arrow_forward</span>
+            </router-link>
+          </div>
+          <div v-else class="space-y-3">
+            <p class="text-sm text-text-muted">
+              {{ t('onboarding.step3ZoneReady', { zoneName: zoneDisplayName }) }}
+            </p>
+            <Select
+              :model-value="firstGroupWithClient.stream_id"
+              :options="streamSelectOptions"
+              :placeholder="t('onboarding.chooseSourcePlaceholder')"
+              @update:model-value="handleZoneAssignment"
+            />
+          </div>
+        </template>
+      </section>
     </div>
   </Layout>
 </template>

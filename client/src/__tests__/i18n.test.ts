@@ -70,7 +70,7 @@ describe('real i18n singleton has all namespaces registered', () => {
 
     i18n.global.locale.value = 'es';
     expect(i18n.global.t('login.title')).toBe('Snapcast Manager');
-    expect(i18n.global.t('login.signIn')).toBe('Iniciar Sesión');
+    expect(i18n.global.t('login.signIn')).toBe('Iniciar sesión');
   });
 
   it.each(['en', 'es'] as const)('resolves setup.title for locale "%s" (not the raw key)', (locale) => {
@@ -80,12 +80,12 @@ describe('real i18n singleton has all namespaces registered', () => {
 
   it('resolves setup.title and setup.submit to the correct translated string per locale', () => {
     i18n.global.locale.value = 'en';
-    expect(i18n.global.t('setup.title')).toBe('System Ignition');
-    expect(i18n.global.t('setup.submit')).toBe('Complete Setup & Launch');
+    expect(i18n.global.t('setup.title')).toBe('Welcome to Snapcast Manager');
+    expect(i18n.global.t('setup.submit')).toBe('Create account');
 
     i18n.global.locale.value = 'es';
-    expect(i18n.global.t('setup.title')).toBe('Ignición del Sistema');
-    expect(i18n.global.t('setup.submit')).toBe('Completar Configuración y Lanzar');
+    expect(i18n.global.t('setup.title')).toBe('Bienvenido a Snapcast Manager');
+    expect(i18n.global.t('setup.submit')).toBe('Crear cuenta');
   });
 
   it.each(['en', 'es'] as const)('resolves onboarding.step1Title for locale "%s" (not the raw key)', (locale) => {
@@ -126,14 +126,14 @@ describe('real i18n singleton has all namespaces registered', () => {
     expect(i18n.global.t('dashboard.headerTitle')).not.toBe('dashboard.headerTitle');
   });
 
-  it('resolves dashboard.headerTitle and dashboard.syncAllButton to the correct translated string per locale', () => {
+  it('resolves dashboard.headerTitle and dashboard.refreshButton to the correct translated string per locale', () => {
     i18n.global.locale.value = 'en';
-    expect(i18n.global.t('dashboard.headerTitle')).toBe('System Dashboard');
-    expect(i18n.global.t('dashboard.syncAllButton')).toBe('SYNC ALL');
+    expect(i18n.global.t('dashboard.headerTitle')).toBe('Dashboard');
+    expect(i18n.global.t('dashboard.refreshButton')).toBe('Refresh');
 
     i18n.global.locale.value = 'es';
-    expect(i18n.global.t('dashboard.headerTitle')).toBe('Panel del Sistema');
-    expect(i18n.global.t('dashboard.syncAllButton')).toBe('SINCRONIZAR TODO');
+    expect(i18n.global.t('dashboard.headerTitle')).toBe('Panel');
+    expect(i18n.global.t('dashboard.refreshButton')).toBe('Actualizar');
   });
 
   // Named interpolation (Task 56 CRITICAL note): proves the real singleton
@@ -141,9 +141,9 @@ describe('real i18n singleton has all namespaces registered', () => {
   // Task 55's onboarding.step3ZoneReady proof above.
   it('resolves dashboard.newVersionAvailable with named interpolation per locale', () => {
     i18n.global.locale.value = 'en';
-    expect(i18n.global.t('dashboard.newVersionAvailable', { version: '1.2.3' })).toBe('NEW VERSION: 1.2.3');
+    expect(i18n.global.t('dashboard.newVersionAvailable', { version: '1.2.3' })).toBe('New version: 1.2.3');
 
     i18n.global.locale.value = 'es';
-    expect(i18n.global.t('dashboard.newVersionAvailable', { version: '1.2.3' })).toBe('NUEVA VERSIÓN: 1.2.3');
+    expect(i18n.global.t('dashboard.newVersionAvailable', { version: '1.2.3' })).toBe('Nueva versión: 1.2.3');
   });
 });

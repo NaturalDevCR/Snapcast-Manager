@@ -97,14 +97,14 @@ describe('Dashboard.vue', () => {
   // in both locales.
   it('renders English copy by default across the header and service cards (i18n)', async () => {
     const wrapper = await mountSmokeTest(Dashboard, '/');
-    expect(wrapper.text()).toContain('System Dashboard');
-    expect(wrapper.text()).toContain('Manage and monitor your Snapcast infrastructure.');
-    expect(wrapper.text()).toContain('SYNC ALL');
-    expect(wrapper.text()).toContain('Core System Services');
+    expect(wrapper.text()).toContain('Dashboard');
+    expect(wrapper.text()).toContain('Live status of your Snapcast server, zones and services.');
+    expect(wrapper.text()).toContain('Refresh');
+    expect(wrapper.text()).toContain('Services');
     // Default store state: no packages installed -- these "Install X"
     // buttons are the ones guaranteed to render without further store setup.
     expect(wrapper.text()).toContain('Install Snapserver');
-    expect(wrapper.text()).toContain('Audio Plugins & Remotes');
+    expect(wrapper.text()).toContain('Install MPD');
     expect(wrapper.text()).toContain('Install FFmpeg');
     expect(wrapper.text()).toContain('Install AirPlay');
   });
@@ -114,12 +114,12 @@ describe('Dashboard.vue', () => {
     useUIStore().setLocale('es');
     await nextTick();
 
-    expect(wrapper.text()).toContain('Panel del Sistema');
-    expect(wrapper.text()).toContain('Administra y monitorea tu infraestructura Snapcast.');
-    expect(wrapper.text()).toContain('SINCRONIZAR TODO');
-    expect(wrapper.text()).toContain('Servicios Principales del Sistema');
+    expect(wrapper.text()).toContain('Panel');
+    expect(wrapper.text()).toContain('Estado en vivo de tu servidor Snapcast, zonas y servicios.');
+    expect(wrapper.text()).toContain('Actualizar');
+    expect(wrapper.text()).toContain('Servicios');
     expect(wrapper.text()).toContain('Instalar Snapserver');
-    expect(wrapper.text()).toContain('Plugins de Audio y Controles Remotos');
+    expect(wrapper.text()).toContain('Instalar MPD');
     expect(wrapper.text()).toContain('Instalar FFmpeg');
     expect(wrapper.text()).toContain('Instalar AirPlay');
   });
@@ -131,11 +131,11 @@ describe('Dashboard.vue', () => {
     systemStore.packageVersions.snapserver = '1.0.0';
     systemStore.availableVersions.snapserver = '1.2.3';
     await nextTick();
-    expect(wrapper.text()).toContain('NEW VERSION: 1.2.3');
+    expect(wrapper.text()).toContain('New version: 1.2.3');
 
     useUIStore().setLocale('es');
     await nextTick();
-    expect(wrapper.text()).toContain('NUEVA VERSIÓN: 1.2.3');
+    expect(wrapper.text()).toContain('Nueva versión: 1.2.3');
   });
 
   // --- Health panel (Task 58) --------------------------------------------
@@ -229,6 +229,7 @@ describe('Dashboard.vue', () => {
 
       expect(wrapper.text()).toContain('All clear');
       const link = wrapper
+        .find('main')
         .findAll('a, router-link-stub')
         .find((el) => el.attributes('to') === '/diagnostics' || el.attributes('href') === '/diagnostics');
       expect(link).toBeFalsy();
@@ -249,6 +250,7 @@ describe('Dashboard.vue', () => {
       expect(wrapper.text()).not.toContain('All clear');
       expect(wrapper.text()).toContain("Couldn't check");
       const link = wrapper
+        .find('main')
         .findAll('a, router-link-stub')
         .find((el) => el.attributes('to') === '/diagnostics' || el.attributes('href') === '/diagnostics');
       expect(link, 'the "couldn\'t check" state should still link to /diagnostics').toBeTruthy();
@@ -266,6 +268,7 @@ describe('Dashboard.vue', () => {
 
       expect(wrapper.text()).toContain('3 issues found');
       const link = wrapper
+        .find('main')
         .findAll('a, router-link-stub')
         .find((el) => el.attributes('to') === '/diagnostics' || el.attributes('href') === '/diagnostics');
       expect(link, 'expected a link to /diagnostics').toBeTruthy();

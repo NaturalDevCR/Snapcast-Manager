@@ -10,8 +10,14 @@
   "step2Title": "2. Agrega tu primera fuente",
   "step2AlreadyHave": "Ya tienes {count} fuente(s) configurada(s).",
   "step3Title": "3. Asigna tu primera zona",
-  "step3Waiting": "Esperando que se conecte un cliente. Conecta un dispositivo snapclient físico en tu red, o usa el modo Cliente local de esta aplicación -- esta página se actualiza automáticamente en cuanto aparezca uno.",
+  "step3Waiting": "Esperando que se conecte un cliente (un parlante con snapclient). Esta página se actualiza sola en cuanto aparezca uno.",
   "step3ZoneReady": "{zoneName} está lista. Elige una fuente para ella:",
   "zoneFallbackName": "Zona {id}",
-  "chooseSourcePlaceholder": "Elige una fuente"
+  "chooseSourcePlaceholder": "Elige una fuente",
+  "stepShort1": "Instalar servidor",
+  "stepShort2": "Agregar fuente",
+  "stepShort3": "Asignar zona",
+  "step2Description": "Una fuente es de donde viene el audio: una radio por internet o tu biblioteca de MPD.",
+  "addSourceButton": "Agregar una fuente",
+  "useLocalClient": "Usar este equipo como parlante"
 }

@@ -8,5 +8,6 @@
   "manager": "Manager",
   "mpd": "MPD",
   "consoleOutput": "Console Output",
-  "fetchFailed": "Failed to fetch logs"
+  "fetchFailed": "Failed to fetch logs",
+  "empty": "No log entries for this service yet."
 }

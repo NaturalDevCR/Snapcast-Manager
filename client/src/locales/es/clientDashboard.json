@@ -1,7 +1,7 @@
 {
   "title": "Panel de Clientes",
   "subtitle": "Administra instancias de receptor de audio Snapclient.",
-  "syncAll": "SINCRONIZAR TODO",
+  "syncAll": "Actualizar",
   "syncing": "Sincronizando...",
   "snapclientPackage": "Paquete Snapclient",
   "snapclient": "Snapclient",
@@ -9,8 +9,8 @@
   "yes": "SÍ",
   "no": "NO",
   "version": "Versión",
-  "newVersion": "NUEVA VERSIÓN: {version}",
-  "upToDate": "ACTUALIZADO",
+  "newVersion": "Nueva versión: {version}",
+  "upToDate": "Al día",
   "installUpdate": "Instalar Actualización",
   "cleanReinstall": "Reinstalación Limpia",
   "uninstall": "Desinstalar",
@@ -66,5 +66,7 @@
   "snapclientUpdated": "¡snapclient actualizado correctamente!",
   "failedToast": "Error: ",
   "snapclientUninstalled": "¡snapclient desinstalado correctamente!",
-  "alsaError": "Error de ALSA: "
+  "alsaError": "Error de ALSA: ",
+  "snapclientDescription": "Reproduce un stream de Snapcast por la tarjeta de sonido de este equipo. Usa una instancia por salida de audio.",
+  "outputInstancesDescription": "Cada instancia envía un stream de snapserver a una tarjeta de sonido."
 }

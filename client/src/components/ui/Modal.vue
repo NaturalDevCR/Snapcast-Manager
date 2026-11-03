@@ -81,7 +81,7 @@ const panelClasses = computed(() => [
           >
             <DialogPanel :class="panelClasses">
               <div class="flex items-start gap-3" :class="title ? 'mb-4' : 'mb-2'">
-                <DialogTitle v-if="title" as="h3" class="text-lg font-black text-text-main pr-2">
+                <DialogTitle v-if="title" as="h3" class="text-lg font-semibold text-text-main pr-2">
                   {{ title }}
                 </DialogTitle>
                 <button
