@@ -8,6 +8,35 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.4.0] - 2026-11-03
+
+### 🚀 Features
+
+- *(ui)* Design tokens, sidebar navigation and shared UI primitives
+- *(dashboard)* Restructure around status, live data and unified service cards
+- *(routing)* Clearer zones, member-based names for unnamed groups, offline state
+- *(ui)* Unified page headers, readable server config, theme-safe surfaces
+- *(ui)* Sentence-case typography sweep, theme-safe Tools/Logs, client ServiceCard
+- *(onboarding)* Labelled stepper, reopenable add-source step, local-client hint
+
+### 🐛 Bug Fixes
+
+- *(security)* Patch vulnerable dependencies and harden repo config
+- *(ui)* Render missing watchdog and pipe-source controls; working delete confirm
+- *(ui)* Logs no longer spin forever on error/empty; clearer security forms
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.3.13
+
+### 🎨 Styling
+
+- *(ui)* Map remaining raw palette colors to semantic tokens; wrap stat values on mobile
+
+### ⚙️ Miscellaneous Tasks
+
+- *(ui)* Drop new any types, format new components, brand-color pipe dialog submit
+- Bump version to v0.4.0
 ## [0.3.13] - 2026-10-07
 
 ### 🐛 Bug Fixes
