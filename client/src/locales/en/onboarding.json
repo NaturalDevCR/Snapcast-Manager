@@ -10,8 +10,14 @@
   "step2Title": "2. Add your first source",
   "step2AlreadyHave": "You already have {count} source(s) configured.",
   "step3Title": "3. Assign your first zone",
-  "step3Waiting": "Waiting for a client to connect. Connect a physical snapclient device on your network, or use this app's own local Client mode -- this page updates automatically once one appears.",
+  "step3Waiting": "Waiting for a client (a speaker running snapclient) to connect. This page updates on its own as soon as one appears.",
   "step3ZoneReady": "{zoneName} is ready. Pick a source for it:",
   "zoneFallbackName": "Zone {id}",
-  "chooseSourcePlaceholder": "Choose a source"
+  "chooseSourcePlaceholder": "Choose a source",
+  "stepShort1": "Install server",
+  "stepShort2": "Add a source",
+  "stepShort3": "Assign a zone",
+  "step2Description": "A source is where audio comes from — an internet radio stream or your MPD library.",
+  "addSourceButton": "Add a source",
+  "useLocalClient": "Use this device as a speaker"
 }
