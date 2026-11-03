@@ -3,6 +3,9 @@ import Layout from '../components/Layout.vue';
 import Badge from '../components/ui/Badge.vue';
 import Select from '../components/ui/Select.vue';
 import Skeleton from '../components/ui/Skeleton.vue';
+import PageHeader from '../components/ui/PageHeader.vue';
+import Button from '../components/ui/Button.vue';
+import EmptyState from '../components/ui/EmptyState.vue';
 import { useSnapcastStore } from '../stores/snapcast';
 import { useEventSource } from '../composables/useEventSource';
 import { sseStatusBadge } from '../utils/sseStatus';
@@ -292,11 +295,21 @@ const getStreamLabel = (stream: any) => {
     return stream.id || t('routing.unknownStream');
 };
 
+// Unnamed snapserver groups used to render as "Zone g-be" (a slice of the
+// opaque group id). Snapcast's own clients name an unnamed group after its
+// members, which is what people actually recognise -- do the same, and only
+// fall back to the id when the group has no clients at all.
 const getZoneLabel = (group: any) => {
     const name = group?.name;
     if (name) return name;
+    const memberNames = (group?.clients || [])
+        .map((c: any) => c.config?.name || c.host?.name)
+        .filter(Boolean);
+    if (memberNames.length) return memberNames.join(' + ');
     return t('routing.zoneFallback', { id: (group?.id || '').slice(0, 4) });
 };
+
+const onlineCount = (group: any) => (group?.clients || []).filter((c: any) => c.connected).length;
 
 // Task 34: keyboard/screen-reader-usable alternative to the mouse/touch
 // "cable" drag gesture above. Every zone gets a <Select> listing all
@@ -364,28 +377,18 @@ const updateVolume = (client: any, event: Event) => {
 
 <template>
   <Layout>
-    <div class="space-y-8 pb-12 w-full max-w-[1600px] mx-auto overflow-x-hidden">
-      <!-- Page Header -->
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-brand-surface/40 backdrop-blur-3xl border border-black/[0.03] dark:border-white/[0.03] p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
-        <div class="absolute inset-0 bg-gradient-to-r from-brand-primary/5 to-transparent pointer-events-none"></div>
-        <div class="relative z-10 flex items-center space-x-4">
-            <div class="p-4 bg-brand-primary/10 rounded-2xl border border-brand-primary/20 shadow-lg shadow-brand-primary/20 group-hover:shadow-xl group-hover:shadow-brand-primary/40 transition-all duration-500">
-                <span class="material-symbols-outlined text-brand-primary text-3xl">hub</span>
-            </div>
-            <div>
-                <div class="flex items-center gap-3">
-                    <h1 class="text-3xl font-black text-text-main tracking-tight">{{ t('routing.title') }}</h1>
-                    <Badge :variant="sseStatusBadge(sse.status.value).variant" size="sm">{{ sseStatusBadge(sse.status.value).label }}</Badge>
-                </div>
-                <p class="text-[10px] text-text-muted font-black uppercase tracking-[0.3em] mt-1">{{ t('routing.subtitle') }}</p>
-            </div>
-        </div>
-        <button @click="snapcastStore.fetchStatus()" :disabled="snapcastStore.loading"
-                class="px-6 py-3 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-text-main rounded-2xl text-xs font-black border border-black/[0.05] dark:border-white/[0.05] backdrop-blur-xl transition-all active:scale-95 flex items-center gap-3 group/btn shadow-xl z-20">
-            <span class="material-symbols-outlined text-sm group-hover/btn:rotate-180 transition-transform duration-700" :class="{'animate-spin': snapcastStore.loading}">refresh</span>
+    <div class="pb-12 w-full overflow-x-hidden">
+      <PageHeader :title="t('routing.title')" :description="t('routing.subtitle')">
+        <template #badge>
+          <Badge :variant="sseStatusBadge(sse.status.value).variant" size="sm">{{ sseStatusBadge(sse.status.value).label }}</Badge>
+        </template>
+        <template #actions>
+          <Button variant="subtle" :loading="snapcastStore.loading" @click="snapcastStore.fetchStatus()">
+            <span v-if="!snapcastStore.loading" class="material-symbols-outlined text-[1.1rem]" aria-hidden="true">refresh</span>
             {{ t('routing.resync') }}
-        </button>
-      </div>
+          </Button>
+        </template>
+      </PageHeader>
 
       <!-- Loading / Empty States -->
       <!-- Task 35: shaped like the two-column Sources/Zones matrix it's
@@ -404,9 +407,8 @@ const updateVolume = (client: any, event: Event) => {
           <Skeleton v-for="n in 2" :key="n" variant="rect" height="96px" />
         </div>
       </div>
-      <div v-else-if="!snapcastStore.loading && (!snapcastStore.status || snapcastStore.status.groups.length === 0)" class="flex flex-col items-center justify-center py-24 text-white/10 glass rounded-[3rem]">
-        <span class="material-symbols-outlined text-6xl mb-4">settings_input_component</span>
-        <span class="text-xs font-black uppercase tracking-[0.3em]">{{ t('routing.noClusters') }}</span>
+      <div v-else-if="!snapcastStore.loading && (!snapcastStore.status || snapcastStore.status.groups.length === 0)" class="rounded-2xl border border-dashed border-line bg-brand-surface/50">
+        <EmptyState icon="speaker_group" :title="t('routing.noClusters')" :description="t('routing.noClustersHint')" />
       </div>
 
       <!-- Interactive Matrix -->
@@ -440,31 +442,31 @@ const updateVolume = (client: any, event: Event) => {
                   class="cable-animated opacity-100 pointer-events-none" />
          </svg>
          
-         <div class="relative z-20 flex flex-col lg:flex-row gap-8 lg:gap-16 xl:gap-24 w-full px-2 sm:px-4">
+         <div class="relative z-20 flex flex-col lg:flex-row gap-8 lg:gap-16 xl:gap-20 w-full lg:px-4">
              
              <!-- SOURCES COLUMN (Left) -->
-             <div class="w-full lg:w-1/2 flex flex-col gap-4">
-                 <h2 class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 flex items-center gap-2 px-2">
-                    <span class="material-symbols-outlined text-sm">input</span> {{ t('routing.virtualSources') }}
+             <div class="w-full lg:w-1/2 flex flex-col gap-3 order-2 lg:order-1">
+                 <h2 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1 flex items-center gap-2 px-1">
+                    <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">input</span> {{ t('routing.virtualSources') }}
                  </h2>
                  <div v-for="stream in snapcastStore.status?.streams || []" :key="stream.id"
-                      class="bg-brand-surface/80 backdrop-blur-xl border rounded-[1.5rem] p-4 flex items-center justify-between shadow-lg transition-all duration-300 relative group/source"
-                      :class="[stream.status === 'playing' ? 'border-brand-primary/30' : 'border-black/5 dark:border-white/5']"
+                      class="bg-brand-surface/80 backdrop-blur-xl border rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all duration-300 relative group/source"
+                      :class="[stream.status === 'playing' ? 'border-brand-primary/30' : 'border-line']"
                       :style="`--stream-color: ${getStreamColor(stream.id)}`">
                       
                       <!-- Left side info -->
                       <div class="flex items-center gap-4 overflow-hidden">
-                         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-black/5 dark:border-white/5 flex items-center justify-center shrink-0">
+                         <div class="w-10 h-10 rounded-xl bg-inset border border-line flex items-center justify-center shrink-0">
                            <span class="material-symbols-outlined text-lg opacity-80" :style="{ color: getStreamColor(stream.id) }">cast</span>
                          </div>
                          <div class="truncate pr-4 flex flex-col justify-center">
-                             <div class="font-bold text-text-main text-[15px] truncate items-center flex gap-2">
+                             <div class="font-semibold text-text-main text-sm truncate items-center flex gap-2">
                                 {{ getStreamLabel(stream) }}
                                 <div class="w-2 h-2 rounded-full shrink-0 transition-all duration-500"
                                      :class="stream.status === 'playing' ? 'animate-pulse' : 'opacity-40'"
                                      :style="{ backgroundColor: getStreamColor(stream.id) }"></div>
                              </div>
-                             <div class="text-[10px] font-bold text-text-muted mt-0.5 truncate uppercase tracking-widest">{{ stream.status }}</div>
+                             <div class="text-xs text-text-muted mt-0.5 truncate">{{ stream.status === 'playing' ? t('routing.playing') : t('routing.idle') }}</div>
                          </div>
                       </div>
                       
@@ -490,17 +492,17 @@ const updateVolume = (client: any, event: Event) => {
               </div>
              
              <!-- ZONES COLUMN (Right) -->
-             <div class="w-full lg:w-1/2 flex flex-col gap-4 mt-8 lg:mt-0">
-                 <h2 class="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 flex items-center gap-2 px-2">
-                    <span class="material-symbols-outlined text-sm">speaker_group</span> {{ t('routing.outputZones') }}
+             <div class="w-full lg:w-1/2 flex flex-col gap-3 order-1 lg:order-2">
+                 <h2 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1 flex items-center gap-2 px-1">
+                    <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">speaker_group</span> {{ t('routing.outputZones') }}
                  </h2>
                  
                  <div v-for="group in snapcastStore.status?.groups || []" :key="group.id"
                       :ref="setZoneCardRef(group.id)"
-                      class="bg-brand-surface/80 backdrop-blur-3xl border rounded-[1.5rem] shadow-xl transition-all duration-500 relative flex flex-col group/zone"
+                      class="bg-brand-surface/80 backdrop-blur-xl border rounded-2xl shadow-sm transition-all duration-300 relative flex flex-col group/zone"
                       :class="[
-                         hoverZoneId === group.id ? 'border-brand-primary bg-brand-primary/5 scale-[1.02] z-20' : 'border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10',
-                         !group.stream_id ? 'border-red-500/20 shadow-red-500/5' : ''
+                         hoverZoneId === group.id ? 'border-brand-primary bg-brand-primary/5 scale-[1.02] z-20' : 'border-line',
+                         !group.stream_id ? 'border-warning/40' : ''
                       ]">
                       
                       <!-- Input Connector Node (Drop Target) -->
@@ -519,52 +521,57 @@ const updateVolume = (client: any, event: Event) => {
                       </div>
                       
                       <!-- Zone Header -->
-                      <div class="p-4 flex items-center justify-between gap-4 cursor-pointer min-h-[72px]" @click="toggleGroup(group.id)">
-                          <div class="w-2 h-2 rounded-full absolute opacity-0"></div> <!-- spacing component -->
+                      <div class="p-4 flex items-center justify-between gap-3 cursor-pointer min-h-[72px]" @click="toggleGroup(group.id)">
                           <!-- Identity -->
-                          <div class="flex items-center gap-4 ml-6 overflow-hidden">
-                              <div class="truncate">
-                                  <h3 class="text-base font-black text-text-main tracking-tight flex items-center gap-3 truncate">
-                                    <!-- Zone name: inline edit on click -->
-                                    <div v-if="renamingGroupId === group.id" class="flex items-center gap-2" @click.stop>
-                                        <input
-                                          type="text"
-                                          v-model="newGroupName"
-                                          @keyup.enter="submitGroupRename(group.id)"
-                                          @keyup.esc="renamingGroupId = null"
-                                          @blur="submitGroupRename(group.id)"
-                                          class="bg-brand-surface border border-brand-primary/50 outline-none rounded-lg px-2 py-1 text-sm text-text-main focus:ring-2 focus:ring-brand-primary/30 w-40 transition-all"
-                                          v-focus
-                                        />
-                                    </div>
-                                    <div v-else class="flex items-center gap-2 group/zonename cursor-pointer" @click.stop="startGroupRename(group.id, getZoneLabel(group), $event)">
-                                        <span class="truncate">{{ getZoneLabel(group) }}</span>
-                                        <span class="material-symbols-outlined text-[13px] text-text-muted opacity-0 group-hover/zonename:opacity-100 transition-all">edit</span>
-                                    </div>
-                                    <span v-if="group.stream_id" class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-black/10 dark:bg-white/10 shrink-0" :style="{ color: getStreamColor(group.stream_id) }">
-                                        {{ getStreamLabel(snapcastStore.status?.streams?.find(s => s.id === group.stream_id) || {}) }}
-                                    </span>
+                          <div class="flex items-center gap-3 lg:ml-6 min-w-0">
+                              <div class="min-w-0">
+                                  <div v-if="renamingGroupId === group.id" class="flex items-center gap-2" @click.stop>
+                                      <input
+                                        type="text"
+                                        v-model="newGroupName"
+                                        :aria-label="t('routing.renameZone', { name: getZoneLabel(group) })"
+                                        @keyup.enter="submitGroupRename(group.id)"
+                                        @keyup.esc="renamingGroupId = null"
+                                        @blur="submitGroupRename(group.id)"
+                                        class="bg-brand-surface border border-brand-primary/50 outline-none rounded-lg px-2 py-1 text-sm text-text-main focus:ring-2 focus:ring-brand-primary/30 w-48"
+                                        v-focus
+                                      />
+                                  </div>
+                                  <h3 v-else class="text-sm font-bold text-text-main flex items-center gap-1.5 min-w-0">
+                                      <span class="truncate" :class="group.name ? '' : 'italic font-semibold'">{{ getZoneLabel(group) }}</span>
+                                      <button
+                                        type="button"
+                                        class="w-7 h-7 flex items-center justify-center rounded-md text-text-muted hover:text-text-main hover:bg-inset opacity-60 group-hover/zone:opacity-100 focus:opacity-100 shrink-0"
+                                        :aria-label="t('routing.renameZone', { name: getZoneLabel(group) })"
+                                        @click.stop="startGroupRename(group.id, group.name || '', $event)"
+                                      >
+                                          <span class="material-symbols-outlined text-[15px]" aria-hidden="true">edit</span>
+                                      </button>
                                   </h3>
-                                  <p class="text-[9px] font-black text-text-muted mt-0.5 uppercase tracking-[0.1em]">
-                                      <i18n-t keypath="routing.destinationsCount">
-                                          <template #count>{{ group.clients.length }}</template>
-                                      </i18n-t>
+                                  <p class="text-xs text-text-muted flex items-center gap-1.5">
+                                      <span class="w-1.5 h-1.5 rounded-full" :class="onlineCount(group) === group.clients.length ? 'bg-success' : onlineCount(group) === 0 ? 'bg-danger' : 'bg-warning'" aria-hidden="true"></span>
+                                      {{ t('routing.speakersOnline', { online: onlineCount(group), total: group.clients.length }) }}
                                   </p>
                               </div>
                           </div>
-                          
+
                           <!-- Group Controls -->
-                          <div class="flex items-center gap-2 shrink-0">
+                          <div class="flex items-center gap-1 shrink-0">
                             <button @click.stop="snapcastStore.setGroupMute(group.id, !group.muted)"
-                                    class="w-10 h-10 rounded-xl transition-all duration-300 border flex items-center justify-center group/mute shadow-md shrink-0"
-                                    :class="group.muted ? 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' : 'bg-brand-surface text-text-muted border-black/5 dark:border-white/5 hover:text-text-main hover:border-black/10 dark:hover:border-white/10'"
+                                    class="w-10 h-10 rounded-lg transition-colors border flex items-center justify-center shrink-0"
+                                    :class="group.muted ? 'bg-danger/10 text-danger border-danger/20 hover:bg-danger/15' : 'text-text-muted border-transparent hover:text-text-main hover:bg-inset'"
+                                    :aria-pressed="group.muted"
                                     :aria-label="group.muted ? t('routing.unmuteZone', { name: getZoneLabel(group) }) : t('routing.muteZone', { name: getZoneLabel(group) })">
-                                <span class="material-symbols-outlined text-sm transition-transform group-hover/mute:scale-110">{{ group.muted ? 'volume_off' : 'volume_up' }}</span>
+                                <span class="material-symbols-outlined text-[1.2rem]" aria-hidden="true">{{ group.muted ? 'volume_off' : 'volume_up' }}</span>
                             </button>
-                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-text-muted transition-transform duration-300"
-                                 :class="{'rotate-180': expandedGroups.has(group.id)}">
-                                <span class="material-symbols-outlined">expand_more</span>
-                            </div>
+                            <button
+                                 type="button"
+                                 class="w-10 h-10 rounded-lg flex items-center justify-center text-text-muted hover:text-text-main hover:bg-inset"
+                                 :aria-expanded="expandedGroups.has(group.id)"
+                                 :aria-label="expandedGroups.has(group.id) ? t('routing.hideSpeakers', { name: getZoneLabel(group) }) : t('routing.showSpeakers', { name: getZoneLabel(group) })"
+                                 @click.stop="toggleGroup(group.id)">
+                                <span class="material-symbols-outlined transition-transform duration-300" :class="{'rotate-180': expandedGroups.has(group.id)}" aria-hidden="true">expand_more</span>
+                            </button>
                           </div>
                       </div>
 
@@ -585,8 +592,8 @@ const updateVolume = (client: any, event: Event) => {
                            UI is hidden below the `lg` breakpoint. -->
                       <div class="px-4 pb-4 relative z-10">
                           <label class="flex items-center gap-3 w-full">
-                              <span class="text-[9px] font-black text-text-muted uppercase tracking-[0.15em] shrink-0 flex items-center gap-1.5">
-                                  <span class="material-symbols-outlined text-sm" aria-hidden="true">tune</span>
+                              <span class="text-xs font-medium text-text-muted shrink-0 flex items-center gap-1.5 lg:ml-6">
+                                  <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">input</span>
                                   {{ t('routing.source') }}
                               </span>
                               <span class="flex-1 min-w-0">
@@ -602,13 +609,13 @@ const updateVolume = (client: any, event: Event) => {
 
                       <!-- Clients List (Expanded) -->
                       <transition name="slide">
-                        <div v-if="expandedGroups.has(group.id)" class="bg-black/20 rounded-b-[2rem] p-4 sm:p-6 space-y-2 relative z-10 w-full overflow-hidden transition-all duration-500">
+                        <div v-if="expandedGroups.has(group.id)" class="border-t border-line bg-inset rounded-b-2xl p-3 sm:p-4 space-y-2 relative z-10 w-full overflow-hidden">
                           <div v-for="client in group.clients" :key="client.id" 
-                               class="p-4 rounded-2xl bg-brand-surface/40 backdrop-blur-md border border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10 transition-all duration-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full group/client">
+                               class="p-3 rounded-xl bg-brand-surface border border-line flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full group/client" :class="client.connected ? '' : 'opacity-70'">
                               
                               <!-- Client Detail -->
                               <div class="flex items-center gap-4 min-w-0 w-full lg:w-1/2">
-                                  <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-black/5 dark:border-white/5 flex items-center justify-center shrink-0 transition-colors"
+                                  <div class="w-10 h-10 rounded-xl bg-inset border border-line flex items-center justify-center shrink-0 transition-colors"
                                        :class="client.connected ? 'text-text-main' : 'text-text-muted'">
                                       <span class="material-symbols-outlined text-[20px]">{{ client.config.name ? 'speaker' : 'smartphone' }}</span>
                                   </div>
@@ -626,8 +633,9 @@ const updateVolume = (client: any, event: Event) => {
                                           <span class="material-symbols-outlined text-[14px] text-text-muted opacity-0 group-hover/name:opacity-100 transition-all">edit</span>
                                       </div>
                                       <div class="flex items-center gap-1.5 mt-0.5">
-                                          <div class="w-1.5 h-1.5 rounded-full" :class="client.connected ? 'bg-[#10b981]' : 'bg-red-500'"></div>
-                                          <span class="text-[10px] font-medium text-text-muted truncate tracking-wider uppercase">{{ client.host.ip }}</span>
+                                          <div class="w-1.5 h-1.5 rounded-full" :class="client.connected ? 'bg-success' : 'bg-danger'" aria-hidden="true"></div>
+                                          <span class="text-[11px] text-text-muted truncate font-mono">{{ client.host.ip }}</span>
+                                          <span v-if="!client.connected" class="text-[11px] font-semibold text-danger">· {{ t('routing.offline') }}</span>
                                       </div>
                                   </div>
                               </div>
@@ -635,15 +643,15 @@ const updateVolume = (client: any, event: Event) => {
                               <!-- Volume Controls -->
                               <div class="flex items-center gap-3 w-full sm:w-auto shrink-0 justify-end">
                                   <button @click="snapcastStore.setClientVolume(client.id, { percent: client.config.volume.percent, muted: !client.config.volume.muted })"
-                                          class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl transition-all hover:bg-black/5 dark:hover:bg-white/5 border border-transparent"
-                                          :class="client.config.volume.muted ? 'text-danger bg-danger/10 border-danger/20' : 'text-text-muted hover:text-text-main hover:border-black/10 dark:hover:border-white/10'"
+                                          class="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg transition-colors hover:bg-inset border border-transparent"
+                                          :class="client.config.volume.muted ? 'text-danger bg-danger/10 border-danger/20' : 'text-text-muted hover:text-text-main'"
                                           :aria-label="client.config.volume.muted ? t('routing.unmuteClient', { name: client.config.name || client.host.name || t('routing.client') }) : t('routing.muteClient', { name: client.config.name || client.host.name || t('routing.client') })">
                                       <span class="material-symbols-outlined text-[18px]">{{ client.config.volume.muted ? 'volume_off' : 'volume_up' }}</span>
                                   </button>
                                   <div class="flex items-center gap-3">
-                                      <input type="range" class="w-full sm:w-28 h-2 bg-black/40 shadow-inner rounded-full appearance-none cursor-pointer accent-brand-primary hover:accent-brand-primary/80 transition-all" 
+                                      <input type="range" class="w-full sm:w-32 h-2 bg-line rounded-full appearance-none cursor-pointer accent-brand-primary" :aria-label="t('routing.volumeFor', { name: client.config.name || client.host.name || t('routing.client') })" 
                                              min="0" max="100" v-model="client.config.volume.percent" @change="updateVolume(client, $event)">
-                                      <span class="text-[11px] font-black tracking-wider w-10 text-right" :class="client.config.volume.muted ? 'text-danger' : 'text-text-muted'">
+                                      <span class="text-xs font-medium tabular-nums w-14 text-right" :class="client.config.volume.muted ? 'text-danger' : 'text-text-muted'">
                                           {{ client.config.volume.muted ? t('routing.muted') : client.config.volume.percent + '%' }}
                                       </span>
                                   </div>

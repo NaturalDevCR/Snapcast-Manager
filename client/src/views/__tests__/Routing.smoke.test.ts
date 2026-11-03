@@ -27,8 +27,8 @@ describe('Routing.vue', () => {
     const snapcastStore = useSnapcastStore();
     const fetchSpy = vi.spyOn(snapcastStore, 'fetchStatus');
 
-    const refreshButton = wrapper.findAll('button').find((b) => b.text().includes('RE-SYNC INFRASTRUCTURE'));
-    expect(refreshButton, 'expected to find the RE-SYNC INFRASTRUCTURE button').toBeTruthy();
+    const refreshButton = wrapper.findAll('button').find((b) => b.text().includes('Refresh'));
+    expect(refreshButton, 'expected to find the Refresh button').toBeTruthy();
     await refreshButton!.trigger('click');
 
     expect(fetchSpy).toHaveBeenCalled();
@@ -38,7 +38,7 @@ describe('Routing.vue', () => {
     const wrapper = await mountSmokeTest(Routing, '/routing');
     const snapcastStore = useSnapcastStore();
 
-    expect(wrapper.text()).toContain('No Snapserver Clusters Identified');
+    expect(wrapper.text()).toContain('No zones yet');
 
     // Simulate what useEventSource()'s applySnapcastUpdate() does on a
     // 'snapcast' SSE event: replace store.status wholesale with fresh data.
@@ -50,7 +50,7 @@ describe('Routing.vue', () => {
     await nextTick();
     await nextTick(); // let the newly-mounted connector refs attach before the redraw is read
 
-    expect(wrapper.text()).not.toContain('No Snapserver Clusters Identified');
+    expect(wrapper.text()).not.toContain('No zones yet');
     expect(wrapper.findAll('svg path').length).toBeGreaterThan(0);
   });
 
@@ -166,9 +166,9 @@ describe('Routing.vue', () => {
     await nextTick();
 
     expect(wrapper.text()).toContain('Matriz de Audio');
-    expect(wrapper.text()).toContain('Enrutamiento de Infraestructura y Control de Zonas');
-    expect(wrapper.text()).toContain('RESINCRONIZAR INFRAESTRUCTURA');
-    expect(wrapper.text()).toContain('Fuentes Virtuales');
-    expect(wrapper.text()).toContain('Zonas de Salida');
+    expect(wrapper.text()).toContain('Envía cada fuente a las zonas que deben reproducirla');
+    expect(wrapper.text()).toContain('Actualizar');
+    expect(wrapper.text()).toContain('Fuentes');
+    expect(wrapper.text()).toContain('Zonas');
   });
 });
