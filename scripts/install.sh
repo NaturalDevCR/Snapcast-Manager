@@ -79,6 +79,31 @@ SNAPMANAGER_USER="snapmanager"
 AUTO_CONFIRM=false
 
 # Helper to ask questions or auto-confirm
+# Confirms the app answers HTTP. `systemctl is-active` alone isn't enough:
+# Restart=always reports a crash-looping unit as active between crashes.
+wait_for_app() {
+    local _
+    for _ in $(seq 1 "${APP_WAIT_SECONDS:-20}"); do
+        if curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:${APP_PORT}/api/health"; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+# better-sqlite3 is a native addon: without its compiled binding the server
+# can't start, and npm only warns when its install script doesn't run.
+verify_native_modules() {
+    if node -e "new (require('better-sqlite3'))(':memory:')" >/dev/null 2>&1; then
+        echo -e "${GREEN}[OK] Native modules load correctly.${NC}"
+        return 0
+    fi
+    echo -e "${RED}[!] better-sqlite3 failed to load, so the server cannot start.${NC}"
+    echo "Check the npm output above, then re-run this installer."
+    exit 1
+}
+
 prompt_yes_no() {
     local prompt="$1"
     local default="$2"
@@ -690,10 +715,12 @@ if [ -d "server/dist" ] && [ -d "client/dist" ] && [ ! -f ".rebuilding" ]; then
     echo -e "${GREEN}[OK] Pre-compiled release detected! Skipping long build process.${NC}"
     echo "Installing server production dependencies..."
     cd server && npm install --omit=dev
+    verify_native_modules
 else
     echo "Source code detected. Building project from scratch (this may take several minutes)..."
     echo "Installing server dependencies..."
     cd server && npm install
+    verify_native_modules
     echo "Building server..."
     npm run build
 
@@ -1234,18 +1261,16 @@ EOF
         # v0.3.1 -> v0.3.2 update, since neither changed the unit template
         # itself), the service was left stopped after every such update --
         # confirmed live on a real host. Explicitly check and (re)start it.
-        if $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
-            echo -e "${GREEN}[OK] Service already active.${NC}"
-        else
+        if ! $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
             echo "Service is not currently active -- starting it..."
             $SUDO systemctl start "$SERVICE_NAME"
-            sleep 2
-            if $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
-                echo -e "${GREEN}[OK] Service started.${NC}"
-            else
-                echo -e "${RED}[!] Service failed to start with the existing (unchanged) unit configuration. Checking logs...${NC}"
-                $SUDO journalctl -u "$SERVICE_NAME" -n 50 --no-pager
-            fi
+        fi
+        if wait_for_app; then
+            echo -e "${GREEN}[OK] Service is running and responding.${NC}"
+        else
+            echo -e "${RED}[!] Service is not responding on port $APP_PORT. Installation did NOT complete.${NC}"
+            $SUDO journalctl -u "$SERVICE_NAME" -n 30 --no-pager
+            exit 1
         fi
     else
         echo "$NEW_UNIT_CONTENT" | $SUDO tee "$UNIT_FILE" >/dev/null
@@ -1260,8 +1285,7 @@ EOF
             # success (Type=simple + Restart=always would otherwise mask a
             # persistent crash-loop, e.g. from a ReadWritePaths omission,
             # as a "successful" restart here).
-            sleep 2
-            if $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
+            if wait_for_app; then
                 RESTART_OK=true
             fi
         fi
