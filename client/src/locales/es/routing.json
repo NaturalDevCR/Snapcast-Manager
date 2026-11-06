@@ -26,5 +26,11 @@
   "offline": "Desconectado",
   "volumeFor": "Volumen de {name}",
   "playing": "Reproduciendo",
-  "idle": "Inactivo"
+  "idle": "Inactivo",
+  "zonesCount": "{count} zona | {count} zonas",
+  "noSourceZones": "Sin fuente",
+  "noSourceZonesHint": "Elige una fuente o arrastra un cable hasta una de estas zonas.",
+  "unusedSources": "Fuentes que no suenan en ninguna zona",
+  "filterLabel": "Filtrar fuentes y zonas",
+  "noMatches": "Nada coincide con “{query}”."
 }
