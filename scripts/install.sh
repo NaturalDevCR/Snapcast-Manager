@@ -600,7 +600,9 @@ ACTION="install"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -y|--yes)
+        # --auto-confirm is -y for the second half of a remote run, when a
+        # release too old to know it should ignore it. See EXEC_ARGS below.
+        -y|--yes|--auto-confirm)
             AUTO_CONFIRM=true
             shift
             ;;
@@ -1105,10 +1107,14 @@ if [ "$REMOTE_FLOW" = true ]; then
         #
         # -y and --no-service are never passed together: a release older than
         # --no-service ignores it and would install the service under -y. When
-        # the service was declined it asks again instead.
+        # the service was declined, that release asks again instead, and
+        # --auto-confirm keeps this release from asking anything.
         EXEC_ARGS=("--resumed=${RUN_KIND}:${STEP_NUM}/${STEP_TOTAL}" "--port" "$APP_PORT" "--mode" "$APP_MODE")
         if [ "$INSTALL_SERVICE" = false ]; then
             EXEC_ARGS+=("--no-service")
+            if [ "$AUTO_CONFIRM" = true ]; then
+                EXEC_ARGS+=("--auto-confirm")
+            fi
         elif [ "$AUTO_CONFIRM" = true ]; then
             EXEC_ARGS+=("-y")
         fi
