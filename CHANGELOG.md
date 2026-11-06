@@ -8,6 +8,16 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.4.2] - 2026-11-06
+
+### 🐛 Bug Fixes
+
+- *(install)* Allow better-sqlite3 build and verify the app really started
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* Publish changelog notes on every release
+- Check native modules build with the latest npm
 ## [0.4.1] - 2026-11-06
 
 ### 🚀 Features
@@ -18,14 +28,6 @@ regenerate.
 
 - *(ui)* Render code editors without CSP-blocked inline styles
 - *(updates)* Stop reporting updates for packages already up to date
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.4.0
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.4.1
 ## [0.4.0] - 2026-11-03
 
 ### 🚀 Features
@@ -43,10 +45,6 @@ regenerate.
 - *(ui)* Render missing watchdog and pipe-source controls; working delete confirm
 - *(ui)* Logs no longer spin forever on error/empty; clearer security forms
 
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.13
-
 ### 🎨 Styling
 
 - *(ui)* Map remaining raw palette colors to semantic tokens; wrap stat values on mobile
@@ -54,17 +52,12 @@ regenerate.
 ### ⚙️ Miscellaneous Tasks
 
 - *(ui)* Drop new any types, format new components, brand-color pipe dialog submit
-- Bump version to v0.4.0
 ## [0.3.13] - 2026-10-07
 
 ### 🐛 Bug Fixes
 
 - *(sudoers)* Grant /usr/bin/ss so watchdog connection kills stop prompting for a password
 - *(release)* Sync install.sh fallback version when the VERSION line is indented
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.3.13
 ## [0.3.12] - 2026-10-06
 
 ### 🚀 Features
@@ -75,10 +68,6 @@ regenerate.
 
 - Use package install path for channel changes
 - *(test)* Use imports accepted by the lint gate
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.11
 
 ### 🎨 Styling
 
@@ -92,27 +81,11 @@ regenerate.
 ### 🐛 Bug Fixes
 
 - *(backup)* Chown backup archives back to the service account after creation
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.10
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.3.11
 ## [0.3.10] - 2026-09-21
 
 ### 🐛 Bug Fixes
 
 - *(backup)* Handle read-stream errors on backup download
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.9
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.3.10
 ## [0.3.9] - 2026-09-21
 
 ### 🚀 Features
@@ -131,77 +104,44 @@ regenerate.
 
 ### 📚 Documentation
 
-- *(changelog)* Update CHANGELOG.md for v0.3.8
 - *(specs)* Add scheduled disaster-recovery backups design
 - *(plans)* Add scheduled disaster-recovery backups implementation plan
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.3.9
 ## [0.3.8] - 2026-09-04
 
 ### 🐛 Bug Fixes
 
 - *(server)* Use --require instead of --import for ts-node/register in test script (#11)
 - *(ui)* Theme persistence CSP block + broad light-mode contrast sweep (v0.3.8) (#12)
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.7
 ## [0.3.7] - 2026-09-03
 
 ### 🐛 Bug Fixes
 
 - *(ui)* Theme toggle one-toggle-behind lag (v0.3.7) (#10)
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.6
 ## [0.3.6] - 2026-09-01
 
 ### 🐛 Bug Fixes
 
 - *(ui)* Break Raw Editor feedback loop + add real install/update log window (v0.3.6) (#9)
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.5
 ## [0.3.5] - 2026-09-01
 
 ### 🐛 Bug Fixes
 
 - *(install,ui)* Missing .service suffix breaking shairport-sync installs + more light-mode contrast (v0.3.5) (#8)
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.4
 ## [0.3.4] - 2026-09-01
 
 ### 🐛 Bug Fixes
 
 - *(ui)* Connect the light/dark theme toggle + fix hardcoded dark-only colors (v0.3.4) (#7)
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.3
 ## [0.3.3] - 2026-09-01
 
 ### 🐛 Bug Fixes
 
 - *(install)* Restart service after an update when the unit content is unchanged (v0.3.3) (#6)
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.2
 ## [0.3.2] - 2026-09-01
 
 ### 🐛 Bug Fixes
 
 - *(install,security)* Auto-install missing sudo package + drop upgrade-insecure-requests CSP directive (v0.3.2) (#5)
-
-### 📚 Documentation
-
-- *(changelog)* Update CHANGELOG.md for v0.3.1
 ## [0.3.1] - 2026-09-01
 
 ### 🚀 Features
@@ -356,20 +296,12 @@ regenerate.
 ### 🐛 Bug Fixes
 
 - Detect snap-ctrl version with new dist-only release format
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.2.2
 ## [0.2.1] - 2026-07-12
 
 ### 🐛 Bug Fixes
 
 - Snap-ctrl doc_root update no longer resets snapserver.conf
 - Pipe-source changes no longer reset snapserver.conf; add config-edit tests
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.2.1
 ## [0.2.0] - 2026-07-11
 
 ### 🐛 Bug Fixes
@@ -379,19 +311,11 @@ regenerate.
 ### 📚 Documentation
 
 - Warn against committing the runtime database
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.2.0
 ## [0.1.20] - 2026-06-12
 
 ### 🐛 Bug Fixes
 
 - Prevent snap-ctrl update from overwriting config data
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.1.20
 ## [0.1.19] - 2026-05-19
 
 ### 🐛 Bug Fixes
@@ -402,28 +326,16 @@ regenerate.
 ### 🚀 Features
 
 - Add service file editor and rename support to Pipe Sources
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.1.18
 ## [0.1.17] - 2026-05-19
 
 ### 🚀 Features
 
 - Generalize Radio Streams into multi-type Pipe Sources (Radio + MPD)
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.1.17
 ## [0.1.16] - 2026-05-19
 
 ### 🐛 Bug Fixes
 
 - Fetch latest release version dynamically in install.sh; silence Node.js 20 deprecation in CI
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.1.16
 ## [0.1.15] - 2026-05-19
 
 ### 🚀 Features
@@ -434,11 +346,6 @@ regenerate.
 ### 🐛 Bug Fixes
 
 - Resolve CI TypeScript errors in RadioStreams.vue
-## [0.1.14] - 2026-04-17
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.1.14
 ## [0.1.13] - 2026-04-17
 
 ### 🐛 Bug Fixes
@@ -448,7 +355,6 @@ regenerate.
 ### ⚙️ Miscellaneous Tasks
 
 - Remove vite-plugin-pwa (unused in admin dashboard)
-- Bump version to v0.1.13
 ## [0.1.10] - 2026-04-17
 
 ### ⚙️ Miscellaneous Tasks
@@ -461,16 +367,6 @@ regenerate.
 ### 🚀 Features
 
 - Add MPD management, Tools view (crontab/script editor), and fix dropdown transparency
-## [0.1.8] - 2026-04-04
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.1.8
-## [0.1.7] - 2026-04-04
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.1.7 and fix bashism in shairport sync install
 ## [0.1.6] - 2026-04-04
 
 ### 🚀 Features
@@ -501,72 +397,31 @@ regenerate.
 ### 🚀 Features
 
 - Dynamic sudo detection, installation mode selection, bump v0.1.1
-## [0.1.0] - 2026-03-19
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.1.0 and update README features
 ## [0.0.10] - 2026-03-18
 
 ### 🚀 Features
 
 - *(ui)* Security as standalone page, fix client logs mode, bump v0.0.10
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.0.10 in install script and Dashboard UI
 ## [0.0.9] - 2026-03-18
 
 ### 🚀 Features
 
 - *(ui+api)* Navigation overhaul, zone rename, and client log filtering
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.0.9
-- Bump version to v0.0.9 and fix undefined access in Logs.vue
 ## [0.0.8] - 2026-03-18
 
 ### 🚀 Features
 
 - *(ui)* Redesign navbar and configuration tab navigation
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.0.8 and ignore .claude
-## [0.0.7] - 2026-03-18
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.0.7
-## [0.0.5] - 2026-03-18
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.0.5
 ## [0.0.4] - 2026-03-18
 
 ### 🐛 Bug Fixes
 
 - *(system)* Enhance err reporting in getServiceLogs and fallback to non-sudo journalctl
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.0.4
 ## [0.0.3] - 2026-03-18
 
 ### 🐛 Bug Fixes
 
 - Sudo handling in Node.js installation
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.0.3
-## [0.0.2] - 2026-03-18
-
-### ⚙️ Miscellaneous Tasks
-
-- Bump version to v0.0.2
 ## [0.0.1] - 2026-03-18
 
 ### 🚀 Features
@@ -663,13 +518,10 @@ regenerate.
 
 ### ⚙️ Miscellaneous Tasks
 
-- Bump version to v0.0.7 and include version in installer header
-- Bump version to v0.1.2
 - Release v0.1.6 - full UI/UX overhaul and toast system
 - Release v0.1.7 - robust Snapserver updates and Node.js LTS selector
 - Release v0.1.8 - fix Snapserver permission issue and upgrade installer
 - *(release)* Bump all versions to v0.1.18 including hardcoded strings
-- Bump version to v0.1.28, add export/import, password reset, login fix, and UI tweaks
 - Update web app HTML title to Snapcast Manager
 - *(release)* Bump version to 0.1.31 across all files
 - Bump version to 0.1.33
@@ -678,16 +530,7 @@ regenerate.
 - Allow force re-install item selections
 - Bump version to 0.1.37 everywhere
 - Fix installer read issue in piped shells & bump to 0.1.38
-- Bump version to 0.1.39 and fix UI items
-- Bump version to 0.1.47 & added mobile navigation drawer
-- Bump version to 0.1.48 (fix UI/install script) & Node 22 upgrade
-- Bump version to 0.1.49
 - Apply custom logo asset to UI layout and login panels
-- Bump version to v0.1.59 and remove MPD integration
-- Bump version to v0.1.60 and UI overhaul
-- Bump version to v0.1.61 and refine UI aesthetics
-- Bump version to v0.1.62 and finalize UI refinements
 - *(release)* V0.1.63 - UI redesign and stream fix
 - *(ui)* Restore previous lighter purple theme
-- Bump version to v0.1.66
 - Reset versioning to v0.0.1 and purge previous release history
