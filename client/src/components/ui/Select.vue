@@ -48,12 +48,12 @@ function onUpdate(value: string | number) {
   <Listbox :model-value="modelValue" :disabled="disabled" @update:model-value="onUpdate">
     <div class="relative w-full">
       <ListboxButton
-        class="relative w-full flex items-center justify-between py-3 px-4 bg-brand-bg border border-brand-primary/20 rounded-xl text-sm text-left font-medium text-text-main outline-none transition-all focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="relative w-full flex items-center justify-between gap-2 py-3 px-4 bg-brand-bg border border-brand-primary/20 rounded-xl text-sm text-left font-medium text-text-main outline-none transition-all focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <span :class="selected ? 'text-text-main' : 'text-text-muted'">
+        <span class="truncate" :class="selected ? 'text-text-main' : 'text-text-muted'">
           {{ selected ? selected.label : placeholder }}
         </span>
-        <ChevronUpDownIcon class="h-4 w-4 text-text-muted" aria-hidden="true" />
+        <ChevronUpDownIcon class="h-4 w-4 shrink-0 text-text-muted" aria-hidden="true" />
       </ListboxButton>
       <transition
         leave-active-class="transition duration-100 ease-in"

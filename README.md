@@ -44,17 +44,17 @@ route audio sources to output zones, and back up/restore your setup.
 
 ---
 
-<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/a9fe0eef-cd9c-41f9-9c63-e64309a55699" />
-
-<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/30ba0850-7181-44bc-b201-e74adbb5c7ec" />
-
-<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/df9b71d8-af84-4726-82a8-563ee4f43ba1" />
-
-<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/186525ea-6fda-4242-a6a8-40a8f3202a35" />
-
-<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/56507eb1-51e4-4af5-80c2-0911e74c0dd6" />
-
-<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/90928d89-339d-4ac4-a91a-4938f907f408" />
+<p align="center">
+  <img width="400" alt="Dashboard with stream, client and system health status" src="docs/screenshots/dashboard.png" />
+  <img width="400" alt="Audio Matrix with each source on the same row as its zones, joined by cables" src="docs/screenshots/audio-matrix.png" />
+</p>
+<p align="center">
+  <img width="400" alt="Server config, Standard tab with a visual editor" src="docs/screenshots/server-config-standard.png" />
+  <img width="400" alt="Server config, Expert tab with a raw snapserver.conf editor" src="docs/screenshots/server-config-expert.png" />
+</p>
+<p align="center">
+  <img width="400" alt="Client Dashboard with snapclient instances" src="docs/screenshots/client-dashboard.png" />
+</p>
 
 ---
 

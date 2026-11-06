@@ -26,5 +26,11 @@
   "offline": "Offline",
   "volumeFor": "Volume for {name}",
   "playing": "Playing",
-  "idle": "Idle"
+  "idle": "Idle",
+  "zonesCount": "{count} zone | {count} zones",
+  "noSourceZones": "No source",
+  "noSourceZonesHint": "Pick a source, or drag a cable onto one of these zones.",
+  "unusedSources": "Sources not playing in any zone",
+  "filterLabel": "Filter sources and zones",
+  "noMatches": "Nothing matches “{query}”."
 }
