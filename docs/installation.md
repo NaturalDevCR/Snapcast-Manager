@@ -57,57 +57,99 @@ Other flags `scripts/install.sh` accepts:
 | Flag | Effect |
 |---|---|
 | `-y`, `--yes` | Auto-confirm every prompt, using each prompt's stated default. |
-| `--port <n>` / `--port=<n>` | Web interface port (default `3000` if unspecified and not interactively prompted). |
-| `--mode <client\|server\|both>` / `--mode=<...>` | Installation mode (see below). Defaults to `both` under `-y`. |
+| `--port <n>` / `--port=<n>` | Web interface port. Overrides the saved port on an update. Without it, a new install asks (`3000` under `-y`). |
+| `--mode <client\|server\|both>` / `--mode=<...>` | Installation mode (see below). Overrides the saved mode on an update. Without it, a new install asks (`both` under `-y`). |
+| `--no-service` | Don't install the systemd service. Nothing is started, so nothing can be verified. |
 | `--restore <path>` / `--restore=<path>` | Restore a backup archive (see [Update/upgrade path](#updateupgrade-path) below) as part of this run. |
 
 If run with no TTY and no flags at all (e.g. piped from a script with no
-`-y`), prompts that can't be answered fall back to their stated default
-automatically rather than hanging.
+`-y`), a new install's prompts fall back to their stated default
+automatically rather than hanging. An existing install is the exception: the
+installer never replaces one without an answer, so it stops with
+`No TTY available for input. Aborting.` Pass `-y` to update unattended.
 
-### Phase 0 — consent and installation mode
+### Before anything changes — one summary, one confirmation
 
-The script prints a banner, explains what it's about to install (the
-manager itself, Node.js, and system tools like `ffmpeg`/`build-essential`
-— explicitly *not* Snapserver/Snapclient), and asks for confirmation
-(skipped entirely under `-y`). It then asks you to choose a mode:
+The installer looks for an existing install first, because that decides what
+it needs to ask. Nothing on the system changes until you confirm.
 
-1. **Snapclient Manager Only** — manage audio output clients.
-2. **Snapserver Manager Only** — manage the audio server.
-3. **Snapcast Manager (both)** — full server + client management (the
-   default, and what `-y` selects).
+**New install.** It explains what it's about to set up (the manager itself,
+Node.js and system tools like `ffmpeg`/`build-essential` when they're missing,
+explicitly *not* Snapserver/Snapclient), then asks:
 
-### Phase 1 — source detection (remote install vs. local source)
+1. **Installation mode**, unless `--mode` was passed:
+   1. **Snapclient Manager only** — manage audio output clients.
+   2. **Snapserver Manager only** — manage the audio server.
+   3. **Snapcast Manager (both)** — full server + client management (the
+      default, and what `-y` selects).
+2. **Web interface port**, unless `--port` was passed (default `3000`).
+3. **Whether to install the systemd service**, unless `--no-service` was
+   passed (default yes).
+
+It then shows a summary and asks once for confirmation. `-y` skips the
+questions, using the defaults above.
+
+```text
+Ready to install
+  Version     v0.4.3
+  Mode        both
+  Port        3000
+  Service     snapmanager (systemd)
+
+Install Snapcast Manager v0.4.3? (Y/n):
+```
+
+**Existing install.** It reuses the mode and port saved in
+`/opt/snapcast-manager/server/.env` and asks nothing else. See
+[Update/upgrade path](#updateupgrade-path).
+
+### The steps
+
+Every run then shows numbered steps in one style. The exact count depends on
+the run: an update adds a backup step, and a local checkout has nothing to
+download.
+
+| Step | Runs on |
+|---|---|
+| Stopping the service and backing up data | Remote updates |
+| Downloading Snapcast Manager | Remote flow |
+| Unpacking files | Remote flow |
+| Checking system requirements | Always |
+| Installing dependencies, or building from source | Always |
+| Applying configuration | Always |
+| Setting up the system service | Unless skipped |
+| Verifying the installation | Unless the service was skipped |
+
+Output from `apt-get`, `npm`, and other commands goes to a temporary log, not
+the screen. If something fails, the installer shows the end of that log and
+prints its path, for example
+`Full log: /tmp/snapcast-manager-install.a1B2c3`. The log is deleted after a
+successful run.
+
+### Remote install vs. local source
 
 If you run the script from a directory that doesn't already contain
 `server/` and `client/` (true for the curl-piped one-liner), it treats this
-as a **remote install**:
+as a **remote install**: it downloads the latest tagged release (or falls back
+to the tagged source archive if no pre-built `.zip` asset exists), verifies
+the archive against the size and SHA-256 digest GitHub reports, extracts it to
+`/opt/snapcast-manager`, and hands over to the installer inside that release.
+The numbering carries on across the hand-over, and you aren't asked anything
+twice.
 
-- If `/opt/snapcast-manager` already exists, it detects the installed
-  version and offers an interactive menu — see
-  [Update/upgrade path](#updateupgrade-path) below; this whole
-  detection/menu step is skipped if you're installing from a local checked-out
-  copy of the repo that already has `server/`/`client/` present (the "local
-  source" flow), since there's nothing to download in that case.
-- Otherwise, it downloads the latest tagged release (or falls back to the
-  tagged source archive if no pre-built `.zip` asset exists), extracts it to
-  `/opt/snapcast-manager`, and re-executes itself from that location with
-  the same flags you originally passed.
+### Checking system requirements
 
-### Phase 2 — system checks (Steps 1–3 in the script's own numbering)
+Checks for `curl`, `ffmpeg`, `lsb-release`, `make`/`build-essential` (needed
+for `better-sqlite3`'s native compilation step), and Node.js. If Node.js is
+missing, it offers Node 22 via NodeSource. If a different version is already
+present, it's left alone — the script only reports what it detected.
 
-- **Step 1**: checks for `curl`, `ffmpeg`, `lsb-release`; offers to install
-  any that are missing via `apt-get`.
-- **Step 2**: checks for `make`/`build-essential`; offers to install it
-  (needed for `better-sqlite3`'s native compilation step).
-- **Step 3**: checks for Node.js; if missing, offers to install Node 22 via
-  NodeSource. If a different version is already present, it's left alone —
-  the script only reports what it detected.
+Anything missing on a new install is a `y/n` prompt defaulting to "yes", and
+`-y` accepts all of them automatically. On an update, your confirmation
+already covers them, so a missing package is installed without another
+question.
 
-Each of these is a `y/n` prompt defaulting to "yes"; `-y` accepts all of
-them automatically.
-
-### Phase 3 — dependencies and build (Step 4)
+### Dependencies and build
 
 - If `server/dist` and `client/dist` already exist (a pre-built release,
   the normal case for the remote-download path) and there's no
@@ -117,23 +159,19 @@ them automatically.
 - Otherwise (source checkout, or a source-archive fallback download that
   set the `.rebuilding` flag) it runs a full build: `npm install` and
   `npm run build` in both `server/` and `client/`. The script's own output
-  warns this "may take several minutes."
-- If `--restore <path>` was passed, the specified backup archive is
-  extracted and its database/`snapserver.conf` are restored at this point
-  (Step 4.5).
+  warns this can take several minutes.
 
-### Phase 4 — web interface configuration (Step 5)
+### Applying configuration
 
-Prompts for the port the web UI should listen on (default `3000`, skipped
-if `--port` was already passed or under `-y`), then writes
-`/opt/snapcast-manager/server/.env` with `PORT`, `SNAPCAST_MODE`, and
+If `--restore <path>` was passed, the specified backup archive is extracted
+and its database/`snapserver.conf` are restored here. The installer then
+writes `/opt/snapcast-manager/server/.env` with `PORT`, `SNAPCAST_MODE`, and
 `NODE_ENV=production`.
 
-### Phase 5 — systemd service setup (Step 6)
+### Setting up the system service
 
 This is the privilege-hardening step described in detail in
-[`SECURITY.md`](../SECURITY.md#privilege-model-task-16). Offered as a
-`y/n` prompt (default yes; `-y` accepts). If accepted, the installer:
+[`SECURITY.md`](../SECURITY.md#privilege-model-task-16). The installer:
 
 1. Creates the dedicated, unprivileged `snapmanager` system user
    (`--system --no-create-home --shell /usr/sbin/nologin`, member of the
@@ -177,8 +215,11 @@ constrained hardware like a Raspberry Pi.
 
 ### Completion
 
-The script prints the URL to open (`http://<detected-local-ip>:<port>`)
-and a note that the Setup Wizard will greet you on first visit.
+The final step checks that the web interface answers on `/api/health` and
+that the service is active. Only then does the script report success, with
+the URL to open (`http://<detected-local-ip>:<port>`) and, on a new install, a
+note that the Setup Wizard will greet you on first visit. With `--no-service`,
+it says plainly that nothing is running.
 
 ## First-run experience
 
@@ -201,36 +242,52 @@ and a note that the Setup Wizard will greet you on first visit.
 ## Update/upgrade path
 
 Re-running the **remote** one-liner against a host that already has
-`/opt/snapcast-manager` triggers a version check and an interactive menu
-(skipped, with different behavior, under `-y` — see below):
+`/opt/snapcast-manager` shows a summary and asks one question:
 
-- **If a newer version is available** (or the installed version couldn't
-  be determined): choose between **Update/Upgrade** (preserves the
-  database and `snapserver.conf`, recommended), **Force Re-install**
-  (wipes the installed bundle but still backs up data first), **Clean
-  Re-install** (wipes everything, starting fresh), **Uninstall**, or
-  **Abort**. Under `-y`, this always resolves to **Update/Upgrade** —
-  data is preserved automatically.
-- **If you're already on the latest version**: the menu instead offers
-  **Update/Force Re-install**, **Clean Re-install**, **Uninstall**, or
-  **Abort**. Under `-y`, this case **aborts immediately** rather than
-  doing anything — re-running the non-interactive installer against an
-  already-up-to-date install is a deliberate no-op, not a forced
-  reinstall.
+```text
+Update available
+  Installed   v0.4.2
+  New         v0.4.3
+  Mode        both (saved)
+  Port        3000 (saved)
+  Service     snapmanager (systemd)
+  Data        database and settings are kept
+
+Update to v0.4.3 now? (Y/n, or o for other options):
+```
+
+- **Enter or `y`** updates. Nothing else is asked: the mode and port come from
+  the saved settings, and the service question only appears if no service is
+  installed. `--port` and `--mode` still override the saved values.
+- **`o`** opens the other options: **Force Re-install** (replaces the app,
+  keeps data), **Clean Re-install** (deletes everything, then asks the
+  new-install questions), **Uninstall**, or **Abort**. Clean Re-install asks
+  you to confirm the deletion first.
+- **`n`** stops without changing anything.
+- Under `-y`, this always resolves to **Update/Upgrade** — data is preserved
+  automatically.
+- **If you're already on the latest version**, Enter exits and `o` opens the
+  same other options. Under `-y`, this case **exits immediately** rather
+  than doing anything — re-running the non-interactive installer against an
+  already-up-to-date install is a deliberate no-op, not a forced reinstall.
 - When an update proceeds, the existing service is stopped, the database
   (`data/` or the legacy `server/data/` path) and `/etc/snapserver.conf`
   are backed up to `/tmp`, the install directory is wiped and
   re-populated from the newly downloaded release, and the backups are
-  restored into place before the build/systemd steps re-run.
+  restored into place before the build/systemd steps re-run. If a run fails
+  while the backup is still in `/tmp`, the installer tells you where it is.
+
+Only `PORT` and `SNAPCAST_MODE` carry over from `server/.env`. Anything else
+added to that file by hand is lost on an update.
 
 This update flow only applies to the **remote** (curl-piped) install
 path. Re-running `scripts/install.sh` from a local checked-out copy of
-the repository (where `server/`/`client/` already exist) skips this
-detection entirely and goes straight to the build/systemd steps against
-whatever is on disk in that checkout — useful for local development, not
-the mechanism for updating a production install.
+the repository (where `server/`/`client/` already exist) skips the download
+and the menu, and goes straight to the build/systemd steps against whatever is
+on disk in that checkout, still reusing any saved mode and port — useful for
+local development, not the mechanism for updating a production install.
 
-Separately, the **systemd/privilege-hardening step (Phase 5 above) is
+Separately, the **systemd/privilege-hardening step is
 itself idempotent and safe to re-run on its own**: re-running the
 installer against an already-migrated install detects the unit is
 already up to date and makes no changes, and re-running it against an
@@ -242,9 +299,9 @@ loss.
 
 There is no dedicated `--uninstall` command-line flag. Uninstalling is
 reached interactively, by re-running the remote one-liner against an
-existing install and choosing the **Uninstall** option from the
-update-detection menu described above (not available under `-y`, since
-`-y` never selects that menu option). Confirming uninstall:
+existing install, typing `o` for other options, and choosing **Uninstall**
+(not available under `-y`, since `-y` never selects that menu option).
+Confirming uninstall:
 
 1. Stops and disables the `snapmanager` systemd service.
 2. Removes the unit file (`/etc/systemd/system/snapmanager.service`) and
@@ -261,7 +318,7 @@ update-detection menu described above (not available under `-y`, since
 ## Upgrading an existing install to v0.3.1+
 
 If you installed any earlier version, the privilege-hardening step
-(Phase 5 above) is idempotent and safe to re-run on its own — no special
+(see [Setting up the system service](#setting-up-the-system-service)) is idempotent and safe to re-run on its own — no special
 migration procedure, flag, or data-loss risk. Simply re-run the installer
 against your existing install (the same one-liner for a remote install,
 or `bash scripts/install.sh` from a local checkout) and let it detect and
@@ -296,10 +353,10 @@ you're upgrading from an older release and those still concern you.
 - **[`docs/troubleshooting.md`](troubleshooting.md)** — organized by
   symptom, covering installation issues, sudo/permission errors, package
   install failures, snapserver/snapclient, pipe sources, myMPD, and
-  backup/restore. The installer's own console output (plus, for the
-  systemd step, `journalctl -u snapmanager -n 50 --no-pager`, which the
-  installer runs automatically on a failed restart) is the primary
-  diagnostic tool alongside it.
+  backup/restore. The installer's own console output is the primary
+  diagnostic tool alongside it: on a failure it shows the end of its log and
+  prints the log's path, and for the systemd step that log includes
+  `journalctl -u snapmanager -n 50 --no-pager`.
 
 ## Snapcast beta packages
 

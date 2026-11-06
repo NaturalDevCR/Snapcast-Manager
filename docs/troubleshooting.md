@@ -59,8 +59,9 @@ elevation for everything it does.
 It is written for Debian/Ubuntu/Raspberry Pi OS (`apt`-based, `systemd`).
 There is no supported macOS/Windows path.
 
-**"[!] No TTY available for input. Aborting."**
-The interactive menu needs a terminal. On a fully headless box use the
+**"No TTY available for input. Aborting."**
+An existing install is never replaced without an answer, so the update
+question needs a terminal. On a fully headless box use the
 non-interactive flag:
 
 ```bash
@@ -74,8 +75,9 @@ handled the same way: if `node` isn't found it offers to install Node 22
 via NodeSource.
 
 **Already-installed detection / upgrade flow.**
-A re-run against an existing remote install detects the old version and
-presents a menu: **Update/Force Re-install** (preserves database and
+A re-run against an existing remote install detects the old version, shows a
+summary with the saved mode and port, and asks once whether to update. Type
+`o` at that question for **Force Re-install** (preserves database and
 settings), **Clean Re-install** (wipes everything), **Uninstall**, or
 **Abort**. Two non-obvious behaviors worth knowing:
 
@@ -83,7 +85,14 @@ settings), **Clean Re-install** (wipes everything), **Uninstall**, or
   rather than reinstalling — `-y` does not force a refresh of an
   up-to-date install.
 - This whole menu only exists on the remote (curl-piped) flow. Running
-  `install.sh` from a local source checkout skips it.
+  `install.sh` from a local source checkout skips it, but still reuses the
+  saved mode and port.
+
+**"Setup did not finish."**
+Command output isn't shown during a run. The installer prints the end of its
+log when a step fails, and the log's path after this message
+(`/tmp/snapcast-manager-install.*`). Reboot only after copying anything you
+need from `/tmp`, including a database backup if the message mentions one.
 
 **"Pre-built asset \<version\> not found. Falling back to tagged source code..."**
 The GitHub release for that tag has no attached `.zip`; the installer
