@@ -8,6 +8,24 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.4.1] - 2026-11-06
+
+### 🚀 Features
+
+- *(dashboard)* Keep long stream and client lists compact
+
+### 🐛 Bug Fixes
+
+- *(ui)* Render code editors without CSP-blocked inline styles
+- *(updates)* Stop reporting updates for packages already up to date
+
+### 📚 Documentation
+
+- *(changelog)* Update CHANGELOG.md for v0.4.0
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to v0.4.1
 ## [0.4.0] - 2026-11-03
 
 ### 🚀 Features
