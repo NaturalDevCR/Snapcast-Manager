@@ -8,6 +8,11 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.4.3] - 2026-11-06
+
+### 🚀 Features
+
+- *(install)* Redesign the terminal installer flow (#25)
 ## [0.4.2] - 2026-11-06
 
 ### 🐛 Bug Fixes
