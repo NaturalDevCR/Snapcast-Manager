@@ -101,6 +101,14 @@ SNAPMANAGER_USER="snapmanager"
 DEFAULT_PORT=3000
 DEFAULT_MODE="both"
 AUTO_CONFIRM=false
+# In an unpacked release until its installer finishes the second half.
+INCOMPLETE_MARKER=".update-incomplete"
+
+# Remote flow state, read by on_exit.
+WORK_DIR=""
+STAGE_DIR=""
+OLD_INSTALL_INTACT=false
+SERVICE_STOPPED=false
 
 # ---- Terminal output ----
 #
@@ -202,8 +210,31 @@ show_service_logs() {
     printf '%s\n' "$journal" | tail -n 10 | sed 's/^/        /'
 }
 
+remove_temporary_files() {
+    if [ -n "$WORK_DIR" ]; then
+        $SUDO rm -rf "$WORK_DIR" || true
+    fi
+    if [ -n "$STAGE_DIR" ]; then
+        $SUDO rm -rf "$STAGE_DIR" || true
+    fi
+}
+
+# Only for a failure before the swap in replace_install: the old install is
+# still whole, so it can simply run again.
+restart_previous_version() {
+    if [ "$SERVICE_STOPPED" != true ]; then
+        return 0
+    fi
+    if $SUDO systemctl start "$SERVICE_NAME" 2>/dev/null; then
+        ui_note "The previous version is running again."
+    else
+        ui_error "The previous version did not restart. Try: systemctl start $SERVICE_NAME"
+    fi
+}
+
 on_exit() {
     local status=$?
+    remove_temporary_files
     if [ "$status" -eq 0 ]; then
         return 0
     fi
@@ -212,8 +243,9 @@ on_exit() {
     if [ -n "$INSTALL_LOG" ] && [ -s "$INSTALL_LOG" ]; then
         ui_note "Full log: $INSTALL_LOG"
     fi
-    if [ -e /tmp/snapmgr_data_backup ]; then
-        ui_note "Your database backup is in /tmp/snapmgr_data_backup. Copy it somewhere safe before rebooting."
+    if [ "$OLD_INSTALL_INTACT" = true ]; then
+        ui_note "The installed version was not changed."
+        restart_previous_version
     fi
     ui_note "After fixing the problem, re-run this installer."
 }
@@ -306,6 +338,13 @@ is_valid_mode() {
     esac
 }
 
+# Both values were validated, and printf keeps them from ever being parsed by
+# a shell running as root.
+write_env_file() {
+    printf 'PORT=%s\nSNAPCAST_MODE=%s\nNODE_ENV=production\n' "$APP_PORT" "$APP_MODE" \
+        | $SUDO tee "$1" >/dev/null
+}
+
 # Prints vX.Y.Z from a package.json, or nothing.
 read_package_version() {
     local version=""
@@ -337,8 +376,8 @@ saved_env_value() {
     printf '%s\n' "$2" | sed -n "s/^$1=//p" | tail -n 1 | tr -d "\r\"' "
 }
 
-# Must run before anything touches $INSTALL_BASE_DIR: the update flow deletes
-# server/.env along with the rest of the old release.
+# Must run before anything touches $INSTALL_BASE_DIR: its server/.env is where
+# the saved settings come from.
 detect_install() {
     EXISTING_INSTALL=false
     INSTALLED_VERSION=""
@@ -355,6 +394,12 @@ detect_install() {
 
     EXISTING_INSTALL=true
     INSTALLED_VERSION=$(read_package_version "$INSTALL_BASE_DIR/server/package.json")
+    # The files of the new version are in place but it was never set up, so
+    # it must not count as up to date.
+    if [ -e "$INSTALL_BASE_DIR/$INCOMPLETE_MARKER" ]; then
+        ui_warn "The last run did not finish. This run completes it."
+        INSTALLED_VERSION=""
+    fi
 
     local saved_env value
     saved_env=$(read_saved_env)
@@ -814,7 +859,7 @@ plan_steps() {
         # Download, unpack.
         STEP_TOTAL=$((STEP_TOTAL + 2))
         if [ "$EXISTING_INSTALL" = true ]; then
-            # Stop and back up.
+            # Replace the old version.
             STEP_TOTAL=$((STEP_TOTAL + 1))
         fi
     fi
@@ -858,278 +903,343 @@ REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
 NODE_VERSION="22"
 
 
-# 0. Download the release (remote flow only)
-if [ "$REMOTE_FLOW" = true ]; then
-    # Replace an existing install, if there is one. The action was chosen above.
+# Builds the complete new tree next to the install, on the same filesystem so
+# that replace_install can rename it into place. Runs while the old version is
+# still serving, so running out of disk here costs nothing.
+stage_release() {
+    local parent
+    parent=$(dirname "$INSTALL_BASE_DIR")
+    $SUDO mkdir -p "$parent"
+    # Left by a run that was killed. *.old.* is not touched: it could be the
+    # only copy of an install.
+    $SUDO find "$parent" -maxdepth 1 -name "$(basename "$INSTALL_BASE_DIR").new.*" -exec rm -rf {} +
+
+    STAGE_DIR=$($SUDO mktemp -d "${INSTALL_BASE_DIR}.new.XXXXXX")
+    run_quiet "Copying the new version" $SUDO cp -r "$RELEASE_ROOT/." "$STAGE_DIR/"
+    if [ "$IS_SOURCE_ARCHIVE" = true ]; then
+        # Forces a rebuild, since this is source code.
+        $SUDO touch "$STAGE_DIR/.rebuilding"
+    fi
+
+    # The second half writes this too, but only after its slow steps. Saving
+    # it here means a run that fails in between still has the settings for the
+    # next run. A release that doesn't know the marker would never remove it.
+    write_env_file "$STAGE_DIR/server/.env"
+    $SUDO chmod 600 "$STAGE_DIR/server/.env"
+    if grep -q "$INCOMPLETE_MARKER" "$RELEASE_ROOT/scripts/install.sh"; then
+        $SUDO touch "$STAGE_DIR/$INCOMPLETE_MARKER"
+    fi
+}
+
+# Sets DATA_SOURCE to the directory holding the database, if there is one.
+find_data_source() {
+    DATA_SOURCE=""
+    LEGACY_DATA_BACKUP=""
+    # DB can be in root data/ (production) or server/data/ (legacy installs missing NODE_ENV)
+    if [ -n "$($SUDO ls -A "$INSTALL_BASE_DIR/data" 2>/dev/null)" ]; then
+        DATA_SOURCE="$INSTALL_BASE_DIR/data"
+    elif [ -n "$($SUDO ls -A "$INSTALL_BASE_DIR/server/data" 2>/dev/null)" ]; then
+        DATA_SOURCE="$INSTALL_BASE_DIR/server/data"
+        ui_warn "Found database in the legacy path server/data/, migrating to data/"
+    else
+        # Installers up to v0.4.3 deleted the install before downloading, and
+        # a failed download left the only copy here. /tmp is writable by every
+        # local user, so anything root didn't create could be a planted
+        # database and is ignored.
+        local legacy=/tmp/snapmgr_data_backup
+        if [ -d "$legacy" ] && [ ! -L "$legacy" ] \
+            && [ -n "$($SUDO find "$legacy" -maxdepth 0 -user root ! -perm /022)" ]; then
+            DATA_SOURCE="$legacy"
+            LEGACY_DATA_BACKUP="$legacy"
+            ui_warn "Found the database backup left by an earlier failed update"
+        fi
+    fi
+}
+
+# The only destructive part of the remote flow. The database is copied after
+# the service stops so it is consistent, and the old tree is left whole until
+# the new one, database included, is complete.
+replace_install() {
     if [ "$EXISTING_INSTALL" = true ]; then
-        ui_step "Stopping the service and backing up data"
-        $SUDO systemctl stop $SERVICE_NAME 2>/dev/null || true
-        $SUDO systemctl disable $SERVICE_NAME 2>/dev/null || true
+        SERVICE_STOPPED=false
+        if $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
+            SERVICE_STOPPED=true
+        fi
+        $SUDO systemctl stop "$SERVICE_NAME" 2>/dev/null || true
         ui_ok "Service stopped"
 
         if [ "$PRESERVE_DATA" = true ]; then
-            # DB can be in root data/ (production) or server/data/ (legacy installs missing NODE_ENV)
-            DB_SOURCE=""
-            if [ -d "$INSTALL_BASE_DIR/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/data 2>/dev/null)" ]; then
-                DB_SOURCE="$INSTALL_BASE_DIR/data"
-            elif [ -d "$INSTALL_BASE_DIR/server/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/server/data 2>/dev/null)" ]; then
-                DB_SOURCE="$INSTALL_BASE_DIR/server/data"
-                ui_warn "Found database in the legacy path server/data/, migrating to data/"
-            fi
-
-            if [ -n "$DB_SOURCE" ]; then
-                $SUDO rm -rf /tmp/snapmgr_data_backup
-                $SUDO cp -r "$DB_SOURCE" /tmp/snapmgr_data_backup
-                ui_ok "Database backed up from $DB_SOURCE"
+            find_data_source
+            if [ -n "$DATA_SOURCE" ]; then
+                $SUDO mkdir -p "$STAGE_DIR/data"
+                run_quiet "Copying the database from $DATA_SOURCE" $SUDO cp -a "$DATA_SOURCE/." "$STAGE_DIR/data/"
             else
-                ui_note "No database to back up."
-            fi
-
-            if [ -f "/etc/snapserver.conf" ]; then
-                $SUDO cp /etc/snapserver.conf /tmp/snapserver_conf_backup
-                ui_ok "snapserver.conf backed up"
+                ui_note "No database to keep."
             fi
         else
-            ui_warn "Clean re-install: no backups taken"
-            $SUDO rm -rf /tmp/snapmgr_data_backup /tmp/snapserver_conf_backup 2>/dev/null || true
+            ui_warn "Clean re-install: the database is not kept"
         fi
-
-        $SUDO rm -rf "$INSTALL_BASE_DIR"
-        ui_ok "Previous version removed"
     fi
 
-    if [ ! -d "$INSTALL_BASE_DIR" ]; then
-        ui_step "Downloading Snapcast Manager $VERSION"
+    # mktemp's 700 was only for building it.
+    $SUDO chmod 755 "$STAGE_DIR"
 
-        if ! command -v wget >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1 || ! command -v sha256sum >/dev/null 2>&1; then
-            # sha256sum (GNU coreutils) verifies the downloaded release .zip's
-            # hash below (Task 75) before it is ever extracted/installed --
-            # ships in every Debian/Ubuntu base install already, so this is
-            # a defensive check, not an expected real-world install path.
-            if prompt_yes_no "Missing wget, unzip, or sha256sum. Install them?" "y"; then
-                run_quiet "Installing wget, unzip and coreutils" install_packages wget unzip coreutils
-            else
-                echo "Cannot proceed without wget, unzip, and sha256sum. Installation aborted."
-                exit 1
-            fi
+    if [ "$EXISTING_INSTALL" = true ]; then
+        local old_dir
+        old_dir=$($SUDO mktemp -d "${INSTALL_BASE_DIR}.old.XXXXXX")
+        # Ctrl-C between these two renames would leave no install at all.
+        trap '' INT TERM
+        if ! $SUDO mv -T "$INSTALL_BASE_DIR" "$old_dir/install"; then
+            $SUDO rmdir "$old_dir" || true
+            exit 1
         fi
+        if ! $SUDO mv -T "$STAGE_DIR" "$INSTALL_BASE_DIR"; then
+            $SUDO mv -T "$old_dir/install" "$INSTALL_BASE_DIR"
+            $SUDO rmdir "$old_dir" || true
+            exit 1
+        fi
+        STAGE_DIR=""
+        OLD_INSTALL_INTACT=false
+        trap 'exit 130' INT TERM
+        $SUDO rm -rf "$old_dir"
+        ui_ok "Previous version replaced"
 
-        # Task 75: verify_download_hash() (scripts/lib/verify-download.sh)
-        # size+hash-verifies the downloaded release .zip below, against the
-        # size/digest fields GitHub's Releases API returns for that asset.
-        # Fallback definition matching the exact real logic in that file --
-        # see this script's earlier optional `source
-        # "$SCRIPT_DIR/lib/verify-download.sh"` for why a fallback (rather
-        # than just failing when the lib file is absent) is needed here: the
-        # primary documented install path (`curl -sL .../install.sh |
-        # bash`, README.md) fetches ONLY this one file, never scripts/lib/,
-        # so relying solely on that optional source would silently skip
-        # real verification on the most common real-world path -- defeating
-        # this task's whole purpose. Kept byte-for-byte identical to
-        # scripts/lib/verify-download.sh's real body (that file remains the
-        # single source of truth exercised by scripts/test-verify-download.sh;
-        # this is a deliberate, disclosed duplication for the piped-install
-        # case, not a divergent reimplementation).
-        if ! declare -f verify_download_hash >/dev/null 2>&1; then
-            verify_download_hash() {
-                local file_path="$1"
-                local expected_size="$2"
-                local expected_digest="$3"
+        if [ -n "${LEGACY_DATA_BACKUP:-}" ]; then
+            $SUDO rm -rf "$LEGACY_DATA_BACKUP"
+        fi
+        $SUDO systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+    else
+        $SUDO mv -T "$STAGE_DIR" "$INSTALL_BASE_DIR"
+        STAGE_DIR=""
+    fi
 
-                if [ ! -f "$file_path" ]; then
-                    echo "verify_download_hash: file not found: $file_path" >&2
+    $SUDO chown -R $USER:$USER "$INSTALL_BASE_DIR"
+}
+
+# 0. Download the release (remote flow only)
+if [ "$REMOTE_FLOW" = true ]; then
+    # Nothing touches the current install until the new release is downloaded,
+    # verified and unpacked, so a failure up to replace_install leaves the old
+    # version running.
+    OLD_INSTALL_INTACT="$EXISTING_INSTALL"
+
+    ui_step "Downloading Snapcast Manager $VERSION"
+
+    if ! command -v wget >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1 || ! command -v sha256sum >/dev/null 2>&1; then
+        # sha256sum (GNU coreutils) verifies the downloaded release .zip's
+        # hash below (Task 75) before it is ever extracted/installed --
+        # ships in every Debian/Ubuntu base install already, so this is
+        # a defensive check, not an expected real-world install path.
+        if prompt_yes_no "Missing wget, unzip, or sha256sum. Install them?" "y"; then
+            run_quiet "Installing wget, unzip and coreutils" install_packages wget unzip coreutils
+        else
+            echo "Cannot proceed without wget, unzip, and sha256sum. Installation aborted."
+            exit 1
+        fi
+    fi
+
+    # Task 75: verify_download_hash() (scripts/lib/verify-download.sh)
+    # size+hash-verifies the downloaded release .zip below, against the
+    # size/digest fields GitHub's Releases API returns for that asset.
+    # Fallback definition matching the exact real logic in that file --
+    # see this script's earlier optional `source
+    # "$SCRIPT_DIR/lib/verify-download.sh"` for why a fallback (rather
+    # than just failing when the lib file is absent) is needed here: the
+    # primary documented install path (`curl -sL .../install.sh |
+    # bash`, README.md) fetches ONLY this one file, never scripts/lib/,
+    # so relying solely on that optional source would silently skip
+    # real verification on the most common real-world path -- defeating
+    # this task's whole purpose. Kept byte-for-byte identical to
+    # scripts/lib/verify-download.sh's real body (that file remains the
+    # single source of truth exercised by scripts/test-verify-download.sh;
+    # this is a deliberate, disclosed duplication for the piped-install
+    # case, not a divergent reimplementation).
+    if ! declare -f verify_download_hash >/dev/null 2>&1; then
+        verify_download_hash() {
+            local file_path="$1"
+            local expected_size="$2"
+            local expected_digest="$3"
+
+            if [ ! -f "$file_path" ]; then
+                echo "verify_download_hash: file not found: $file_path" >&2
+                return 1
+            fi
+
+            if [ -n "$expected_size" ]; then
+                local actual_size
+                actual_size=$(stat -c '%s' "$file_path" 2>/dev/null || stat -f '%z' "$file_path" 2>/dev/null)
+                if [ -z "$actual_size" ]; then
+                    echo "verify_download_hash: unable to determine file size for $file_path" >&2
                     return 1
                 fi
-
-                if [ -n "$expected_size" ]; then
-                    local actual_size
-                    actual_size=$(stat -c '%s' "$file_path" 2>/dev/null || stat -f '%z' "$file_path" 2>/dev/null)
-                    if [ -z "$actual_size" ]; then
-                        echo "verify_download_hash: unable to determine file size for $file_path" >&2
-                        return 1
-                    fi
-                    if [ "$actual_size" != "$expected_size" ]; then
-                        echo "verify_download_hash: size mismatch for $file_path -- GitHub reported $expected_size bytes, got $actual_size bytes" >&2
-                        return 1
-                    fi
+                if [ "$actual_size" != "$expected_size" ]; then
+                    echo "verify_download_hash: size mismatch for $file_path -- GitHub reported $expected_size bytes, got $actual_size bytes" >&2
+                    return 1
                 fi
+            fi
 
-                if [ -n "$expected_digest" ]; then
-                    local expected_hash actual_hash
-                    expected_hash="${expected_digest#sha256:}"
-                    if command -v sha256sum >/dev/null 2>&1; then
-                        actual_hash=$(sha256sum "$file_path" | cut -d ' ' -f 1)
-                    elif command -v shasum >/dev/null 2>&1; then
-                        actual_hash=$(shasum -a 256 "$file_path" | cut -d ' ' -f 1)
-                    else
-                        echo "verify_download_hash: neither sha256sum nor shasum is available to compute a hash" >&2
-                        return 1
-                    fi
-                    if [ "$actual_hash" != "$expected_hash" ]; then
-                        echo "verify_download_hash: hash mismatch for $file_path -- GitHub reported sha256:$expected_hash, computed sha256:$actual_hash" >&2
-                        return 1
-                    fi
+            if [ -n "$expected_digest" ]; then
+                local expected_hash actual_hash
+                expected_hash="${expected_digest#sha256:}"
+                if command -v sha256sum >/dev/null 2>&1; then
+                    actual_hash=$(sha256sum "$file_path" | cut -d ' ' -f 1)
+                elif command -v shasum >/dev/null 2>&1; then
+                    actual_hash=$(shasum -a 256 "$file_path" | cut -d ' ' -f 1)
+                else
+                    echo "verify_download_hash: neither sha256sum nor shasum is available to compute a hash" >&2
+                    return 1
                 fi
-
-                return 0
-            }
-        fi
-
-        $SUDO rm -rf "$INSTALL_BASE_DIR"
-        $SUDO mkdir -p "$INSTALL_BASE_DIR"
-
-        # Fetch the release's full API response once (not pre-filtered to
-        # just browser_download_url lines, as before) -- Task 75 needs each
-        # asset's "size"/"digest" fields too, which live in the SAME object
-        # as its browser_download_url, not as standalone lines elsewhere in
-        # the response.
-        API_URL="https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/tags/${VERSION}"
-        RELEASE_JSON=$(curl -sL "$API_URL" || true)
-
-        # Isolate just the "assets": [ ... ] array (2-space indent, GitHub's
-        # standard pretty-printed API format) so the per-asset block split
-        # below can safely use "name" as a splitting anchor -- the top-level
-        # release object ALSO has its own unrelated "name" field (the
-        # release's display title, e.g. "v0.3.0"), which would otherwise be
-        # ambiguous.
-        ASSETS_JSON=$(printf '%s\n' "$RELEASE_JSON" | awk '
-            /^  "assets": \[/ { flag=1 }
-            flag { print }
-            flag && /^  \],?$/ { exit }
-        ')
-
-        # This repo's release asset filename (release.yml's "Prepare Release
-        # Package" step zips to exactly this name). Split ASSETS_JSON into
-        # per-asset blocks on the 4-space-indented "{"/"}" object boundaries
-        # (each array element), and keep only the block whose "name" field
-        # is an EXACT match -- not a substring match. Requirement 1 (this
-        # same task) now ALSO publishes a "snapcast-manager-release.zip.sha256"
-        # asset in the SAME assets array; a naive `grep ".zip"` (the old
-        # logic) would match EITHER asset depending on array order, since
-        # ".zip" is a substring of both filenames. Anchoring on the closing
-        # quote (`"name": "snapcast-manager-release.zip"` as a literal
-        # substring, which cannot appear inside the longer ".zip.sha256"
-        # name) makes the match exact.
-        RELEASE_ASSET_NAME="snapcast-manager-release.zip"
-        ASSET_BLOCK=$(printf '%s\n' "$ASSETS_JSON" | awk -v name="\"name\": \"$RELEASE_ASSET_NAME\"" '
-            /^    \{$/ { block = "" }
-            { block = block "\n" $0 }
-            /^    \},?$/ {
-                if (index(block, name) > 0) { print block; exit }
-            }
-        ')
-
-        REPO_ZIP_URL=$(printf '%s\n' "$ASSET_BLOCK" | grep '"browser_download_url":' | head -n 1 | cut -d '"' -f 4 || true)
-        ASSET_SIZE=$(printf '%s\n' "$ASSET_BLOCK" | grep '"size":' | head -n 1 | grep -oE '[0-9]+' || true)
-        ASSET_DIGEST=$(printf '%s\n' "$ASSET_BLOCK" | grep '"digest":' | head -n 1 | cut -d '"' -f 4 || true)
-
-
-        DOWNLOADED_PREBUILT_ASSET=false
-        if spin "Downloading release archive" $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"; then
-            DOWNLOADED_PREBUILT_ASSET=true
-        else
-            ui_warn "Pre-built asset $VERSION not found. Falling back to tagged source code..."
-            REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/archive/refs/tags/${VERSION}.zip"
-            run_quiet "Downloading source archive" $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"
-        fi
-
-        if [ "$DOWNLOADED_PREBUILT_ASSET" = true ]; then
-            if [ -z "$ASSET_SIZE" ] && [ -z "$ASSET_DIGEST" ]; then
-                # Genuinely nothing to verify against (e.g. GitHub API
-                # response didn't include this asset's metadata for some
-                # reason) -- logged clearly rather than silently treated as
-                # a pass, matching verifyDownloadedAsset()'s (Task 61,
-                # server/src/services/system.ts) own "no digest available"
-                # non-fatal-but-disclosed handling.
-                ui_warn "No size/hash metadata available from GitHub's API for this asset -- proceeding WITHOUT verification."
-            elif ! verify_download_hash /tmp/snapmanager.zip "$ASSET_SIZE" "$ASSET_DIGEST"; then
-                ui_error "Downloaded release archive failed verification -- aborting BEFORE extraction/install."
-                ui_note "This could mean a corrupted download, a mid-transfer network issue, or (far less"
-                ui_note "likely) a tampered asset. Re-run the installer; if this keeps happening, please"
-                ui_note "report it."
-                $SUDO rm -f /tmp/snapmanager.zip
-                exit 1
-            else
-                ui_ok "Verified: size and hash match GitHub's reported asset metadata"
-            fi
-        else
-            # The tagged-source-code fallback above is a GitHub-generated
-            # archive (Codeload), not a release asset -- it has no
-            # size/digest field to verify against at all (distinct from the
-            # "asset present but metadata missing" case above).
-            ui_warn "Source-archive fallback has no GitHub-published checksum to verify against -- proceeding WITHOUT verification."
-        fi
-
-        ui_step "Unpacking files"
-        TEMP_EXTRACT="/tmp/snapmgr_extract"
-        $SUDO rm -rf "$TEMP_EXTRACT"
-        $SUDO mkdir -p "$TEMP_EXTRACT"
-        $SUDO unzip -qo /tmp/snapmanager.zip -d "$TEMP_EXTRACT"
-        
-        # Move contents to INSTALL_BASE_DIR. Note: source zip has a root folder, release zip does not.
-        if [ -d $TEMP_EXTRACT/Snapcast-Manager-* ]; then
-            ROOT_FOLDER=$(ls -d $TEMP_EXTRACT/Snapcast-Manager-*)
-            $SUDO cp -r $ROOT_FOLDER/. "$INSTALL_BASE_DIR/"
-            # Create flag to force rebuild since this is source code
-            $SUDO touch "$INSTALL_BASE_DIR/.rebuilding"
-        else
-            $SUDO cp -r $TEMP_EXTRACT/. "$INSTALL_BASE_DIR/"
-        fi
-        
-        $SUDO rm -rf "$TEMP_EXTRACT"
-        $SUDO rm -f /tmp/snapmanager.zip
-
-        ui_ok "Files unpacked to $INSTALL_BASE_DIR"
-
-        # Restore database if backup exists
-        if [ -d "/tmp/snapmgr_data_backup" ] || [ -f "/tmp/snapserver_conf_backup" ]; then
-            if [ -d "/tmp/snapmgr_data_backup" ]; then
-                $SUDO mkdir -p "$INSTALL_BASE_DIR/data"
-                $SUDO cp -rT /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
-                ui_ok "Database restored"
-            fi
-            if [ -f "/tmp/snapserver_conf_backup" ]; then
-                $SUDO cp /tmp/snapserver_conf_backup /etc/snapserver.conf
-                ui_ok "snapserver.conf restored"
+                if [ "$actual_hash" != "$expected_hash" ]; then
+                    echo "verify_download_hash: hash mismatch for $file_path -- GitHub reported sha256:$expected_hash, computed sha256:$actual_hash" >&2
+                    return 1
+                fi
             fi
 
-            # Clean up backups
-            $SUDO rm -rf /tmp/snapmgr_data_backup
-            $SUDO rm -f /tmp/snapserver_conf_backup
-        fi
+            return 0
+        }
+    fi
 
-        $SUDO chown -R $USER:$USER "$INSTALL_BASE_DIR"
+    # Private to the user running this, so nothing can swap the archive between
+    # the hash check and unpacking. Nothing here needs root.
+    WORK_DIR=$(mktemp -d /tmp/snapcast-manager-update.XXXXXX)
+    RELEASE_ARCHIVE="$WORK_DIR/snapmanager.zip"
 
-        cd "$INSTALL_BASE_DIR"
-        # Hand over to the installer inside this release, so the unit, sudoers
-        # rule and paths it sets up match the release just unpacked. Settings
-        # are passed along because the old server/.env is gone by now.
-        #
-        # -y and --no-service are never passed together: a release older than
-        # --no-service ignores it and would install the service under -y. When
-        # the service was declined, that release asks again instead, and
-        # --auto-confirm keeps this release from asking anything.
-        EXEC_ARGS=("--resumed=${RUN_KIND}:${STEP_NUM}/${STEP_TOTAL}" "--port" "$APP_PORT" "--mode" "$APP_MODE")
-        if [ "$INSTALL_SERVICE" = false ]; then
-            EXEC_ARGS+=("--no-service")
-            if [ "$AUTO_CONFIRM" = true ]; then
-                EXEC_ARGS+=("--auto-confirm")
-            fi
-        elif [ "$AUTO_CONFIRM" = true ]; then
-            EXEC_ARGS+=("-y")
-        fi
-        if [ -n "$RESTORE_FILE" ]; then
-            EXEC_ARGS+=("--restore" "$RESTORE_FILE")
-        fi
-        # Same version as the summary, without asking GitHub a second time.
-        if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
-            export SNAPCAST_MANAGER_VERSION="$VERSION"
-        fi
-        exec bash scripts/install.sh "${EXEC_ARGS[@]}"
+    # Fetch the release's full API response once (not pre-filtered to
+    # just browser_download_url lines, as before) -- Task 75 needs each
+    # asset's "size"/"digest" fields too, which live in the SAME object
+    # as its browser_download_url, not as standalone lines elsewhere in
+    # the response.
+    API_URL="https://api.github.com/repos/NaturalDevCR/Snapcast-Manager/releases/tags/${VERSION}"
+    RELEASE_JSON=$(curl -sL "$API_URL" || true)
+
+    # Isolate just the "assets": [ ... ] array (2-space indent, GitHub's
+    # standard pretty-printed API format) so the per-asset block split
+    # below can safely use "name" as a splitting anchor -- the top-level
+    # release object ALSO has its own unrelated "name" field (the
+    # release's display title, e.g. "v0.3.0"), which would otherwise be
+    # ambiguous.
+    ASSETS_JSON=$(printf '%s\n' "$RELEASE_JSON" | awk '
+        /^  "assets": \[/ { flag=1 }
+        flag { print }
+        flag && /^  \],?$/ { exit }
+    ')
+
+    # This repo's release asset filename (release.yml's "Prepare Release
+    # Package" step zips to exactly this name). Split ASSETS_JSON into
+    # per-asset blocks on the 4-space-indented "{"/"}" object boundaries
+    # (each array element), and keep only the block whose "name" field
+    # is an EXACT match -- not a substring match. Requirement 1 (this
+    # same task) now ALSO publishes a "snapcast-manager-release.zip.sha256"
+    # asset in the SAME assets array; a naive `grep ".zip"` (the old
+    # logic) would match EITHER asset depending on array order, since
+    # ".zip" is a substring of both filenames. Anchoring on the closing
+    # quote (`"name": "snapcast-manager-release.zip"` as a literal
+    # substring, which cannot appear inside the longer ".zip.sha256"
+    # name) makes the match exact.
+    RELEASE_ASSET_NAME="snapcast-manager-release.zip"
+    ASSET_BLOCK=$(printf '%s\n' "$ASSETS_JSON" | awk -v name="\"name\": \"$RELEASE_ASSET_NAME\"" '
+        /^    \{$/ { block = "" }
+        { block = block "\n" $0 }
+        /^    \},?$/ {
+            if (index(block, name) > 0) { print block; exit }
+        }
+    ')
+
+    REPO_ZIP_URL=$(printf '%s\n' "$ASSET_BLOCK" | grep '"browser_download_url":' | head -n 1 | cut -d '"' -f 4 || true)
+    ASSET_SIZE=$(printf '%s\n' "$ASSET_BLOCK" | grep '"size":' | head -n 1 | grep -oE '[0-9]+' || true)
+    ASSET_DIGEST=$(printf '%s\n' "$ASSET_BLOCK" | grep '"digest":' | head -n 1 | cut -d '"' -f 4 || true)
+
+
+    DOWNLOADED_PREBUILT_ASSET=false
+    if spin "Downloading release archive" wget -qO "$RELEASE_ARCHIVE" "$REPO_ZIP_URL"; then
+        DOWNLOADED_PREBUILT_ASSET=true
     else
-        echo "Installation aborted."
+        ui_warn "Pre-built asset $VERSION not found. Falling back to tagged source code..."
+        REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/archive/refs/tags/${VERSION}.zip"
+        run_quiet "Downloading source archive" wget -qO "$RELEASE_ARCHIVE" "$REPO_ZIP_URL"
+    fi
+
+    if [ "$DOWNLOADED_PREBUILT_ASSET" = true ]; then
+        if [ -z "$ASSET_SIZE" ] && [ -z "$ASSET_DIGEST" ]; then
+            # Genuinely nothing to verify against (e.g. GitHub API
+            # response didn't include this asset's metadata for some
+            # reason) -- logged clearly rather than silently treated as
+            # a pass, matching verifyDownloadedAsset()'s (Task 61,
+            # server/src/services/system.ts) own "no digest available"
+            # non-fatal-but-disclosed handling.
+            ui_warn "No size/hash metadata available from GitHub's API for this asset -- proceeding WITHOUT verification."
+        elif ! verify_download_hash "$RELEASE_ARCHIVE" "$ASSET_SIZE" "$ASSET_DIGEST"; then
+            ui_error "Downloaded release archive failed verification -- aborting BEFORE extraction/install."
+            ui_note "This could mean a corrupted download, a mid-transfer network issue, or (far less"
+            ui_note "likely) a tampered asset. Re-run the installer; if this keeps happening, please"
+            ui_note "report it."
+            exit 1
+        else
+            ui_ok "Verified: size and hash match GitHub's reported asset metadata"
+        fi
+    else
+        # The tagged-source-code fallback above is a GitHub-generated
+        # archive (Codeload), not a release asset -- it has no
+        # size/digest field to verify against at all (distinct from the
+        # "asset present but metadata missing" case above).
+        ui_warn "Source-archive fallback has no GitHub-published checksum to verify against -- proceeding WITHOUT verification."
+    fi
+
+    ui_step "Unpacking files"
+    EXTRACT_DIR="$WORK_DIR/extract"
+    mkdir "$EXTRACT_DIR"
+    run_quiet "Unpacking the archive" unzip -qo "$RELEASE_ARCHIVE" -d "$EXTRACT_DIR"
+
+    # A source archive has a root folder, a release archive does not.
+    RELEASE_ROOT="$EXTRACT_DIR"
+    IS_SOURCE_ARCHIVE=false
+    for candidate in "$EXTRACT_DIR"/Snapcast-Manager-*; do
+        if [ -d "$candidate" ]; then
+            RELEASE_ROOT="$candidate"
+            IS_SOURCE_ARCHIVE=true
+        fi
+    done
+
+    if [ ! -f "$RELEASE_ROOT/scripts/install.sh" ] || [ ! -f "$RELEASE_ROOT/server/package.json" ]; then
+        ui_error "The downloaded archive is not a Snapcast Manager release."
         exit 1
     fi
+
+    stage_release
+    ui_ok "New version ready"
+
+    if [ "$EXISTING_INSTALL" = true ]; then
+        ui_step "Replacing the previous version"
+    fi
+    replace_install
+
+    cd "$INSTALL_BASE_DIR"
+    # Hand over to the installer inside this release, so the unit, sudoers
+    # rule and paths it sets up match the release just unpacked.
+    #
+    # -y and --no-service are never passed together: a release older than
+    # --no-service ignores it and would install the service under -y. When
+    # the service was declined, that release asks again instead, and
+    # --auto-confirm keeps this release from asking anything.
+    EXEC_ARGS=("--resumed=${RUN_KIND}:${STEP_NUM}/${STEP_TOTAL}" "--port" "$APP_PORT" "--mode" "$APP_MODE")
+    if [ "$INSTALL_SERVICE" = false ]; then
+        EXEC_ARGS+=("--no-service")
+        if [ "$AUTO_CONFIRM" = true ]; then
+            EXEC_ARGS+=("--auto-confirm")
+        fi
+    elif [ "$AUTO_CONFIRM" = true ]; then
+        EXEC_ARGS+=("-y")
+    fi
+    if [ -n "$RESTORE_FILE" ]; then
+        EXEC_ARGS+=("--restore" "$RESTORE_FILE")
+    fi
+    # Same version as the summary, without asking GitHub a second time.
+    if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+        export SNAPCAST_MANAGER_VERSION="$VERSION"
+    fi
+    # exec skips the EXIT trap.
+    remove_temporary_files
+    exec bash scripts/install.sh "${EXEC_ARGS[@]}"
 fi
 
 # 2. System requirements
@@ -1203,32 +1313,28 @@ ui_step "Applying configuration"
 # Restore from backup file
 if [ -n "$RESTORE_FILE" ]; then
     if [ -f "$RESTORE_FILE" ]; then
-        $SUDO mkdir -p /tmp/snapmgr_restore
-        $SUDO tar -xzf "$RESTORE_FILE" -C /tmp/snapmgr_restore
+        WORK_DIR=$($SUDO mktemp -d /tmp/snapcast-manager-restore.XXXXXX)
+        $SUDO tar -xzf "$RESTORE_FILE" -C "$WORK_DIR"
         
-        if [ -d "/tmp/snapmgr_restore/data" ]; then
+        if $SUDO test -d "$WORK_DIR/data"; then
             $SUDO mkdir -p "$INSTALL_BASE_DIR/data"
-            $SUDO cp -rT /tmp/snapmgr_restore/data "$INSTALL_BASE_DIR/data"
+            $SUDO cp -rT "$WORK_DIR/data" "$INSTALL_BASE_DIR/data"
             $SUDO chown -R $USER:$USER "$INSTALL_BASE_DIR/data"
             ui_ok "Database restored from $RESTORE_FILE"
         fi
         
-        if [ -f "/tmp/snapmgr_restore/snapserver.conf" ]; then
-            $SUDO cp /tmp/snapmgr_restore/snapserver.conf /etc/snapserver.conf
+        if $SUDO test -f "$WORK_DIR/snapserver.conf"; then
+            $SUDO cp "$WORK_DIR/snapserver.conf" /etc/snapserver.conf
             $SUDO chown snapserver:snapserver /etc/snapserver.conf
             ui_ok "snapserver.conf restored from $RESTORE_FILE"
         fi
         
-        $SUDO rm -rf /tmp/snapmgr_restore
     else
         ui_error "Backup file not found: $RESTORE_FILE"
     fi
 fi
 
-# Both values were validated, and printf keeps them from ever being parsed by
-# a shell running as root.
-printf 'PORT=%s\nSNAPCAST_MODE=%s\nNODE_ENV=production\n' "$APP_PORT" "$APP_MODE" \
-    | $SUDO tee "$INSTALL_BASE_DIR/server/.env" >/dev/null
+write_env_file "$INSTALL_BASE_DIR/server/.env"
 ui_ok "Settings saved: mode $APP_MODE, port $APP_PORT"
 
 # 5. Systemd Service setup (Task 16: dedicated 'snapmanager' user, sudoers.d,
@@ -1774,6 +1880,8 @@ if [ "$INSTALL_SERVICE" = true ]; then
     ui_ok "Service '$SERVICE_NAME' is active"
     ui_ok "Version $FINAL_VERSION"
 fi
+
+$SUDO rm -f "$SOURCE_DIR/$INCOMPLETE_MARKER"
 
 # Detect Local IP
 LOCAL_IP=$(hostname -I | awk '{print $1}')

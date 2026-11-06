@@ -106,14 +106,14 @@ Install Snapcast Manager v0.4.3? (Y/n):
 ### The steps
 
 Every run then shows numbered steps in one style. The exact count depends on
-the run: an update adds a backup step, and a local checkout has nothing to
-download.
+the run: an update adds a step that replaces the old version, and a local
+checkout has nothing to download.
 
 | Step | Runs on |
 |---|---|
-| Stopping the service and backing up data | Remote updates |
 | Downloading Snapcast Manager | Remote flow |
 | Unpacking files | Remote flow |
+| Replacing the previous version | Remote updates |
 | Checking system requirements | Always |
 | Installing dependencies, or building from source | Always |
 | Applying configuration | Always |
@@ -132,8 +132,9 @@ If you run the script from a directory that doesn't already contain
 `server/` and `client/` (true for the curl-piped one-liner), it treats this
 as a **remote install**: it downloads the latest tagged release (or falls back
 to the tagged source archive if no pre-built `.zip` asset exists), verifies
-the archive against the size and SHA-256 digest GitHub reports, extracts it to
-`/opt/snapcast-manager`, and hands over to the installer inside that release.
+the archive against the size and SHA-256 digest GitHub reports, unpacks it into
+a temporary directory, moves it to `/opt/snapcast-manager`, and hands over to
+the installer inside that release.
 The numbering carries on across the hand-over, and you aren't asked anything
 twice.
 
@@ -270,15 +271,33 @@ Update to v0.4.3 now? (Y/n, or o for other options):
   same other options. Under `-y`, this case **exits immediately** rather
   than doing anything — re-running the non-interactive installer against an
   already-up-to-date install is a deliberate no-op, not a forced reinstall.
-- When an update proceeds, the existing service is stopped, the database
-  (`data/` or the legacy `server/data/` path) and `/etc/snapserver.conf`
-  are backed up to `/tmp`, the install directory is wiped and
-  re-populated from the newly downloaded release, and the backups are
-  restored into place before the build/systemd steps re-run. If a run fails
-  while the backup is still in `/tmp`, the installer tells you where it is.
+- When an update proceeds, the new release is downloaded, verified and
+  unpacked first, and a complete copy of it is prepared next to the install
+  in `/opt/snapcast-manager.new.*`. The running version isn't touched during
+  any of this. Only then is the service stopped, the database (`data/` or the
+  legacy `server/data/` path) copied into the new copy, and the two directories
+  swapped, before the build/systemd steps re-run. `/etc/snapserver.conf` is
+  outside the install directory and isn't touched.
 
 Only `PORT` and `SNAPCAST_MODE` carry over from `server/.env`. Anything else
 added to that file by hand is lost on an update.
+
+#### If an update fails
+
+| Fails during | Result |
+|---|---|
+| Download, verification or unpacking | The old version keeps running, unchanged. |
+| Copying the database | The old install is still whole, and the installer restarts it. |
+| Any later step, such as `npm install` or starting the service | The new files are in place but the app is down. Database and settings are safe. |
+
+In every case, fix the problem and run the installer again. After a failure in
+a later step, the next run keeps the saved mode and port, says that the last
+run did not finish, and completes it, even under `-y` and even when the
+version already matches.
+
+If an installer up to v0.4.3 failed during an update and left a database
+backup in `/tmp/snapmgr_data_backup`, the next run restores it as long as the
+install has no database of its own and root owns that directory.
 
 This update flow only applies to the **remote** (curl-piped) install
 path. Re-running `scripts/install.sh` from a local checked-out copy of
