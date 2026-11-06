@@ -1440,6 +1440,113 @@ test('postSnapclientInstall() stops/disables the default snapclient service (tol
 });
 
 // ============================================================
+// isUpdateAvailable() / package cache freshness
+// ============================================================
+
+function stubPolicy(installed: string, candidate: string) {
+  return stubRun(async () => ({
+    stdout: `pkg:\n  Installed: ${installed}\n  Candidate: ${candidate}\n  Version table:\n`,
+    stderr: '',
+  }));
+}
+
+test('isUpdateAvailable() trusts apt for apt-managed packages, ignoring binary version format', async () => {
+  const restore = stubPolicy('7:7.1.5-0+deb13u1', '7:7.1.5-0+deb13u1');
+  try {
+    assert.equal(await freshService().isUpdateAvailable('ffmpeg' as any), false);
+  } finally {
+    restore();
+  }
+});
+
+test('isUpdateAvailable() reports a Debian-revision-only upgrade for apt packages', async () => {
+  const restore = stubPolicy('7:7.1.5-0+deb13u1', '7:7.1.5-0+deb13u2');
+  try {
+    assert.equal(await freshService().isUpdateAvailable('ffmpeg' as any), true);
+  } finally {
+    restore();
+  }
+});
+
+test('isUpdateAvailable() is false for an apt package dpkg does not know', async () => {
+  const restore = stubPolicy('(none)', '26.1.2-1');
+  try {
+    assert.equal(await freshService().isUpdateAvailable('mympd' as any), false);
+  } finally {
+    restore();
+  }
+});
+
+test('getLatestAvailableVersion() hides the epoch and reads myMPD from apt, which is what updates it', async () => {
+  const restore = stubPolicy('7:26.1.2-1', '7:26.1.3-1');
+  try {
+    assert.equal(await freshService().getLatestAvailableVersion('mympd' as any), '26.1.3-1');
+  } finally {
+    restore();
+  }
+});
+
+async function snapserverUpdate(selection: any, dpkgVersion: string, latestTag: string) {
+  const restoreChannels = stubModuleFn(channels, 'readChannels', async () => ({
+    snapserver: selection,
+    snapclient: { channel: 'official' },
+  }));
+  const restoreBeta = stubModuleFn(channels, 'fetchBetaReleases', async () => [
+    { tag_name: latestTag },
+  ]);
+  const restoreAsset = stubModuleFn(channels, 'selectBetaAsset', () => ({}));
+  const restoreRunImpl = stubRun(async (bin: string) =>
+    bin === 'dpkg-query'
+      ? { stdout: dpkgVersion, stderr: '' }
+      : { stdout: 'amd64', stderr: '' },
+  );
+  const restoreFetch = stubFetch(async () => ({
+    ok: true,
+    json: async () => ({ tag_name: latestTag }),
+  }));
+  try {
+    return await freshService().isUpdateAvailable('snapserver' as any);
+  } finally {
+    restoreFetch();
+    restoreRunImpl();
+    restoreAsset();
+    restoreBeta();
+    restoreChannels();
+  }
+}
+
+test('isUpdateAvailable() sees through the v prefix and Debian revision on the official channel', async () => {
+  assert.equal(await snapserverUpdate({ channel: 'official' }, '0.35.0-1', 'v0.35.0'), false);
+  assert.equal(await snapserverUpdate({ channel: 'official' }, '0.34.0-1', 'v0.35.0'), true);
+});
+
+test('isUpdateAvailable() matches an installed beta to its tag despite the .deb version format', async () => {
+  const beta = { channel: 'beta' };
+  const installed = '0.35.0.naturaldevcr.beta.6-1';
+  assert.equal(await snapserverUpdate(beta, installed, 'v0.35.0-naturaldevcr.beta.6'), false);
+  assert.equal(await snapserverUpdate(beta, installed, 'v0.35.0-naturaldevcr.beta.7'), true);
+});
+
+test('a dashboard poll during an update cannot leave stale versions cached afterwards', async () => {
+  const restoreApt = stubModuleFn(aptModule, 'update', async () => {});
+  const restoreUpgrade = stubModuleFn(aptModule, 'upgrade', async () => {});
+  try {
+    const service = freshService();
+    service.safeBackupOrAbort = async () => null;
+    const upgraded = aptModule.upgrade;
+    aptModule.upgrade = async () => {
+      service.pkgCache = { timestamp: Date.now(), installed: {}, versions: {}, available: {}, updates: {} };
+      await upgraded();
+    };
+    await service.updatePackage('mpd' as any);
+    assert.equal(service.pkgCache, null);
+  } finally {
+    restoreUpgrade();
+    restoreApt();
+  }
+});
+
+// ============================================================
 // getPackageVersion() -- shell `| head -n1` pipes eliminated
 // ============================================================
 

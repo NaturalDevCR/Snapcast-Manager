@@ -58,6 +58,8 @@ export const useSystemStore = defineStore('system', () => {
     'mympd': '',
   });
 
+  const updatesAvailable = ref<Record<string, boolean>>({});
+
   async function checkStatus(service: 'snapserver' | 'snapclient' | 'shairport-sync' | 'mpd' | 'mympd') {
      try {
        const data = await fetchApi(`/system/status/${service}`);
@@ -93,6 +95,7 @@ export const useSystemStore = defineStore('system', () => {
     try {
       const data = await fetchApi(`/system/check-updates/${pkg}`);
       availableVersions.value[pkg] = data.version;
+      updatesAvailable.value[pkg] = data.updateAvailable === true;
     } catch (err) {
       console.error(err);
     }
@@ -270,6 +273,8 @@ export const useSystemStore = defineStore('system', () => {
       for (const [pkg, ver] of Object.entries(data.available)) {
          availableVersions.value[pkg] = ver as string;
       }
+
+      updatesAvailable.value = data.updates ?? {};
     } catch (err) {
       console.error('Failed to refresh dashboard data:', err);
     } finally {
@@ -295,6 +300,7 @@ export const useSystemStore = defineStore('system', () => {
     installedPackages,
     packageVersions,
     availableVersions,
+    updatesAvailable,
     checkInstalled,
     controlService,
     installPackage,

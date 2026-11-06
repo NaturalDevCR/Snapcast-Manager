@@ -450,6 +450,7 @@ const isServerMode = computed(() => systemStore.snapcastMode !== 'client');
             :service-status="systemStore.snapserverStatus"
             :version="systemStore.packageVersions.snapserver"
             :available-version="systemStore.availableVersions.snapserver"
+            :update-available="systemStore.updatesAvailable.snapserver"
             :busy="systemStore.loading"
             can-reinstall
             @install="systemStore.installPackage('snapserver')"
@@ -476,6 +477,7 @@ const isServerMode = computed(() => systemStore.snapcastMode !== 'client');
             :service-status="systemStore.shairportSyncStatus"
             :version="systemStore.packageVersions['shairport-sync']"
             :available-version="systemStore.availableVersions['shairport-sync']"
+            :update-available="systemStore.updatesAvailable['shairport-sync']"
             :busy="systemStore.loading"
             can-uninstall
             @install="systemStore.installPackage('shairport-sync')"
@@ -492,6 +494,7 @@ const isServerMode = computed(() => systemStore.snapcastMode !== 'client');
             :service-status="systemStore.mpdStatus"
             :version="systemStore.packageVersions.mpd"
             :available-version="systemStore.availableVersions.mpd"
+            :update-available="systemStore.updatesAvailable.mpd"
             :busy="systemStore.loading"
             can-uninstall
             @install="systemStore.installPackage('mpd')"
@@ -508,6 +511,7 @@ const isServerMode = computed(() => systemStore.snapcastMode !== 'client');
             :service-status="systemStore.mympdStatus"
             :version="systemStore.packageVersions.mympd"
             :available-version="systemStore.availableVersions.mympd"
+            :update-available="systemStore.updatesAvailable.mympd"
             :busy="systemStore.loading"
             can-uninstall
             @install="systemStore.installPackage('mympd')"
@@ -530,6 +534,7 @@ const isServerMode = computed(() => systemStore.snapcastMode !== 'client');
             :installed="systemStore.installedPackages.ffmpeg"
             :version="systemStore.packageVersions.ffmpeg"
             :available-version="systemStore.availableVersions.ffmpeg"
+            :update-available="systemStore.updatesAvailable.ffmpeg"
             :busy="systemStore.loading"
             @install="systemStore.installPackage('ffmpeg')"
             @update="performUpdate('ffmpeg', false)"
@@ -543,6 +548,7 @@ const isServerMode = computed(() => systemStore.snapcastMode !== 'client');
             :installed="systemStore.installedPackages['snap-ctrl']"
             :version="systemStore.packageVersions['snap-ctrl']"
             :available-version="systemStore.availableVersions['snap-ctrl']"
+            :update-available="systemStore.updatesAvailable['snap-ctrl']"
             :busy="systemStore.loading"
             @install="performUpdate('snap-ctrl', false)"
             @update="performUpdate('snap-ctrl', false)"

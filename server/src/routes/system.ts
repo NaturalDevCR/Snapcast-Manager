@@ -325,8 +325,11 @@ router.get('/check-updates/:pkg', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Invalid package name' });
     }
     try {
-        const version = await systemService.getLatestAvailableVersion(pkg as any);
-        res.json({ pkg, version });
+        const [version, updateAvailable] = await Promise.all([
+            systemService.getLatestAvailableVersion(pkg as any),
+            systemService.isUpdateAvailable(pkg as any),
+        ]);
+        res.json({ pkg, version, updateAvailable });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

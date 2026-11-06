@@ -130,6 +130,7 @@ describe('Dashboard.vue', () => {
     systemStore.installedPackages.snapserver = true;
     systemStore.packageVersions.snapserver = '1.0.0';
     systemStore.availableVersions.snapserver = '1.2.3';
+    systemStore.updatesAvailable.snapserver = true;
     await nextTick();
     expect(wrapper.text()).toContain('New version: 1.2.3');
 

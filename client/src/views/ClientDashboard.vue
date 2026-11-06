@@ -241,6 +241,7 @@ onMounted(async () => {
             :installed="systemStore.installedPackages.snapclient"
             :version="systemStore.packageVersions.snapclient"
             :available-version="systemStore.availableVersions.snapclient"
+            :update-available="systemStore.updatesAvailable.snapclient"
             :busy="systemStore.loading"
             can-reinstall
             can-uninstall

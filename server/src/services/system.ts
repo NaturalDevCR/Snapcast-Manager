@@ -1,4 +1,5 @@
 import { readChannels, fetchBetaReleases, selectBetaAsset, SnapcastPackage } from './snapcastChannels';
+import { canonicalVersion, isNewerVersion } from '../platform/versions';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -34,6 +35,11 @@ const BUILD_RUN_OPTS: RunOptions = { maxBuffer: 50 * 1024 * 1024, timeoutMs: 20 
 const FETCH_TIMEOUT_MS = 10_000;
 
 export type PackageName = 'snapserver' | 'snapclient' | 'ffmpeg' | 'shairport-sync' | 'snap-ctrl' | 'node' | 'mpd' | 'mympd';
+
+// Updated through `apt-get`, so apt alone knows whether an update exists. This
+// includes myMPD: its GitHub releases can land before its OBS repo has them,
+// leaving an update button that apt can't act on.
+const APT_MANAGED_PACKAGES: ReadonlySet<PackageName> = new Set(['ffmpeg', 'mpd', 'mympd']);
 
 function normalizeVersion(raw: string | undefined | null): string {
   if (!raw) return 'unknown';
@@ -105,11 +111,25 @@ export class SystemService {
 
   // Installed packages and versions only change through install/update actions,
   // so cache them and let the dashboard poll cheaply (statuses stay live).
-  private pkgCache: { timestamp: number; installed: any; versions: any; available: any } | null = null;
+  private pkgCache: { timestamp: number; installed: any; versions: any; available: any; updates: any } | null = null;
   private readonly PKG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   invalidatePackageCache(): void {
     this.pkgCache = null;
+  }
+
+  /**
+   * Clears the cache on BOTH sides of `work`: the dashboard keeps polling
+   * while a job runs, so clearing only at the start lets a poll re-cache the
+   * old versions and bring the update banner back for the full TTL.
+   */
+  private async refreshingPackageCache<T>(work: () => Promise<T>): Promise<T> {
+    this.invalidatePackageCache();
+    try {
+      return await work();
+    } finally {
+      this.invalidatePackageCache();
+    }
   }
 
   /**
@@ -315,8 +335,11 @@ export class SystemService {
     return needsSudo() ? run('sudo', argv, opts) : run(argv[0], argv.slice(1), opts);
   }
 
-  async installPackage(pkg: string): Promise<string> {
-    this.invalidatePackageCache();
+  installPackage(pkg: string): Promise<string> {
+    return this.refreshingPackageCache(() => this.runInstall(pkg));
+  }
+
+  private async runInstall(pkg: string): Promise<string> {
     const backup = await this.safeBackupOrAbort(pkg, 'install');
     const knownUnit = SystemService.KNOWN_SERVICE_UNITS[pkg];
 
@@ -471,8 +494,11 @@ export class SystemService {
     return msg;
   }
 
-  async updatePackage(pkg: PackageName, clean: boolean = false): Promise<string> {
-    this.invalidatePackageCache();
+  updatePackage(pkg: PackageName, clean: boolean = false): Promise<string> {
+    return this.refreshingPackageCache(() => this.runUpdate(pkg, clean));
+  }
+
+  private async runUpdate(pkg: PackageName, clean: boolean): Promise<string> {
     if (pkg !== 'snap-ctrl') {
       // 'snap-ctrl' takes its own safeBackupOrAbort-equivalent path via
       // installSnapCtrl() below, which already calls safeBackup() itself --
@@ -504,8 +530,11 @@ export class SystemService {
     return msg;
   }
 
-  async uninstallPackage(pkg: string): Promise<string> {
-    this.invalidatePackageCache();
+  uninstallPackage(pkg: string): Promise<string> {
+    return this.refreshingPackageCache(() => this.runUninstall(pkg));
+  }
+
+  private async runUninstall(pkg: string): Promise<string> {
     await this.safeBackup(this.mapToComponent(pkg));
     if (pkg === 'snapclient') {
       jobService.log('Stopping snapclient.service...');
@@ -918,7 +947,10 @@ export class SystemService {
     if (!/^\d{1,2}$/.test(version)) {
       throw new Error('Invalid Node.js major version');
     }
-    this.invalidatePackageCache();
+    return this.refreshingPackageCache(() => this.runNodeUpdate(version));
+  }
+
+  private async runNodeUpdate(version: string): Promise<string> {
     log.info(`Updating Node.js to version ${version}...`);
 
     // Only `gpg` is installed here -- `updateNodeJs()` can be triggered
@@ -1119,36 +1151,73 @@ export class SystemService {
         return release.tag_name;
       }
 
-      if (pkg === 'mympd') {
-        const release = await this.getLatestGitHubRelease('jcorporation', 'myMPD');
-        return normalizeVersion(release.tag_name);
-      }
-
       if (pkg === 'node') {
         // We follow the nodesource LTS line used by the installer
         return 'v22.x (Latest)';
       }
 
-      // `apt-cache policy <pkg>` is run for its FULL output (no shell pipe)
-      // and the "Candidate:" line is parsed in JS instead of `grep Candidate
-      // | awk '{print $2}'` (Task 11). Real `apt-cache policy` output looks
-      // like:
-      //   mpd:
-      //     Installed: 0.23.5-1
-      //     Candidate: 0.23.5-1
-      //     Version table:
-      //    *** 0.23.5-1 500
-      //           500 http://deb.debian.org/debian bookworm/main amd64 Packages
-      // -- when no candidate is available, "Candidate:" is followed by the
-      // literal token "(none)".
-      const { stdout } = await run('apt-cache', ['policy', pkg]);
-      const match = stdout.match(/^\s*Candidate:\s*(\S+)/m);
-      const version = match?.[1];
-      if (!version || version === '(none)') return 'unknown';
-      return version;
+      const { candidate } = await this.aptPolicy(pkg);
+      return candidate?.replace(/^\d+:/, '') ?? 'unknown';
     } catch (error) {
       log.error({ err: error }, `Error checking latest version for ${pkg}`);
       return 'unknown';
+    }
+  }
+
+  /**
+   * `apt-cache policy <pkg>` is run for its FULL output (no shell pipe) and
+   * parsed in JS (Task 11). Real output looks like:
+   *   mpd:
+   *     Installed: 0.23.5-1
+   *     Candidate: 0.23.5-1
+   *     Version table:
+   *    *** 0.23.5-1 500
+   *           500 http://deb.debian.org/debian bookworm/main amd64 Packages
+   * -- either version can be the literal token "(none)".
+   */
+  private async aptPolicy(pkg: string): Promise<{ installed: string | null; candidate: string | null }> {
+    const { stdout } = await run('apt-cache', ['policy', pkg]);
+    const field = (name: string) => {
+      const value = stdout.match(new RegExp(`^\\s*${name}:\\s*(\\S+)`, 'm'))?.[1];
+      return !value || value === '(none)' ? null : value;
+    };
+    return { installed: field('Installed'), candidate: field('Candidate') };
+  }
+
+  /**
+   * Whether `pkg` has an update the Update button can actually apply. Compared
+   * here rather than in the client because each package needs a different
+   * source of truth, and raw strings never match across formats (see
+   * platform/versions.ts).
+   */
+  async isUpdateAvailable(pkg: PackageName): Promise<boolean> {
+    try {
+      if (pkg === 'node') return false;
+
+      if (APT_MANAGED_PACKAGES.has(pkg)) {
+        const { installed, candidate } = await this.aptPolicy(pkg);
+        return !!installed && !!candidate && installed !== candidate;
+      }
+
+      const available = await this.getLatestAvailableVersion(pkg);
+
+      if (pkg === 'snapserver' || pkg === 'snapclient') {
+        // dpkg, not --version: only dpkg tells one beta build from another.
+        const packaged = await this.getSnapcastPackageVersion(pkg);
+        const installed = packaged === 'unknown' ? await this.getPackageVersion(pkg) : packaged;
+        if ((await readChannels())[pkg].channel === 'beta') {
+          // The selected beta is the target, even when older than what's installed.
+          const target = canonicalVersion(available);
+          const current = canonicalVersion(installed);
+          return !!target && !!current && target !== current;
+        }
+        return isNewerVersion(available, installed);
+      }
+
+      return isNewerVersion(available, await this.getPackageVersion(pkg));
+    } catch (error) {
+      log.error({ err: error }, `Error checking updates for ${pkg}`);
+      return false;
     }
   }
 
@@ -1196,11 +1265,16 @@ export class SystemService {
         Promise.all(packages.map(pkg => this.getPackageVersion(pkg).then(res => ({ pkg, val: res })))),
         Promise.all(packages.map(pkg => this.getLatestAvailableVersion(pkg).then(res => ({ pkg, val: res })))),
       ]);
+      // After the lookups above, so it reuses their cached GitHub responses.
+      const updateResults = await Promise.all(
+        packages.map(pkg => this.isUpdateAvailable(pkg).then(res => ({ pkg, val: res })))
+      );
       pkgData = {
         timestamp: Date.now(),
         installed: Object.fromEntries(installedResults.map(r => [r.pkg, r.val])),
         versions: Object.fromEntries(versionResults.map(r => [r.pkg, r.val])),
         available: Object.fromEntries(availableResults.map(r => [r.pkg, r.val])),
+        updates: Object.fromEntries(updateResults.map(r => [r.pkg, r.val])),
       };
       this.pkgCache = pkgData;
     }
@@ -1211,6 +1285,7 @@ export class SystemService {
       installed: pkgData.installed,
       versions: pkgData.versions,
       available: pkgData.available,
+      updates: pkgData.updates,
       statuses: Object.fromEntries(statusResults.map(r => [r.svc, r.val]))
     };
   }
@@ -1350,8 +1425,11 @@ export class SystemService {
    *     `platform/files.ts`'s `installPrivilegedFile()` directly, which is
    *     exactly what that function exists for.
    */
-  async installSnapCtrl(): Promise<string> {
-      this.invalidatePackageCache();
+  installSnapCtrl(): Promise<string> {
+    return this.refreshingPackageCache(() => this.runSnapCtrlInstall());
+  }
+
+  private async runSnapCtrlInstall(): Promise<string> {
       await this.safeBackup('snap-ctrl');
       const installPath = '/usr/share/snapserver/snap-ctrl';
       const docRootPath = path.join(installPath, 'dist');

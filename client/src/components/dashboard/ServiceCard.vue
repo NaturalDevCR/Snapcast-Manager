@@ -30,6 +30,8 @@ const props = withDefaults(
     serviceStatus?: string;
     version?: string;
     availableVersion?: string;
+    /** Decided by the server, which knows each package's update source. */
+    updateAvailable?: boolean;
     busy?: boolean;
     canReinstall?: boolean;
     canUninstall?: boolean;
@@ -40,6 +42,7 @@ const props = withDefaults(
     serviceStatus: undefined,
     version: undefined,
     availableVersion: undefined,
+    updateAvailable: false,
     busy: false,
     canReinstall: false,
     canUninstall: false,
@@ -71,17 +74,7 @@ const status = computed<{ label: string; variant: 'success' | 'warning' | 'dange
   },
 );
 
-const knownAvailable = computed(
-  () => !!props.availableVersion && props.availableVersion !== 'unknown',
-);
-
-const updateAvailable = computed(
-  () =>
-    props.installed &&
-    knownAvailable.value &&
-    !!props.version &&
-    props.version !== props.availableVersion,
-);
+const showUpdate = computed(() => props.installed && props.updateAvailable);
 
 const showVersion = computed(
   () => props.installed && !!props.version && props.version !== 'unknown',
@@ -116,7 +109,7 @@ const hasMenu = computed(() => props.installed && (props.canReinstall || props.c
     </dl>
 
     <div
-      v-if="updateAvailable"
+      v-if="showUpdate"
       class="mt-3 flex items-center gap-2 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs font-medium text-warning"
     >
       <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">upgrade</span>
@@ -136,7 +129,7 @@ const hasMenu = computed(() => props.installed && (props.canReinstall || props.c
         >{{ t('dashboard.installButton', { name }) }}</Button
       >
 
-      <Button v-if="updateAvailable" size="sm" :disabled="busy" @click="emit('update')">{{
+      <Button v-if="showUpdate" size="sm" :disabled="busy" @click="emit('update')">{{
         t('dashboard.updateToButton', { version: availableVersion })
       }}</Button>
 
