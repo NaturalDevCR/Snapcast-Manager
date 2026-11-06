@@ -6,8 +6,9 @@
 # Runs as root INSIDE the container built from
 # docker/Dockerfile.integration-test. It replaces /opt/snapcast-manager and the
 # snapmanager unit, so never run it on a real host. The network is replaced by
-# curl and wget stubs on PATH, and the "release" is a small stub whose own
-# installer only records how it was called.
+# curl and wget stubs on PATH. The "release" is a small stub whose own installer
+# only records how it was called, except where a test ships the real installer
+# as its second half, with npm and node stubbed.
 #
 # Usage: bash scripts/test-update-failure.sh [path/to/install.sh]
 
@@ -15,6 +16,7 @@ set -uo pipefail
 
 INSTALLER="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/install.sh}"
 INSTALL_DIR=/opt/snapcast-manager
+PREVIOUS_DIR="${INSTALL_DIR}.previous"
 UNIT=/etc/systemd/system/snapmanager.service
 VERSION=v9.9.9
 OLD_VERSION=1.0.0
@@ -72,19 +74,43 @@ if ! command -v zip >/dev/null || ! command -v unzip >/dev/null; then
 fi
 
 # Builds a stub release at $1. Its installer exits with $2 and records its args.
+# On success it cleans up the way a current installer's second half does.
 make_release_zip() {
     local out="$1" stage2_status="${2:-0}" tree="$WORK/tree"
     rm -rf "$tree" "$out"
-    mkdir -p "$tree/scripts" "$tree/server" "$tree/client"
+    mkdir -p "$tree/scripts" "$tree/server/dist" "$tree/client/dist"
     printf '{\n  "version": "%s"\n}\n' "${VERSION#v}" > "$tree/server/package.json"
     cat > "$tree/scripts/install.sh" <<STUB
 #!/bin/bash
 # Second half stub. Knows about .update-incomplete, like a current release.
 echo "\$*" > "$WORK/stage2-args"
 pwd > "$WORK/stage2-cwd"
+if [ -d "$PREVIOUS_DIR" ]; then touch "$WORK/stage2-saw-previous"; fi
+if [ "$stage2_status" -eq 0 ]; then rm -rf "$PREVIOUS_DIR" "$INSTALL_DIR/.update-incomplete"; fi
 exit $stage2_status
 STUB
     (cd "$tree" && zip -qr "$out" .)
+}
+
+# Same tree, with a stub installer from a release that knows nothing about
+# finishing an update.
+make_old_release_zip() {
+    make_release_zip "$1"
+    cat > "$WORK/tree/scripts/install.sh" <<STUB
+#!/bin/bash
+echo "\$*" > "$WORK/stage2-args"
+pwd > "$WORK/stage2-cwd"
+STUB
+    rm -f "$1"
+    (cd "$WORK/tree" && zip -qr "$1" .)
+}
+
+# Same tree, with the installer under test as the second half.
+make_real_second_half_zip() {
+    make_release_zip "$1"
+    cp "$WORK/install.sh" "$WORK/tree/scripts/install.sh"
+    rm -f "$1"
+    (cd "$WORK/tree" && zip -qr "$1" .)
 }
 
 # Publishes $1 as the release asset, with the size and digest of file $2.
@@ -112,14 +138,16 @@ JSON
 # ---- A running install ----
 reset_install() {
     systemctl stop snapmanager 2>/dev/null || true
-    rm -rf "$INSTALL_DIR" "$INSTALL_DIR".new.* "$INSTALL_DIR".old.*
+    rm -rf "$INSTALL_DIR" "$INSTALL_DIR".new.* "$INSTALL_DIR".old.* "$PREVIOUS_DIR"
     rm -rf /tmp/snapmgr_* /tmp/snapmanager.zip /tmp/snapserver_conf_backup /tmp/snapcast-manager-update.*
-    rm -f "$WORK/release.json" "$WORK/asset.zip" "$WORK/source.zip" "$WORK/stage2-args" "$WORK/stage2-cwd"
-    mkdir -p "$INSTALL_DIR/data" "$INSTALL_DIR/server"
+    rm -f "$WORK/release.json" "$WORK/asset.zip" "$WORK/source.zip" "$WORK/stage2-args" "$WORK/stage2-cwd" \
+        "$WORK/stage2-saw-previous"
+    mkdir -p "$INSTALL_DIR/data" "$INSTALL_DIR/server/snapshots"
     echo "the database" > "$INSTALL_DIR/data/snapmanager.db"
     chmod 700 "$INSTALL_DIR/data"
+    echo "a snapshot" > "$INSTALL_DIR/server/snapshots/one.tar.gz"
     printf '{\n  "version": "%s"\n}\n' "$OLD_VERSION" > "$INSTALL_DIR/server/package.json"
-    printf 'PORT=8124\nSNAPCAST_MODE=client\nNODE_ENV=production\n' > "$INSTALL_DIR/server/.env"
+    printf 'PORT=8124\nSNAPCAST_MODE=client\nNODE_ENV=production\nJWT_SECRET=hand-added\n' > "$INSTALL_DIR/server/.env"
     chmod 600 "$INSTALL_DIR/server/.env"
     cat > "$UNIT" <<UNIT
 [Unit]
@@ -150,7 +178,7 @@ run_update() {
 
 no_leftovers() {
     local found
-    found=$(ls -d "$INSTALL_DIR".new.* "$INSTALL_DIR".old.* /tmp/snapmgr_* /tmp/snapmanager.zip \
+    found=$(ls -d "$INSTALL_DIR".new.* "$INSTALL_DIR".old.* "$PREVIOUS_DIR" /tmp/snapmgr_* /tmp/snapmanager.zip \
         /tmp/snapcast-manager-update.* 2>/dev/null || true)
     [ -z "$found" ] || { echo "    left behind: $found"; return 1; }
 }
@@ -236,7 +264,50 @@ check "second half got the saved port" grep -q -- "--port 8124" "$WORK/stage2-ar
 check "second half got the saved mode" grep -q -- "--mode client" "$WORK/stage2-args"
 check "database carried over" grep -q "the database" "$INSTALL_DIR/data/snapmanager.db"
 check "new version in place" grep -q "${VERSION#v}" "$INSTALL_DIR/server/package.json"
+check "snapshots carried over" grep -q "a snapshot" "$INSTALL_DIR/server/snapshots/one.tar.gz"
+check "hand-added .env value carried over" grep -q '^JWT_SECRET=hand-added$' "$INSTALL_DIR/server/.env"
+check ".env has one port" [ "$(grep -c '^PORT=' "$INSTALL_DIR/server/.env")" = 1 ]
+check "old version kept for the second half" [ -f "$WORK/stage2-saw-previous" ]
 check "nothing left behind" no_leftovers
+
+echo "== update to a release that cannot finish an update"
+reset_install
+make_old_release_zip "$WORK/old-release.zip"
+publish_asset "$WORK/old-release.zip"
+run_update; status=$?
+check "installer succeeds" [ "$status" -eq 0 ]
+check "no marker it could never remove" [ ! -e "$INSTALL_DIR/.update-incomplete" ]
+check "nothing left behind" no_leftovers
+
+echo "== real second half succeeds"
+reset_install
+make_real_second_half_zip "$WORK/real.zip"
+publish_asset "$WORK/real.zip"
+mkdir -p "$WORK/stubs"
+printf '#!/bin/bash\nexit 0\n' > "$WORK/stubs/npm"
+printf '#!/bin/bash\nexit 0\n' > "$WORK/stubs/node"
+chmod +x "$WORK/stubs/npm" "$WORK/stubs/node"
+env PATH="$WORK/stubs:$PATH" bash -c "$(declare -f run_update); WORK='$WORK' OUTPUT='$OUTPUT' VERSION='$VERSION' run_update --no-service"
+status=$?
+check "installer succeeds" [ "$status" -eq 0 ]
+check "second half keeps the saved port" grep -q '^PORT=8124$' "$INSTALL_DIR/server/.env"
+check "second half keeps hand-added values" grep -q '^JWT_SECRET=hand-added$' "$INSTALL_DIR/server/.env"
+check "marker removed" [ ! -e "$INSTALL_DIR/.update-incomplete" ]
+check "nothing left behind" no_leftovers
+
+echo "== real second half fails, so the old version comes back"
+reset_install
+publish_asset "$WORK/real.zip"
+printf '#!/bin/bash\nexit 1\n' > "$WORK/stubs/npm"
+env PATH="$WORK/stubs:$PATH" APP_WAIT_SECONDS=1 bash -c "$(declare -f run_update); WORK='$WORK' OUTPUT='$OUTPUT' VERSION='$VERSION' run_update"
+status=$?
+check "installer reports failure" [ "$status" -ne 0 ]
+check "old version running again" systemctl is-active --quiet snapmanager
+check "service enabled again" systemctl is-enabled --quiet snapmanager
+check "old unit in place" grep -q "Stub of the old version" "$UNIT"
+check "install tree unchanged" [ "$(tree_hash)" = "$OLD_TREE" ]
+check "nothing left behind" no_leftovers
+check "says it went back" grep -q "previous version was restored" "$OUTPUT"
 
 echo "== second half fails, then the installer is run again"
 reset_install
@@ -255,6 +326,19 @@ check "re-run does not stop at 'already up to date'" [ -f "$WORK/stage2-args" ]
 check "re-run keeps the port" grep -q -- "--port 8124" "$WORK/stage2-args" 
 check "re-run keeps the mode" grep -q -- "--mode client" "$WORK/stage2-args"
 check "database still there" grep -q "the database" "$INSTALL_DIR/data/snapmanager.db"
+check "last good version cleaned up" no_leftovers
+
+echo "== killed between the two renames"
+reset_install
+publish_asset "$WORK/good.zip"
+mkdir -m 700 "$PREVIOUS_DIR"
+systemctl stop snapmanager
+mv -T "$INSTALL_DIR" "$PREVIOUS_DIR/install"
+run_update; status=$?
+check "installer succeeds" [ "$status" -eq 0 ]
+check "treated as an update, port kept" grep -q -- "--port 8124" "$WORK/stage2-args"
+check "database found" grep -q "the database" "$INSTALL_DIR/data/snapmanager.db"
+check "nothing left behind" no_leftovers
 
 echo "== database stranded in /tmp by an older installer"
 reset_install
@@ -298,6 +382,9 @@ check "database not kept" [ ! -e "$INSTALL_DIR/data/snapmanager.db" ]
 check "new port passed on" grep -q -- "--port 9000" "$WORK/stage2-args"
 check "new mode passed on" grep -q -- "--mode server" "$WORK/stage2-args"
 check "new settings saved" grep -q '^PORT=9000$' "$INSTALL_DIR/server/.env"
+check "hand-added values not kept" [ "$(grep -c JWT_SECRET "$INSTALL_DIR/server/.env")" = 0 ]
+check "snapshots not kept" [ ! -e "$INSTALL_DIR/server/snapshots/one.tar.gz" ]
+check "old version not kept" [ ! -f "$WORK/stage2-saw-previous" ]
 check "nothing left behind" no_leftovers
 
 echo "== fresh install"

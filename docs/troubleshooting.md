@@ -92,8 +92,8 @@ settings), **Clean Re-install** (wipes everything), **Uninstall**, or
 Command output isn't shown during a run. The installer prints the end of its
 log when a step fails, and the log's path after this message
 (`/tmp/snapcast-manager-install.*`). Copy the log before rebooting if you
-need it. The message also says if the installed version was not changed, which
-is the case for any failure up to and including the database copy. See
+need it. On an update, the message also says whether the installed version was
+not changed or the previous version was restored. See
 [If an update fails](installation.md#if-an-update-fails).
 
 **"Pre-built asset \<version\> not found. Falling back to tagged source code..."**
@@ -105,8 +105,9 @@ network/GitHub reachability from the host.
 **A failed install left something behind.**
 The installer is idempotent and transactional against the live systemd
 unit: on the remote flow it prepares the new version in
-`/opt/snapcast-manager.new.*` and swaps it in once it is complete,
-and if the new hardened unit fails to start it restores the previous unit
+`/opt/snapcast-manager.new.*`, swaps it in once it is complete, and keeps the
+old version in `/opt/snapcast-manager.previous` until the update finishes.
+If the new hardened unit fails to start it restores the previous unit
 file and restarts the service under it, printing the old unit's backup
 path if even that rollback fails. In every case the correct retry is
 simply to **re-run the installer** — it detects whatever state exists and

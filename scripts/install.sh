@@ -89,6 +89,8 @@ fi
 APP_VERSION="$VERSION"
 
 INSTALL_BASE_DIR="/opt/snapcast-manager"
+# The version an update replaced, until the second half finishes.
+PREVIOUS_DIR="${INSTALL_BASE_DIR}.previous"
 SERVICE_NAME="snapmanager"
 UNIT_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 # Task 16: dedicated, unprivileged system user the service runs as (see
@@ -232,6 +234,51 @@ restart_previous_version() {
     fi
 }
 
+# Second half only, after a failure: everything up to here happened in the new
+# tree, so going back is two renames plus the unit. The database is the one from
+# before the update, which matters if the new version already migrated its copy.
+roll_back_update() {
+    if [ "$RESUMED" != true ] || ! $SUDO test -d "$PREVIOUS_DIR/install"; then
+        return 0
+    fi
+    trap '' INT TERM
+    ui_note "Going back to the previous version..."
+    cd /
+    $SUDO systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+
+    if ! $SUDO mv -T "$INSTALL_BASE_DIR" "$PREVIOUS_DIR/unfinished"; then
+        ui_error "Could not restore the previous version. It is in $PREVIOUS_DIR/install."
+        return 0
+    fi
+    if ! $SUDO mv -T "$PREVIOUS_DIR/install" "$INSTALL_BASE_DIR"; then
+        $SUDO mv -T "$PREVIOUS_DIR/unfinished" "$INSTALL_BASE_DIR" || true
+        ui_error "Could not restore the previous version. It is in $PREVIOUS_DIR/install."
+        return 0
+    fi
+
+    if $SUDO test -f "$PREVIOUS_DIR/unit"; then
+        $SUDO cp "$PREVIOUS_DIR/unit" "$UNIT_FILE" || true
+        $SUDO systemctl daemon-reload || true
+        $SUDO systemctl enable "$SERVICE_NAME" 2>/dev/null || true
+    else
+        $SUDO systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+        $SUDO rm -f "$UNIT_FILE" || true
+        $SUDO systemctl daemon-reload || true
+    fi
+    ui_ok "The previous version was restored"
+
+    if $SUDO test -e "$PREVIOUS_DIR/was-running"; then
+        APP_PORT=$(saved_env_value PORT "$(read_saved_env)")
+        APP_PORT="${APP_PORT:-$DEFAULT_PORT}"
+        if $SUDO systemctl start "$SERVICE_NAME" 2>/dev/null && wait_for_app; then
+            ui_ok "It is running again on port $APP_PORT"
+        else
+            ui_warn "It is not answering on port $APP_PORT. Check: systemctl status $SERVICE_NAME"
+        fi
+    fi
+    $SUDO rm -rf "$PREVIOUS_DIR" || true
+}
+
 on_exit() {
     local status=$?
     remove_temporary_files
@@ -247,6 +294,7 @@ on_exit() {
         ui_note "The installed version was not changed."
         restart_previous_version
     fi
+    roll_back_update
     ui_note "After fixing the problem, re-run this installer."
 }
 
@@ -339,10 +387,19 @@ is_valid_mode() {
 }
 
 # Both values were validated, and printf keeps them from ever being parsed by
-# a shell running as root.
+# a shell running as root. Lines added by hand are kept, as text only: they are
+# as untrusted as the rest of the file, and it is the service that reads them.
 write_env_file() {
-    printf 'PORT=%s\nSNAPCAST_MODE=%s\nNODE_ENV=production\n' "$APP_PORT" "$APP_MODE" \
-        | $SUDO tee "$1" >/dev/null
+    local extra=""
+    if [ "$PRESERVE_DATA" = true ]; then
+        extra=$(read_saved_env | grep -vE '^[[:space:]]*(export[[:space:]]+)?(PORT|SNAPCAST_MODE|NODE_ENV)[[:space:]]*=' || true)
+    fi
+    {
+        printf 'PORT=%s\nSNAPCAST_MODE=%s\nNODE_ENV=production\n' "$APP_PORT" "$APP_MODE"
+        if [ -n "$extra" ]; then
+            printf '%s\n' "$extra"
+        fi
+    } | $SUDO tee "$1" >/dev/null
 }
 
 # Prints vX.Y.Z from a package.json, or nothing.
@@ -384,6 +441,13 @@ detect_install() {
     SAVED_PORT=""
     SAVED_MODE=""
     SERVICE_INSTALLED=false
+
+    # A run killed between the two renames in replace_install.
+    if [ ! -d "$INSTALL_BASE_DIR" ] && $SUDO test -d "$PREVIOUS_DIR/install"; then
+        $SUDO mv -T "$PREVIOUS_DIR/install" "$INSTALL_BASE_DIR"
+        $SUDO rm -rf "$PREVIOUS_DIR"
+        ui_warn "Recovered the previous version from an interrupted run."
+    fi
 
     if [ -f "$UNIT_FILE" ]; then
         SERVICE_INSTALLED=true
@@ -774,7 +838,7 @@ plan_existing_install() {
     ui_row "New" "$VERSION"
     print_settings
     if [ "$INSTALLED_VERSION" != "$VERSION" ]; then
-        ui_row "Data" "database and settings are kept"
+        ui_row "Data" "database, snapshots and settings are kept"
     fi
     echo ""
 
@@ -910,8 +974,7 @@ stage_release() {
     local parent
     parent=$(dirname "$INSTALL_BASE_DIR")
     $SUDO mkdir -p "$parent"
-    # Left by a run that was killed. *.old.* is not touched: it could be the
-    # only copy of an install.
+    # Left by a run that was killed.
     $SUDO find "$parent" -maxdepth 1 -name "$(basename "$INSTALL_BASE_DIR").new.*" -exec rm -rf {} +
 
     STAGE_DIR=$($SUDO mktemp -d "${INSTALL_BASE_DIR}.new.XXXXXX")
@@ -923,10 +986,15 @@ stage_release() {
 
     # The second half writes this too, but only after its slow steps. Saving
     # it here means a run that fails in between still has the settings for the
-    # next run. A release that doesn't know the marker would never remove it.
+    # next run.
     write_env_file "$STAGE_DIR/server/.env"
     $SUDO chmod 600 "$STAGE_DIR/server/.env"
+
+    # An older release's second half would never remove the marker or the kept
+    # old version, and couldn't roll back to it.
+    RELEASE_FINISHES_UPDATES=false
     if grep -q "$INCOMPLETE_MARKER" "$RELEASE_ROOT/scripts/install.sh"; then
+        RELEASE_FINISHES_UPDATES=true
         $SUDO touch "$STAGE_DIR/$INCOMPLETE_MARKER"
     fi
 }
@@ -956,9 +1024,46 @@ find_data_source() {
     fi
 }
 
-# The only destructive part of the remote flow. The database is copied after
-# the service stops so it is consistent, and the old tree is left whole until
-# the new one, database included, is complete.
+# Moves the old tree aside and the new one into place. The old tree is kept for
+# roll_back_update until the second half finishes. If a killed run left one
+# there, that is the last version known to work, so it stays and the unfinished
+# install being replaced is what goes.
+swap_install() {
+    local old_dir="$PREVIOUS_DIR/install" unfinished=false
+    if $SUDO test -d "$old_dir"; then
+        old_dir="$PREVIOUS_DIR/unfinished"
+        unfinished=true
+    fi
+    $SUDO mkdir -p -m 700 "$PREVIOUS_DIR"
+
+    # Ctrl-C between these two renames would leave no install at all.
+    trap '' INT TERM
+    if ! $SUDO mv -T "$INSTALL_BASE_DIR" "$old_dir"; then
+        exit 1
+    fi
+    if ! $SUDO mv -T "$STAGE_DIR" "$INSTALL_BASE_DIR"; then
+        $SUDO mv -T "$old_dir" "$INSTALL_BASE_DIR"
+        exit 1
+    fi
+    STAGE_DIR=""
+    OLD_INSTALL_INTACT=false
+    trap 'exit 130' INT TERM
+
+    $SUDO rm -rf "$PREVIOUS_DIR/unfinished"
+    if [ "$RELEASE_FINISHES_UPDATES" != true ] || [ "$PRESERVE_DATA" != true ]; then
+        $SUDO rm -rf "$PREVIOUS_DIR"
+    elif [ "$unfinished" = false ]; then
+        if [ -f "$UNIT_FILE" ]; then
+            $SUDO cp "$UNIT_FILE" "$PREVIOUS_DIR/unit"
+        fi
+        if [ "$SERVICE_STOPPED" = true ]; then
+            $SUDO touch "$PREVIOUS_DIR/was-running"
+        fi
+    fi
+}
+
+# The only destructive part of the remote flow. Data is copied after the service
+# stops so it is consistent, and the old tree stays whole throughout.
 replace_install() {
     if [ "$EXISTING_INSTALL" = true ]; then
         SERVICE_STOPPED=false
@@ -976,8 +1081,12 @@ replace_install() {
             else
                 ui_note "No database to keep."
             fi
+            if [ -n "$($SUDO ls -A "$INSTALL_BASE_DIR/server/snapshots" 2>/dev/null)" ]; then
+                $SUDO mkdir -p "$STAGE_DIR/server/snapshots"
+                run_quiet "Copying snapshots" $SUDO cp -a "$INSTALL_BASE_DIR/server/snapshots/." "$STAGE_DIR/server/snapshots/"
+            fi
         else
-            ui_warn "Clean re-install: the database is not kept"
+            ui_warn "Clean re-install: the database and snapshots are not kept"
         fi
     fi
 
@@ -985,23 +1094,7 @@ replace_install() {
     $SUDO chmod 755 "$STAGE_DIR"
 
     if [ "$EXISTING_INSTALL" = true ]; then
-        local old_dir
-        old_dir=$($SUDO mktemp -d "${INSTALL_BASE_DIR}.old.XXXXXX")
-        # Ctrl-C between these two renames would leave no install at all.
-        trap '' INT TERM
-        if ! $SUDO mv -T "$INSTALL_BASE_DIR" "$old_dir/install"; then
-            $SUDO rmdir "$old_dir" || true
-            exit 1
-        fi
-        if ! $SUDO mv -T "$STAGE_DIR" "$INSTALL_BASE_DIR"; then
-            $SUDO mv -T "$old_dir/install" "$INSTALL_BASE_DIR"
-            $SUDO rmdir "$old_dir" || true
-            exit 1
-        fi
-        STAGE_DIR=""
-        OLD_INSTALL_INTACT=false
-        trap 'exit 130' INT TERM
-        $SUDO rm -rf "$old_dir"
+        swap_install
         ui_ok "Previous version replaced"
 
         if [ -n "${LEGACY_DATA_BACKUP:-}" ]; then
@@ -1882,6 +1975,9 @@ if [ "$INSTALL_SERVICE" = true ]; then
 fi
 
 $SUDO rm -f "$SOURCE_DIR/$INCOMPLETE_MARKER"
+if [ "$RESUMED" = true ]; then
+    $SUDO rm -rf "$PREVIOUS_DIR"
+fi
 
 # Detect Local IP
 LOCAL_IP=$(hostname -I | awk '{print $1}')

@@ -275,25 +275,34 @@ Update to v0.4.3 now? (Y/n, or o for other options):
   unpacked first, and a complete copy of it is prepared next to the install
   in `/opt/snapcast-manager.new.*`. The running version isn't touched during
   any of this. Only then is the service stopped, the database (`data/` or the
-  legacy `server/data/` path) copied into the new copy, and the two directories
-  swapped, before the build/systemd steps re-run. `/etc/snapserver.conf` is
-  outside the install directory and isn't touched.
+  legacy `server/data/` path) and snapshots (`server/snapshots/`) copied into
+  the new copy, and the two directories swapped, before the build/systemd steps
+  re-run. The old version stays in `/opt/snapcast-manager.previous` until the
+  update finishes. `/etc/snapserver.conf` is outside the install directory and
+  isn't touched.
 
-Only `PORT` and `SNAPCAST_MODE` carry over from `server/.env`. Anything else
-added to that file by hand is lost on an update.
+Everything in `server/.env` carries over, including lines you added by hand.
+`NODE_ENV` is always reset to `production`. A clean re-install starts from an
+empty file.
 
 #### If an update fails
 
 | Fails during | Result |
 |---|---|
 | Download, verification or unpacking | The old version keeps running, unchanged. |
-| Copying the database | The old install is still whole, and the installer restarts it. |
-| Any later step, such as `npm install` or starting the service | The new files are in place but the app is down. Database and settings are safe. |
+| Copying the database or snapshots | The old install is still whole, and the installer restarts it. |
+| Any later step, such as `npm install` or starting the service | The installer stops the new version and puts the old one back, with its database, settings and service definition, and restarts it if it was running. |
 
-In every case, fix the problem and run the installer again. After a failure in
-a later step, the next run keeps the saved mode and port, says that the last
-run did not finish, and completes it, even under `-y` and even when the
-version already matches.
+In every case, fix the problem and run the installer again. The database that
+comes back is the one from before the update, so anything the new version wrote
+during a failed start is dropped.
+
+If the run is killed outright, for example by a power cut, the installer can't
+go back on its own. The next run says that the last run did not finish and
+completes it, even under `-y` and even when the version already matches. It
+keeps the saved mode and port, and uses the kept old version if the update
+fails again. Updating to a release from before this behaviour, such as v0.4.3,
+doesn't keep the old version.
 
 If an installer up to v0.4.3 failed during an update and left a database
 backup in `/tmp/snapmgr_data_backup`, the next run restores it as long as the
