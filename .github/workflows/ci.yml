@@ -29,6 +29,15 @@ jobs:
           npm run build
           npm test
 
+      # Mirrors install.sh on a host with the newest npm, which blocks
+      # dependency install scripts unless package.json allows them.
+      - name: Check native modules build with the latest npm
+        working-directory: ./server
+        run: |
+          rm -rf node_modules
+          npx --yes npm@latest install --omit=dev
+          node -e "new (require('better-sqlite3'))(':memory:')"
+
   client:
     runs-on: ubuntu-latest
     strategy:
