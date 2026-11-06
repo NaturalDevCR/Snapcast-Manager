@@ -94,6 +94,11 @@ jobs:
         run: |
           docker exec snapcast-integration-test bash /opt/snapcast-manager/scripts/test-container-integration.sh
 
+      # Last, because it replaces /opt/snapcast-manager and the unit with stubs.
+      - name: Run the installer update-failure test script
+        run: |
+          docker exec snapcast-integration-test bash /opt/snapcast-manager/scripts/test-update-failure.sh
+
       - name: Dump diagnostics on failure
         if: failure()
         run: |
