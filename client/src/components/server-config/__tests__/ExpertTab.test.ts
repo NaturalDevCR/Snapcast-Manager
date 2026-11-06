@@ -11,7 +11,7 @@
 //
 // `prism-code-editor` (the real editor library) is mocked here rather than
 // exercised for real. Empirically confirmed while writing this test: under
-// jsdom, `basicEditor()` neither throws NOR renders any DOM content into its
+// jsdom, the original `basicEditor()` neither throws NOR renders any DOM content into its
 // container -- it silently no-ops (no ResizeObserver/rAF-related error, just
 // an empty `<div class="pce-custom">`). That's not a regression from this
 // extraction: the ORIGINAL `ServerConfig.vue` had ZERO test coverage of the
@@ -32,29 +32,15 @@ import { nextTick } from 'vue';
 let capturedUpdateCallback: ((value: string) => void) | null = null;
 const setOptionsSpy = vi.fn();
 
-vi.mock('prism-code-editor/setups', () => ({
-  basicEditor: (
-    _el: HTMLElement,
-    options: { value: string },
-    onReady: () => void,
-  ) => {
-    const instance = {
-      value: options.value,
-      setOptions: setOptionsSpy,
-      on: (event: string, cb: (value: string) => void) => {
-        if (event === 'update') capturedUpdateCallback = cb;
-      },
-    };
-    // Real prism-code-editor invokes its onReady callback asynchronously
-    // (after basicEditor() has already returned and been assigned to
-    // `editorInstance`) -- that's WHY the original code's onReady body
-    // guards with `if (editorInstance && ...)` before calling `.on(...)`.
-    // Calling onReady synchronously here (before this function returns)
-    // would make that guard fail even in production, so the mock defers
-    // it a tick to match real timing.
-    Promise.resolve().then(onReady);
-    return instance;
-  },
+vi.mock('../../../utils/codeEditor', () => ({
+  createCodeEditor: (_el: HTMLElement, options: { value: string }) => ({
+    value: options.value,
+    setOptions: setOptionsSpy,
+    remove: vi.fn(),
+    on: (event: string, cb: (value: string) => void) => {
+      if (event === 'update') capturedUpdateCallback = cb;
+    },
+  }),
 }));
 
 import ExpertTab from '../ExpertTab.vue';
@@ -90,6 +76,19 @@ describe('ExpertTab.vue', () => {
     expect(setOptionsSpy).toHaveBeenCalledWith({ value: 'server = 2' });
   });
 
+  it('keeps applying external writes after the editor echoes one back', async () => {
+    const wrapper = mount(ExpertTab, { props: { rawConfig: 'server = 1' } });
+    await nextTick();
+
+    await wrapper.setProps({ rawConfig: 'server = 2' });
+    capturedUpdateCallback!('server = 2'); // the real editor fires 'update' on setOptions()
+    await nextTick();
+    await wrapper.setProps({ rawConfig: 'server = 3' });
+    await nextTick();
+
+    expect(setOptionsSpy).toHaveBeenLastCalledWith({ value: 'server = 3' });
+  });
+
   it('propagates an editor edit back to the parent (child -> parent)', async () => {
     const wrapper = mount(ExpertTab, { props: { rawConfig: 'server = 1' } });
     await nextTick();
@@ -106,22 +105,6 @@ describe('ExpertTab.vue', () => {
     // back to ServerConfig.vue's `localRawConfig` via `v-model:rawConfig`.
     expect(wrapper.emitted('update:rawConfig')).toBeTruthy();
     expect(wrapper.emitted('update:rawConfig')![0]).toEqual(['server = 3']);
-  });
-
-  it('syncs the editor theme when the UI store dark-mode flag changes', async () => {
-    const { useUIStore } = await import('../../../stores/ui');
-    const wrapper = mount(ExpertTab, { props: { rawConfig: 'server = 1' } });
-    await nextTick();
-    setOptionsSpy.mockClear();
-
-    const uiStore = useUIStore();
-    uiStore.isDark = !uiStore.isDark;
-    await nextTick();
-
-    expect(setOptionsSpy).toHaveBeenCalledWith({
-      theme: uiStore.isDark ? 'github-dark' : 'github-light',
-    });
-    expect(wrapper.exists()).toBe(true);
   });
 
   it('emits revert-requested when the header Revert button is clicked', async () => {

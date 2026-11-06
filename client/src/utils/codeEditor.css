@@ -1,0 +1,113 @@
+/*
+ * Theme for createCodeEditor(). Replaces prism-code-editor's bundled themes,
+ * which are written for one fixed mode each and can't both be global in the
+ * light DOM. Colours follow the app's own `.dark` class and surface tokens.
+ */
+.prism-code-editor {
+  --pce-bg: var(--brand-surface);
+  --pce-cursor: var(--brand-primary);
+  --pce-selection: rgb(var(--brand-primary-rgb) / 0.25);
+  --pce-selection-match: rgb(var(--brand-primary-rgb) / 0.15);
+  --pce-bg-highlight: var(--inset);
+  --pce-line-number: var(--text-muted);
+  --pce-guide-indent: var(--line);
+  --pce-scrollbar: 260, 10%, 55%;
+  --pce-invisibles: rgb(127 127 127 / 0.3);
+  --pce-search-match: #f2cc6080;
+  --pce-widget-bg: var(--brand-surface);
+  --pce-widget-bg-input: var(--inset);
+  --pce-widget-bg-hover: var(--inset);
+  --pce-widget-bg-active: rgb(var(--brand-primary-rgb) / 0.25);
+  --pce-widget-bg-error: #5a1d1d;
+  --pce-widget-border: var(--line);
+  --pce-widget-color: var(--text-main);
+  --pce-widget-color-active: var(--text-main);
+  --pce-widget-color-options: var(--text-muted);
+  --pce-widget-error: #be1100;
+  --pce-widget-focus: var(--brand-primary);
+  --tok-plain: #24292e;
+  --tok-comment: #6a737d;
+  --tok-section: #22863a;
+  --tok-key: #6f42c1;
+  --tok-value: #032f62;
+  --tok-literal: #005cc5;
+  color: var(--tok-plain);
+  color-scheme: light;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.dark .prism-code-editor {
+  --tok-plain: #e6edf3;
+  --tok-comment: #8b949e;
+  --tok-section: #7ee787;
+  --tok-key: #d2a8ff;
+  --tok-value: #a5d6ff;
+  --tok-literal: #79c0ff;
+  color-scheme: dark;
+}
+
+.code-editor-host {
+  min-height: 0;
+}
+
+.code-editor-host > .prism-code-editor {
+  height: 100%;
+}
+
+.active-line {
+  --pce-line-number: var(--text-main);
+}
+
+.prism-code-editor .token.comment,
+.prism-code-editor .token.prolog {
+  color: var(--tok-comment);
+}
+
+.prism-code-editor .token.section,
+.prism-code-editor .token.selector {
+  color: var(--tok-section);
+}
+
+.prism-code-editor .token.key,
+.prism-code-editor .token.attr-name,
+.prism-code-editor .token.property {
+  color: var(--tok-key);
+}
+
+.prism-code-editor .token.value,
+.prism-code-editor .token.attr-value,
+.prism-code-editor .token.string {
+  color: var(--tok-value);
+}
+
+.prism-code-editor .token.number,
+.prism-code-editor .token.boolean,
+.prism-code-editor .token.null,
+.prism-code-editor .token.keyword-null {
+  color: var(--tok-literal);
+}
+
+.prism-code-editor .active-bracket {
+  box-shadow: inset 0 0 0 1px var(--brand-primary);
+}
+
+.prism-code-editor .word-matches span {
+  box-shadow: inset 0 0 0 9in var(--pce-selection-match);
+}
+
+/*
+ * prism-code-editor sets these two as inline style attributes in its HTML
+ * templates, which the CSP blocks as well, so they live here instead.
+ */
+.prism-search-container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.pce-line > div {
+  position: absolute;
+  top: 0;
+  opacity: 0;
+  padding-inline-end: inherit;
+}

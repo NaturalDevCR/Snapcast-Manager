@@ -10,11 +10,7 @@ import Card from '../components/Card.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import Button from '../components/ui/Button.vue';
-import { basicEditor } from 'prism-code-editor/setups';
-import 'prism-code-editor/prism/languages/json';
-import 'prism-code-editor/layout.css';
-import 'prism-code-editor/themes/github-dark.css';
-import 'prism-code-editor/themes/github-light.css';
+import { createCodeEditor, type CodeEditor } from '../utils/codeEditor';
 
 const watchdogStore = useWatchdogStore();
 const uiStore = useUIStore();
@@ -35,7 +31,7 @@ const newWatchdog = ref({
 });
 
 const editorRef = ref<HTMLElement | null>(null);
-let editorInstance: any = null;
+let editorInstance: CodeEditor | null = null;
 const jsonError = ref('');
 
 // Polling intervals
@@ -121,14 +117,11 @@ async function disconnectSocket(watchdogId: string, peerIp: string, peerPort: nu
 watch(showExpertMode, (val) => {
   if (val) {
      setTimeout(() => {
-        if (editorRef.value && !editorInstance) {
-           editorInstance = basicEditor(editorRef.value, {
-              value: JSON.stringify(watchdogStore.watchdogs, null, 2),
-              language: 'json',
-              theme: uiStore.isDark ? 'github-dark' : 'github-light'
-           });
-        } else if (editorInstance) {
-           editorInstance.setOptions({ value: JSON.stringify(watchdogStore.watchdogs, null, 2) });
+        const value = JSON.stringify(watchdogStore.watchdogs, null, 2);
+        if (editorInstance?.container.isConnected) {
+           editorInstance.setOptions({ value });
+        } else if (editorRef.value) {
+           editorInstance = createCodeEditor(editorRef.value, { value, language: 'json' });
         }
      }, 100);
   }
@@ -281,7 +274,7 @@ function formatBytes(bytes?: number) {
                  <h3 class="text-lg font-bold text-text-main">{{ t('watchdogs.manualJsonTitle') }}</h3>
                  <span v-if="jsonError" class="text-xs text-danger">{{ jsonError }}</span>
              </div>
-             <div ref="editorRef" class="flex-1 bg-inset border border-line rounded-xl p-2 overflow-hidden font-mono text-sm"></div>
+             <div ref="editorRef" class="code-editor-host flex-1 border border-line rounded-xl overflow-hidden text-sm"></div>
              <div class="flex justify-end space-x-3 mt-4">
                  <Button variant="ghost" @click="showExpertMode = false">{{ t('watchdogs.cancel') }}</Button>
                  <Button @click="saveExpertMode">{{ t('watchdogs.saveChanges') }}</Button>

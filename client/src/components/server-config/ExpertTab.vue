@@ -15,12 +15,8 @@
 // need to read AND write the same primitive value": it gives real two-way
 // binding without a plain-object-mutation escape hatch.
 import { onMounted, onUnmounted, ref, watch } from 'vue';
-import { basicEditor } from 'prism-code-editor/setups';
-import 'prism-code-editor/prism/languages/ini';
-import 'prism-code-editor/layout.css';
-import 'prism-code-editor/themes/github-dark.css';
-import 'prism-code-editor/themes/github-light.css';
 import { useUIStore } from '../../stores/ui';
+import { createCodeEditor, type CodeEditor } from '../../utils/codeEditor';
 
 const rawConfig = defineModel<string>('rawConfig', { required: true });
 
@@ -34,7 +30,7 @@ const emit = defineEmits<{ 'revert-requested': [] }>();
 const uiStore = useUIStore();
 
 const editorRef = ref<HTMLElement | null>(null);
-let editorInstance: any = null;
+let editorInstance: CodeEditor | null = null;
 
 // This component is only ever mounted while `activeTab === 'expert'`
 // (gated by the parent's `v-else-if`, same as StandardTab.vue /
@@ -45,75 +41,25 @@ let editorInstance: any = null;
 // once per navigation into the tab, same as before), and onUnmounted
 // fires on navigating away (same teardown timing as the old `else`
 // branch nulling out `editorInstance`).
-// Post-v0.3.5 fix, found live: the plain two-way watch below (editor
-// 'update' -> rawConfig.value = ...; watch(rawConfig) -> editorInstance.
-// setOptions({value})) was a genuine feedback loop with no guard against
-// re-entering it from its OWN write. Every keystroke fired the editor's
-// 'update' event synchronously mid-keypress, which wrote `rawConfig.value`
-// -- and Vue's `watch(rawConfig, ...)` then fired on the NEXT tick and
-// called `setOptions({value: newVal})` back on the SAME editor instance
-// while it may still have been finishing that keystroke's own internal
-// DOM update (prism-code-editor renders into a Shadow DOM with its own
-// invisible, exactly-overlaid `<textarea>` -- see basicEditor()'s own
-// internals). `editorInstance.value !== newVal` was meant to short-circuit
-// this, but by the time the watch callback ran, the editor's own `.value`
-// had ALREADY been updated internally by typing (that's what fired
-// 'update' in the first place) -- so the guard rarely actually prevented
-// the redundant setOptions() call; it just usually landed on an already-
-// equal value moments too late to be free of a mid-keystroke re-render
-// race. Symptom reported: while typing, a small, unstyled native
-// `<textarea>` (roughly the browser's default 2-row size, no CSS at all)
-// visibly appeared inside the editor -- consistent with the Shadow DOM's
-// own `<textarea>` briefly re-rendering before its scoped `<style>` was
-// (re-)applied.
-//
-// Fixed with an explicit "this write came from the editor itself, not an
-// external source (Revert button, a fresh GET, etc.)" flag: the watch now
-// skips the redundant setOptions() call for a write it just caused,
-// leaving setOptions({value}) to only ever run for genuinely EXTERNAL
-// changes -- exactly the case it exists for.
-let isInternalUpdate = false;
-
-onMounted(async () => {
-    if (editorRef.value) {
-        editorInstance = basicEditor(
-            editorRef.value,
-            {
-                language: 'ini',
-                theme: uiStore.isDark ? 'github-dark' : 'github-light',
-                value: rawConfig.value
-            },
-            () => {
-                if (editorInstance && typeof editorInstance.on === 'function') {
-                    editorInstance.on('update', (value: string) => {
-                        isInternalUpdate = true;
-                        rawConfig.value = value;
-                    });
-                }
-            }
-        );
-    }
+onMounted(() => {
+    if (!editorRef.value) return;
+    editorInstance = createCodeEditor(editorRef.value, {
+        language: 'ini',
+        value: rawConfig.value
+    });
+    editorInstance.on('update', (value: string) => {
+        rawConfig.value = value;
+    });
 });
 
 onUnmounted(() => {
+    editorInstance?.remove();
     editorInstance = null;
 });
 
-watch(() => uiStore.isDark, (isDark) => {
-    if (editorInstance) {
-        editorInstance.setOptions({ theme: isDark ? 'github-dark' : 'github-light' });
-    }
-});
-
+// The comparison makes this a no-op for the editor's own writes, so only
+// external changes (Revert, a fresh GET) reach setOptions().
 watch(rawConfig, (newVal) => {
-    if (isInternalUpdate) {
-        // This change originated from the editor's own 'update' event
-        // above -- the editor already has this value, re-applying it via
-        // setOptions() would be both redundant and the exact source of
-        // the mid-keystroke re-render race described above.
-        isInternalUpdate = false;
-        return;
-    }
     if (editorInstance && editorInstance.value !== newVal) {
         editorInstance.setOptions({ value: newVal });
     }
@@ -188,9 +134,9 @@ const handleExportBackup = async () => {
       </div>
 
       <!-- Editor Wrapper -->
-      <div class="rounded-2xl border border-line bg-[#140b1b]/80 backdrop-blur-md overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+      <div class="rounded-2xl border border-line bg-brand-surface overflow-hidden shadow-sm">
           <!-- Frame Header -->
-          <div class="bg-black/30 px-6 py-2.5 flex items-center justify-between text-[10px] font-mono text-text-muted border-b border-line">
+          <div class="bg-inset px-6 py-2.5 flex items-center justify-between text-[10px] font-mono text-text-muted border-b border-line">
               <div class="flex items-center space-x-2">
                   <span class="material-symbols-outlined text-[14px]">description</span>
                   <span>/etc/snapserver.conf</span>
@@ -202,7 +148,7 @@ const handleExportBackup = async () => {
           </div>
 
           <!-- Code Editor Container -->
-          <div ref="editorRef" class="text-xs font-mono pce-custom"></div>
+          <div ref="editorRef" class="code-editor-host h-[65vh] min-h-80 text-xs"></div>
       </div>
 
       <!-- Footer Actions -->
