@@ -35,6 +35,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue';
 import JobLogPanel from '../components/JobLogPanel.vue';
 import StatTile, { type StatTone } from '../components/dashboard/StatTile.vue';
 import ServiceCard from '../components/dashboard/ServiceCard.vue';
+import ClientsPanel from '../components/dashboard/ClientsPanel.vue';
 import { version } from '../../package.json';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -103,15 +104,14 @@ const snapserverVersion = computed(() => {
   return server?.snapserver?.version;
 });
 
-const streams = computed(() => snapcastStore.status?.streams ?? []);
+const streams = computed(() =>
+  [...(snapcastStore.status?.streams ?? [])].sort(
+    (a, b) => Number(b.status === 'playing') - Number(a.status === 'playing'),
+  ),
+);
 const playingCount = computed(() => streams.value.filter((s) => s.status === 'playing').length);
 
-const allClients = computed(() =>
-  (snapcastStore.status?.groups ?? [])
-    .flatMap((g) => g.clients)
-    .slice()
-    .sort((a, b) => Number(b.connected) - Number(a.connected)),
-);
+const allClients = computed(() => (snapcastStore.status?.groups ?? []).flatMap((g) => g.clients));
 const onlineCount = computed(() => allClients.value.filter((c) => c.connected).length);
 
 const diagnosticsTile = computed<{ value: string; tone: StatTone; to?: string }>(() => {
@@ -331,10 +331,13 @@ const isServerMode = computed(() => systemStore.snapcastMode !== 'client');
       <section class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         <template v-if="isServerMode">
           <template v-if="snapcastStore.status">
-            <Card :title="t('dashboard.streamsCardTitle')">
+            <Card :title="t('dashboard.streamsCardTitle')" class="lg:h-[32rem]">
               <template #icon><span class="material-symbols-outlined text-[1.2rem]">graphic_eq</span></template>
-              <ul v-if="streams.length" class="-my-1 divide-y divide-line">
-                <li v-for="stream in streams" :key="stream.id" class="flex items-center justify-between gap-3 py-2.5">
+              <ul
+                v-if="streams.length"
+                class="-mx-5 -my-3 max-h-96 flex-1 divide-y divide-line overflow-y-auto px-5 [scrollbar-width:thin] lg:max-h-none lg:min-h-0"
+              >
+                <li v-for="stream in streams" :key="stream.id" class="flex items-center justify-between gap-3 py-2">
                   <span class="flex items-center gap-2.5 min-w-0">
                     <span
                       class="w-2 h-2 rounded-full flex-shrink-0"
@@ -354,37 +357,7 @@ const isServerMode = computed(() => systemStore.snapcastMode !== 'client');
               </div>
             </Card>
 
-            <Card :title="t('dashboard.clientsCardTitle')">
-              <template #icon><span class="material-symbols-outlined text-[1.2rem]">speaker_group</span></template>
-              <template #action>
-                <router-link to="/routing" class="text-xs font-semibold text-brand-primary-text hover:underline">{{ t('dashboard.openMatrixLink') }}</router-link>
-              </template>
-              <ul v-if="allClients.length" class="-my-1 divide-y divide-line">
-                <li
-                  v-for="client in allClients"
-                  :key="client.id"
-                  class="flex items-center justify-between gap-3 py-2.5"
-                  :class="client.connected ? '' : 'opacity-60'"
-                >
-                  <div class="min-w-0">
-                    <p class="text-sm text-text-main truncate">{{ client.config.name || client.host.name }}</p>
-                    <p class="text-[11px] text-text-muted font-mono">{{ client.host.ip }}</p>
-                  </div>
-                  <span v-if="!client.connected" class="text-xs text-text-muted">{{ t('dashboard.clientOffline') }}</span>
-                  <span v-else-if="client.config.volume.muted" class="inline-flex items-center gap-1 text-xs text-text-muted">
-                    <span class="material-symbols-outlined text-[1rem]" aria-hidden="true">volume_off</span>
-                    {{ t('dashboard.volumeMutedLabel') }}
-                  </span>
-                  <span v-else class="flex items-center gap-2">
-                    <span class="h-1.5 w-16 rounded-full bg-line overflow-hidden" aria-hidden="true">
-                      <span class="block h-full bg-brand-primary" :style="{ width: client.config.volume.percent + '%' }"></span>
-                    </span>
-                    <span class="text-xs tabular-nums text-text-muted w-9 text-right">{{ client.config.volume.percent }}%</span>
-                  </span>
-                </li>
-              </ul>
-              <p v-else class="text-sm text-text-muted">{{ t('dashboard.clientsEmpty') }}</p>
-            </Card>
+            <ClientsPanel :clients="allClients" />
           </template>
 
           <!-- Snapserver unreachable -->

@@ -31,7 +31,7 @@ defineProps<{
       </div>
     </div>
 
-    <div class="p-5 flex-1 flex flex-col">
+    <div class="p-5 flex-1 flex flex-col min-h-0">
       <slot></slot>
     </div>
   </div>
