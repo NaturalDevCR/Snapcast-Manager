@@ -123,6 +123,15 @@ jobs:
           sha256sum snapcast-manager-release.zip > snapcast-manager-release.zip.sha256
           cat snapcast-manager-release.zip.sha256
 
+      # Must run before "Commit CHANGELOG.md": --current needs HEAD on the tag.
+      - name: Generate release notes
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --current --strip all
+        env:
+          OUTPUT: RELEASE_NOTES.md
+
       - name: Update CHANGELOG.md
         uses: orhun/git-cliff-action@v4
         with:
@@ -137,11 +146,7 @@ jobs:
           # Regenerates CHANGELOG.md from this release's full conventional-
           # commit history (Task 75, requirement 2) and commits it back to
           # the branch the release tag points at, so the committed
-          # CHANGELOG.md stays in sync with the repo across releases -- the
-          # per-release notes GitHub itself auto-generates below
-          # (`generate_release_notes: true`) are a DIFFERENT, separate
-          # thing (per-tag release-page prose, not an accumulating
-          # committed file). Gated on there actually being a diff, since a
+          # CHANGELOG.md stays in sync with the repo across releases. Gated on there actually being a diff, since a
           # release with no new conventional commits since the last run
           # would otherwise produce an empty, failing commit.
           git config user.name "github-actions[bot]"
@@ -161,4 +166,8 @@ jobs:
             snapcast-manager-release.zip
             snapcast-manager-release.zip.sha256
           prerelease: ${{ contains(github.ref_name, '-') }}
+          # GitHub's generated notes only list merged PRs, so a release of
+          # commits pushed straight to main came out blank. body_path is the
+          # git-cliff section for this tag; GitHub appends its changelog link.
+          body_path: RELEASE_NOTES.md
           generate_release_notes: true
