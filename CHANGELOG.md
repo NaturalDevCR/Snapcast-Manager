@@ -8,6 +8,15 @@ each `release.yml` run (see .github/workflows/release.yml) -- do not hand
 edit entries below; amend the source commit message instead and
 regenerate.
 
+## [0.4.4] - 2026-11-06
+
+### 🚀 Features
+
+- *(routing)* Make the Audio Matrix readable at any size (#27)
+
+### 🐛 Bug Fixes
+
+- *(install)* Make updates safe to fail (#26)
 ## [0.4.3] - 2026-11-06
 
 ### 🚀 Features
