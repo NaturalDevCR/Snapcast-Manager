@@ -5,15 +5,40 @@
 
 set -e
 
-# Colors and formatting for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
+# Colors and formatting for output. Plain text when stdout isn't a terminal,
+# so logs and CI output stay readable.
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    CYAN='\033[0;36m'
+    MAGENTA='\033[0;35m'
+    BOLD='\033[1m'
+    DIM='\033[2m'
+    NC='\033[0m' # No Color
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    CYAN=''
+    MAGENTA=''
+    BOLD=''
+    DIM=''
+    NC=''
+fi
+
+case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+    *UTF-8*|*UTF8*|*utf-8*|*utf8*)
+        OK_MARK='✓'
+        WARN_MARK='!'
+        FAIL_MARK='✗'
+        ;;
+    *)
+        OK_MARK='[OK]'
+        WARN_MARK='[!]'
+        FAIL_MARK='[X]'
+        ;;
+esac
 
 # Task 16: pure unit-file User= migration-detection logic lives in
 # scripts/lib/migration.sh so it can be exercised by the standalone test
@@ -63,12 +88,9 @@ else
 fi
 APP_VERSION="$VERSION"
 
-# Colors for output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m'
 INSTALL_BASE_DIR="/opt/snapcast-manager"
 SERVICE_NAME="snapmanager"
+UNIT_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 # Task 16: dedicated, unprivileged system user the service runs as (see
 # SECURITY.md's "Privilege model" section / .superpowers/sdd/task-16-report.md).
 # Coincidentally the same literal string as SERVICE_NAME above, but they are
@@ -76,15 +98,132 @@ SERVICE_NAME="snapmanager"
 # kept as a separate constant so the rest of this script is self-documenting
 # about which one it means at each call site.
 SNAPMANAGER_USER="snapmanager"
+DEFAULT_PORT=3000
+DEFAULT_MODE="both"
 AUTO_CONFIRM=false
 
-# Helper to ask questions or auto-confirm
+# ---- Terminal output ----
+#
+# One visual vocabulary for the whole run: numbered steps, then one indented
+# result line per thing that happened. Command output goes to the log file,
+# never to the screen (see spin/run_quiet below).
+STEP_NUM=0
+STEP_TOTAL=0
+
+ui_step() {
+    STEP_NUM=$((STEP_NUM + 1))
+    echo -e "\n${BOLD}${CYAN}[${STEP_NUM}/${STEP_TOTAL}]${NC} ${BOLD}$1${NC}"
+}
+ui_ok() { echo -e "      ${GREEN}${OK_MARK}${NC} $1"; }
+ui_warn() { echo -e "      ${YELLOW}${WARN_MARK}${NC} $1"; }
+ui_error() { echo -e "      ${RED}${FAIL_MARK} $1${NC}"; }
+ui_note() { echo -e "        ${DIM}$1${NC}"; }
+ui_heading() { echo -e "\n${BOLD}$1${NC}"; }
+ui_row() { printf "  %-11s %b\n" "$1" "$2"; }
+
+# The log is created on first use, so a run that stops at the first question
+# leaves nothing in /tmp. Exported so the re-executed installer appends to the
+# same file. mktemp makes it private to the user running the installer.
+INSTALL_LOG="${SNAPMGR_INSTALL_LOG:-}"
+ensure_log() {
+    if [ -z "$INSTALL_LOG" ]; then
+        INSTALL_LOG=$(mktemp /tmp/snapcast-manager-install.XXXXXX)
+    fi
+    export SNAPMGR_INSTALL_LOG="$INSTALL_LOG"
+}
+
+show_log_tail() {
+    ensure_log
+    tail -n "${1:-12}" "$INSTALL_LOG" | sed 's/^/        /'
+}
+
+# Runs a command with its output in the log and a spinner on a terminal.
+# Prints one result line and returns the command's status.
+#
+# The command stays in the foreground and the spinner is the background job,
+# not the other way round: a non-interactive shell starts background jobs with
+# SIGINT ignored, so Ctrl-C would leave npm or apt-get running. stdin is
+# /dev/null because under `curl | bash` it is the rest of this script, and
+# because a hidden prompt would look like a hang.
+spin() {
+    local label="$1"
+    shift
+    ensure_log
+    printf '\n=== %s\n$ %s\n' "$label" "$*" >> "$INSTALL_LOG"
+
+    local spinner=""
+    if [ -t 1 ]; then
+        (
+            frames='|/-\'
+            i=0
+            while kill -0 "$$" 2>/dev/null; do
+                printf '\r      %s %s' "${frames:$((i % 4)):1}" "$label"
+                i=$((i + 1))
+                sleep 0.2
+            done
+        ) &
+        spinner=$!
+    fi
+
+    local status=0
+    "$@" >> "$INSTALL_LOG" 2>&1 < /dev/null || status=$?
+
+    if [ -n "$spinner" ]; then
+        kill "$spinner" 2>/dev/null || true
+        wait "$spinner" 2>/dev/null || true
+        printf '\r\033[K'
+    fi
+
+    if [ "$status" -eq 0 ]; then
+        ui_ok "$label"
+    else
+        ui_error "$label failed"
+    fi
+    return "$status"
+}
+
+# spin, plus the end of the log when the command fails.
+run_quiet() {
+    local status=0
+    spin "$@" || status=$?
+    if [ "$status" -ne 0 ]; then
+        show_log_tail 12
+    fi
+    return "$status"
+}
+
+# Keeps the full journal in the log and shows only its tail.
+show_service_logs() {
+    local journal
+    ensure_log
+    journal=$($SUDO journalctl -u "$SERVICE_NAME" -n 50 --no-pager 2>&1 || true)
+    printf '\n=== journalctl -u %s\n%s\n' "$SERVICE_NAME" "$journal" >> "$INSTALL_LOG"
+    ui_note "Last lines from the service log:"
+    printf '%s\n' "$journal" | tail -n 10 | sed 's/^/        /'
+}
+
+on_exit() {
+    local status=$?
+    if [ "$status" -eq 0 ]; then
+        return 0
+    fi
+    echo ""
+    ui_error "Setup did not finish."
+    if [ -n "$INSTALL_LOG" ] && [ -s "$INSTALL_LOG" ]; then
+        ui_note "Full log: $INSTALL_LOG"
+    fi
+    if [ -e /tmp/snapmgr_data_backup ]; then
+        ui_note "Your database backup is in /tmp/snapmgr_data_backup. Copy it somewhere safe before rebooting."
+    fi
+    ui_note "After fixing the problem, re-run this installer."
+}
+
 # Confirms the app answers HTTP. `systemctl is-active` alone isn't enough:
 # Restart=always reports a crash-looping unit as active between crashes.
 wait_for_app() {
     local _
     for _ in $(seq 1 "${APP_WAIT_SECONDS:-20}"); do
-        if curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:${APP_PORT}/api/health"; then
+        if curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:${APP_PORT}/api/health" 2>/dev/null; then
             return 0
         fi
         sleep 1
@@ -96,47 +235,326 @@ wait_for_app() {
 # can't start, and npm only warns when its install script doesn't run.
 verify_native_modules() {
     if node -e "new (require('better-sqlite3'))(':memory:')" >/dev/null 2>&1; then
-        echo -e "${GREEN}[OK] Native modules load correctly.${NC}"
+        ui_ok "Native modules load correctly"
         return 0
     fi
-    echo -e "${RED}[!] better-sqlite3 failed to load, so the server cannot start.${NC}"
-    echo "Check the npm output above, then re-run this installer."
+    ui_error "better-sqlite3 failed to load, so the server cannot start."
+    show_log_tail 12
     exit 1
+}
+
+# Reads one line from the terminal into ANSWER. Returns 1 when there is no
+# terminal to ask on. Under `curl | bash` stdin is the script, so it reads
+# /dev/tty, and it must open the device to test it: the node exists even for
+# a process with no controlling terminal, where opening it fails.
+ask() {
+    local prompt="$1"
+    ANSWER=""
+    if [ -t 0 ]; then
+        read -r -p "$prompt" ANSWER || ANSWER=""
+    elif (: < /dev/tty) 2>/dev/null; then
+        read -r -p "$prompt" ANSWER < /dev/tty || ANSWER=""
+    else
+        return 1
+    fi
 }
 
 prompt_yes_no() {
     local prompt="$1"
     local default="$2"
-    
+    local hint="y/N"
+    if [ "$default" = "y" ]; then
+        hint="Y/n"
+    fi
+
     if [ "$AUTO_CONFIRM" = true ]; then
-        echo -e "${prompt} [Auto-confirmed: y]"
+        ui_note "$prompt [Auto-confirmed: y]"
         return 0
     fi
 
-    local ans
-    if [ -t 0 ]; then
-        # Standard interactive terminal
-        read -p "$prompt (y/n): " ans
-    elif [ -c /dev/tty ]; then
-        # Piped execution (curl | bash), but TTY is available
-        read -p "$prompt (y/n): " ans < /dev/tty
-    else
-        # Truly headless (no TTY), use default
-        echo -e "${prompt} [Auto-answered: ${default}]"
-        [[ "$default" == "y" ]]
-        return $?
+    if ! ask "$prompt ($hint): "; then
+        ui_note "$prompt [Auto-answered: $default]"
+        ANSWER="$default"
     fi
-    
-    [[ "$ans" == "y" || "$ans" == "Y" ]]
+
+    case "${ANSWER:-$default}" in
+        y|Y|yes|Yes|YES) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+install_packages() {
+    $SUDO apt-get update && $SUDO apt-get install -y "$@"
+}
+
+add_nodesource() {
+    if [ -n "$SUDO" ]; then
+        curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash -
+    else
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    fi
+}
+
+is_valid_port() {
+    [[ "$1" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$1" -le 65535 ]
+}
+
+is_valid_mode() {
+    case "$1" in
+        client|server|both) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Prints vX.Y.Z from a package.json, or nothing.
+read_package_version() {
+    local version=""
+    if [ -f "$1" ]; then
+        version=$(grep -m 1 '"version"' "$1" | cut -d '"' -f 4)
+    fi
+    if [ -n "$version" ]; then
+        echo "v$version"
+    fi
+}
+
+read_saved_env() {
+    local env_file="$INSTALL_BASE_DIR/server/.env"
+    if [ ! -e "$env_file" ]; then
+        return 0
+    fi
+    # Mode 600 and owned by the service user once the service is set up.
+    if [ -r "$env_file" ]; then
+        cat "$env_file"
+    else
+        $SUDO cat "$env_file" 2>/dev/null || true
+    fi
+}
+
+# Security: the service user owns server/.env and this script usually runs as
+# root, so its content is untrusted. Never source it. Values are extracted as
+# text here and validated in detect_install before anything uses them.
+saved_env_value() {
+    printf '%s\n' "$2" | sed -n "s/^$1=//p" | tail -n 1 | tr -d "\r\"' "
+}
+
+# Must run before anything touches $INSTALL_BASE_DIR: the update flow deletes
+# server/.env along with the rest of the old release.
+detect_install() {
+    EXISTING_INSTALL=false
+    INSTALLED_VERSION=""
+    SAVED_PORT=""
+    SAVED_MODE=""
+    SERVICE_INSTALLED=false
+
+    if [ -f "$UNIT_FILE" ]; then
+        SERVICE_INSTALLED=true
+    fi
+    if [ ! -d "$INSTALL_BASE_DIR" ]; then
+        return 0
+    fi
+
+    EXISTING_INSTALL=true
+    INSTALLED_VERSION=$(read_package_version "$INSTALL_BASE_DIR/server/package.json")
+
+    local saved_env value
+    saved_env=$(read_saved_env)
+    if [ -z "$saved_env" ]; then
+        return 0
+    fi
+
+    value=$(saved_env_value PORT "$saved_env")
+    if is_valid_port "$value"; then
+        SAVED_PORT="$value"
+    elif [ -n "$value" ]; then
+        ui_warn "Ignoring invalid PORT in the saved settings."
+    fi
+
+    value=$(saved_env_value SNAPCAST_MODE "$saved_env")
+    if is_valid_mode "$value"; then
+        SAVED_MODE="$value"
+    elif [ -n "$value" ]; then
+        ui_warn "Ignoring invalid SNAPCAST_MODE in the saved settings."
+    else
+        # Installs older than the mode setting ran with the server's default.
+        SAVED_MODE="$DEFAULT_MODE"
+    fi
+}
+
+choose_mode() {
+    ui_heading "Installation mode"
+    echo -e "  1) ${BOLD}Snapclient Manager only${NC}  Manage audio output clients"
+    echo -e "  2) ${BOLD}Snapserver Manager only${NC}  Manage the audio server"
+    echo -e "  3) ${BOLD}Snapcast Manager (both)${NC}  Full server and client management"
+
+    if ask "Select mode (1-3) [3]: "; then
+        case "${ANSWER:-3}" in
+            1) APP_MODE="client" ;;
+            2) APP_MODE="server" ;;
+            *) APP_MODE="both" ;;
+        esac
+        MODE_SOURCE="chosen"
+    else
+        APP_MODE="$DEFAULT_MODE"
+        MODE_SOURCE="default"
+    fi
+}
+
+choose_port() {
+    while true; do
+        if ! ask "Web interface port [$DEFAULT_PORT]: "; then
+            APP_PORT="$DEFAULT_PORT"
+            PORT_SOURCE="default"
+            return 0
+        fi
+        APP_PORT="${ANSWER:-$DEFAULT_PORT}"
+        if is_valid_port "$APP_PORT"; then
+            PORT_SOURCE="chosen"
+            return 0
+        fi
+        ui_warn "Enter a port number from 1 to 65535."
+    done
+}
+
+# Each setting comes from, in order: its flag, the saved install, a question
+# (only when there is nothing saved), or the default under -y.
+collect_settings() {
+    if [ -z "$APP_MODE" ]; then
+        if [ -n "$SAVED_MODE" ]; then
+            APP_MODE="$SAVED_MODE"
+            MODE_SOURCE="saved"
+        elif [ "$AUTO_CONFIRM" = true ]; then
+            APP_MODE="$DEFAULT_MODE"
+            MODE_SOURCE="default"
+        else
+            choose_mode
+        fi
+    fi
+
+    if [ -z "$APP_PORT" ]; then
+        if [ -n "$SAVED_PORT" ]; then
+            APP_PORT="$SAVED_PORT"
+            PORT_SOURCE="saved"
+        elif [ "$AUTO_CONFIRM" = true ]; then
+            APP_PORT="$DEFAULT_PORT"
+            PORT_SOURCE="default"
+        else
+            choose_port
+        fi
+    fi
+
+    if [ -z "$INSTALL_SERVICE" ]; then
+        if [ "$SERVICE_INSTALLED" = true ]; then
+            INSTALL_SERVICE=true
+        elif prompt_yes_no "Install Snapcast Manager as a systemd service?" "y"; then
+            INSTALL_SERVICE=true
+        else
+            INSTALL_SERVICE=false
+        fi
+    fi
+}
+
+source_label() {
+    case "$1" in
+        saved) echo " ${DIM}(saved)${NC}" ;;
+        flag) echo " ${DIM}(from flag)${NC}" ;;
+        default) echo " ${DIM}(default)${NC}" ;;
+    esac
+}
+
+print_settings() {
+    ui_row "Mode" "$APP_MODE$(source_label "$MODE_SOURCE")"
+    ui_row "Port" "$APP_PORT$(source_label "$PORT_SOURCE")"
+    if [ "$INSTALL_SERVICE" = true ]; then
+        ui_row "Service" "$SERVICE_NAME (systemd)"
+    else
+        ui_row "Service" "not installed"
+    fi
+}
+
+no_tty_abort() {
+    ui_error "No TTY available for input. Aborting."
+    exit 1
+}
+
+choose_other_action() {
+    ui_heading "Other options"
+    echo -e "  1) ${BOLD}Force re-install${NC}  Replaces the app, keeps database and settings"
+    echo -e "  2) ${BOLD}Clean re-install${NC}  ${RED}Deletes everything${NC} and starts fresh"
+    echo -e "  3) ${BOLD}Uninstall${NC}"
+    echo -e "  4) ${BOLD}Abort${NC}"
+
+    ask "Select an option (1-4): " || no_tty_abort
+    case "$ANSWER" in
+        1)
+            ACTION="force"
+            ;;
+        2)
+            ACTION="clean"
+            ;;
+        3)
+            uninstall_snapmanager
+            ;;
+        *)
+            echo "Installation aborted."
+            exit 0
+            ;;
+    esac
+}
+
+# The one decision an existing install needs. Enter accepts the update, and
+# the destructive actions sit behind "o" rather than next to it.
+choose_action() {
+    if [ "$INSTALLED_VERSION" = "$VERSION" ]; then
+        if [ "$AUTO_CONFIRM" = true ]; then
+            echo ""
+            ui_ok "Already on $VERSION. Nothing to do."
+            exit 0
+        fi
+        ask "Already up to date. Press Enter to exit, or o for other options: " || no_tty_abort
+        case "$ANSWER" in
+            o|O)
+                choose_other_action
+                ;;
+            *)
+                exit 0
+                ;;
+        esac
+        return 0
+    fi
+
+    if [ "$AUTO_CONFIRM" = true ]; then
+        ACTION="update"
+        return 0
+    fi
+
+    while true; do
+        ask "Update to $VERSION now? (Y/n, or o for other options): " || no_tty_abort
+        case "${ANSWER:-y}" in
+            y|Y|yes|Yes|YES)
+                ACTION="update"
+                return 0
+                ;;
+            n|N|no|No|NO)
+                echo "Installation aborted."
+                exit 0
+                ;;
+            o|O)
+                choose_other_action
+                return 0
+                ;;
+            *)
+                ui_warn "Type y, n or o."
+                ;;
+        esac
+    done
 }
 
 uninstall_snapmanager() {
-    echo -e "\n${RED}${BOLD}=== Uninstalling Snapcast Manager ===${NC}"
+    ui_heading "Uninstall Snapcast Manager"
     if prompt_yes_no "Are you sure you want to completely remove Snapcast Manager?" "n"; then
-        echo "Stopping and disabling service..."
         $SUDO systemctl stop $SERVICE_NAME 2>/dev/null || true
         $SUDO systemctl disable $SERVICE_NAME 2>/dev/null || true
-        $SUDO rm -f /etc/systemd/system/${SERVICE_NAME}.service
+        $SUDO rm -f "$UNIT_FILE"
         # Task 16: remove the app-scoped sudoers.d grant too -- safe to
         # remove unconditionally (a missing file is not an error), and
         # leaving it behind after uninstall would keep passwordless root
@@ -144,22 +562,25 @@ uninstall_snapmanager() {
         # account that may later be reused for something else.
         $SUDO rm -f /etc/sudoers.d/snapcast-manager
         $SUDO systemctl daemon-reload
-        echo -e "${YELLOW}Note: the '$SNAPMANAGER_USER' system user/group were NOT removed${NC} (left in place, standard practice for system accounts). Remove manually with 'userdel $SNAPMANAGER_USER' if desired."
+        ui_ok "Service stopped and removed"
 
         if [ -d "$INSTALL_BASE_DIR/data" ]; then
-            if prompt_yes_no "Do you want to delete all application data (Database and settings)?" "n"; then
-                echo "Removing application and data..."
+            if prompt_yes_no "Also delete all application data (database and settings)?" "n"; then
                 $SUDO rm -rf "$INSTALL_BASE_DIR"
+                ui_ok "Application and data removed"
             else
-                echo "Removing application files but keeping $INSTALL_BASE_DIR/data..."
                 # Remove everything EXCEPT 'data'
                 $SUDO find "$INSTALL_BASE_DIR" -mindepth 1 -maxdepth 1 ! -name 'data' -exec rm -rf {} +
+                ui_ok "Application removed, data kept in $INSTALL_BASE_DIR/data"
             fi
         else
             $SUDO rm -rf "$INSTALL_BASE_DIR"
+            ui_ok "Application removed"
         fi
-        
-        echo -e "${GREEN}[OK] Snapcast Manager has been uninstalled.${NC}"
+
+        ui_note "The '$SNAPMANAGER_USER' system user was left in place. Remove it with 'userdel $SNAPMANAGER_USER' if you want."
+        echo ""
+        ui_ok "Snapcast Manager has been uninstalled."
         exit 0
     else
         echo "Uninstallation cancelled."
@@ -172,6 +593,10 @@ AUTO_CONFIRM=false
 RESTORE_FILE=""
 APP_PORT=""
 APP_MODE=""
+INSTALL_SERVICE=""
+RESUMED=false
+RUN_KIND="install"
+ACTION="install"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -203,11 +628,51 @@ while [[ $# -gt 0 ]]; do
             APP_MODE="${1#*=}"
             shift
             ;;
+        --no-service)
+            INSTALL_SERVICE=false
+            shift
+            ;;
+        --resumed=*)
+            # Internal: the second half of a remote run, after the downloaded
+            # release's own installer takes over. The first half has already
+            # shown the summary and asked for confirmation.
+            if [[ "${1#*=}" =~ ^(install|update):([0-9]+)/([0-9]+)$ ]]; then
+                RESUMED=true
+                RUN_KIND="${BASH_REMATCH[1]}"
+                STEP_NUM="${BASH_REMATCH[2]}"
+                STEP_TOTAL="${BASH_REMATCH[3]}"
+            fi
+            shift
+            ;;
         *)
             shift
             ;;
     esac
 done
+
+# These values end up in server/.env and in curl's URL.
+if [ -n "$APP_PORT" ] && ! is_valid_port "$APP_PORT"; then
+    echo -e "${RED}Error: --port must be a number from 1 to 65535.${NC}" >&2
+    exit 1
+fi
+if [ -n "$APP_MODE" ] && ! is_valid_mode "$APP_MODE"; then
+    echo -e "${RED}Error: --mode must be client, server or both.${NC}" >&2
+    exit 1
+fi
+MODE_SOURCE=""
+PORT_SOURCE=""
+if [ -n "$APP_MODE" ]; then
+    MODE_SOURCE="flag"
+fi
+if [ -n "$APP_PORT" ]; then
+    PORT_SOURCE="flag"
+fi
+
+# 1. Check for Linux
+if [[ "$OSTYPE" != "linux-gnu"* ]]; then
+    echo -e "${RED}Error: This script is intended for Linux systems only.${NC}"
+    exit 1
+fi
 
 # Determine if SUDO is needed
 if [ "$(id -u)" -eq 0 ]; then
@@ -216,12 +681,17 @@ else
     if command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
     else
-        echo -e "${RED}[!] Error: This script requires root privileges or sudo to be installed.${NC}"
+        echo -e "${RED}Error: This script requires root privileges or sudo to be installed.${NC}"
         exit 1
     fi
 fi
 
-echo -e "${MAGENTA}${BOLD}"
+trap on_exit EXIT
+# A signal would otherwise end the shell without running the EXIT trap.
+trap 'exit 130' INT TERM
+
+print_banner() {
+    echo -e "${MAGENTA}${BOLD}"
 cat << "EOF"
    _____                                 _     __  __                                   
   / ____|                               | |   |  \/  |                                  
@@ -232,49 +702,152 @@ cat << "EOF"
                     | |                                                  __/ |          
                     |_|                                                 |___/           
 EOF
-echo -e "${NC}"
-echo -e "${GREEN}${BOLD}=== Snapcast Manager Installer ($VERSION) ===${NC}"
-echo -e "This script will set up Snapcast Manager on your system.\n"
-echo -e "${CYAN}What will be installed:${NC}"
-echo -e "  - ${BOLD}Snapcast Manager${NC}: The web dashboard and control server."
-echo -e "  - ${BOLD}Node.js${NC}: The JavaScript runtime required to run the server."
-echo -e "  - ${BOLD}System Tools${NC}: Utilities like curl, ffmpeg, and build-essential."
-echo -e "\n${YELLOW}Note: Snapserver/Snapclient will NOT be installed automatically.${NC}"
-echo -e "You can install them later directly from the web interface.\n"
+    echo -e "${NC}"
+    echo -e "${BOLD}Snapcast Manager Installer${NC}"
+}
 
-if [ "$AUTO_CONFIRM" != true ]; then
-    if ! prompt_yes_no "Do you want to proceed?" "y"; then
+print_fresh_intro() {
+    echo -e "\nThis sets up Snapcast Manager on this system:"
+    echo -e "  - ${BOLD}Snapcast Manager${NC}: the web dashboard and control server"
+    echo -e "  - ${BOLD}Node.js${NC}: the runtime for the server, if missing"
+    echo -e "  - ${BOLD}System tools${NC}: curl, ffmpeg and build-essential, if missing"
+    echo -e "\nSnapserver and Snapclient are ${BOLD}not${NC} installed here. Add them later from the web interface."
+}
+
+# Remote flow, existing install: one summary, one question, nothing else.
+plan_existing_install() {
+    collect_settings
+
+    if [ "$INSTALLED_VERSION" = "$VERSION" ]; then
+        ui_heading "Snapcast Manager is up to date"
+    else
+        ui_heading "Update available"
+    fi
+    ui_row "Installed" "${INSTALLED_VERSION:-unknown}"
+    ui_row "New" "$VERSION"
+    print_settings
+    if [ "$INSTALLED_VERSION" != "$VERSION" ]; then
+        ui_row "Data" "database and settings are kept"
+    fi
+    echo ""
+
+    choose_action
+
+    if [ "$ACTION" = "clean" ]; then
+        # Starting fresh means not reusing the old install's answers either.
+        if ! prompt_yes_no "This permanently deletes the database and all settings. Continue?" "n"; then
+            echo "Installation aborted."
+            exit 0
+        fi
+        PRESERVE_DATA=false
+        SAVED_PORT=""
+        SAVED_MODE=""
+        if [ "$MODE_SOURCE" != "flag" ]; then
+            APP_MODE=""
+        fi
+        if [ "$PORT_SOURCE" != "flag" ]; then
+            APP_PORT=""
+        fi
+        collect_settings
+        RUN_KIND="install"
+    else
+        RUN_KIND="update"
+    fi
+
+    # The user has decided. Nothing else in this run asks them anything.
+    AUTO_CONFIRM=true
+}
+
+plan_fresh_install() {
+    print_fresh_intro
+    collect_settings
+
+    ui_heading "Ready to install"
+    ui_row "Version" "$VERSION"
+    print_settings
+    echo ""
+
+    if ! prompt_yes_no "Install Snapcast Manager $VERSION?" "y"; then
         echo "Installation aborted."
         exit 0
     fi
-fi
+}
 
-# Choose installation mode (skip if already provided via --mode)
-if [ -z "$APP_MODE" ]; then
-    if [ "$AUTO_CONFIRM" = true ]; then
-        APP_MODE="both"
-        echo -e "Installation mode [Auto-confirmed: both]"
-    else
-        echo -e "\n${CYAN}${BOLD}Choose Installation Mode:${NC}"
-        echo -e "  1) ${BOLD}Snapclient Manager Only${NC}  - Manage audio output clients"
-        echo -e "  2) ${BOLD}Snapserver Manager Only${NC}  - Manage the audio server"
-        echo -e "  3) ${BOLD}Snapcast Manager (both)${NC}  - Full server + client management"
+# Local checkout: there is nothing to download and the menu doesn't apply,
+# but an existing install's settings are still reused.
+plan_local_install() {
+    local local_version
+    local_version=$(read_package_version server/package.json)
+    VERSION="${local_version:-$VERSION}"
 
-        if [ -t 0 ]; then
-            read -p "Select mode (1-3) [3]: " MODE_CHOICE
-        elif [ -c /dev/tty ]; then
-            read -p "Select mode (1-3) [3]: " MODE_CHOICE < /dev/tty
-        else
-            MODE_CHOICE=3
-        fi
-
-        case "${MODE_CHOICE:-3}" in
-            1) APP_MODE="client" ;;
-            2) APP_MODE="server" ;;
-            *) APP_MODE="both" ;;
-        esac
+    if [ -z "$SAVED_PORT$SAVED_MODE" ] && [ "$SERVICE_INSTALLED" = false ]; then
+        plan_fresh_install
+        return 0
     fi
-    echo -e "${GREEN}[OK] Mode set to: ${BOLD}$APP_MODE${NC}\n"
+
+    RUN_KIND="update"
+    collect_settings
+
+    ui_heading "Install from this directory"
+    ui_row "Source" "$PWD"
+    ui_row "Version" "$VERSION"
+    print_settings
+    echo ""
+
+    if ! prompt_yes_no "Continue?" "y"; then
+        echo "Installation aborted."
+        exit 0
+    fi
+    AUTO_CONFIRM=true
+}
+
+plan_steps() {
+    # System requirements, dependencies, configuration.
+    STEP_TOTAL=3
+    if [ "$INSTALL_SERVICE" = true ]; then
+        # Service setup, verification.
+        STEP_TOTAL=$((STEP_TOTAL + 2))
+    fi
+    if [ "$REMOTE_FLOW" = true ]; then
+        # Download, unpack.
+        STEP_TOTAL=$((STEP_TOTAL + 2))
+        if [ "$EXISTING_INSTALL" = true ]; then
+            # Stop and back up.
+            STEP_TOTAL=$((STEP_TOTAL + 1))
+        fi
+    fi
+}
+
+REMOTE_FLOW=false
+PRESERVE_DATA=true
+if [ "$RESUMED" = true ]; then
+    # The first half settled all of this and passed it along.
+    APP_PORT="${APP_PORT:-$DEFAULT_PORT}"
+    APP_MODE="${APP_MODE:-$DEFAULT_MODE}"
+    INSTALL_SERVICE="${INSTALL_SERVICE:-true}"
+else
+    if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
+        REMOTE_FLOW=true
+    fi
+
+    print_banner
+    detect_install
+
+    if [ "$REMOTE_FLOW" = false ]; then
+        plan_local_install
+    elif [ "$EXISTING_INSTALL" = true ]; then
+        plan_existing_install
+    else
+        plan_fresh_install
+    fi
+
+    plan_steps
+
+    # Later steps run behind a spinner. Ask for the password now, where the
+    # prompt can be seen.
+    if [ -n "$SUDO" ]; then
+        $SUDO -v 2>/dev/null || true
+    fi
 fi
 
 # Application Configuration
@@ -283,158 +856,56 @@ REPO_URL="https://github.com/NaturalDevCR/Snapcast-Manager.git"
 NODE_VERSION="22"
 
 
-# 0. Check if we need to download the source
-if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
-    # Remote install flow
-    echo -e "\n${YELLOW}Project files not found in current directory.${NC}"
-    echo "It looks like you are running this script remotely."
-    
-    # Check if already installed
-    # Check if already installed
-    if [ -d "$INSTALL_BASE_DIR" ]; then
-        # Detect currently installed version
-        INSTALLED_VERSION="unknown"
-        if [ -f "$INSTALL_BASE_DIR/server/package.json" ]; then
-            INSTALLED_VERSION=$(grep -m 1 '"version"' "$INSTALL_BASE_DIR/server/package.json" | cut -d '"' -f 4 || echo "unknown")
-            INSTALLED_VERSION="v$INSTALLED_VERSION"
-        fi
+# 0. Download the release (remote flow only)
+if [ "$REMOTE_FLOW" = true ]; then
+    # Replace an existing install, if there is one. The action was chosen above.
+    if [ "$EXISTING_INSTALL" = true ]; then
+        ui_step "Stopping the service and backing up data"
+        $SUDO systemctl stop $SERVICE_NAME 2>/dev/null || true
+        $SUDO systemctl disable $SERVICE_NAME 2>/dev/null || true
+        ui_ok "Service stopped"
 
-        echo -e "${YELLOW}Snapcast Manager is already installed at $INSTALL_BASE_DIR.${NC}"
-        echo -e "Installed Version: ${CYAN}${INSTALLED_VERSION}${NC}"
-        echo -e "Installer Version: ${CYAN}${VERSION}${NC}"
-        
-        DO_UPDATE=false
-        PRESERVE_DATA=true
-        
-        if [ "$INSTALLED_VERSION" = "unknown" ] || [ "$INSTALLED_VERSION" != "$VERSION" ]; then
-            echo -e "\n${GREEN}An update is available or version mismatch detected.${NC}"
-            echo -e "1) ${CYAN}Update / Upgrade${NC} (Preserves Database & Settings) - Recommended"
-            echo -e "2) ${RED}Force Re-install${NC} (Wipes installation bundle but still backs up data)"
-            echo -e "3) ${RED}Clean Re-install${NC} (Wipes everything, starting fresh)"
-            echo -e "4) ${RED}Uninstall${NC}"
-            echo -e "5) ${YELLOW}Abort${NC}"
-            
-            if [ "$AUTO_CONFIRM" = true ]; then
-                CHOICE=1
-                echo -e "Select option [Auto-confirmed: 1]"
-            else
-                if [ -t 0 ]; then
-                    read -p "Select an option (1-5): " CHOICE
-                elif [ -c /dev/tty ]; then
-                    read -p "Select an option (1-5): " CHOICE < /dev/tty
-                else
-                    echo -e "${RED}[!] No TTY available for input. Aborting.${NC}"
-                    exit 1
-                fi
+        if [ "$PRESERVE_DATA" = true ]; then
+            # DB can be in root data/ (production) or server/data/ (legacy installs missing NODE_ENV)
+            DB_SOURCE=""
+            if [ -d "$INSTALL_BASE_DIR/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/data 2>/dev/null)" ]; then
+                DB_SOURCE="$INSTALL_BASE_DIR/data"
+            elif [ -d "$INSTALL_BASE_DIR/server/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/server/data 2>/dev/null)" ]; then
+                DB_SOURCE="$INSTALL_BASE_DIR/server/data"
+                ui_warn "Found database in the legacy path server/data/, migrating to data/"
             fi
 
-            case "$CHOICE" in
-                1|2)
-                    DO_UPDATE=true
-                    ;;
-                3)
-                    DO_UPDATE=true
-                    PRESERVE_DATA=false
-                    ;;
-                4)
-                    uninstall_snapmanager
-                    ;;
-                *)
-                    echo "Installation aborted."
-                    exit 0
-                    ;;
-            esac
+            if [ -n "$DB_SOURCE" ]; then
+                $SUDO rm -rf /tmp/snapmgr_data_backup
+                $SUDO cp -r "$DB_SOURCE" /tmp/snapmgr_data_backup
+                ui_ok "Database backed up from $DB_SOURCE"
+            else
+                ui_note "No database to back up."
+            fi
+
+            if [ -f "/etc/snapserver.conf" ]; then
+                $SUDO cp /etc/snapserver.conf /tmp/snapserver_conf_backup
+                ui_ok "snapserver.conf backed up"
+            fi
         else
-            echo -e "\n${GREEN}You are already running the latest version ($VERSION).${NC}"
-            echo -e "1) ${RED}Update / Force Re-install${NC} (Preserves Database & Settings)"
-            echo -e "2) ${RED}Clean Re-install${NC} (Wipes everything, starting fresh)"
-            echo -e "3) ${RED}Uninstall${NC}"
-            echo -e "4) ${YELLOW}Abort${NC}"
-
-            if [ "$AUTO_CONFIRM" = true ]; then
-                CHOICE=4
-                echo -e "Select option [Auto-confirmed: Abort]"
-                exit 0
-            else
-                if [ -t 0 ]; then
-                    read -p "Select an option (1-4): " CHOICE
-                elif [ -c /dev/tty ]; then
-                    read -p "Select an option (1-4): " CHOICE < /dev/tty
-                else
-                    echo -e "${RED}[!] No TTY available for input. Aborting.${NC}"
-                    exit 1
-                fi
-            fi
-
-            case "$CHOICE" in
-                1)
-                    DO_UPDATE=true
-                    ;;
-                2)
-                    DO_UPDATE=true
-                    PRESERVE_DATA=false
-                    ;;
-                3)
-                    uninstall_snapmanager
-                    ;;
-                *)
-                    echo "Installation aborted."
-                    exit 0
-                    ;;
-            esac
+            ui_warn "Clean re-install: no backups taken"
+            $SUDO rm -rf /tmp/snapmgr_data_backup /tmp/snapserver_conf_backup 2>/dev/null || true
         fi
 
-        if [ "$DO_UPDATE" = true ]; then
-            echo -e "\n${BLUE}Preparing for installation...${NC}"
-            echo "Stopping existing service..."
-            $SUDO systemctl stop $SERVICE_NAME 2>/dev/null || true
-            $SUDO systemctl disable $SERVICE_NAME 2>/dev/null || true
-            
-            if [ "$PRESERVE_DATA" = true ]; then
-                echo "Backing up database data securely..."
-                # DB can be in root data/ (production) or server/data/ (legacy installs missing NODE_ENV)
-                DB_SOURCE=""
-                if [ -d "$INSTALL_BASE_DIR/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/data 2>/dev/null)" ]; then
-                    DB_SOURCE="$INSTALL_BASE_DIR/data"
-                elif [ -d "$INSTALL_BASE_DIR/server/data" ] && [ "$(ls -A $INSTALL_BASE_DIR/server/data 2>/dev/null)" ]; then
-                    DB_SOURCE="$INSTALL_BASE_DIR/server/data"
-                    echo -e "${YELLOW}[!] Found DB in legacy path (server/data/), migrating to data/${NC}"
-                fi
-
-                if [ -n "$DB_SOURCE" ]; then
-                    $SUDO rm -rf /tmp/snapmgr_data_backup
-                    $SUDO cp -r "$DB_SOURCE" /tmp/snapmgr_data_backup
-                    echo -e "${GREEN}[OK] Database backed up from $DB_SOURCE${NC}"
-                else
-                    echo "Data directory is empty or missing, skipping backup."
-                fi
-                
-                if [ -f "/etc/snapserver.conf" ]; then
-                    $SUDO cp /etc/snapserver.conf /tmp/snapserver_conf_backup
-                fi
-            else
-                echo -e "${RED}[!] Clean re-install: Skipping configuration backups.${NC}"
-                $SUDO rm -rf /tmp/snapmgr_data_backup /tmp/snapserver_conf_backup 2>/dev/null || true
-            fi
-            
-            echo "Wiping existing application files..."
-            $SUDO rm -rf "$INSTALL_BASE_DIR"
-        else
-            echo "Installation aborted by user."
-            exit 0
-        fi
+        $SUDO rm -rf "$INSTALL_BASE_DIR"
+        ui_ok "Previous version removed"
     fi
 
     if [ ! -d "$INSTALL_BASE_DIR" ]; then
+        ui_step "Downloading Snapcast Manager $VERSION"
+
         if ! command -v wget >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1 || ! command -v sha256sum >/dev/null 2>&1; then
-            echo -e "${YELLOW}Step 0: Checking for essential tools...${NC}"
             # sha256sum (GNU coreutils) verifies the downloaded release .zip's
             # hash below (Task 75) before it is ever extracted/installed --
             # ships in every Debian/Ubuntu base install already, so this is
             # a defensive check, not an expected real-world install path.
             if prompt_yes_no "Missing wget, unzip, or sha256sum. Install them?" "y"; then
-                $SUDO apt-get update
-                $SUDO apt-get install -y wget unzip coreutils
+                run_quiet "Installing wget, unzip and coreutils" install_packages wget unzip coreutils
             else
                 echo "Cannot proceed without wget, unzip, and sha256sum. Installation aborted."
                 exit 1
@@ -502,8 +973,6 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
             }
         fi
 
-        echo "Downloading pre-built release $VERSION..."
-
         $SUDO rm -rf "$INSTALL_BASE_DIR"
         $SUDO mkdir -p "$INSTALL_BASE_DIR"
 
@@ -552,17 +1021,17 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         ASSET_SIZE=$(printf '%s\n' "$ASSET_BLOCK" | grep '"size":' | head -n 1 | grep -oE '[0-9]+' || true)
         ASSET_DIGEST=$(printf '%s\n' "$ASSET_BLOCK" | grep '"digest":' | head -n 1 | cut -d '"' -f 4 || true)
 
+
         DOWNLOADED_PREBUILT_ASSET=false
-        if $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"; then
+        if spin "Downloading release archive" $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"; then
             DOWNLOADED_PREBUILT_ASSET=true
         else
-            echo -e "${RED}[!] Pre-built asset $VERSION not found. Falling back to tagged source code...${NC}"
+            ui_warn "Pre-built asset $VERSION not found. Falling back to tagged source code..."
             REPO_ZIP_URL="https://github.com/NaturalDevCR/Snapcast-Manager/archive/refs/tags/${VERSION}.zip"
-            $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"
+            run_quiet "Downloading source archive" $SUDO wget -qO /tmp/snapmanager.zip "$REPO_ZIP_URL"
         fi
 
         if [ "$DOWNLOADED_PREBUILT_ASSET" = true ]; then
-            echo "Verifying downloaded release archive against GitHub's reported size/hash..."
             if [ -z "$ASSET_SIZE" ] && [ -z "$ASSET_DIGEST" ]; then
                 # Genuinely nothing to verify against (e.g. GitHub API
                 # response didn't include this asset's metadata for some
@@ -570,26 +1039,26 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
                 # a pass, matching verifyDownloadedAsset()'s (Task 61,
                 # server/src/services/system.ts) own "no digest available"
                 # non-fatal-but-disclosed handling.
-                echo -e "${YELLOW}[!] No size/hash metadata available from GitHub's API for this asset -- proceeding WITHOUT verification.${NC}"
+                ui_warn "No size/hash metadata available from GitHub's API for this asset -- proceeding WITHOUT verification."
             elif ! verify_download_hash /tmp/snapmanager.zip "$ASSET_SIZE" "$ASSET_DIGEST"; then
-                echo -e "${RED}[!] Downloaded release archive failed verification -- aborting BEFORE extraction/install.${NC}"
-                echo "This could mean a corrupted download, a mid-transfer network issue, or (far less"
-                echo "likely) a tampered asset. Re-run the installer; if this keeps happening, please"
-                echo "report it."
+                ui_error "Downloaded release archive failed verification -- aborting BEFORE extraction/install."
+                ui_note "This could mean a corrupted download, a mid-transfer network issue, or (far less"
+                ui_note "likely) a tampered asset. Re-run the installer; if this keeps happening, please"
+                ui_note "report it."
                 $SUDO rm -f /tmp/snapmanager.zip
                 exit 1
             else
-                echo -e "${GREEN}[OK] Verified: size and hash match GitHub's reported asset metadata.${NC}"
+                ui_ok "Verified: size and hash match GitHub's reported asset metadata"
             fi
         else
             # The tagged-source-code fallback above is a GitHub-generated
             # archive (Codeload), not a release asset -- it has no
             # size/digest field to verify against at all (distinct from the
             # "asset present but metadata missing" case above).
-            echo -e "${YELLOW}[!] Source-archive fallback has no GitHub-published checksum to verify against -- proceeding WITHOUT verification.${NC}"
+            ui_warn "Source-archive fallback has no GitHub-published checksum to verify against -- proceeding WITHOUT verification."
         fi
 
-        echo "Extracting source..."
+        ui_step "Unpacking files"
         TEMP_EXTRACT="/tmp/snapmgr_extract"
         $SUDO rm -rf "$TEMP_EXTRACT"
         $SUDO mkdir -p "$TEMP_EXTRACT"
@@ -608,44 +1077,47 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
         $SUDO rm -rf "$TEMP_EXTRACT"
         $SUDO rm -f /tmp/snapmanager.zip
 
-        # (Flag handled above)
+        ui_ok "Files unpacked to $INSTALL_BASE_DIR"
 
         # Restore database if backup exists
         if [ -d "/tmp/snapmgr_data_backup" ] || [ -f "/tmp/snapserver_conf_backup" ]; then
-            echo -e "\n${YELLOW}Restoring previous configuration and database...${NC}"
             if [ -d "/tmp/snapmgr_data_backup" ]; then
                 $SUDO mkdir -p "$INSTALL_BASE_DIR/data"
                 $SUDO cp -rT /tmp/snapmgr_data_backup "$INSTALL_BASE_DIR/data"
-                echo -e "${GREEN}[OK] Database Data restored.${NC}"
+                ui_ok "Database restored"
             fi
             if [ -f "/tmp/snapserver_conf_backup" ]; then
                 $SUDO cp /tmp/snapserver_conf_backup /etc/snapserver.conf
-                echo -e "${GREEN}[OK] snapserver.conf restored.${NC}"
+                ui_ok "snapserver.conf restored"
             fi
-            
+
             # Clean up backups
             $SUDO rm -rf /tmp/snapmgr_data_backup
             $SUDO rm -f /tmp/snapserver_conf_backup
         fi
-        
+
         $SUDO chown -R $USER:$USER "$INSTALL_BASE_DIR"
-        
-        echo -e "${GREEN}Resuming installation from $INSTALL_BASE_DIR...${NC}"
+
         cd "$INSTALL_BASE_DIR"
-        # Re-run the script from the new location so relative paths work
-        # Pass -y, --restore, and --port if they were used initially
-        EXEC_ARGS=()
-        if [ "$AUTO_CONFIRM" = true ]; then
+        # Hand over to the installer inside this release, so the unit, sudoers
+        # rule and paths it sets up match the release just unpacked. Settings
+        # are passed along because the old server/.env is gone by now.
+        #
+        # -y and --no-service are never passed together: a release older than
+        # --no-service ignores it and would install the service under -y. When
+        # the service was declined it asks again instead.
+        EXEC_ARGS=("--resumed=${RUN_KIND}:${STEP_NUM}/${STEP_TOTAL}" "--port" "$APP_PORT" "--mode" "$APP_MODE")
+        if [ "$INSTALL_SERVICE" = false ]; then
+            EXEC_ARGS+=("--no-service")
+        elif [ "$AUTO_CONFIRM" = true ]; then
             EXEC_ARGS+=("-y")
         fi
         if [ -n "$RESTORE_FILE" ]; then
             EXEC_ARGS+=("--restore" "$RESTORE_FILE")
         fi
-        if [ -n "$APP_PORT" ]; then
-            EXEC_ARGS+=("--port" "$APP_PORT")
-        fi
-        if [ -n "$APP_MODE" ]; then
-            EXEC_ARGS+=("--mode" "$APP_MODE")
+        # Same version as the summary, without asking GitHub a second time.
+        if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            export SNAPCAST_MANAGER_VERSION="$VERSION"
         fi
         exec bash scripts/install.sh "${EXEC_ARGS[@]}"
     else
@@ -654,148 +1126,114 @@ if [[ ! -d "server" ]] || [[ ! -d "client" ]]; then
     fi
 fi
 
-# 1. Check for Linux
-if [[ "$OSTYPE" != "linux-gnu"* ]]; then
-    echo -e "${RED}Error: This script is intended for Linux systems only.${NC}"
-    exit 1
-fi
-
-# 2. Check for System Prerequisites (Prerequisites)
-echo -e "\n${YELLOW}Step 1: Checking for system prerequisites (curl, ffmpeg, lsb-release)...${NC}"
+# 2. System requirements
+ui_step "Checking system requirements"
 PREREQS=()
 if ! command -v curl >/dev/null 2>&1; then PREREQS+=("curl"); fi
 if ! command -v ffmpeg >/dev/null 2>&1; then PREREQS+=("ffmpeg"); fi
 if ! command -v lsb_release >/dev/null 2>&1; then PREREQS+=("lsb-release"); fi
 
 if [ ${#PREREQS[@]} -gt 0 ]; then
-    echo -e "${YELLOW}[!] Missing prerequisites: ${PREREQS[*]}${NC}"
+    ui_warn "Missing: ${PREREQS[*]}"
     if prompt_yes_no "Do you want to install them?" "y"; then
-        $SUDO apt-get update
-        $SUDO apt-get install -y "${PREREQS[@]}"
+        run_quiet "Installing ${PREREQS[*]}" install_packages "${PREREQS[@]}"
     fi
 else
-    echo -e "${GREEN}[OK] All system prerequisites detected.${NC}"
+    ui_ok "curl, ffmpeg and lsb-release found"
 fi
 
-
-# 2.5 Check for Build Essentials (for native modules like better-sqlite3)
-echo -e "\n${YELLOW}Step 2: Checking for build tools...${NC}"
-if ! command -v make >/dev/null 2>&1; then
-    echo -e "${YELLOW}[!] Build tools (make/gcc) not detected.${NC}"
+# Build tools, for native modules like better-sqlite3
+if command -v make >/dev/null 2>&1; then
+    ui_ok "Build tools found"
+else
+    ui_warn "Build tools (make/gcc) not detected"
     if prompt_yes_no "Install build-essential? (Highly recommended for database performance)" "y"; then
-        $SUDO apt-get update && $SUDO apt-get install -y build-essential
+        run_quiet "Installing build-essential" install_packages build-essential
     fi
 fi
 
-# 3. Check for Node.js
-echo -e "\n${YELLOW}Step 3: Checking for Node.js...${NC}"
+# Node.js
 if command -v node >/dev/null 2>&1; then
     NODE_VER=$(node -v)
-    echo -e "${GREEN}[OK] Node.js $NODE_VER detected.${NC}"
+    ui_ok "Node.js $NODE_VER found"
 else
-    echo -e "${RED}[!] Node.js not detected.${NC}"
+    ui_warn "Node.js not detected"
     if prompt_yes_no "Install Node.js 22?" "y"; then
-        if [ -n "$SUDO" ]; then
-            curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash -
-        else
-            curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-        fi
-
-        $SUDO apt-get install -y nodejs
+        run_quiet "Adding the Node.js package source" add_nodesource
+        run_quiet "Installing Node.js 22" $SUDO apt-get install -y nodejs
     else
         echo "Installation aborted."
         exit 1
     fi
 fi
 
-# 4. Install Dependencies & Build
-echo -e "\n${YELLOW}Step 4: Installing dependencies and building project...${NC}"
-
+# 3. Dependencies and build
+SOURCE_DIR="$PWD"
 if [ -d "server/dist" ] && [ -d "client/dist" ] && [ ! -f ".rebuilding" ]; then
-    echo -e "${GREEN}[OK] Pre-compiled release detected! Skipping long build process.${NC}"
-    echo "Installing server production dependencies..."
-    cd server && npm install --omit=dev
+    ui_step "Installing dependencies"
+    cd server
+    run_quiet "Installing server dependencies" npm install --omit=dev
     verify_native_modules
 else
-    echo "Source code detected. Building project from scratch (this may take several minutes)..."
-    echo "Installing server dependencies..."
-    cd server && npm install
+    ui_step "Building Snapcast Manager"
+    ui_note "Building from source. This can take several minutes."
+    cd server
+    run_quiet "Installing server dependencies" npm install
     verify_native_modules
-    echo "Building server..."
-    npm run build
+    run_quiet "Building server" npm run build
 
-    echo "Installing client dependencies..."
-    cd ../client && npm install
-    echo "Building client..."
-    npm run build
+    cd ../client
+    run_quiet "Installing client dependencies" npm install
+    run_quiet "Building client" npm run build
     cd ..
 fi
 
 # Clean up re-run flag
-rm -f .rebuilding
+rm -f "$SOURCE_DIR/.rebuilding"
 
-# 4.5 Restore from backup file
+# 4. Configuration
+ui_step "Applying configuration"
+
+# Restore from backup file
 if [ -n "$RESTORE_FILE" ]; then
-    echo -e "\n${YELLOW}Step 3.5: Restoring from backup file...${NC}"
     if [ -f "$RESTORE_FILE" ]; then
-        echo "Extracting $RESTORE_FILE to temporary directory..."
         $SUDO mkdir -p /tmp/snapmgr_restore
         $SUDO tar -xzf "$RESTORE_FILE" -C /tmp/snapmgr_restore
         
         if [ -d "/tmp/snapmgr_restore/data" ]; then
-            echo "Restoring database data..."
             $SUDO mkdir -p "$INSTALL_BASE_DIR/data"
             $SUDO cp -rT /tmp/snapmgr_restore/data "$INSTALL_BASE_DIR/data"
             $SUDO chown -R $USER:$USER "$INSTALL_BASE_DIR/data"
-            echo -e "${GREEN}[OK] Database Data restored.${NC}"
+            ui_ok "Database restored from $RESTORE_FILE"
         fi
         
         if [ -f "/tmp/snapmgr_restore/snapserver.conf" ]; then
-            echo "Restoring snapserver.conf..."
             $SUDO cp /tmp/snapmgr_restore/snapserver.conf /etc/snapserver.conf
             $SUDO chown snapserver:snapserver /etc/snapserver.conf
-            echo -e "${GREEN}[OK] snapserver.conf restored.${NC}"
+            ui_ok "snapserver.conf restored from $RESTORE_FILE"
         fi
         
         $SUDO rm -rf /tmp/snapmgr_restore
     else
-        echo -e "${RED}[!] Backup file not found: $RESTORE_FILE${NC}"
+        ui_error "Backup file not found: $RESTORE_FILE"
     fi
 fi
 
-# 5. Configurable Port and Environment File
-echo -e "\n${YELLOW}▶ Step 5: Web Interface Configuration...${NC}"
+# Both values were validated, and printf keeps them from ever being parsed by
+# a shell running as root.
+printf 'PORT=%s\nSNAPCAST_MODE=%s\nNODE_ENV=production\n' "$APP_PORT" "$APP_MODE" \
+    | $SUDO tee "$INSTALL_BASE_DIR/server/.env" >/dev/null
+ui_ok "Settings saved: mode $APP_MODE, port $APP_PORT"
 
-# If port wasn't provided by argument, ask or use default 3000
-if [ -z "$APP_PORT" ]; then
-    if [ "$AUTO_CONFIRM" = true ]; then
-        APP_PORT=3000
-        echo -e "Web interface port [Auto-confirmed: $APP_PORT]"
-    else
-        read -p "Enter the port for the Snapcast Manager web interface [3000]: " USER_PORT
-        APP_PORT=${USER_PORT:-3000}
-    fi
-fi
-
-echo -e "${GREEN}[OK] Interface will be available on port $APP_PORT.${NC}"
-
-# Write the .env file
-$SUDO bash -c "cat <<EOF > $INSTALL_BASE_DIR/server/.env
-PORT=$APP_PORT
-SNAPCAST_MODE=${APP_MODE:-both}
-NODE_ENV=production
-EOF"
-
-# 6. Systemd Service setup (Task 16: dedicated 'snapmanager' user, sudoers.d,
+# 5. Systemd Service setup (Task 16: dedicated 'snapmanager' user, sudoers.d,
 # systemd sandboxing, and an idempotent migration path for pre-Task-16
 # installs that were still running the whole service as $(whoami) -- often
 # root). See SECURITY.md's "Privilege model" section and
 # .superpowers/sdd/task-16-report.md for the full design and its explicitly
 # documented residual risk/real-hardware validation checklist.
-echo -e "\n${YELLOW}▶ Step 6: Setting up as a systemd service...${NC}"
-if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?" "y"; then
+if [ "$INSTALL_SERVICE" = true ]; then
+    ui_step "Setting up the system service"
     INSTALL_DIR="$INSTALL_BASE_DIR"
-    UNIT_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
     SUDOERS_SRC="$INSTALL_DIR/scripts/sudoers.d/snapcast-manager"
     SUDOERS_DEST="/etc/sudoers.d/snapcast-manager"
 
@@ -808,7 +1246,7 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
         unit_needs_user_migration() { return 0; }
     fi
 
-    echo -e "${CYAN}Applying privilege-hardening: dedicated '${SNAPMANAGER_USER}' user, sudoers.d, systemd sandboxing (Task 16)...${NC}"
+    ui_note "Applying privilege hardening: dedicated user, sudoers.d rule, systemd sandboxing"
 
     # --- 6a-pre. The `sudo` package itself (which provides `visudo` AND
     # `/usr/bin/sudo`) must be installed, independent of whether THIS
@@ -830,32 +1268,27 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     # check below false either way) -- actively misleading, since the file
     # itself was never actually wrong.
     if ! command -v visudo >/dev/null 2>&1; then
-        echo "The 'sudo' package (needed for 'visudo' and for the 'snapmanager' user to escalate privileges later) is not installed..."
-        $SUDO apt-get update -qq
-        if ! $SUDO apt-get install -y sudo; then
-            echo -e "${RED}[!] Failed to install the 'sudo' package. Privilege-hardening cannot proceed without it -- fix this manually (e.g. 'apt-get install sudo') and re-run this installer.${NC}"
+        if ! run_quiet "Installing the 'sudo' package" install_packages sudo; then
+            ui_error "Privilege-hardening cannot proceed without the 'sudo' package. Fix this manually (e.g. 'apt-get install sudo') and re-run this installer."
             exit 1
         fi
-        echo -e "${GREEN}[OK] 'sudo' package installed.${NC}"
     fi
 
     # --- 6a. Dedicated system user (idempotent: skipped entirely if it already exists) ---
     if ! getent group audio >/dev/null 2>&1; then
-        echo "Creating 'audio' group (not present on this host)..."
         $SUDO groupadd audio
     fi
     if ! id -u "$SNAPMANAGER_USER" >/dev/null 2>&1; then
-        echo "Creating dedicated system user '$SNAPMANAGER_USER' (system account, no login shell, member of 'audio')..."
         if ! $SUDO useradd --system --no-create-home --shell /usr/sbin/nologin --groups audio "$SNAPMANAGER_USER"; then
-            echo -e "${RED}[!] Failed to create the '$SNAPMANAGER_USER' user.${NC}"
-            echo "Aborting BEFORE touching the systemd unit or restarting the service -- whatever"
-            echo "configuration was already running (if any) has NOT been modified. Fix whatever"
-            echo "useradd reported above and re-run this installer."
+            ui_error "Failed to create the '$SNAPMANAGER_USER' user."
+            ui_note "Aborting BEFORE touching the systemd unit or restarting the service -- whatever"
+            ui_note "configuration was already running (if any) has NOT been modified. Fix whatever"
+            ui_note "useradd reported above and re-run this installer."
             exit 1
         fi
-        echo -e "${GREEN}[OK] User '$SNAPMANAGER_USER' created.${NC}"
+        ui_ok "User '$SNAPMANAGER_USER' created"
     else
-        echo -e "${GREEN}[OK] User '$SNAPMANAGER_USER' already exists.${NC}"
+        ui_ok "User '$SNAPMANAGER_USER' exists"
         # Idempotent top-up: harmless if already a member.
         $SUDO usermod -aG audio "$SNAPMANAGER_USER" 2>/dev/null || true
     fi
@@ -867,10 +1300,7 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
     # smaller /etc paths below are cheap enough to just always re-assert. ---
     CURRENT_OWNER=$($SUDO stat -c '%U' "$INSTALL_BASE_DIR" 2>/dev/null || echo "")
     if [ "$CURRENT_OWNER" != "$SNAPMANAGER_USER" ]; then
-        echo "Setting ownership of $INSTALL_BASE_DIR to $SNAPMANAGER_USER:$SNAPMANAGER_USER (this can take a moment)..."
-        $SUDO chown -R "$SNAPMANAGER_USER:$SNAPMANAGER_USER" "$INSTALL_BASE_DIR"
-    else
-        echo -e "${GREEN}[OK] $INSTALL_BASE_DIR already owned by $SNAPMANAGER_USER -- skipping recursive chown.${NC}"
+        run_quiet "Setting ownership of $INSTALL_BASE_DIR" $SUDO chown -R "$SNAPMANAGER_USER:$SNAPMANAGER_USER" "$INSTALL_BASE_DIR"
     fi
 
     if [ -f "$INSTALL_DIR/server/.env" ]; then
@@ -1031,18 +1461,18 @@ if prompt_yes_no "Do you want to install Snapcast Manager as a systemd service?"
         cp "$SUDOERS_SRC" "$TMP_SUDOERS"
         if $SUDO visudo -c -f "$TMP_SUDOERS" >/dev/null 2>&1; then
             $SUDO install -o root -g root -m 0440 "$TMP_SUDOERS" "$SUDOERS_DEST"
-            echo -e "${GREEN}[OK] sudoers.d rule installed ($SUDOERS_DEST).${NC}"
+            ui_ok "sudoers.d rule installed"
         else
-            echo -e "${RED}[!] The sudoers file failed 'visudo -c' validation -- NOT installing it.${NC}"
-            echo "The service will still be started as '$SNAPMANAGER_USER', but privileged actions"
-            echo "(installing packages, controlling snapserver/snapclient/mpd, etc.) will fail with"
-            echo "'sudo: a password is required' until this is fixed. This is very likely an"
-            echo "installer/packaging bug rather than a host problem -- please report it, then"
-            echo "re-run this installer once fixed."
+            ui_error "The sudoers file failed 'visudo -c' validation -- NOT installing it."
+            ui_note "The service will still be started as '$SNAPMANAGER_USER', but privileged actions"
+            ui_note "(installing packages, controlling snapserver/snapclient/mpd, etc.) will fail with"
+            ui_note "'sudo: a password is required' until this is fixed. This is very likely an"
+            ui_note "installer/packaging bug rather than a host problem -- please report it, then"
+            ui_note "re-run this installer once fixed."
         fi
         rm -f "$TMP_SUDOERS"
     else
-        echo -e "${YELLOW}[!] $SUDOERS_SRC not found in this release -- skipping sudoers.d installation.${NC}"
+        ui_warn "$SUDOERS_SRC not found in this release -- skipping sudoers.d installation."
     fi
 
     # --- 6d. Hardened unit file. Idempotent (a second run against an
@@ -1235,7 +1665,7 @@ EOF
     if [ -f "$UNIT_FILE" ]; then
         EXISTING_UNIT_CONTENT=$($SUDO cat "$UNIT_FILE" 2>/dev/null || echo "")
         if unit_needs_user_migration "$EXISTING_UNIT_CONTENT"; then
-            echo -e "${YELLOW}Detected a pre-existing unit without User=$SNAPMANAGER_USER set (this is a pre-Task-16 install, or one whose User= differs) -- migrating.${NC}"
+            ui_note "Migrating the existing service to User=$SNAPMANAGER_USER"
         fi
         if [ "$EXISTING_UNIT_CONTENT" = "$NEW_UNIT_CONTENT" ]; then
             UNIT_CHANGED=false
@@ -1246,7 +1676,7 @@ EOF
     fi
 
     if [ "$UNIT_CHANGED" = false ]; then
-        echo -e "${GREEN}[OK] systemd unit already up to date (User=$SNAPMANAGER_USER, hardening directives present) -- no unit changes needed.${NC}"
+        ui_ok "Service definition already up to date"
         $SUDO systemctl daemon-reload
         $SUDO systemctl enable "$SERVICE_NAME" 2>/dev/null || true
         # Post-v0.3.2 fix, found live: this branch used to assume the
@@ -1262,20 +1692,19 @@ EOF
         # itself), the service was left stopped after every such update --
         # confirmed live on a real host. Explicitly check and (re)start it.
         if ! $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
-            echo "Service is not currently active -- starting it..."
             $SUDO systemctl start "$SERVICE_NAME"
         fi
         if wait_for_app; then
-            echo -e "${GREEN}[OK] Service is running and responding.${NC}"
+            ui_ok "Service started"
         else
-            echo -e "${RED}[!] Service is not responding on port $APP_PORT. Installation did NOT complete.${NC}"
-            $SUDO journalctl -u "$SERVICE_NAME" -n 30 --no-pager
+            ui_error "Service is not responding on port $APP_PORT."
+            show_service_logs
             exit 1
         fi
     else
         echo "$NEW_UNIT_CONTENT" | $SUDO tee "$UNIT_FILE" >/dev/null
         $SUDO systemctl daemon-reload
-        $SUDO systemctl enable "$SERVICE_NAME"
+        run_quiet "Enabling the service" $SUDO systemctl enable "$SERVICE_NAME"
 
         RESTART_OK=false
         if $SUDO systemctl restart "$SERVICE_NAME"; then
@@ -1291,33 +1720,53 @@ EOF
         fi
 
         if [ "$RESTART_OK" = true ]; then
-            echo -e "${GREEN}[OK] Service installed and started as user '$SNAPMANAGER_USER'.${NC}"
+            ui_ok "Service installed and started as user '$SNAPMANAGER_USER'"
             [ -n "$UNIT_BACKUP" ] && rm -f "$UNIT_BACKUP"
         else
-            echo -e "${RED}[!] Service failed to start (or stay running) with the new hardened configuration.${NC}"
-            echo "Checking logs..."
-            $SUDO journalctl -u "$SERVICE_NAME" -n 50 --no-pager
+            ui_error "Service failed to start (or stay running) with the new hardened configuration."
+            show_service_logs
             if [ -n "$UNIT_BACKUP" ]; then
-                echo -e "${YELLOW}Rolling back to the previous unit file so the service is not left down...${NC}"
+                ui_note "Rolling back to the previous unit file so the service is not left down..."
                 $SUDO cp "$UNIT_BACKUP" "$UNIT_FILE"
                 $SUDO systemctl daemon-reload
                 if $SUDO systemctl restart "$SERVICE_NAME"; then
-                    echo -e "${YELLOW}[!] Rolled back successfully -- the service is running again under its PREVIOUS configuration.${NC}"
-                    echo "The privilege-hardening migration did NOT complete. Investigate the error above"
-                    echo "(commonly: a missing ReadWritePaths entry, or an unusual node/systemd path) and"
-                    echo "re-run this installer -- it is safe to re-run."
+                    ui_warn "Rolled back successfully -- the service is running again under its PREVIOUS configuration."
+                    ui_note "The privilege-hardening migration did NOT complete. Investigate the error above"
+                    ui_note "(commonly: a missing ReadWritePaths entry, or an unusual node/systemd path) and"
+                    ui_note "re-run this installer -- it is safe to re-run."
                     rm -f "$UNIT_BACKUP" 2>/dev/null || true
                 else
-                    echo -e "${RED}[!!!] Rollback ALSO failed to start the service. Manual intervention required.${NC}"
-                    echo "The previous unit file's content was saved at: $UNIT_BACKUP (left in place, NOT deleted)."
+                    ui_error "Rollback ALSO failed to start the service. Manual intervention required."
+                    ui_note "The previous unit file's content was saved at: $UNIT_BACKUP (left in place, NOT deleted)."
                 fi
                 exit 1
             else
-                echo -e "${RED}[!] No previous unit file existed to roll back to (this was a fresh install). Exiting.${NC}"
+                ui_note "No previous unit file existed to roll back to (this was a fresh install)."
                 exit 1
             fi
         fi
     fi
+fi
+
+# 6. Verify, then report what is actually true.
+FINAL_VERSION=$(read_package_version "$SOURCE_DIR/server/package.json")
+FINAL_VERSION="${FINAL_VERSION:-$VERSION}"
+
+if [ "$INSTALL_SERVICE" = true ]; then
+    ui_step "Verifying the installation"
+    if ! wait_for_app; then
+        ui_error "Snapcast Manager is not answering on port $APP_PORT."
+        show_service_logs
+        exit 1
+    fi
+    ui_ok "Web interface responds on port $APP_PORT"
+    if ! $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
+        ui_error "Service '$SERVICE_NAME' is not active."
+        show_service_logs
+        exit 1
+    fi
+    ui_ok "Service '$SERVICE_NAME' is active"
+    ui_ok "Version $FINAL_VERSION"
 fi
 
 # Detect Local IP
@@ -1326,9 +1775,26 @@ if [ -z "$LOCAL_IP" ]; then
     LOCAL_IP="<your-server-ip>"
 fi
 
-echo -e "\n${GREEN}${BOLD}🎉 === Installation Complete! === 🎉${NC}"
-echo -e "\n${CYAN}Snapcast Manager is now running.${NC}"
-echo -e "You can access the manager via the configured port:\n"
-echo -e "    ${BOLD}👉 http://${LOCAL_IP}:${APP_PORT} 👈${NC}\n"
-echo -e "If this is your first time, the Initial Setup Wizard will greet you."
-echo -e "Made with ❤️ by NaturalDevCR.\n"
+if [ -n "$INSTALL_LOG" ]; then
+    rm -f "$INSTALL_LOG"
+fi
+
+if [ "$INSTALL_SERVICE" = true ]; then
+    if [ "$RUN_KIND" = "update" ]; then
+        echo -e "\n${GREEN}${BOLD}${OK_MARK} Snapcast Manager $FINAL_VERSION is updated and running${NC}\n"
+    else
+        echo -e "\n${GREEN}${BOLD}${OK_MARK} Snapcast Manager $FINAL_VERSION is installed and running${NC}\n"
+    fi
+    ui_row "Open" "${BOLD}http://${LOCAL_IP}:${APP_PORT}${NC}"
+    ui_row "Mode" "$APP_MODE"
+    if [ "$RUN_KIND" != "update" ]; then
+        echo -e "\nOn your first visit, the Setup Wizard will guide you through the rest."
+    fi
+else
+    echo -e "\n${YELLOW}${BOLD}Snapcast Manager $FINAL_VERSION is installed, but it is not running${NC}\n"
+    ui_row "Files" "$SOURCE_DIR"
+    ui_row "Mode" "$APP_MODE"
+    ui_row "Port" "$APP_PORT"
+    echo -e "\nThe system service was skipped. Run this installer again to set it up."
+fi
+echo -e "\nMade with ❤️ by NaturalDevCR.\n"
